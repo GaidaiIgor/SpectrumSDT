@@ -1,0 +1,431 @@
+module config
+  use constants
+  use rovib_utils_mod
+  use dict_utils
+  use dictionary
+  use ftlRegexModule
+  use general_utils
+  use input_params_mod
+  use io_utils
+  use path_utils
+  use parallel_utils
+  use string_mod
+  use string_utils
+
+  private
+  public :: process_user_settings
+  
+contains
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Reads config file (a set of key-value pairs)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function read_config_dict(config_path) result(config)
+    character(*), intent(in) :: config_path
+    type(dict) :: config
+    integer :: file_unit, iostat, line_num
+    character(:), allocatable :: line, key, value, error_msg
+    type(string), allocatable :: line_tokens(:)
+    
+    open(newunit = file_unit, file = config_path)
+    line_num = 0
+    do
+      line_num = line_num + 1
+      line = read_line(file_unit, iostat)
+      if (iostat == -1) then
+        exit ! EOF
+      end if 
+      
+      line_tokens = strsplit(line, '!') ! separate inline comments
+      line = trim(line_tokens(1) % to_char_str())
+      if (line == '') then
+        cycle ! skip empty/commented lines
+      end if
+      
+      line_tokens = strsplit(line, '=') ! separate key value pair
+      if (size(line_tokens) /= 2) then
+        print '(A)', 'An error in config format on line ' // num2str(line_num) // '. Only key-value assignments and comments are allowed.'
+        stop 
+      end if
+      
+      key = trim(adjustl(line_tokens(1) % to_char_str()))
+      value = trim(adjustl(line_tokens(2) % to_char_str()))
+      call put_string(config, key, value)
+    end do
+    close(file_unit)
+  end function
+  
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks if all the *keys* are simultaneously present or absent in *config_dict*
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_setting_group(config_dict, keys)
+    class(dict) :: config_dict ! intent(in)
+    class(string), intent(in) :: keys(:)
+    integer :: i
+    integer :: status(size(keys))
+    character(:), allocatable :: key
+
+    status = 0
+    do i = 1, size(keys)
+      key = keys(i) % to_char_str()
+      if (key .in. config_dict) then
+        status(i) = 1
+      end if
+    end do
+
+    if (any(status == 1) .and. .not. all(status == 1)) then
+      call print_parallel('Error: the following keys must all be set if any of them is set: ' // string_arr_to_char_str(keys))
+      stop
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks that all setting groups are set/unset
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_setting_groups(config_dict)
+    class(dict) :: config_dict ! intent(in)
+    ! call check_setting_group(config_dict, string(['basis_root_path', 'basis_J', 'basis_K']))
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Fills out mode settings of all parameters
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine populate_mode_settings(mandatory_modes, optional_modes)
+    class(dict), intent(out) :: mandatory_modes, optional_modes
+
+    call put_string(mandatory_modes, 'mode', '.*')
+    call put_string(mandatory_modes, 'rovib_coupling', '^[2-4].*')
+    call put_string(mandatory_modes, 'fix_basis_jk', '^[2-4].*')
+
+    call put_string(mandatory_modes, 'molecule', '^([0-3]|40).*')
+    call put_string(mandatory_modes, 'J', '^(1|[3-4]).*')
+    call put_string(mandatory_modes, 'K', '^([1-2]|[3-4]0).*')
+    call put_string(mandatory_modes, 'parity', '^[3-4]1.*')
+    call put_string(mandatory_modes, 'symmetry', '^[1-4].*')
+    call put_string(mandatory_modes, 'basis_size_phi', '^([1-2|4]).*')
+    call put_string(mandatory_modes, 'cutoff_energy', '^[1-2].*')
+    call put_string(mandatory_modes, 'basis_root_path', '^[3-4]11.*')
+    call put_string(mandatory_modes, 'basis_J', '^[3-4]11.*')
+    call put_string(mandatory_modes, 'basis_K', '^[3-4]11.*')
+    call put_string(mandatory_modes, 'num_states', '^[3-4].*')
+    call put_string(mandatory_modes, 'grid_path', '^[1-4].*')
+    call put_string(mandatory_modes, 'root_path', '^[1-4].*')
+    call put_string(mandatory_modes, 'channels_root', '^40.*')
+
+    call put_string(optional_modes, 'K', '^[3-4]1.*')
+    call put_string(optional_modes, 'basis_size_arnoldi', '^3.*')
+    call put_string(optional_modes, 'max_iterations', '^3.*')
+    call put_string(optional_modes, 'cap_type', '^(3|40).*')
+    call put_string(optional_modes, 'print_potential', '^0.*')
+    call put_string(optional_modes, 'sequential', '^[1-4].*')
+    call put_string(optional_modes, 'enable_terms', '^31.*')
+    call put_string(optional_modes, 'optimized_mult', '^31.*')
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Builds a string that incorporates settings relevant for mode determination
+! 1st digit: mode
+! 2nd digit: rovib_coupling
+! 3rd digit: basis_J
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_mode_id(config_dict) result(mode_id)
+    class(dict) :: config_dict ! intent(in)
+    character(3) :: mode_id
+    character(:), allocatable :: mode, rovib, fix_basis_jk
+
+    mode_id = repeat('x', len(mode_id))
+    mode = item_or_default(config_dict, 'mode', 'unset')
+    call assert(mode /= 'unset', 'Error: mode has to be specified')
+    if (mode == 'pesprint') then
+      mode_id(1:1) = '0'
+    else if (mode == 'basis') then
+      mode_id(1:1) = '1'
+    else if (mode == 'overlaps') then
+      mode_id(1:1) = '2'
+    else if (mode == 'diagonalization') then
+      mode_id(1:1) = '3'
+    else if (mode == 'properties') then
+      mode_id(1:1) = '4'
+    else
+      call print_parallel('Error: unknown mode')
+      stop
+    end if
+
+    mode_id(2:2) = '0'
+    rovib = item_or_default(config_dict, 'rovib_coupling', 'unset')
+    if (mode == 'overlaps' .or. mode == 'diagonalization' .or. mode == 'properties') then
+      call assert(rovib /= 'unset', 'Error: rovib_coupling has to be specified in this mode')
+      call assert(rovib == '0' .or. rovib == '1', 'Error: rovib_coupling can be 0 or 1')
+      mode_id(2:2) = rovib(1:1)
+    else
+      if (rovib /= 'unset') then
+        call print_parallel('Warning: rovib_coupling parameter has no effect in this mode')
+      end if
+    end if
+
+    mode_id(3:3) = '0'
+    fix_basis_jk = item_or_default(config_dict, 'fix_basis_jk', 'unset')
+    if (mode == 'overlaps' .or. mode == 'diagonalization' .or. mode == 'properties') then
+      call assert(fix_basis_jk /= 'unset', 'Error: fix_basis_jk has to be specified in this mode')
+      call assert(fix_basis_jk == '0' .or. fix_basis_jk == '1', 'Error: fix_basis_jk can be 0 or 1')
+      mode_id(3:3) = fix_basis_jk(1:1)
+    else
+      if (fix_basis_jk /= 'unset') then
+        call print_parallel('Warning: fix_basis_jk parameter has no effect in this mode')
+      end if
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks if all mandatory keys of this mode are specified
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_mandatory_keys(mode_id, config_dict, mandatory_modes)
+    character(*), intent(in) :: mode_id
+    class(dict) :: config_dict, mandatory_modes ! intent(in)
+    integer :: i
+    character(:), allocatable :: key, mode_pattern
+    type(string), allocatable :: keys(:)
+    type(ftlRegex) :: re
+    type(ftlRegexMatch), allocatable :: m(:)
+
+    keys = key_set(mandatory_modes)
+    do i = 1, size(keys)
+      key = keys(i) % to_char_str()
+      mode_pattern = extract_string(mandatory_modes, key)
+      call re % New(mode_pattern)
+      m = re % Match(mode_id)
+      if (size(m) > 0 .and. .not. (key .in. config_dict)) then
+        call print_parallel('Error: ' // key // ' value must be set in the current mode')
+        stop
+      end if
+    end do
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks if some of the specified keys will be unused
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function check_mode_match(modes, key, mode_id) result(is_match)
+    class(dict) :: modes ! intent(in)
+    character(*), intent(in) :: key, mode_id
+    logical :: is_match
+    character(:), allocatable :: mode_pattern
+    type(ftlRegex) :: re
+    type(ftlRegexMatch), allocatable :: matches(:)
+
+    is_match = .false.
+    mode_pattern = item_or_default(modes, key, '')
+    if (len(mode_pattern) > 0) then
+      call re % New(mode_pattern)
+      matches = re % Match(mode_id)
+      is_match = size(matches) > 0
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks if some of the specified keys will be unused
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_extra_keys(mode_id, config_dict, mandatory_modes, optional_modes)
+    character(*), intent(in) :: mode_id
+    class(dict) :: config_dict, mandatory_modes, optional_modes ! intent(in)
+    integer :: i
+    character(:), allocatable :: key
+    type(string), allocatable :: keys(:)
+
+    keys = key_set(config_dict)
+    do i = 1, size(keys)
+      key = keys(i) % to_char_str()
+      if (.not. (key .in. mandatory_modes) .and. .not. (key .in. optional_modes)) then
+        call print_parallel('Warning: "' // key // '" keyword is not recognized; ignoring it')
+      else if (.not. check_mode_match(mandatory_modes, key, mode_id) .and. .not. check_mode_match(optional_modes, key, mode_id)) then
+        call print_parallel('Warning: ' // key // ' value is not used in this mode')
+      end if
+    end do
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Extracts info from *config_dict* and fills out *config* structure
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function process_raw_config(config_dict) result(config)
+    class(dict) :: config_dict ! intent(in)
+    type(input_params) :: config
+    character(:), allocatable :: mode, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
+    integer :: rovib, fix_basis_jk, J, parity, symmetry, basis_size_phi, basis_J, basis_K, basis_size_arnoldi, num_states, print_potential, max_iterations, sequential, &
+      optimized_mult
+    integer :: pos
+    integer :: K(2), enable_terms(2)
+    real*8 :: cutoff_energy
+    type(string), allocatable :: tokens(:)
+
+    ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults
+    mode = item_or_default(config_dict, 'mode', '-1')
+    rovib = str2int(item_or_default(config_dict, 'rovib_coupling', '-1'))
+    fix_basis_jk = str2int(item_or_default(config_dict, 'fix_basis_jk', '-1'))
+
+    molecule = item_or_default(config_dict, 'molecule', '-1')
+    J = str2int(item_or_default(config_dict, 'J', '-1'))
+    parity = str2int(item_or_default(config_dict, 'parity', '-1'))
+    K_str = item_or_default(config_dict, 'K', '-1')
+    if (K_str == 'all') then
+      K(1) = get_k_start(J, parity)
+      K(2) = J
+    else
+      pos = index(K_str, '..')
+      if (pos == 0) then
+        K(1) = str2int(K_str)
+        K(2) = K(1)
+      else
+        tokens = strsplit(K_str, '..')
+        K(1) = str2int(tokens(1) % to_char_str())
+        K(2) = str2int(tokens(2) % to_char_str())
+      end if
+    end if
+    symmetry = str2int(item_or_default(config_dict, 'symmetry', '-1'))
+
+    basis_size_phi = str2int(item_or_default(config_dict, 'basis_size_phi', '-1'))
+    cutoff_energy = str2real(item_or_default(config_dict, 'cutoff_energy', '-1')) / autown
+    basis_root_path = item_or_default(config_dict, 'basis_root_path', '-1')
+    basis_J = str2int(item_or_default(config_dict, 'basis_J', '-1'))
+    basis_K = str2int(item_or_default(config_dict, 'basis_K', '-1'))
+
+    num_states = str2int(item_or_default(config_dict, 'num_states', '-1'))
+    basis_size_arnoldi = str2int(item_or_default(config_dict, 'basis_size_arnoldi', '-1'))
+    max_iterations = str2int(item_or_default(config_dict, 'max_iterations', '-1'))
+
+    cap_type = item_or_default(config_dict, 'cap_type', '-1')
+
+    grid_path = item_or_default(config_dict, 'grid_path', '-1')
+    root_path = item_or_default(config_dict, 'root_path', '-1')
+    channels_root = item_or_default(config_dict, 'channels_root', '-1')
+
+    print_potential = str2int(item_or_default(config_dict, 'print_potential', '-1'))
+
+    sequential = str2int(item_or_default(config_dict, 'sequential', '-1'))
+    enable_terms_str = item_or_default(config_dict, 'enable_terms', '-1')
+    if (enable_terms_str == '-1') then
+      enable_terms(1) = -1
+      enable_terms(2) = -1
+    else
+      enable_terms(1) = str2int(enable_terms_str(1:1))
+      enable_terms(2) = str2int(enable_terms_str(2:2))
+    end if
+    optimized_mult = str2int(item_or_default(config_dict, 'optimized_mult', '-1'))
+    debug_mode = item_or_default(config_dict, 'debug_mode', '-1')
+    test_mode = item_or_default(config_dict, 'test_mode', '-1')
+    debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
+
+    config = input_params(mode, rovib, fix_basis_jk, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, &
+        num_states, basis_size_arnoldi, max_iterations, cap_type, grid_path, root_path, channels_root, print_potential, sequential, enable_terms, optimized_mult, debug_mode, &
+        test_mode, debug_param_1)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Announces default setting of *key*, represented by *default_str*, if it is used in *mode_id*. 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine announce_default(mode_id, key, default_str, default_comment, optional_modes)
+    character(*), intent(in) :: mode_id, key, default_str, default_comment
+    character(:), allocatable :: mode_pattern
+    class(dict) :: optional_modes ! intent(in)
+    type(ftlRegex) :: re
+    type(ftlRegexMatch), allocatable :: m(:)
+
+    mode_pattern = item_or_default(optional_modes, key, '')
+    call assert(mode_pattern /= '', 'Assertion error: attempt to set default for non-existing key')
+    call re % New(mode_pattern)
+    m = re % Match(mode_id)
+    if (size(m) > 0) then
+      call print_parallel(key // ' is not specified; assuming default = ' // default_str // ' ' // default_comment)
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Sets default values
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine set_defaults(mode_id, params, optional_modes)
+    character(*), intent(in) :: mode_id
+    class(input_params), intent(inout) :: params
+    class(dict) :: optional_modes ! intent(in)
+
+    if (params % cap_type == '-1') then
+      params % cap_type = 'none'
+      call announce_default(mode_id, 'cap_type', params % cap_type, '', optional_modes)
+    end if
+    if (params % basis_size_arnoldi == -1 .and. params % num_states /= -1) then
+      params % basis_size_arnoldi = params % num_states * 2
+      call announce_default(mode_id, 'basis_size_arnoldi', num2str(params % basis_size_arnoldi), '(2 * num_states)', optional_modes)
+    end if
+
+    ! Silent defaults. These parameters should not normally be changed.
+    params % max_iterations = merge(10000, params % max_iterations, params % max_iterations == -1)
+    params % print_potential = merge(0, params % print_potential, params % print_potential == -1)
+    params % print_potential = merge(0, params % print_potential, params % print_potential == -1)
+    params % enable_terms(1) = merge(1, params % enable_terms(1), params % enable_terms(1) == -1)
+    params % enable_terms(2) = merge(1, params % enable_terms(2), params % enable_terms(2) == -1)
+    params % optimized_mult = merge(1, params % optimized_mult, params % optimized_mult == -1)
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks validity of values of parameters
+! A value of -1 means the value was unassigned, which means it's unused in this mode and should not be checked
+! Therefore -1 is always considered a valid value (but that is not displayed in the error messages)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_params_values(params)
+    class(input_params), intent(in) :: params
+    integer :: K_min
+
+    call assert(any(string(params % molecule) == string(['-1', '686', '868'])), 'Error: molecule can be "686" or "868"')
+    call assert(params % J >= -1, 'Error: J should be >= 0')
+    call assert(any(params % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
+    if (any(string(params % mode) == string(['diagonalization', 'properties'])) .and. params % rovib_coupling == 1) then
+      K_min = get_k_start(params % J, params % parity)
+      call assert(all(params % K == -1) .or. all(params % K >= K_min), 'Error: K(1:2) should be >= mod(J+p, 2)')
+    else
+      call assert(all(params % K >= -1), 'Error: K(1:2) should be >= 0')
+    end if
+    ! call assert(all(params % K <= params % J), 'Error: K(1:2) should be <= J')
+    call assert(any(params % symmetry == [-1, 0, 1]), 'Error: symmery value can be 0 or 1')
+
+    call assert(params % basis_size_phi == -1 .or. params % basis_size_phi > 0, 'Error: basis_size_phi should be > 0')
+    call assert(params % basis_J >= -1, 'Error: basis_J should be >= 0')
+    call assert(params % basis_K >= -1, 'Error: basis_K should be >= 0')
+    ! call assert(params % basis_K <= params % basis_J, 'Error: basis_K should be <= basis_J')
+    call assert(params % num_states == -1 .or. params % num_states > 0, 'Error: num_states should be > 0')
+    call assert(params % basis_size_arnoldi == -1 .or. params % basis_size_arnoldi > 0, 'Error: basis_size_arnoldi should be > 0')
+    call assert(params % max_iterations == -1 .or. params % max_iterations > 0, 'Error: max_iterations should be > 0')
+
+    call assert(any(string(params % cap_type) == string(['-1', 'none', 'Manolopoulos'])), 'Error: cap_type can be "none" or "Manolopoulos"')
+    call assert(any(params % print_potential == [-1, 0, 1]), 'Error: print_potential can be 0 or 1')
+    call assert(any(params % sequential == [-1, 0, 1]), 'Error: sequential can be 0 or 1')
+    call assert(any(params % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
+    call assert(any(params % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) can be 0 or 1')
+    call assert(any(params % optimized_mult == [-1, 0, 1]), 'Error: optimized_mult can be 0 or 1')
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Assigns default values to some parameters if unset by user. Not all parameters have reasonable defaults.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function process_user_settings(settings_path) result(params)
+    character(*), intent(in) :: settings_path ! path to the file with settings
+    character(:), allocatable :: sequential
+    type(dict) :: raw_config, mandatory_modes, optional_modes
+    type(input_params) :: params
+    integer :: my_id, n_procs
+    character(:), allocatable :: mode_id
+    
+    ! Parse the raw file and structure its content into a dictionary
+    raw_config = read_config_dict(settings_path)
+    ! Pull out sequential ahead of time as we need to decide if parallel mode should be initialized first
+    sequential = item_or_default(raw_config, 'sequential', '0') ! Sequential execution is disabled by default
+    if (sequential == '0') then
+      call blacs_setup(my_id, n_procs) ! Init blacs if the sequential mode is not requested to enable parallel mode
+    end if
+
+    call check_setting_groups(raw_config)
+    call populate_mode_settings(mandatory_modes, optional_modes)
+    mode_id = get_mode_id(raw_config)
+    call check_mandatory_keys(mode_id, raw_config, mandatory_modes)
+    call check_extra_keys(mode_id, raw_config, mandatory_modes, optional_modes)
+    params = process_raw_config(raw_config)
+    call set_defaults(mode_id, params, optional_modes)
+    call check_params_values(params)
+  end function
+end module
