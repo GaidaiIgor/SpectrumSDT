@@ -307,6 +307,10 @@ contains
     call rovib_ham % build(params, kinetic, cap)
     call set_arnoldi_variables(params)
 
+    ! open(1, file='ham', form='unformatted')
+    ! write(1) rovib_ham % proc_chunk
+    ! close(1)
+
     if (params % optimized_mult == 1) then
       call rovib_ham % diagonalize(context, ham_mult_compressed, params % num_states, params % basis_size_arnoldi, params % max_iterations, eivals, eivecs)
     else
