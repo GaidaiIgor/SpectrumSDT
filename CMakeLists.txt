@@ -70,14 +70,15 @@ set(overlaps_extra ${rovib_io} ${formulas} ${array_2d} ${array_1d} ${path_utils}
 set(distributed_rovib_hamiltonian ${block_borders} ${rovib_utils} ${formulas} ${general_utils} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${parpack} ${path_utils} ${debug_tools} src/rovib/distributed_rovib_hamiltonian.f90)
 set(state_properties ${array_1d} ${array_2d} ${constants} ${rovib_io} ${rovib_utils} ${input_params} ${general_utils} ${parallel_utils} ${path_utils} src/rovib/state_properties.f90)
 set(arnoldi_operator ${distributed_rovib_hamiltonian} ${matrix_block_info} src/tools/eicalc/arnoldi_operator.f90)
+set(slepc_solver ${arnoldi_operator} ${parallel_utils} src/tools/eicalc/slepc_solver.F90)
 
 set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
 # Specify where to look for external module files (-I option)
-include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl)
+include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc/include external/petsc/arch-linux-c-debug/include external/slepc-3.12.2/include external/slepc-3.12.2/arch-linux-c-debug/include)
 # Specify where to look for libraries (-L option)
-link_directories(external/lib external/fdict/lib external/ftl_lib/lib)
+link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc/arch-linux-c-debug/lib external/slepc-3.12.2/arch-linux-c-debug/lib)
 # Add common compile flag for all sources. -u forces implicitnone for all functions.
 add_compile_options(-mkl=cluster -assume bscc -g -traceback -u)
 # Add common linker flags for all targets
@@ -89,14 +90,14 @@ target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 add_executable(pesprint ${config} ${input_params} ${pes} ${dawes} src/programs/pesprint.f90)
 target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(spectrumsdt ${arnoldi_operator} ${config} ${constants} ${debug_tools} ${dict_utils} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${overlaps_extra} ${parallel_utils} ${path_utils} ${pesgeneral} ${sdt} ${state_properties} src/programs/spectrumsdt.f90)
-target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix)
+add_executable(spectrumsdt ${arnoldi_operator} ${config} ${constants} ${debug_tools} ${dict_utils} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${overlaps_extra} ${parallel_utils} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.f90)
+target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
 
 add_executable(kinetics ${pesgeneral} src/programs/kinetics.f90)
 # target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(test_prg ${array_2d} ${state_properties} src/test/test_prg.f90)
-target_link_libraries(test_prg fdict ftl parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
+add_executable(test_prg src/test/test_prg.F90)
+target_link_libraries(test_prg fdict ftl parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64 petsc)
 
 add_executable(dawes_de ${utils} ${tools} ${dawes} src/programs/misc/dawes_de.f90)
 target_link_libraries(dawes_de parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
