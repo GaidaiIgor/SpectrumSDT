@@ -89,6 +89,9 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Fills out mode settings of all parameters
+! 1st digit - mode id
+! 2nd digit - rovib coupling
+! 3rd digit - fixed basis
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine populate_mode_settings(mandatory_modes, optional_modes)
     class(dict), intent(out) :: mandatory_modes, optional_modes
@@ -113,7 +116,9 @@ contains
     call put_string(mandatory_modes, 'channels_root', '^40.*')
 
     call put_string(optional_modes, 'K', '^[3-4]1.*')
-    call put_string(optional_modes, 'basis_size_arnoldi', '^3.*')
+    call put_string(optional_modes, 'solver', '^3.*')
+    call put_string(optional_modes, 'ncv', '^3.*')
+    call put_string(optional_modes, 'mpd', '^3.*')
     call put_string(optional_modes, 'max_iterations', '^3.*')
     call put_string(optional_modes, 'cap_type', '^(3|40).*')
     call put_string(optional_modes, 'print_potential', '^0.*')
@@ -248,8 +253,9 @@ contains
   function process_raw_config(config_dict) result(config)
     class(dict) :: config_dict ! intent(in)
     type(input_params) :: config
-    character(:), allocatable :: mode, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
-    integer :: rovib, fix_basis_jk, J, parity, symmetry, basis_size_phi, basis_J, basis_K, basis_size_arnoldi, num_states, print_potential, max_iterations, sequential, &
+    character(:), allocatable :: mode, molecule, K_str, basis_root_path, solver, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, &
+      debug_param_1
+    integer :: rovib, fix_basis_jk, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, print_potential, max_iterations, sequential, &
       optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
@@ -287,8 +293,10 @@ contains
     basis_J = str2int(item_or_default(config_dict, 'basis_J', '-1'))
     basis_K = str2int(item_or_default(config_dict, 'basis_K', '-1'))
 
+    solver = item_or_default(config_dict, 'solver', '-1')
     num_states = str2int(item_or_default(config_dict, 'num_states', '-1'))
-    basis_size_arnoldi = str2int(item_or_default(config_dict, 'basis_size_arnoldi', '-1'))
+    ncv = str2int(item_or_default(config_dict, 'ncv', '-1'))
+    mpd = str2int(item_or_default(config_dict, 'mpd', '-1'))
     max_iterations = str2int(item_or_default(config_dict, 'max_iterations', '-1'))
 
     cap_type = item_or_default(config_dict, 'cap_type', '-1')
@@ -313,18 +321,19 @@ contains
     test_mode = item_or_default(config_dict, 'test_mode', '-1')
     debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
 
-    config = input_params(mode, rovib, fix_basis_jk, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, &
-        num_states, basis_size_arnoldi, max_iterations, cap_type, grid_path, root_path, channels_root, print_potential, sequential, enable_terms, optimized_mult, debug_mode, &
+    config = input_params(mode, rovib, fix_basis_jk, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, solver, &
+        num_states, ncv, mpd, max_iterations, cap_type, grid_path, root_path, channels_root, print_potential, sequential, enable_terms, optimized_mult, debug_mode, &
         test_mode, debug_param_1)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Announces default setting of *key*, represented by *default_str*, if it is used in *mode_id*. 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine announce_default(mode_id, key, default_str, default_comment, optional_modes)
+  subroutine announce_default(mode_id, key, default_str, default_comment, optional_modes, custom_message)
     character(*), intent(in) :: mode_id, key, default_str, default_comment
     character(:), allocatable :: mode_pattern
     class(dict) :: optional_modes ! intent(in)
+    character(*), optional, intent(in) :: custom_message
     type(ftlRegex) :: re
     type(ftlRegexMatch), allocatable :: m(:)
 
@@ -333,7 +342,11 @@ contains
     call re % New(mode_pattern)
     m = re % Match(mode_id)
     if (size(m) > 0) then
-      call print_parallel(key // ' is not specified; assuming default = ' // default_str // ' ' // default_comment)
+      if (present(custom_message)) then
+        call print_parallel(custom_message)
+      else
+        call print_parallel(key // ' is not specified; assuming default = ' // default_str // ' ' // default_comment)
+      end if
     end if
   end subroutine
 
@@ -349,9 +362,20 @@ contains
       params % cap_type = 'none'
       call announce_default(mode_id, 'cap_type', params % cap_type, '', optional_modes)
     end if
-    if (params % basis_size_arnoldi == -1 .and. params % num_states /= -1) then
-      params % basis_size_arnoldi = params % num_states * 2
-      call announce_default(mode_id, 'basis_size_arnoldi', num2str(params % basis_size_arnoldi), '(2 * num_states)', optional_modes)
+
+    params % solver = iff('slepc', params % solver, params % solver == '-1')
+
+    if (params % ncv == -1 .and. params % num_states /= -1 .and. params % solver == 'parpack') then
+      params % ncv = params % num_states * 2
+      call announce_default(mode_id, 'ncv', num2str(params % ncv), '(2 * num_states)', optional_modes)
+    end if
+    if (params % ncv == -1 .and. params % solver == 'slepc') then
+      call announce_default(mode_id, 'ncv', '', '', optional_modes, 'ncv is not specified; its value will be determined by SLEPc. This might affect the number of converged ' // &
+         'eigenvalues')
+    end if
+    if (params % mpd == -1 .and. params % solver == 'slepc') then
+      call announce_default(mode_id, 'mpd', '', '', optional_modes, 'mpd is not specified; its value will be determined by SLEPc. This might affect the number of converged ' // &
+         'eigenvalues')
     end if
 
     ! Silent defaults. These parameters should not normally be changed.
@@ -388,11 +412,14 @@ contains
     call assert(params % basis_J >= -1, 'Error: basis_J should be >= 0')
     call assert(params % basis_K >= -1, 'Error: basis_K should be >= 0')
     ! call assert(params % basis_K <= params % basis_J, 'Error: basis_K should be <= basis_J')
+
+    call assert(any(string(params % solver) == string(['slepc', 'parpack'])), 'Error: solver can be "slepc" or "parpack"')
     call assert(params % num_states == -1 .or. params % num_states > 0, 'Error: num_states should be > 0')
-    call assert(params % basis_size_arnoldi == -1 .or. params % basis_size_arnoldi > 0, 'Error: basis_size_arnoldi should be > 0')
+    call assert(params % ncv == -1 .or. params % ncv > 0, 'Error: ncv should be > 0')
+    call assert(params % mpd == -1 .or. params % mpd > 0, 'Error: mpd should be > 0')
     call assert(params % max_iterations == -1 .or. params % max_iterations > 0, 'Error: max_iterations should be > 0')
 
-    call assert(any(string(params % cap_type) == string(['-1', 'none', 'Manolopoulos'])), 'Error: cap_type can be "none" or "Manolopoulos"')
+    call assert(any(string(params % cap_type) == string(['none', 'Manolopoulos'])), 'Error: cap_type can be "none" or "Manolopoulos"')
     call assert(any(params % print_potential == [-1, 0, 1]), 'Error: print_potential can be 0 or 1')
     call assert(any(params % sequential == [-1, 0, 1]), 'Error: sequential can be 0 or 1')
     call assert(any(params % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')

@@ -20,8 +20,10 @@ module input_params_mod
     integer :: basis_K
 
     ! Diagonalization
+    character(:), allocatable :: solver
     integer :: num_states ! desired number of eigenstates from diagonalization
-    integer :: basis_size_arnoldi ! number of vectors in arnoldi basis during diagonalization
+    integer :: ncv ! number of vectors in arnoldi basis during diagonalization
+    integer :: mpd ! maximum projected dimension, slepc only
     integer :: max_iterations ! maximum number of iterations during diagonalization
     
     ! CAP

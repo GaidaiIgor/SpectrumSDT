@@ -70,7 +70,7 @@ set(overlaps_extra ${rovib_io} ${formulas} ${array_2d} ${array_1d} ${path_utils}
 set(distributed_rovib_hamiltonian ${block_borders} ${rovib_utils} ${formulas} ${general_utils} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${parpack} ${path_utils} ${debug_tools} src/rovib/distributed_rovib_hamiltonian.f90)
 set(state_properties ${array_1d} ${array_2d} ${constants} ${rovib_io} ${rovib_utils} ${input_params} ${general_utils} ${parallel_utils} ${path_utils} src/rovib/state_properties.f90)
 set(arnoldi_operator ${distributed_rovib_hamiltonian} ${matrix_block_info} src/tools/eicalc/arnoldi_operator.f90)
-set(slepc_solver ${arnoldi_operator} ${parallel_utils} src/tools/eicalc/slepc_solver.F90)
+set(slepc_solver ${arnoldi_operator} ${parallel_utils} ${debug_tools} ${constants} src/tools/eicalc/slepc_solver.F90)
 
 set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
@@ -88,7 +88,7 @@ add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
 target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
 add_executable(pesprint ${config} ${input_params} ${pes} ${dawes} src/programs/pesprint.f90)
-target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
+target_link_libraries(pesprint fdict ftl pcreposix parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
 add_executable(spectrumsdt ${arnoldi_operator} ${config} ${constants} ${debug_tools} ${dict_utils} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${overlaps_extra} ${parallel_utils} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.f90)
 target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
@@ -96,8 +96,8 @@ target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_l
 add_executable(kinetics ${pesgeneral} src/programs/kinetics.f90)
 # target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(test_prg src/test/test_prg.F90)
-target_link_libraries(test_prg fdict ftl parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64 petsc)
+add_executable(test_prg ${parallel_utils} src/test/test_prg.F90)
+target_link_libraries(test_prg fdict ftl parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64 petsc slepc)
 
 add_executable(dawes_de ${utils} ${tools} ${dawes} src/programs/misc/dawes_de.f90)
 target_link_libraries(dawes_de parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)

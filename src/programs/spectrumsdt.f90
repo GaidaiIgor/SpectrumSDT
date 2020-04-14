@@ -48,7 +48,7 @@ contains
     nvec2prt = 160
     nvec2sch = 160
     nch = 10
-    ncv = params % basis_size_arnoldi
+    ncv = params % ncv
     maxitr = params % max_iterations
     bst1 = 1
     bstn = 5
@@ -290,6 +290,7 @@ contains
     if (proc_id /= 0) return
     ! Write spectrum
     file_path = get_spectrum_path(sym_path)
+
     open(newunit = file_unit, file = file_path)
     do i = 1, size(eivals)
       energy = real(eivals(i)) * autown
@@ -316,16 +317,32 @@ contains
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')
     end if
     call rovib_ham % build(params, kinetic, cap)
+
+    if (debug_mode == 'print_ham') then
+      call print_complex_matrix(rovib_ham % proc_chunk, 'ham')
+      stop 'print_ham'
+    end if
+
     call set_arnoldi_variables(params)
 
-    if (test_mode == 'slepc') then
-      call find_eigenpairs_slepc(params % num_states, params % basis_size_arnoldi, eivals, eivecs)
+    if (debug_mode == 'test_eivecs') then
+      allocate(eivecs(msize, 2))
+      open(1, file='slepc_1600_cap/3dsdt/exps/exp.1000.bin.out', form='unformatted')
+      read(1) eivecs(:, 1)
+      close(1)
+      eivecs(:, 2) = matmul(rovib_ham % proc_chunk, eivecs(:, 1))
+      call print_complex_matrix(eivecs, 'eivecs')
+      stop 'test_eivecs'
+    end if
+
+    if (params % solver == 'slepc') then
+      call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
       call print_spectrum(params, eivals, eivecs, 1)
     else
       if (params % optimized_mult == 1) then
-        call rovib_ham % diagonalize(context, ham_mult_compressed, params % num_states, params % basis_size_arnoldi, params % max_iterations, eivals, eivecs)
+        call rovib_ham % diagonalize(context, ham_mult_compressed, params % num_states, params % ncv, params % max_iterations, eivals, eivecs)
       else
-        call rovib_ham % diagonalize(context, ham_mult_old, params % num_states, params % basis_size_arnoldi, params % max_iterations, eivals, eivecs)
+        call rovib_ham % diagonalize(context, ham_mult_old, params % num_states, params % ncv, params % max_iterations, eivals, eivecs)
       end if
       call print_spectrum(params, eivals, eivecs)
     end if
