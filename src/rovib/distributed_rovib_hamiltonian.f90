@@ -816,10 +816,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Diagonalizes Hamiltonian to find eigenvalues and eigenvectors
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine diagonalize(this, context, operator, n_states, basis_size_arnoldi, max_iterations, eigenvalues, eigenvectors)
+  subroutine diagonalize(this, context, operator, n_states, ncv, max_iterations, eigenvalues, eigenvectors)
     class(distributed_rovib_hamiltonian), intent(in) :: this
     procedure(parpack_operator) :: operator
-    integer, intent(in) :: context, n_states, basis_size_arnoldi, max_iterations
+    integer, intent(in) :: context, n_states, ncv, max_iterations
     complex*16, allocatable, intent(out) :: eigenvalues(:), eigenvectors(:, :)
     integer :: proc_id, n_procs, proc_states
     external :: numroc
@@ -829,7 +829,7 @@ contains
     ! Computes number of states for this process. Workload is distributed in a round-robin fashion.
     proc_states = numroc(n_states, 1, proc_id, 0, n_procs)
     allocate(eigenvalues(n_states), eigenvectors(this % global_chunk_info % columns, proc_states))
-    call parz(context, eigenvalues, eigenvectors, this % global_chunk_info % columns, size(this % proc_chunk, 1), n_states, proc_states, basis_size_arnoldi, max_iterations, &
+    call parz(context, eigenvalues, eigenvectors, this % global_chunk_info % columns, size(this % proc_chunk, 1), n_states, proc_states, ncv, max_iterations, &
         operator)
   end subroutine
 end module

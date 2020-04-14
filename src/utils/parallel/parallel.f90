@@ -96,7 +96,7 @@ contains
     if (proc_id == 0) then
       select type (printable)
       type is (character(*))
-        print *, printable
+        print '(A)', printable
       end select
     end if
   end subroutine

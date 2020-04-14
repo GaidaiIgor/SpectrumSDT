@@ -96,6 +96,18 @@ contains
   end subroutine
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
+! Prints complex matrix as A+iB, where A and B are printed separately
+!---------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine print_complex_matrix(matrix, fileName, append, transpose)
+    complex*16 :: matrix(:, :)
+    character(len = *), optional :: fileName
+    integer, optional :: append, transpose
+
+    call print_real_matrix(real(matrix), fileName // '_real', append, transpose)
+    call print_real_matrix(aimag(matrix), fileName // '_imag', append, transpose)
+  end subroutine
+
+!---------------------------------------------------------------------------------------------------------------------------------------------
 ! Core subroutine for print subroutines
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine write_element(smth, file_unit)

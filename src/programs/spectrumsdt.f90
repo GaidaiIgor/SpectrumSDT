@@ -23,6 +23,7 @@ program spectrumsdt
   use path_utils
   use pesgeneral
   use sdt
+  use slepc_solver_mod
   use state_properties_mod
 
   type(input_params) :: params
@@ -47,7 +48,7 @@ contains
     nvec2prt = 160
     nvec2sch = 160
     nch = 10
-    ncv = params % basis_size_arnoldi
+    ncv = params % ncv
     maxitr = params % max_iterations
     bst1 = 1
     bstn = 5
@@ -247,18 +248,24 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints spectrum
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine print_spectrum(params, eivals, eivecs)
+  subroutine print_spectrum(params, eivals, eivecs, global_mapping)
     class(input_params), intent(in) :: params
     complex*16, allocatable, intent(in) :: eivals(:)
     complex*16, allocatable, intent(in) :: eivecs(:, :)
-    integer :: proc_id, n_procs, proc_states, file_unit, i, global_state_ind
+    integer, optional, intent(in) :: global_mapping ! regulates local-global index mapping behavior
+    integer :: proc_id, n_procs, proc_first_state, proc_states, file_unit, i, global_state_ind, global_mapping_act
     real*8 :: energy, gamma
     character(:), allocatable :: sym_path, file_folder, file_path
     external :: numroc
     integer :: numroc
-    
+
+    global_mapping_act = arg_or_default(global_mapping, 0)
     call get_proc_info(proc_id, n_procs)
-    proc_states = numroc(size(eivals), 1, proc_id, 0, n_procs)
+    if (global_mapping_act == 0) then
+      proc_states = numroc(size(eivals), 1, proc_id, 0, n_procs)
+    else if (global_mapping_act == 1) then
+      call get_proc_elem_range(size(eivals), proc_first_state, proc_states)
+    end if
 
     sym_path = get_sym_path_params(params)
     file_folder = get_expansion_coefficients_3d_path(sym_path)
@@ -267,7 +274,11 @@ contains
     ! Write each eigenvector in a separate binary file
     do i = 1, proc_states
       ! Get global state number
-      call l2g(i, proc_id, size(eivals), n_procs, 1, global_state_ind)
+      if (global_mapping_act == 0) then
+        call l2g(i, proc_id, size(eivals), n_procs, 1, global_state_ind)
+      else if (global_mapping_act == 1) then
+        global_state_ind = proc_first_state + i - 1
+      end if
       file_path = get_solution_3d_path(sym_path, global_state_ind)
 
       open(newunit = file_unit, file = file_path, form = 'unformatted')
@@ -279,6 +290,7 @@ contains
     if (proc_id /= 0) return
     ! Write spectrum
     file_path = get_spectrum_path(sym_path)
+
     open(newunit = file_unit, file = file_path)
     do i = 1, size(eivals)
       energy = real(eivals(i)) * autown
@@ -305,18 +317,35 @@ contains
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')
     end if
     call rovib_ham % build(params, kinetic, cap)
+
+    if (debug_mode == 'print_ham') then
+      call print_complex_matrix(rovib_ham % proc_chunk, 'ham')
+      stop 'print_ham'
+    end if
+
     call set_arnoldi_variables(params)
 
-    ! open(1, file='ham', form='unformatted')
-    ! write(1) rovib_ham % proc_chunk
-    ! close(1)
-
-    if (params % optimized_mult == 1) then
-      call rovib_ham % diagonalize(context, ham_mult_compressed, params % num_states, params % basis_size_arnoldi, params % max_iterations, eivals, eivecs)
-    else
-      call rovib_ham % diagonalize(context, ham_mult_old, params % num_states, params % basis_size_arnoldi, params % max_iterations, eivals, eivecs)
+    if (debug_mode == 'test_eivecs') then
+      allocate(eivecs(msize, 2))
+      open(1, file='slepc_1600_cap/3dsdt/exps/exp.1000.bin.out', form='unformatted')
+      read(1) eivecs(:, 1)
+      close(1)
+      eivecs(:, 2) = matmul(rovib_ham % proc_chunk, eivecs(:, 1))
+      call print_complex_matrix(eivecs, 'eivecs')
+      stop 'test_eivecs'
     end if
-    call print_spectrum(params, eivals, eivecs)
+
+    if (params % solver == 'slepc') then
+      call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
+      call print_spectrum(params, eivals, eivecs, 1)
+    else
+      if (params % optimized_mult == 1) then
+        call rovib_ham % diagonalize(context, ham_mult_compressed, params % num_states, params % ncv, params % max_iterations, eivals, eivecs)
+      else
+        call rovib_ham % diagonalize(context, ham_mult_old, params % num_states, params % ncv, params % max_iterations, eivals, eivecs)
+      end if
+      call print_spectrum(params, eivals, eivecs)
+    end if
   end subroutine
 
 !-----------------------------------------------------------------------
