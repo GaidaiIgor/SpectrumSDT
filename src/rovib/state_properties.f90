@@ -11,6 +11,8 @@ module state_properties_mod
   use rovib_io_mod
   use rovib_utils_mod
 
+  use debug_tools
+
   private
   public :: calculate_state_properties
 
@@ -478,51 +480,6 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! The main procedure for calculation of states properties
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_state_properties(params, N, L)
-    class(input_params), intent(in) :: params
-    integer, intent(in) :: N, L ! Num of points along rho and theta
-    integer, allocatable :: num_solutions_2d(:, :)
-    integer, allocatable :: num_solutions_1d(:, :, :)
-    real*8, allocatable :: energies_3d(:), sym_probs(:)
-    real*8, allocatable :: K_dists(:, :) ! n_state x (J + 1)
-    character(:), allocatable :: sym_path, spectrum_path
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
-    type(array_2d_complex), allocatable :: Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-
-    ! Debug
-    complex*16, allocatable :: Cs_plain(:, :)
-    real*8 :: error
-
-    ! Load expansion coefficients
-    if (params % fix_basis_jk == 1) then
-      call load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
-      call load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
-    else
-      call load_1D_expansion_coefficients(params, N, L, As, num_solutions_1d)
-      call load_2D_expansion_coefficients(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
-    end if
-    call load_3D_expansion_coefficients(params, N, num_solutions_2d, Cs, Cs_plain)
-    call print_parallel('Done loading expansion coefficients')
-
-    ! Calculate properties
-    sym_probs = assign_molecule_all(params, As, Bs, Cs)
-    call print_parallel('Done calculating symmetric isotopomer probability')
-    K_dists = calculate_K_dist_all(params, As, Bs, Cs)
-    call print_parallel('Done calculating K-distributions')
-
-    ! Load energies
-    sym_path = get_sym_path_params(params)
-    spectrum_path = get_spectrum_path(sym_path)
-    energies_3d = load_energies_3D(spectrum_path)
-
-    call print_parallel('Writing results...')
-    call write_results(params, energies_3d, sym_probs, K_dists)
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks orthonormality of 1D solutions
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function check_orthonormality_1D(As) result(max_deviation)
@@ -580,28 +537,37 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks orthonormality of 3D solutions
+! Checks orthonormality of 3D solutions. Returns deviation from expected value (0 for different ks, 1 for same ks).
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function check_orthonormality_3D(As, Bs, Cs, params) result(max_deviation)
+  function check_orthonormality_3D(As, Bs, Cs, params, k1_first, k2_first, k1_last, k2_last) result(max_deviation)
     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B.
     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
     type(array_2d_complex), intent(in) :: Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S.
     class(input_params), intent(in) :: params
+    integer, intent(in) :: k1_first, k2_first
+    integer, optional, intent(in) :: k1_last, k2_last
     real*8 :: max_deviation
-    integer :: K_val, K_sym, K_ind, K_ind_comp, n, l, m_ind, j, k1, k2
+    integer :: K_val, K_sym, K_ind, K_ind_comp, n, l, m_ind, j, k1, k2, k1_last_act, k2_last_act
     real*8 :: i_sum
     complex*16 :: j1_sum, j2_sum
     complex*16 :: overlap
 
+    k1_last_act = arg_or_default(k1_last, k1_first)
+    k2_last_act = arg_or_default(k2_last, k2_first)
     max_deviation = 0
-    do k1 = 6, 6 ! size(Cs(1, 1) % p, 2)
-      do k2 = 6, 6 ! k1, size(Cs(1, 1) % p, 2)
-        print *, 'Calculating overlap between', k1, k2
+    do k1 = k1_first, k1_last_act ! size(Cs(1, 1) % p, 2)
+      do k2 = k2_first, k2_last_act ! k1, size(Cs(1, 1) % p, 2)
+        if (k2 < k1) then
+          print *, 'Skipping ovelap between', k1, k2, 'since k1 has to be >= than k2'
+          cycle
+        end if
 
+        print *, 'Calculating overlap between', k1, k2
         overlap = 0
         do K_val = params % K(1), params % K(2)
           call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
           do n = 1, size(As, 2)
+            ! call track_progress(n * 1d0 / size(As, 2))
             do l = 1, size(As, 3)
               do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
                 j1_sum = 0
@@ -621,6 +587,57 @@ contains
       end do
     end do
   end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! The main procedure for calculation of states properties
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine calculate_state_properties(params, N, L)
+    class(input_params), intent(in) :: params
+    integer, intent(in) :: N, L ! Num of points along rho and theta
+    integer, allocatable :: num_solutions_2d(:, :)
+    integer, allocatable :: num_solutions_1d(:, :, :)
+    real*8, allocatable :: energies_3d(:), sym_probs(:)
+    real*8, allocatable :: K_dists(:, :) ! n_state x (J + 1)
+    character(:), allocatable :: sym_path, spectrum_path
+    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
+    type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
+    type(array_2d_complex), allocatable :: Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+
+    ! Debug
+    complex*16, allocatable :: Cs_plain(:, :)
+    real*8 :: error
+
+    ! Load expansion coefficients
+    if (params % fix_basis_jk == 1) then
+      call load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
+      call load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
+    else
+      call load_1D_expansion_coefficients(params, N, L, As, num_solutions_1d)
+      call load_2D_expansion_coefficients(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
+    end if
+    call load_3D_expansion_coefficients(params, N, num_solutions_2d, Cs, Cs_plain)
+    call print_parallel('Done loading expansion coefficients')
+
+    if (debug_mode == 'check_ortho_3d') then
+      ! print *, check_orthonormality_3D(As, Bs, Cs, params, 797, 797, 798, 798)
+      print *, check_orthonormality_3D(As, Bs, Cs, params, 1000, 1000)
+      stop 'Done check_ortho_3d'
+    end if
+
+    ! Calculate properties
+    sym_probs = assign_molecule_all(params, As, Bs, Cs)
+    call print_parallel('Done calculating symmetric isotopomer probability')
+    K_dists = calculate_K_dist_all(params, As, Bs, Cs)
+    call print_parallel('Done calculating K-distributions')
+
+    ! Load energies
+    sym_path = get_sym_path_params(params)
+    spectrum_path = get_spectrum_path(sym_path)
+    energies_3d = load_energies_3D(spectrum_path)
+
+    call print_parallel('Writing results...')
+    call write_results(params, energies_3d, sym_probs, K_dists)
+  end subroutine
 
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
 ! ! Loads and rearranges 3D expansion coefficients

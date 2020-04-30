@@ -1,16 +1,18 @@
 module config
   use constants
-  use rovib_utils_mod
   use dict_utils
   use dictionary
   use ftlRegexModule
   use general_utils
   use input_params_mod
   use io_utils
-  use path_utils
   use parallel_utils
+  use path_utils
+  use rovib_utils_mod
   use string_mod
   use string_utils
+
+  use debug_tools
 
   private
   public :: process_user_settings
@@ -435,7 +437,7 @@ contains
     character(:), allocatable :: sequential
     type(dict) :: raw_config, mandatory_modes, optional_modes
     type(input_params) :: params
-    integer :: my_id, n_procs
+    integer :: my_id, n_procs, ierr
     character(:), allocatable :: mode_id
     
     ! Parse the raw file and structure its content into a dictionary
@@ -443,7 +445,11 @@ contains
     ! Pull out sequential ahead of time as we need to decide if parallel mode should be initialized first
     sequential = item_or_default(raw_config, 'sequential', '0') ! Sequential execution is disabled by default
     if (sequential == '0') then
-      call blacs_setup(my_id, n_procs) ! Init blacs if the sequential mode is not requested to enable parallel mode
+      if (test_mode == 'MPI_instead_blacs') then
+        call MPI_Init(ierr)
+      else
+        call blacs_setup(my_id, n_procs) ! Init blacs if the sequential mode is not requested to enable parallel mode
+      end if
     end if
 
     call check_setting_groups(raw_config)

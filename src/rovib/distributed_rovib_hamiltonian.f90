@@ -7,10 +7,11 @@ module distributed_rovib_hamiltonian_mod
   use k_block_info
   use matrix_block_info_mod
   use parallel_utils
-  use parpack
   use path_utils
 
+  ! Debug
   use debug_tools
+  use io_utils
 
   private
   public :: load_overlap_block
@@ -37,7 +38,6 @@ module distributed_rovib_hamiltonian_mod
     procedure :: load_k_block_asym_term
     procedure :: load_chunk_asym_term
     procedure, public :: build
-    procedure, public :: diagonalize
   end type
   
 contains
@@ -218,6 +218,7 @@ contains
         file_path = get_asymmetric_overlap_file_path(sym_path, slice_ind_row_act)
       end if
     end if
+
     open(newunit = file_unit, file = file_path, form = 'unformatted')
     read(file_unit) block
     close(file_unit)
@@ -267,8 +268,8 @@ contains
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
         last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
-
         overlap_block_slice = overlap_block(first_row : last_row, :)
+
         ! Use overlap block info to find correct placement of the overlap in the chunk
         call local_overlap_info % update_matrix(this % proc_chunk, overlap_block_slice)
       end do
@@ -481,8 +482,8 @@ contains
             if (slice_ind_row /= slice_ind_col) then
               cycle
             end if
-
             overlap_block = local_overlap_block_info % extract_from_matrix(this % proc_chunk)
+
             ! First column of the main diagonal may not be first in this process chunk, so we need to make corresponding adjustments
             full_ham_overlap_block_info => ham_info % subblocks(K1_ind, K2_ind) % subblocks(slice_ind_row, slice_ind_col)
             col_shift = global_overlap_block_info % borders % top - full_ham_overlap_block_info % borders % top
@@ -695,8 +696,8 @@ contains
     K_row_sym = get_k_symmetry(K_row, params % symmetry)
 
     if (params % fix_basis_jk == 1) then
-      K_row_load = merge(params % basis_K, params % basis_K + 2, K_row < K_col)
-      K_col_load = merge(params % basis_K + 2, params % basis_K, K_row < K_col)
+      K_row_load = merge(params % basis_K, params % basis_K + 2, K_row <= K_col)
+      K_col_load = merge(params % basis_K + 2, params % basis_K, K_row <= K_col)
       root_path = params % basis_root_path
     else
       K_row_load = K_row
@@ -785,6 +786,7 @@ contains
 
     call this % load_chunk_overlaps(params, ham_info)
     call print_parallel('Overlaps are loaded')
+
     call this % include_kinetic_energy(kinetic) ! has to be called when only overlaps are loaded
     call this % load_chunk_eivals_2d(params, ham_info)
 
@@ -795,6 +797,10 @@ contains
     if (params % fix_basis_jk == 1) then
       call this % load_chunk_sym_term(params, ham_info)
       call print_parallel('Sym term is loaded')
+    end if
+
+    if (params % rovib_coupling == 0) then
+      return
     end if
 
     if (params % enable_terms(1) == 0) then
@@ -810,26 +816,5 @@ contains
       call this % load_chunk_asym_term(params, ham_info)
       call print_parallel('Asymmetric term is loaded')
     end if
-    call print_parallel('Hamiltonian matrix is built. Size: ' // num2str(this % global_chunk_info % columns) // ' x ' // num2str(size(this % proc_chunk, 2)))
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Diagonalizes Hamiltonian to find eigenvalues and eigenvectors
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine diagonalize(this, context, operator, n_states, ncv, max_iterations, eigenvalues, eigenvectors)
-    class(distributed_rovib_hamiltonian), intent(in) :: this
-    procedure(parpack_operator) :: operator
-    integer, intent(in) :: context, n_states, ncv, max_iterations
-    complex*16, allocatable, intent(out) :: eigenvalues(:), eigenvectors(:, :)
-    integer :: proc_id, n_procs, proc_states
-    external :: numroc
-    integer :: numroc
-  
-    call get_proc_info(proc_id, n_procs)
-    ! Computes number of states for this process. Workload is distributed in a round-robin fashion.
-    proc_states = numroc(n_states, 1, proc_id, 0, n_procs)
-    allocate(eigenvalues(n_states), eigenvectors(this % global_chunk_info % columns, proc_states))
-    call parz(context, eigenvalues, eigenvectors, this % global_chunk_info % columns, size(this % proc_chunk, 1), n_states, proc_states, ncv, max_iterations, &
-        operator)
   end subroutine
 end module

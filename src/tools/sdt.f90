@@ -78,20 +78,24 @@
 !-----------------------------------------------------------------------
 module sdt
   use algorithms
-  use arnoldi_operator_mod
   use blas95
+  use cap_mod
   use constants
   use formulas_mod
   use general_vars
   use index_conversion
+  use input_params_mod
   use io_utils
   use lapack95
+  use matmul_operator_mod
   use mkl
   use parabola
   use parpack
   use pesgeneral
   use scalapack
+  use slepc_solver_mod
 
+  ! Debug
   use debug_tools
 
   implicit none
@@ -128,6 +132,7 @@ module sdt
   integer,parameter::SOLVER_SCAL    = 0
   integer,parameter::SOLVER_PARP    = 1
   integer,parameter::SOLVER_LAPA    = 2
+  integer,parameter::SOLVER_SLEP    = 3
 
   ! Symmetry constants
   integer,parameter::SY_NONE        = 0
@@ -172,19 +177,14 @@ module sdt
   integer,parameter::HAM2_FFT       = 0
   integer,parameter::HAM2_ANALYTIC  = 1
 
-  ! Log file unit
-  integer,parameter::LG             = 9
-
   ! Directories
   character(:),allocatable::gpath ! Grid
   character(:),allocatable::bpath ! Basis
   character(:),allocatable::opath ! Overlap
   character(:),allocatable::rpath ! Recognition
   character(:),allocatable::dpath ! Diagonalization
-  character(:),allocatable::outdir
   character(7),parameter  ::dirs(*) = (/ 'basis', 'overlap', '3dsdt', '3dsdtp', '3dsdts', 'chrecog', 'chdiag', 'chdiags', 'basprobs' /)
   character(*),parameter::logdir='logs'
-  character(*),parameter::capdir='caps'
   character(*),parameter::expdir='exps'
 
   ! Number of groups (pathways)
@@ -208,7 +208,6 @@ module sdt
 
   ! Sizes
   integer nstate   ! Number of states to calculate
-  integer n1,n2,n3 ! Problem dimensions
   integer nn       ! Size of direct-product Hamiltonian matrix
   integer n12      ! n1 * n2
   integer n23      ! n2 * n3
@@ -219,13 +218,6 @@ module sdt
   integer nvec2max ! Max number of 2D states in slice  before trnc
   integer nvec2prt ! Number of 2D states to print
   integer nvec2sch ! Number of 2D states to search through for rcg
-
-  ! Network
-  integer myid        ! Process id
-  integer nprocs      ! Number of processes
-  integer nprocs_rect ! Number of processes forming rectangle
-  integer myrow,mycol ! Process coordinates
-  integer nprow,npcol ! Process grid sizes
 
   ! Parpack parameters
   integer ncv         ! Number of Lanczos basis vectors
@@ -241,11 +233,6 @@ module sdt
 
   ! Channel grouping after recognition
   integer nch         ! Number of channels within group
-
-  ! Grids
-  real*8,allocatable::g1(:),g2(:),g3(:)
-  real*8,allocatable::jac1(:),jac2(:),jac3(:)
-  real*8 alpha1,alpha2,alpha3
 
 contains
 
@@ -733,55 +720,23 @@ contains
     end if
 
     ! Allocate collective arrays on root
-    ! if (myid == 0) then
     allocate(val2all(nvec2max,n1), sym2all(nvec2max,n1), nvec1all(n2,n1), nvec2all(n1))
     val2all  = 0
     sym2all  = 0
     nvec1all = 0
     nvec2all = 0
-  ! end if
 
     ! Allocate send buffer
     allocate(buf(nvec2max))
     buf = 0
 
     call MPI_Gather(nvec2, 1, MPI_INTEGER, nvec2all, 1, MPI_INTEGER, 0, MPI_COMM_WORLD)
-
-    ! allocate(nvec1_test(130), nvec1all_test(130, 90))
-    ! nvec1_test = nvec1
-    ! call MPI_Gather(nvec1, n2, MPI_INTEGER, nvec1all, n2, MPI_INTEGER, 0, MPI_COMM_WORLD)
-
-    ! print *, myid, size(nvec1)
-    ! if (myid == 0) then
-    !   print *, 'nvec1all size', size(nvec1all, 1), size(nvec1all, 2)
-    ! end if
     call MPI_Gather(nvec1, n2, MPI_INTEGER, nvec1all, n2, MPI_INTEGER, 0, MPI_COMM_WORLD)
 
     buf(1:nvec2) = val2
     call MPI_Gather(buf, nvec2max, MPI_DOUBLE_PRECISION, val2all, nvec2max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD)
     buf(1:nvec2) = sym2
     call MPI_Gather(buf, nvec2max, MPI_DOUBLE_PRECISION, sym2all, nvec2max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD)
-
-    ! ! Colect results old
-    ! if (myid == 0) then
-    !   nvec2all(  1) = nvec2
-    !   nvec1all(:,1) = nvec1
-    !   val2all (1:nvec2,1) = val2
-    !   sym2all (1:nvec2,1) = sym2
-    !   do i=2,n1
-    !     call igerv2d(context,1,1,nvec2all(i),1,0,i-1)
-    !     call igerv2d(context,n2,1,nvec1all(1,i),n2,0,i-1)
-    !     call dgerv2d(context,nvec2max,1,val2all(1,i),nvec2max,0,i-1)
-    !     call dgerv2d(context,nvec2max,1,sym2all(1,i),nvec2max,0,i-1)
-    !   end do
-    ! else
-    !   call igesd2d(context,1,1,nvec2,1,0,0)
-    !   call igesd2d(context,n2,1,nvec1,n2,0,0)
-    !   if (nvec2 /= 0)buf(1:nvec2) = val2
-    !   call dgesd2d(context,nvec2max,1,buf,nvec2max,0,0)
-    !   if (nvec2 /= 0)buf(1:nvec2) = sym2
-    !   call dgesd2d(context,nvec2max,1,buf,nvec2max,0,0)
-    ! end if
 
     ! Only root continues with printing
     if (myid == 0) then
@@ -840,6 +795,110 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
+  !  Frees 1D solution.
+  !-----------------------------------------------------------------------
+  subroutine free_1d(nvec,val,vec)
+    type(array1d),allocatable::val(:) ! 1D values  for each thread
+    type(array2d),allocatable::vec(:) ! 1D vectors for each thread
+    integer,allocatable::nvec(:)      ! Num of 1D vecs
+    integer i
+    if (allocated(nvec))deallocate(nvec)
+    if (allocated(val)) then
+      do i=1,n2
+        if (allocated(val(i)%a))deallocate(val(i)%a)
+      end do
+      deallocate(val)
+    end if
+    if (allocated(vec)) then
+      do i=1,n2
+        if (allocated(vec(i)%a))deallocate(vec(i)%a)
+      end do
+      deallocate(vec)
+    end if
+  end subroutine
+
+  !-----------------------------------------------------------------------
+  !  Frees 2D solution.
+  !-----------------------------------------------------------------------
+  subroutine free_2d(nvec,val,vec)
+    real*8,allocatable::vec(:,:)      ! 2D vectors in basis
+    real*8,allocatable::val(:)        ! 2D values
+    integer nvec                      ! Num of 2D vecs
+    nvec = 0
+    if (allocated(val)) deallocate(val)
+    if (allocated(vec)) deallocate(vec)
+  end subroutine
+
+  !-----------------------------------------------------------------------
+  !  Loads 1D and 2D eigenvector basis for given slice.
+  !-----------------------------------------------------------------------
+  subroutine load_eibasis(isl,nvec1,val1,vec1,val2,vec2)
+    type(array1d),allocatable::val1(:) ! 1D solutions eigenvalues for each thread
+    type(array2d),allocatable::vec1(:) ! 1D solutions expansion coefficients (over sin/cos) for each thread
+    real*8,allocatable::vec2(:,:)      ! 2D solutions expansion coefficients (over 1D solutions)
+    real*8,allocatable::val2(:)        ! 2D eigenvalues
+    integer,allocatable::nvec1(:)      ! Num of 1D solutions in each thread
+    integer nvec2                      ! Num of 2D vecs
+    integer nb2                        ! Size of 2D vector in basis
+    integer isl                        ! Slice number
+    integer i
+    character(:),allocatable::ldir
+    character(256) fn
+    
+    ! Deallocate arrays if allocated
+    call free_1d(nvec1,val1,vec1)
+    call free_2d(nvec2,val2,vec2)
+
+    ! Get load directory
+    ldir = bpath // '/' // getdir(MODE_BASIS)
+    ! Get file name
+    write(fn,'(2A,I4.4,A)')ldir,'/bas2.',isl,'.bin.out'
+    ! Load 2D solution
+    open(1,file=fn,form='unformatted')
+    read(1)nvec2,nb2
+    if (nvec2 == 0)return ! Exit right away, if empty
+    allocate(val2(nvec2),vec2(nb2,nvec2))
+    read(1)val2
+    read(1)vec2
+    close(1)
+
+    ! Get file name
+    write(fn,'(2A,I4.4,A)')ldir,'/bas1.',isl,'.bin.out'
+    ! Load 1D solution
+    allocate(nvec1(n2),val1(n2),vec1(n2))
+    open(1,file=fn,form='unformatted')
+    read(1)nvec1
+    do i=1,n2
+      if (nvec1(i) == 0)cycle
+      allocate(val1(i)%a(nvec1(i)),vec1(i)%a(n3b,nvec1(i)))
+      read(1)val1(i)%a
+      read(1)vec1(i)%a
+    end do
+    close(1)
+  end subroutine
+
+  !-----------------------------------------------------------------------
+  !  Transforms 2D state from 1D eigenvector basis to DVR or FBR basis.
+  !  On exit vec2b contains a vector of expansion coefficients of a given 2D solution over sin/cos
+  !  Vector has M blocks of length L each. Each M-block contains expansion coefficient over the same harmonic in different ls.
+  !  Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2e and is fixed within this subroutine)
+  !-----------------------------------------------------------------------
+  subroutine trans_eibas_bas(vec1,nvec1,vec2e,vec2b)
+    type(array2d) vec1(:)    ! i-th element is a 2D array of 1D solutions in the i-th thread given as expansion coefficients over sin/cos basis
+    real*8        vec2b(:)   ! 2D vector in basis
+    real*8        vec2e(:)   ! expansion coefficients over 1D solutions
+    integer nvec1(n2)        ! Number of 1D vectors in each thread
+    integer is,i,j
+
+    i = 0
+    do is=1,n2
+      j = (is-1) * n3b
+      call gemv(vec1(is)%a,vec2e(i+1:i+nvec1(is)),vec2b(j+1:j+n3b))
+      i = i + nvec1(is)
+    end do
+  end subroutine
+
+  !-----------------------------------------------------------------------
   !  Calculates overlaps and saves them on disk in binary form.
   !  Only blocks in upper triangle.
   !-----------------------------------------------------------------------
@@ -882,9 +941,6 @@ contains
     integer numroc                        ! Calculates num of blocks
     character(256) fn
     integer i,j
-
-    ! Allocate arrays for vectors
-    allocate(lambdac(n23b),lambdar(n23b))
 
     ! One-channel diabatic overlaps
     if (oltype == OVERLAP_DIA) then
@@ -1018,6 +1074,7 @@ contains
           open(1,file=fn,form='unformatted')
           write(1)olap
           close(1)
+
           ! Deallocate matrix
           deallocate(olap)
         end do
@@ -1092,40 +1149,6 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
-  !  Loads asym block for K = 1
-  !-----------------------------------------------------------------------
-  ! function load_asym(block_num, block_sizes) result(matrix)
-  !   integer, intent(in) :: block_num
-  !   integer, intent(in) :: block_sizes(:)
-  !   real*8, allocatable :: matrix(:, :)
-  !   character(:), allocatable :: file_path
-  !
-  !   ! Exit if no basis
-  !   if (block_sizes(block_num) == 0) return
-  !   allocate(matrix(block_sizes(block_num), block_sizes(block_num)))
-  !   file_path = opath // '/' // getdir(MODE_OVERLAP) // '/asym.' // num2str(-block_num) // '.bin.out'
-  !   open(1, file=file_path, form='unformatted')
-  !   read(1) matrix
-  !   close(1)
-  ! end function
-
-  !-----------------------------------------------------------------------
-  !  Loads asym block from the disk. Adiabatic version.
-  !-----------------------------------------------------------------------
-  ! function load_cor(block_num, size1, size2) result(matrix)
-  !   integer, intent(in) :: block_num
-  !   integer, intent(in) :: size1, size2
-  !   real*8, allocatable :: matrix(:, :)
-  !   character(:), allocatable :: file_path
-  !
-  !   allocate(matrix(size1, size2))
-  !   file_path = opath // '/' // getdir(MODE_OVERLAP) // '/coriolis.' // num2str(block_num) // '.bin.out'
-  !   open(1, file=file_path, form='unformatted')
-  !   read(1) matrix
-  !   close(1)
-  ! end function
-
-  !-----------------------------------------------------------------------
   !  Loads 2D energies.
   !-----------------------------------------------------------------------
   subroutine load_val2(isl,val2)
@@ -1187,486 +1210,11 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
-  !  Solution of 3D problem using SDT and Lapack
+  !  Solution of 3D problem using SDT for a specific value of K (symmetric top approximation)
   !  Variables are real (d) and/or complex (z).
   !-----------------------------------------------------------------------
-  subroutine calc_3dsdt_lapa
-    ! Arrays for 2D states
-    real*8,allocatable::val2(:)           ! 2D eivalues
-    ! Arrays for real 3D states
-    real*8,allocatable::val3d(:)          ! 3D eivalues
-    real*8,allocatable::vec3d(:,:)        ! 3D vecs in basis
-    ! Arrays for complex 3D states
-    complex*16,allocatable::val3z(:)      ! 3D eivalues
-    complex*16,allocatable::vec3z(:,:)    ! 3D vecs in basis
-    ! Real hamiltonian arrays
-    real*8,allocatable::kin(:,:)          ! KEO matrix
-    real*8,allocatable::ham1d(:,:)        ! One local block
-    ! Complex hamiltonian arrays
-    complex*16,allocatable::kinz(:,:)     ! KEO matrix
-    complex*16,allocatable::ham1z(:,:)    ! One local block
-    ! Matrix partitioning
-    integer,allocatable::blsize(:)        ! Block sizes
-    integer,allocatable::offset(:)        ! Block offsets
-    integer nbl                           ! Number of blocks in r/c
-    integer gblr,gblc                     ! Global block indices
-    integer blsizemax                     ! Maximum block size
-    ! Miscellaneous
-    integer    kc,kr                      ! Elem indices in fnl mtrx
-    real*8, allocatable   ::s(:)          ! Values to sort
-    integer,allocatable   ::ind(:)        ! Sorted indices
-    real*8, allocatable   ::wd(:)         ! 3D eivalues, raw
-    complex*16,allocatable::wz(:)         ! 3D eivalues, raw
-    complex*16,allocatable::vr(:,:)       ! 3D vecs, raw
-    integer    i
-    
-    ! Load matrix partitioning
-    call load_partitioning(nbl,blsize,blsizemax,offset,msize)
-    
-    ! Stop if number of states exceeds matrix size
-    if (nstate > msize) then
-      write(*,*)'Requested number of states > matrix size, stop'
-      return
-    end if
-
-    ! Allocate real arrays
-    if (realver) then
-      allocate(kin(n1,n1))
-      write(LG,'(A10,F10.3,A3)')'kin:',   sizeof(kin)   /by2mb,' MB'
-    ! Allocate complex arrays
-    else
-      allocate(kinz(n1,n1))
-      write(LG,'(A10,F10.3,A3)')'kinz:',  sizeof(kinz)  /by2mb,' MB'
-    end if
-
-    ! Initialize KEO matrix
-    ! In complex version it also includes CAP
-    if (realver) then
-      call init_matrix1d(kin)
-    else
-      call init_matrix1z(kinz)
-    end if
-
-    ! Allocate final matrix
-    if (myid == 0) write(*,*) 'Final matrix size: ',msize
-    write(LG,*)'Final matrix size: ',msize
-    if (realver) then
-      if (allocated(hamd))deallocate(hamd)
-      allocate(hamd(msize,msize))
-      write(LG,'(A10,F10.3,A3)')'hamd:',sizeof(hamd)/by2mb,' MB'
-    else
-      if (allocated(hamz))deallocate(hamz)
-      allocate(hamz(msize,msize))
-      write(LG,'(A10,F10.3,A3)')'hamz:',sizeof(hamz)/by2mb,' MB'
-    end if
-
-    ! Calculate blocks of Hamiltonian matrix
-    ! Loop over columns
-    do gblc=1,nbl
-      ! Check if column is not empty and log
-      if (adiab .and. blsize(gblc) == 0)cycle
-      write(LG,*)'Column: ',gblc
-      ! Loop over rows
-      do gblr=1,nbl
-        ! Check if row is not empty and log
-        if (adiab .and. blsize(gblr) == 0)cycle
-        write(LG,*)'Row: ',gblr
-        ! Load block
-        call load_overlap(gblr,gblc,blsize,ham1d,adiab)
-        ! Finish block construction and save, real version
-        if (realver) then
-          ! Multiply by KEO element
-          if (adiab) then
-            ham1d = ham1d * kin(gblr,gblc)
-          else
-            ham1d = ham1d * kin
-          end if
-
-          ! Add 2D energies to the diagonal of diagonal block
-          if (gblc == gblr) then
-            if (adiab) then
-              call load_val2(gblc,val2)
-            else
-              call load_val2_grouped(gblc,val2)
-            end if
-            do i=1,blsize(gblc)
-              ham1d(i,i) = ham1d(i,i) + val2(i)
-            end do
-          end if
-
-          ! Save block
-          kr = offset(gblr)
-          kc = offset(gblc)
-          hamd(kr+1:kr+blsize(gblr),kc+1:kc+blsize(gblc)) = ham1d
-        ! Finish block construction and save, complex version
-        else
-          ! Allocate complex array
-          allocate(ham1z(blsize(gblr),blsize(gblc)))
-          ! Multiply by KEO element
-          if (adiab) then
-            ham1z = ham1d * kinz(gblr,gblc)
-          else
-            ham1z = ham1d * kinz
-          end if
-
-          ! Add 2D energies to the diagonal of diagonal block
-          if (gblc == gblr) then
-            if (adiab) then
-              call load_val2(gblc,val2)
-            else
-              call load_val2_grouped(gblc,val2)
-            end if
-            do i=1,blsize(gblc)
-              ham1z(i,i) = ham1z(i,i) + val2(i)
-            end do
-          end if
-
-          ! Save block
-          kr = offset(gblr)
-          kc = offset(gblc)
-          do i=1,blsize(gblc)
-            hamz(kr+1:kr+blsize(gblr),kc+i) = ham1z(:,i)
-          end do
-          ! Deallocate temporary array
-          deallocate(ham1z)
-        end if
-        ! Deallocate temporary array
-        deallocate(ham1d)
-      ! Loop over rows
-      end do
-    ! Loop over columns
-    end do
-
-    ! Allocate memory for values, vectors and symmetries
-    if (realver) then
-      allocate(val3d(nstate),wd(msize),vec3d(msize,nstate))
-      write(LG,'(A10,F10.3,A3)')'val3d:', sizeof(val3d) /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'vec3d:', sizeof(vec3d) /by2mb,' MB'
-    else
-      allocate(val3z(nstate),wz(msize),vec3z(msize,nstate))
-      write(LG,'(A10,F10.3,A3)')'val3z:', sizeof(val3z) /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'vec3z:', sizeof(vec3z) /by2mb,' MB'
-      allocate(s(msize),ind(msize),vr(msize,msize))
-    end if
-
-    ! Solve matrix
-    if (realver) then
-      call syev(hamd,wd,'V')
-      val3d = wd(1:nstate)
-      vec3z = hamd(:,1:nstate)
-    else
-      call geev(hamz,wz,vr,vr)
-      s = real(wz)
-      s = bubble_sort(s, ind) ! algorithms
-      do i=1,nstate
-        val3z(i)   = wz(ind(i))
-        vec3z(:,i) = vr(:,ind(i))
-      end do
-    end if
-
-    ! Print spectrum
-    call prnt_3dsdt(val3d,vec3d,val3z,vec3z,nstate,nprocs)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Solution of 3D problem using SDT and ScaLapack.
-  !  Variables are real (d) and/or complex (z).
-  !-----------------------------------------------------------------------
-  subroutine calc_3dsdt_scal
-    ! Arrays for 2D states
-    real*8,allocatable::val2(:)           ! 2D eivalues
-    ! Arrays for real 3D states
-    real*8,allocatable::val3d(:)          ! 3D eivalues
-    real*8,allocatable::vec3d(:,:)        ! 3D vecs in basis
-    ! Arrays for complex 3D states
-    complex*16,allocatable::val3z(:)      ! 3D eivalues
-    complex*16,allocatable::vec3z(:,:)    ! 3D vecs in basis
-    ! Real hamiltonian arrays
-    real*8,allocatable::kin(:,:)          ! KEO matrix
-    real*8,allocatable::ham1d(:,:)        ! One local block
-    real*8,allocatable::ham2d(:,:,:,:)    ! All local blocks
-    real*8,allocatable::hamtd(:,:,:,:)    ! Stores bcasted blockes
-    ! Complex hamiltonian arrays
-    complex*16,allocatable::kinz(:,:)     ! KEO matrix
-    complex*16,allocatable::ham1z(:,:)    ! One local block
-    complex*16,allocatable::ham2z(:,:,:,:)! All local blocks
-    complex*16,allocatable::hamtz(:,:,:,:)! Stores bcasted blockes
-    ! Matrix partitioning
-    integer,allocatable::blsize(:)        ! Block sizes
-    integer,allocatable::offset(:)        ! Block offsets
-    integer nbl                           ! Number of blocks in r/c
-    integer nblr,nblc                     ! Local number of blocks
-    integer iblr,iblc                     ! Local  block indices
-    integer gblr,gblc                     ! Global block indices
-    integer blsizemax                     ! Maximum block size
-    integer nblcmax                       ! nblc, max
-    integer nblrmax                       ! nblr, max
-    integer nblrt,nblct                   ! Local num of blocks,temp
-    ! Matrix distribution for ScaLapack
-    integer mblr,mblc                     ! Local num of blocks
-    integer fblc,fblr                     ! Local indices in fnl mtrx
-    integer pcol,prow                     ! Process coords
-    integer fpcol,fprow                   ! Process coords, fnl mtrx
-    integer jc,jr                         ! Elem indices in block
-    integer kc,kr                         ! Elem indices in fnl mtrx
-    integer nb                            ! ScaLapack block size
-    integer numroc                        ! Calculates num of blocks
-    integer nstloc                        ! Local num of states
-    ! Miscellaneous
-    character(256) fn
-    integer i
-
-    ! Load matrix partitioning
-    call load_partitioning(nbl,blsize,blsizemax,offset,msize)
-    
-    ! Stop if number of states exceeds matrix size
-    if (nstate > msize) then
-      if (myid == 0) then
-        write(*,*)'Requested number of states > matrix size, stop'
-      end if
-      return
-    end if
-
-    ! Get number of blocks stored locally
-    nblr = numroc(nbl,1,myrow,0,nprow)
-    nblc = numroc(nbl,1,mycol,0,npcol)
-    write(LG,*)'Number of blocks: ',nblr,'x',nblc
-
-    ! Allocate real arrays
-    if (realver) then
-      allocate(kin(n1,n1),ham2d(blsizemax,blsizemax,nblr,nblc))
-      write(LG,'(A10,F10.3,A3)')'kin:',   sizeof(kin)   /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'ham2d:', sizeof(ham2d) /by2mb,' MB'
-      ham2d = 0
-    ! Allocate complex arrays
-    else
-      allocate(kinz(n1,n1),ham2z(blsizemax,blsizemax,nblr,nblc))
-      write(LG,'(A10,F10.3,A3)')'kinz:',  sizeof(kinz)  /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'ham2z:', sizeof(ham2z) /by2mb,' MB'
-      ham2z = 0
-    end if
-
-    ! Initialize KEO matrix
-    ! In complex version it also includes CAP
-    if (realver) then
-      call init_matrix1d(kin)
-    else
-      call init_matrix1z(kinz)
-    end if
-
-    ! Calculate blocks of Hamiltonian matrix
-    ! Loop over columns
-    do iblc=1,nblc
-      ! Get global column number
-      call l2g(iblc,mycol,nbl,npcol,1,gblc) ! index_conversion
-      ! Check if column is not empty and log
-      if (adiab .and. blsize(gblc) == 0)cycle
-      write(LG,*)'Column: ',iblc,gblc
-
-      ! Loop over rows
-      do iblr=1,nblr
-        ! Get global row number
-        call l2g(iblr,myrow,nbl,nprow,1,gblr)
-        ! Check if row is not empty and log
-        if (adiab .and. blsize(gblr) == 0)cycle
-        write(LG,*)'Row: ',iblr,gblr
-        ! Load block
-        call load_overlap(gblr,gblc,blsize,ham1d,adiab)
-        ! Finish block construction and save, real version
-        if (realver) then
-          ! Multiply by KEO element
-          if (adiab) then
-            ham1d = ham1d * kin(gblr,gblc)
-          else
-            ham1d = ham1d * kin
-          end if
-
-          ! Add 2D energies to the diagonal of diagonal block
-          if (gblc == gblr) then
-            if (adiab) then
-              call load_val2(gblc,val2)
-            else
-              call load_val2_grouped(gblc,val2)
-            end if
-            do i=1,blsize(gblc)
-              ham1d(i,i) = ham1d(i,i) + val2(i)
-            end do
-          end if
-
-          ! Save block
-          do i=1,blsize(gblc)
-            ham2d(1:blsize(gblr),i,iblr,iblc) = ham1d(:,i)
-          end do
-        ! Finish block construction and save, complex version
-        else
-          ! Allocate complex array
-          allocate(ham1z(blsize(gblr),blsize(gblc)))
-          ! Multiply by KEO element
-          if (adiab) then
-            ham1z = ham1d * kinz(gblr,gblc)
-          else
-            ham1z = ham1d * kinz
-          end if
-
-          ! Add 2D energies to the diagonal of diagonal block
-          if (gblc == gblr) then
-            if (adiab) then
-              call load_val2(gblc,val2)
-            else
-              call load_val2_grouped(gblc,val2)
-            end if
-            do i=1,blsize(gblc)
-              ham1z(i,i) = ham1z(i,i) + val2(i)
-            end do
-          end if
-
-          ! Save block
-          do i=1,blsize(gblc)
-            ham2z(1:blsize(gblr),i,iblr,iblc) = ham1z(:,i)
-          end do
-          ! Deallocate temporary array
-          deallocate(ham1z)
-        end if
-        ! Deallocate temporary array
-        deallocate(ham1d)
-      ! Loop over rows
-      end do
-    ! Loop over columns
-    end do
-
-    ! Define ScaLapack block size for matrix
-    ! For non-hermitian solver, minimum block size is 6
-    if (realver) then
-      nb = 1
-    else
-      nb = 6
-    end if
-
-    ! Allocate final matrix
-    mblr = numroc(msize,nb,myrow,0,nprow)
-    mblc = numroc(msize,nb,mycol,0,npcol)
-    if (myid == 0)write(*,*)'Final matrix size: ',msize
-    write(LG,*)'Final matrix size: ',msize
-    write(LG,*)'Local chunk size:',mblr,'x',mblc
-    if (realver) then
-      if (allocated(hamd))deallocate(hamd)
-      allocate(hamd(mblr,mblc))
-      write(LG,'(A10,F10.3,A3)')'hamd:',sizeof(hamd)/by2mb,' MB'
-    else
-      if (allocated(hamz))deallocate(hamz)
-      allocate(hamz(mblr,mblc))
-      write(LG,'(A10,F10.3,A3)')'hamz:',sizeof(hamz)/by2mb,' MB'
-    end if
-
-    ! Allocate space for broadcasted blocks
-    nblcmax = nblc
-    nblrmax = nblr
-    call igamx2d(context,'A',' ',1,1,nblcmax,1,i,i,-1,-1,-1)
-    call igamx2d(context,'A',' ',1,1,nblrmax,1,i,i,-1,-1,-1)
-    write(LG,*)'Maximum number of blocks: ',nblrmax,'x',nblcmax
-    if (realver) then
-      allocate(hamtd(blsizemax,blsizemax,nblrmax,nblcmax))
-      write(LG,'(A10,F10.3,A3)')'hamtd:',sizeof(hamtd)/by2mb,' MB'
-    else
-      allocate(hamtz(blsizemax,blsizemax,nblrmax,nblcmax))
-      write(LG,'(A10,F10.3,A3)')'hamtz:',sizeof(hamtz)/by2mb,' MB'
-    end if
-    i = blsizemax**2 * nblrmax
-
-    ! Redistribute elements of matrix in 2d cyclic way
-    ! Spread elements of broadcasted blocks
-    ! Loop over processes
-    do pcol=0,npcol-1
-      do prow=0,nprow-1
-        ! Broadcast all local blocks of one process
-        if (pcol==mycol.and.prow==myrow) then
-          if (realver) then
-            hamtd = 0d0
-          else
-            hamtz = 0d0
-          end if
-          do iblc=1,nblc
-            do iblr=1,nblr
-              if (realver) then
-                hamtd(:,:,iblr,iblc) = ham2d(:,:,iblr,iblc)
-              else
-                hamtz(:,:,iblr,iblc) = ham2z(:,:,iblr,iblc)
-              end if
-            end do
-          end do
-          nblct = nblc
-          nblrt = nblr
-          if (realver) then
-            call dgebs2d(context,'A',' ',i,nblcmax,hamtd,i)
-          else
-            call zgebs2d(context,'A',' ',i,nblcmax,hamtz,i)
-          end if
-          call igebs2d(context,'A',' ',1,1,nblct,1)
-          call igebs2d(context,'A',' ',1,1,nblrt,1)
-        else
-          if (realver) then
-            call dgebr2d(context,'A',' ',i,nblcmax,hamtd,i,prow,pcol)
-          else
-            call zgebr2d(context,'A',' ',i,nblcmax,hamtz,i,prow,pcol)
-          end if
-          call igebr2d(context,'A',' ',1,1,nblct,1,prow,pcol)
-          call igebr2d(context,'A',' ',1,1,nblrt,1,prow,pcol)
-        end if
-
-        ! Fill in corresponding local elements of final matrix
-        do iblc=1,nblct
-          call l2g(iblc,pcol,nbl,npcol,1,gblc)
-          do iblr=1,nblrt
-            call l2g(iblr,prow,nbl,nprow,1,gblr)
-            do jc=1,blsize(gblc)
-              kc = offset(gblc) + jc
-              call g2l(kc,msize,npcol,nb,fpcol,fblc)
-              do jr=1,blsize(gblr)
-                kr = offset(gblr) + jr
-                call g2l(kr,msize,nprow,nb,fprow,fblr)
-                if (fpcol==mycol.and.fprow==myrow) then
-                  if (realver) then
-                    hamd(fblr,fblc) = hamtd(jr,jc,iblr,iblc)
-                  else
-                    hamz(fblr,fblc) = hamtz(jr,jc,iblr,iblc)
-                  end if
-                end if
-              end do
-            end do
-          end do
-        end do
-      ! Loop over processes
-      end do
-    end do
-
-    ! Allocate memory for values, vectors and symmetries
-    nstloc = numroc(nstate,1,myid,0,nprocs_rect)
-    if (realver) then
-      allocate(val3d(nstate),vec3d(msize,nstloc))
-      write(LG,'(A10,F10.3,A3)')'val3d:', sizeof(val3d) /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'vec3d:', sizeof(vec3d) /by2mb,' MB'
-    else
-      allocate(val3z(nstate),vec3z(msize,nstloc))
-      write(LG,'(A10,F10.3,A3)')'val3z:', sizeof(val3z) /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'vec3z:', sizeof(vec3z) /by2mb,' MB'
-    end if
-
-    ! Solve matrix
-    if (realver) then
-      call scald(context,msize,nstate,vec3d,val3d,hamd,mblr,mblc,nstloc,nb) ! tools/eicalc/scalapack.f90
-    else
-      call scalz(context,msize,nstate,vec3z,val3z,hamz,mblr,mblc,nstloc,nb)
-    end if
-
-    ! Print spectrum
-    call prnt_3dsdt(val3d,vec3d,val3z,vec3z,nstloc,nprocs_rect)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Solution of 3D problem using SDT and PARPACK for a specific value of K
-  !  Variables are real (d) and/or complex (z).
-  !-----------------------------------------------------------------------
-  subroutine calc_3dsdt_parp
+  subroutine calc_3dsdt_sym_top(params)
+    class(input_params), intent(in) :: params
     ! Arrays for 2D states
     real*8,allocatable::val2(:)           ! 2D eivalues
     ! Arrays for real 3D states
@@ -1706,18 +1254,6 @@ contains
     ! Miscellaneous
     integer i,j
 
-    ! test adding asym on overlaps stage
-    integer :: sym, msize_1, J_my, K1, K2, par
-    integer :: first_row, last_row, first_col, last_col
-    integer, allocatable :: blsize_1(:)        ! Block sizes (in rows)
-    integer, allocatable :: offset_1(:)        ! starting row number of each block (block offsets)
-    real*8, allocatable :: asym(:, :) ! asym block
-    real*8, allocatable :: cor(:, :) ! coriolis block
-    complex*16, allocatable :: hamz_total(:, :), hamz_1(:, :), hamz_01(:, :)
-    character(:), allocatable :: sym_label, sym_label_op
-
-! Original code
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Load matrix partitioning
     call load_partitioning(nbl,blsize,blsizemax,offset,msize)
     
@@ -1885,15 +1421,6 @@ contains
             ham1z = ham(rn1:rn2,:) * kinz(rn1:rn2,:)
           end if
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ! if (test_mode == 'asym') then
-          !   if (gblc == gblr) then
-          !     asym = load_asym(gblr, blsize)
-          !     ham1z = ham1z + asym(rn1:rn2, :) * calculate_U(jlarge, klarge, klarge, parity)
-          !   end if
-          ! end if
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
           ! Add 2D energies to the diagonal of diagonal block
           if (gblc == gblr) then
             if (adiab) then
@@ -1921,101 +1448,6 @@ contains
     ! Loop over rows
     end do
 
-
-! Coriolis hacking
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! if (test_mode == 'cor') then
-    !   ! Loading second block (K=1) + asym
-    !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !   print *, 'Loading K=1 block'
-    !   sym_label = iff('even', 'odd', sy == 5)
-    !   sym_label_op = iff('odd', 'even', sy == 5)
-    !   par = 1
-    !   bpath = '/global/cscratch1/sd/gaidai/research/spectrumsdt/calcs/686/rmax_5/alpha_0.5/ecut_0/J_' // num2str(jlarge) // '/K_1/' // sym_label_op // '/basis'
-    !   opath = '/global/cscratch1/sd/gaidai/research/spectrumsdt/calcs/686/rmax_5/alpha_0.5/ecut_0/J_' // num2str(jlarge) // '/K_1/' // sym_label_op // '/overlaps'
-    !   call load_partitioning(nbl, blsize_1, blsizemax, offset_1, msize_1)
-    !
-    !   allocate(hamz_1(msize_1, msize_1))
-    !   ! Loop over needed row blocks
-    !   do gblr = 1, n1
-    !     if (blsize_1(gblr) == 0) cycle
-    !     ! Loop over column blocks
-    !     do gblc = 1, n1
-    !       if (blsize_1(gblc) == 0) cycle
-    !       call load_overlap(gblr, gblc, blsize_1, ham, adiab)
-    !       ! Multiply by KEO element
-    !       ham = ham * kinz(gblr,gblc)
-    !
-    !       ! Add asym term
-    !       if (gblc == gblr) then
-    !         asym = load_asym(gblr, blsize_1)
-    !         asym = asym * calculate_U(jlarge, 1, 1, par)
-    !         ham = ham + asym
-    !       end if
-    !
-    !       ! Add 2D energies to the diagonal of diagonal block
-    !       if (gblc == gblr) then
-    !         call load_val2(gblc,val2)
-    !         do i=1, blsize_1(gblr)
-    !           ham(i, i) = ham(i, i) + val2(i)
-    !         end do
-    !       end if
-    !
-    !       ! Save block
-    !       hamz_1(offset_1(gblr) + 1 : offset_1(gblr) + blsize_1(gblr), offset_1(gblc) + 1 : offset_1(gblc) + blsize_1(gblc)) = ham
-    !     end do
-    !   end do
-    !
-    !   ! Loading offdiagonal block
-    !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !   print *, 'Loading coriolis block'
-    !   opath = '/global/cscratch1/sd/gaidai/research/spectrumsdt/calcs/686/rmax_5/alpha_0.5/ecut_0/J_' // num2str(jlarge) // '/K_' // num2str(jlarge - 1) // '/' // sym_label_op // '/overlaps'
-    !
-    !   allocate(hamz_01(msize, msize_1))
-    !   ! Loop over needed row blocks
-    !   do gblr = 1, n1
-    !     if (blsize(gblr) == 0 .or. blsize_1(gblr) == 0) cycle
-    !     ham = load_cor(gblr, blsize(gblr), blsize_1(gblr))
-    !
-    !     if (jlarge == 1) then
-    !       ham = ham * calculate_W(jlarge, 0, 1, par)
-    !     end if
-    !     if (jlarge == 2) then
-    !       ham = ham * calculate_W(jlarge, 1, 2, par)
-    !     end if
-    !
-    !     ! test factor
-    !     ! ham = ham / sqrt(2d0)
-    !
-    !     ! Save block
-    !     hamz_01(offset(gblr) + 1 : offset(gblr) + blsize(gblr), offset_1(gblr) + 1 : offset_1(gblr) + blsize_1(gblr)) = ham
-    !   end do
-    !
-    !   ! Putting all the blocks together
-    !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !   print *, 'Putting the blocks together'
-    !   allocate(hamz_total(msize + msize_1, msize + msize_1))
-    !   if (jlarge == 1) then
-    !     hamz_total(: msize, : msize) = hamz
-    !     hamz_total(msize + 1 :, msize + 1 :) = hamz_1
-    !     hamz_total(: msize, msize + 1 :) = hamz_01
-    !     hamz_total(msize + 1 :, : msize) = transpose(hamz_01)
-    !   else if (jlarge == 2) then
-    !     hamz_total(: msize_1, : msize_1) = hamz_1
-    !     hamz_total(msize_1 + 1 :, msize_1 + 1 :) = hamz
-    !     hamz_total(: msize_1, msize_1 + 1 :) = transpose(hamz_01)
-    !     hamz_total(msize_1 + 1 :, : msize_1) = hamz_01
-    !   end if
-    !
-    !   ! Override the variables
-    !   deallocate(hamz)
-    !   allocate(hamz, source = hamz_total)
-    !   msize = msize + msize_1
-    !   mloc = msize
-    ! end if
-
-! Original code
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Allocate memory for values, vectors and symmetries
     nstloc = numroc(nstate,1,myid,0,nprocs)
     if (realver) then
@@ -2028,11 +1460,16 @@ contains
       write(LG,'(A10,F10.3,A3)')'vec3z:', sizeof(vec3z) /by2mb,' MB'
     end if
 
-    ! Solve matrix
-    if (realver) then
-      call pard(context,val3d,vec3d,msize,mloc,nstate,nstloc,ncv,maxitr,opd)
+    if (debug_mode == 'sdt_use_slepc') then
+      call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, val3z, vec3z)
     else
-      call parz(context,val3z,vec3z,msize,mloc,nstate,nstloc,ncv,maxitr,opz) ! tools/eicalc/parpack.f90
+      ! Solve matrix
+      if (realver) then
+        call pard(context,val3d,vec3d,msize,mloc,nstate,nstloc,ncv,maxitr,opd)
+      else
+        active_matmul_operator => opz
+        call parz(context,val3z,vec3z,msize,mloc,nstate,nstloc,ncv,maxitr) ! tools/eicalc/parpack.f90
+      end if
     end if
     
     ! Print spectrum
@@ -2118,7 +1555,8 @@ contains
   !-----------------------------------------------------------------------
   !  Post-processing.
   !-----------------------------------------------------------------------
-  subroutine calc_3dsdt_post
+  subroutine calc_3dsdt_post(params)
+    class(input_params), intent(in) :: params
     ! Barrier
     real*8  baren(ngr)
     real*8  barps(ngr)
@@ -2168,7 +1606,7 @@ contains
     write(LG,'(A,F10.3,A)')'statez:', sizeof(statez)/by2mb,' MB'
 
     ! Load CAP
-    call init_caps(0d0)
+    call init_caps(params, 0d0)
     call get_cap(cap)
 
     ! Process my states
@@ -2652,7 +2090,8 @@ contains
   !-----------------------------------------------------------------------
   !  Performs diagonalization of 1D channel Hamiltonians.
   !-----------------------------------------------------------------------
-  subroutine calc_chdiag
+  subroutine calc_chdiag(params)
+    class(input_params), intent(in) :: params
     ! Digonalization
     real*8, allocatable :: olap(:,:)    ! Overlap matrix
     integer,allocatable :: ind(:)       ! Channel indices
@@ -2711,7 +2150,7 @@ contains
       write(LG,*)'Barrier Position: ',barps
       write(LG,*)'CAP Ebar: ',capebar
       ! Initialize CAPs
-      call init_caps(capebar / autown)
+      call init_caps(params, capebar / autown)
     end if
 
     ! Load overlap matrix
@@ -3076,109 +2515,6 @@ contains
         enddo
       enddo
     endif
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Loads 1D and 2D eigenvector basis for given slice.
-  !-----------------------------------------------------------------------
-  subroutine load_eibasis(isl,nvec1,val1,vec1,val2,vec2)
-    type(array1d),allocatable::val1(:) ! 1D solutions eigenvalues for each thread
-    type(array2d),allocatable::vec1(:) ! 1D solutions expansion coefficients (over sin/cos) for each thread
-    real*8,allocatable::vec2(:,:)      ! 2D solutions expansion coefficients (over 1D solutions)
-    real*8,allocatable::val2(:)        ! 2D eigenvalues
-    integer,allocatable::nvec1(:)      ! Num of 1D solutions in each thread
-    integer nvec2                      ! Num of 2D vecs
-    integer nb2                        ! Size of 2D vector in basis
-    integer isl                        ! Slice number
-    integer i
-    character(:),allocatable::ldir
-    character(256) fn
-    
-    ! Deallocate arrays if allocated
-    call free_1d(nvec1,val1,vec1)
-    call free_2d(nvec2,val2,vec2)
-
-    ! Get load directory
-    ldir = bpath // '/' // getdir(MODE_BASIS)
-    ! Get file name
-    write(fn,'(2A,I4.4,A)')ldir,'/bas2.',isl,'.bin.out'
-    ! Load 2D solution
-    open(1,file=fn,form='unformatted')
-    read(1)nvec2,nb2
-    if (nvec2 == 0)return ! Exit right away, if empty
-    allocate(val2(nvec2),vec2(nb2,nvec2))
-    read(1)val2
-    read(1)vec2
-    close(1)
-
-    ! Get file name
-    write(fn,'(2A,I4.4,A)')ldir,'/bas1.',isl,'.bin.out'
-    ! Load 1D solution
-    allocate(nvec1(n2),val1(n2),vec1(n2))
-    open(1,file=fn,form='unformatted')
-    read(1)nvec1
-    do i=1,n2
-      if (nvec1(i) == 0)cycle
-      allocate(val1(i)%a(nvec1(i)),vec1(i)%a(n3b,nvec1(i)))
-      read(1)val1(i)%a
-      read(1)vec1(i)%a
-    end do
-    close(1)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Frees 1D solution.
-  !-----------------------------------------------------------------------
-  subroutine free_1d(nvec,val,vec)
-    type(array1d),allocatable::val(:) ! 1D values  for each thread
-    type(array2d),allocatable::vec(:) ! 1D vectors for each thread
-    integer,allocatable::nvec(:)      ! Num of 1D vecs
-    integer i
-    if (allocated(nvec))deallocate(nvec)
-    if (allocated(val)) then
-      do i=1,n2
-        if (allocated(val(i)%a))deallocate(val(i)%a)
-      end do
-      deallocate(val)
-    end if
-    if (allocated(vec)) then
-      do i=1,n2
-        if (allocated(vec(i)%a))deallocate(vec(i)%a)
-      end do
-      deallocate(vec)
-    end if
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Frees 2D solution.
-  !-----------------------------------------------------------------------
-  subroutine free_2d(nvec,val,vec)
-    real*8,allocatable::vec(:,:)      ! 2D vectors in basis
-    real*8,allocatable::val(:)        ! 2D values
-    integer nvec                      ! Num of 2D vecs
-    nvec = 0
-    if (allocated(val)) deallocate(val)
-    if (allocated(vec)) deallocate(vec)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Transforms 2D state from 1D eigenvector basis to DVR or FBR basis.
-  !  On exit vec2b contains a vector of expansion coefficients of a given 2D solution over sin/cos
-  !  Vector has M blocks of length L each. Each M-block contains expansion coefficient over the same harmonic in different ls.
-  !  Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2e and is fixed within this subroutine)
-  !-----------------------------------------------------------------------
-  subroutine trans_eibas_bas(vec1,nvec1,vec2e,vec2b)
-    type(array2d) vec1(:)    ! i-th element is a 2D array of 1D solutions in the i-th thread given as expansion coefficients over sin/cos basis
-    real*8        vec2b(:)   ! 2D vector in basis
-    real*8        vec2e(:)   ! expansion coefficients over 1D solutions
-    integer nvec1(n2)        ! Number of 1D vectors in each thread
-    integer is,i,j
-    i = 0
-    do is=1,n2
-      j = (is-1) * n3b
-      call gemv(vec1(is)%a,vec2e(i+1:i+nvec1(is)),vec2b(j+1:j+n3b))
-      i = i + nvec1(is)
-    end do
   end subroutine
 
   !-----------------------------------------------------------------------
@@ -4085,25 +3421,6 @@ contains
     end if
   end function
   
-  subroutine init_caps(capebarin)
-    implicit none
-    real*8 capebarin
-    character(256)fn
-    capebar = capebarin
-    call calc_cap(n1,g1,LG)
-    write(fn,'(4A,I5.5,A)')outdir,'/',capdir,'/cap',myid+1,'.out'
-    call prnt_cap(fn)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Provides CAP to sdt for integration.
-  !-----------------------------------------------------------------------
-  subroutine get_cap(p)
-    implicit none
-    real*8 p(n1)
-    p = cap(:,capid)
-  end subroutine
-
   !-----------------------------------------------------------------------
   !  Calculates 1D Hamiltonian for coordinate #1. Real version.
   !-----------------------------------------------------------------------
@@ -4156,7 +3473,7 @@ contains
     ! Add complex potential
     if (capid /= 0) then
       do i=1,n1
-        ham(i,i) = ham(i,i) + (0,-1) * cap(i,capid)
+        ham(i,i) = ham(i,i) + (0,-1) * all_caps(i,capid)
       enddo
     endif
 
@@ -4329,7 +3646,7 @@ contains
           k = i3 + (i2-1)*n3 + (i1-1)*n2*n3
           hpsi(k) =  hpsi1(i1,i3,i2) + 4/grho2(i1) * ( hpsi2(i2,i3,i1) + hpsi3(i3,i2,i1) / sintet2(i2) )
           hpsi(k) = -hpsi(k)/(2.0d0*mu) + psi(k)*pottot(i3,i2,i1)
-          if (capid /= 0)hpsi(k)= hpsi(k) + psi(k)*(0,-1)*cap(i1,capid)
+          if (capid /= 0)hpsi(k)= hpsi(k) + psi(k)*(0,-1)*all_caps(i1,capid)
         enddo
       enddo
     enddo

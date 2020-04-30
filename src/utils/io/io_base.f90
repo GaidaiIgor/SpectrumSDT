@@ -64,15 +64,16 @@ contains
 !-----------------------------------------------------------------------
 ! Prints matrix neatly
 !-----------------------------------------------------------------------
-  subroutine print_real_matrix(matrix, fileName, append, transpose)
+  subroutine print_real_matrix(matrix, fileName, append, transpose, print_size)
     real*8 :: matrix(:, :)
     character(len = *), optional :: fileName
-    integer, optional :: append, transpose
-    integer :: append_act, transpose_act
+    integer, optional :: append, transpose, print_size
+    integer :: append_act, transpose_act, print_size_act
     integer :: fileUnit, i, j
 
     append_act = merge(append, 0, present(append))
     transpose_act = merge(transpose, 0, present(transpose))
+    print_size_act = merge(print_size, 0, present(print_size))
     if (present(fileName)) then
       if (append_act) then
         open(newunit = fileUnit, file = fileName, position = 'append')
@@ -83,29 +84,61 @@ contains
       fileUnit = output_unit
     end if
 
+    if (print_size_act == 1) then
+      write(fileUnit, '(I0,x,I0)') size(matrix, 1), size(matrix, 2)
+    end if
     if (transpose_act) then
       do j = 1,size(matrix, 2)
-        write(fileUnit, '(*(E25.16))') (matrix(i, j), i = 1,size(matrix, 1))
+        write(fileUnit, '(*(E26.17))') (matrix(i, j), i = 1,size(matrix, 1))
       end do
     else
       do i = 1,size(matrix, 1)
-        write(fileUnit, '(*(E25.16))') (matrix(i, j), j = 1,size(matrix, 2))
+        write(fileUnit, '(*(E26.17))') (matrix(i, j), j = 1,size(matrix, 2))
       end do
     end if
     close(fileUnit)
   end subroutine
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
+! Reads a real matrix printed by print_real_matrix with print_size=1
+!---------------------------------------------------------------------------------------------------------------------------------------------
+  function read_real_matrix(path) result(res)
+    character(*), intent(in) :: path
+    real*8, allocatable :: res(:, :)
+    integer :: rows, cols, file_unit
+
+    open(newunit = file_unit, file = path)
+    read(file_unit, *) rows, cols
+    allocate(res(cols, rows))
+    read(file_unit, *) res
+    close(file_unit)
+    res = transpose(res)
+  end function
+
+!---------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints complex matrix as A+iB, where A and B are printed separately
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine print_complex_matrix(matrix, fileName, append, transpose)
+  subroutine print_complex_matrix(matrix, fileName, append, transpose, print_size)
     complex*16 :: matrix(:, :)
     character(len = *), optional :: fileName
-    integer, optional :: append, transpose
+    integer, optional :: append, transpose, print_size
 
-    call print_real_matrix(real(matrix), fileName // '_real', append, transpose)
-    call print_real_matrix(aimag(matrix), fileName // '_imag', append, transpose)
+    call print_real_matrix(real(matrix), fileName // '_real', append, transpose, print_size)
+    call print_real_matrix(aimag(matrix), fileName // '_imag', append, transpose, print_size)
   end subroutine
+
+!---------------------------------------------------------------------------------------------------------------------------------------------
+! Reads a complex matrix printed by print_complex_matrix with print_size=1
+!---------------------------------------------------------------------------------------------------------------------------------------------
+  function read_complex_matrix(path) result(res)
+    character(*), intent(in) :: path
+    complex*16, allocatable :: res(:, :)
+    real*8, allocatable :: real_part(:, :), imag_part(:, :)
+
+    real_part = read_real_matrix(path // '_real')
+    imag_part = read_real_matrix(path // '_imag')
+    res = dcmplx(real_part, imag_part)
+  end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Core subroutine for print subroutines

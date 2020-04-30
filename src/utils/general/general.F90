@@ -91,15 +91,21 @@ module general_utils
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints progress %
 ! progress: current progress of some process (a number from 0 to 1)
-! last_progress: the value of progress for the previous call. If it exceeds the value of progress by more than progress_step, 
-! a progress is reported. The first time this procedure is called last_progress is mandatory to specify (usually with 0).
+! last_progress: the value of progress for the previous call. If it exceeds the value of progress by more than progress_step, progress is reported.
 ! progress_step: controls how often progress should be reported (default is every 0.1)
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine track_progress(progress, progress_step)
+  subroutine track_progress(progress, progress_step, reset)
     real*8, value :: progress
     real*8, optional :: progress_step
+    integer, optional, intent(in) :: reset
     real*8, save :: last_progress
     real*8 :: progress_step_act
+
+    if (present(reset)) then
+      if (reset == 1) then
+        last_progress = 0
+      end if
+    end if
 
     progress_step_act = merge(progress_step, 0.1d0, present(progress_step))
     if (progress > last_progress + progress_step_act) then
@@ -241,4 +247,19 @@ module general_utils
     integer :: res
     res = merge(1, 0, a == b)
   end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Find _row_ and _col_ index of maximum element in the _matrix_
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine find_max_loc_matrix(matrix, row, col)
+    real*8, intent(in) :: matrix(:, :)
+    integer, intent(out) :: row, col
+    integer, allocatable :: max_loc_col(:) ! row of maximum in each column
+    real*8, allocatable :: max_val_col(:) ! value of maximum in each column
+    
+    max_loc_col = maxloc(matrix, 2)
+    max_val_col = maxval(matrix, 2)
+    col = maxloc(max_val_col, 1)
+    row = max_loc_col(col)
+  end subroutine
 end module

@@ -1,20 +1,11 @@
 module parpack
   use algorithms
   use index_conversion
+  use matmul_operator_mod
   use parallel_utils
 
-  abstract interface
-    subroutine parpack_operator(proc_rows, vector, result)
-      integer :: proc_rows
-      complex*16 :: vector(proc_rows), result(proc_rows)
-    end subroutine
-    
-    subroutine parpack_operator_real(proc_rows, vector, result)
-      integer :: proc_rows
-      real*8 :: vector(proc_rows), result(proc_rows)
-    end subroutine
-  end interface
 contains
+
   !-----------------------------------------------------------------------
   !  This file contains drivers to PARPACK (parpack.f)
   !  Calculates eigenpairs, adopted from sample code.
@@ -30,7 +21,7 @@ contains
 
     ! Input variables
     integer   n, nloc, nev, nevloc, ncv, maxitr
-    procedure(parpack_operator_real) :: op
+    procedure(matmul_operator_real) :: op
     ! Output arrays
     real*8    eivals(nev)
     real*8    eivecs(n,nevloc)
@@ -202,7 +193,7 @@ contains
   !-----------------------------------------------------------------------
   ! PARPACK eigenproblem solver, complex verison.
   !-----------------------------------------------------------------------
-  subroutine parz(comm,eivals,eivecs,n,nloc,nev,nevloc,ncv,maxitr,op)
+  subroutine parz(comm,eivals,eivecs,n,nloc,nev,nevloc,ncv,maxitr)
     implicit none
 
     ! Input variables. 
@@ -212,9 +203,7 @@ contains
     ! nevloc - number of states belonging to this processor
     ! ncv - arnoldi basis size
     ! maxitr - maximum number of iterations
-    ! op - matrix-vector multiplication operator
     integer   n, nloc, nev, nevloc, ncv, maxitr
-    procedure(parpack_operator) :: op
     ! Output arrays
     complex*16 eivals(nev)
     complex*16 eivecs(n,nevloc) ! each process has only some columns of the overall eigenvectors matrix, distributed in a round-robin fashion (cyclically)
@@ -295,7 +284,7 @@ contains
         exit
       end if
 
-      call op(nloc, workd(ipntr(1)), workd(ipntr(2)))
+      call active_matmul_operator(nloc, workd(ipntr(1)), workd(ipntr(2)))
     end do
 
     ! Check for errors
@@ -329,7 +318,7 @@ contains
     ! Print converged eigenvalues and residuals
     nconv = iparam(5)
     do j=1,nconv
-      call op(nloc, v(1,j), ax)
+      call active_matmul_operator(nloc, v(1,j), ax)
       ! computes Y =     A   *  X   +    Y (residual vector)
       call zaxpy(nloc, -d(j), v(1,j), 1, ax, 1) ! 1 and 1 are increments in X and Y respectively
       rd(j,1) = dble(d(j)) ! real part of a complex number
@@ -429,5 +418,22 @@ contains
       deallocate(bv)
       offset = offset + bnloc 
     end do
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Find eigenvalues and eigenvectors of global variable rovib_ham (has to be built)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine find_eigenpairs_parpack(context, n_states, ncv, max_iterations, eigenvalues, eigenvectors)
+    integer, intent(in) :: context, n_states, ncv, max_iterations
+    complex*16, allocatable, intent(out) :: eigenvalues(:), eigenvectors(:, :)
+    integer :: proc_id, n_procs, proc_states
+    external :: numroc
+    integer :: numroc
+  
+    call get_proc_info(proc_id, n_procs)
+    ! Computes number of states for this process. Workload is distributed in a round-robin fashion.
+    proc_states = numroc(n_states, 1, proc_id, 0, n_procs)
+    allocate(eigenvalues(n_states), eigenvectors(rovib_ham % global_chunk_info % columns, proc_states))
+    call parz(context, eigenvalues, eigenvectors, rovib_ham % global_chunk_info % columns, size(rovib_ham % proc_chunk, 1), n_states, proc_states, ncv, max_iterations)
   end subroutine
 end module

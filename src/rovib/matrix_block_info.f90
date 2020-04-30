@@ -1,8 +1,10 @@
 module matrix_block_info_mod
   use block_borders_mod
   use general_utils
-  private
 
+  use debug_tools
+
+  private
   public :: copy_without_subblocks
 
   interface matrix_block_info
@@ -266,13 +268,20 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Updates part of the given matrix corresponding to this block with a given block
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine update_matrix(this, matrix, block)
+  subroutine update_matrix(this, matrix, block, show_debug)
     class(matrix_block_info), intent(in) :: this
     complex*16, intent(inout) :: matrix(:, :)
     complex*16, intent(in) :: block(:, :)
+    integer, optional :: show_debug
 
     call assert(.not. this % is_empty(), 'Error: attempt to update an empty block')
     call assert(size(block, 1) == this % rows .and. size(block, 2) == this % columns, 'Error: Supplied block has incorrect dimensions')
+
+    if (present(show_debug)) then
+      call this % print_all()
+      print *, 'Block sizes', size(block, 1), size(block, 2)
+    end if
+
     matrix(this % borders % top : this % borders % bottom, this % borders % left : this % borders % right) = block
   end subroutine
 
