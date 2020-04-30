@@ -942,6 +942,9 @@ contains
     character(256) fn
     integer i,j
 
+    ! Allocate arrays for vectors
+    allocate(lambdac(n23b),lambdar(n23b))
+
     ! One-channel diabatic overlaps
     if (oltype == OVERLAP_DIA) then
       ! Load recognition
