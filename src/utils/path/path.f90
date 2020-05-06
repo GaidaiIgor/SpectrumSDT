@@ -4,6 +4,8 @@
 module path_utils
   use general_utils
   use input_params_mod
+  use parallel_utils
+  use system_mod
 
 contains
 
@@ -57,18 +59,21 @@ contains
 !-----------------------------------------------------------------------
 ! resolves a path relative to location of executable file
 !-----------------------------------------------------------------------
-  function resolve_relative_exe_path(relative_exe_path)
+  function resolve_relative_exe_path(relative_exe_path) result(res)
     character(*), intent(in) :: relative_exe_path
-    character(256) :: path
-    character(:), allocatable :: resolve_relative_exe_path
-    call getarg(0, path)
+    character(:), allocatable :: res
+    character(512) :: path_arg
+    character(:), allocatable :: path
+
+    call get_command_argument(0, path_arg)
+    path = execute_shell_command('readlink -f ' // path_arg, '.temp' // num2str(get_proc_id()))
     path = get_path_head(path)
     ! only if path is non-empty
     if (len(path) /= 0) then
       path = trim(path) // '/'
     end if
     path = trim(path) // relative_exe_path
-    resolve_relative_exe_path = trim(path)
+    res = trim(path)
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------

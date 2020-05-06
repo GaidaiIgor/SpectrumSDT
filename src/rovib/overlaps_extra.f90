@@ -3,13 +3,14 @@ module overlaps_extra_mod
   use array_1d_mod
   use array_2d_mod
   use blas95 ! for dot product
-  use rovib_io_mod
-  use debug_tools
   use formulas_mod
   use input_params_mod
   use k_block_info
   use parallel_utils
   use path_utils
+  use rovib_io_mod
+
+  use debug_tools
 
   private
   public :: calculate_overlaps_extra

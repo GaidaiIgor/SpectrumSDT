@@ -27,41 +27,6 @@ contains
   end function countLines
   
 !-----------------------------------------------------------------------
-! List directory content
-! max file name length = 255
-! mask - file name pattern (like '*.txt')
-! additional - additional arguments to find
-!-----------------------------------------------------------------------
-  subroutine listDirectory(path, mask, result, additional)
-    character(len = *), intent(in) :: path, mask
-    character(len = :), allocatable :: command, tempFileName
-    character(len = 255), allocatable :: result(:)
-    character(len = *), optional :: additional 
-    integer :: fileState, fileUnit, linesAmount, i
-
-    tempFileName = '.searchResult'
-    command = 'find ' // path // ' -maxdepth 1 -name "' // mask // '" ! -name "' // tempFileName // '" -type f'
-    if (present(additional)) then
-      command = command // ' ' // additional
-    end if
-    command = command // ' -printf "%f\n" > ' // tempFileName
-    call system(command)
-    linesAmount = countLines(tempFileName)
-    allocate(result(linesAmount))
-
-    open(newunit = fileUnit, file = tempFileName)
-    i = 1
-    do
-      read(fileUnit, *, iostat = fileState) result(i)
-      if (fileState < 0) then
-        exit
-      end if
-      i = i + 1
-    end do
-    close(fileUnit, status = 'delete')
-  end subroutine
-
-!-----------------------------------------------------------------------
 ! Prints matrix neatly
 !-----------------------------------------------------------------------
   subroutine print_real_matrix(matrix, fileName, append, transpose, print_size)
@@ -277,6 +242,28 @@ contains
         return
       end if
     end do
+  end function
+
+!---------------------------------------------------------------------------------------------------------------------------------------------
+! Reads an entire file specified by file_path
+!---------------------------------------------------------------------------------------------------------------------------------------------
+  function read_file(file_path, destruct) result(content)
+    character(*), intent(in) :: file_path
+    integer, optional, intent(in) :: destruct ! Deletes file after read
+    character(:), allocatable :: content
+    integer :: file_unit, file_size, destruct_act
+
+    open(newunit = file_unit, file = file_path, action = 'read', form = 'unformatted', access = 'stream')
+    inquire(unit = file_unit, size = file_size)
+    allocate(character(file_size) :: content)
+    read(file_unit) content
+
+    destruct_act = arg_or_default(destruct, 0)
+    if (destruct_act == 0) then
+      close(file_unit)
+    else
+      close(file_unit, status = 'delete')
+    end if
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------

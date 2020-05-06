@@ -1,7 +1,8 @@
 module slepc_solver_mod
 #include <slepc/finclude/slepceps.h>
+  use general_utils, only: num2str
   use matmul_operator_mod, only: active_matmul_operator, msize
-  use parallel_utils
+  use parallel_utils, only: get_proc_id, get_proc_elem_range, print_parallel
   use slepceps
 
   use debug_tools

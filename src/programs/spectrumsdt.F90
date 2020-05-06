@@ -8,17 +8,15 @@ program spectrumsdt
   use config
   use constants
   use debug_tools
-  use dictionary
-  use dict_utils
   use distributed_rovib_hamiltonian_mod
   use general_vars
   use index_conversion
   use input_params_mod
   use io_utils
   use matmul_operator_mod
-  use mpi_f08
   use overlaps_extra_mod
   use parallel_utils
+  use parpack
   use path_utils
   use pesgeneral
   use sdt

@@ -81,7 +81,6 @@ module sdt
   use blas95
   use cap_mod
   use constants
-  use formulas_mod
   use general_vars
   use index_conversion
   use input_params_mod

@@ -9,10 +9,8 @@ program pesprint
   use pes
 
   implicit none
-  integer n1,n2,n3
   real*8 min1,max1,min2,max2,min3,max3
-  real*8,allocatable::g1(:),g2(:),g3(:)
-  integer iam,nprocs
+  integer iam
   logical optgrid
   logical sdtcalc
   type(input_params) :: params

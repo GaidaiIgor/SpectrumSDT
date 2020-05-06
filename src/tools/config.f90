@@ -7,7 +7,6 @@ module config
   use input_params_mod
   use io_utils
   use parallel_utils
-  use path_utils
   use rovib_utils_mod
   use string_mod
   use string_utils

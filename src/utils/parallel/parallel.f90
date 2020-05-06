@@ -1,6 +1,7 @@
 module parallel_utils
   use algorithms
   use general_utils
+  use mpi_f08
 
 contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -13,12 +14,23 @@ contains
 
     call MPI_Initialized(mpi_enabled, ierr)
     if (mpi_enabled) then
-      call blacs_pinfo(proc_id, n_procs)
+      call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
+      call MPI_Comm_Size(MPI_COMM_WORLD, n_procs, ierr)
+      ! call blacs_pinfo(proc_id, n_procs)
     else
       proc_id = 0
       n_procs = 1
     end if
   end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns current process id
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_proc_id() result(proc_id)
+    integer :: proc_id
+    integer :: n_procs
+    call get_proc_info(proc_id, n_procs)
+  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns current process id and total number of processes
@@ -39,16 +51,6 @@ contains
       proc_col = 0
     end if
   end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns current process id
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_proc_id() result(proc_id)
-    integer :: proc_id
-    integer :: ierr, n_procs
-    logical :: mpi_enabled
-    call get_proc_info(proc_id, n_procs)
-  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Computes range of elements to process by this processor
