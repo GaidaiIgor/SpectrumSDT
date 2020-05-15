@@ -287,10 +287,6 @@ contains
     complex*16, allocatable :: eivals(:), cap(:)
     complex*16, allocatable :: eivecs(:, :), kinetic(:, :)
 
-    ! Debug
-    integer :: size_proc, i
-    complex*16, allocatable :: vin(:), vout(:)
-
     call print_parallel('Using rovib coupling')
     kinetic = compute_kinetic_energy_matrix(n1)
     rovib_ham % compression = merge(1, 0, params % optimized_mult == 1) ! Global in matmul_operator_mod
@@ -320,17 +316,6 @@ contains
     end if
 
     call set_matmul_variables(params) ! rovib_ham is already set
-
-    if (debug_mode == 'check_mult_memory') then
-      size_proc = size(rovib_ham % proc_chunk, 1)
-      allocate(vin(size_proc), vout(size_proc))
-      vin = 1
-      do i = 1, 10
-        call ham_mult_compressed(size_proc, vin, vout)
-      end do
-      stop 'Done check_mult_memory'
-    end if
-
     call print_parallel('Eigenvalue solver has started')
     if (params % solver == 'slepc') then
       call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
