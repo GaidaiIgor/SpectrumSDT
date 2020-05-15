@@ -5,6 +5,7 @@ module cap_mod
   use constants
   use general_vars
   use input_params_mod
+  use parallel_utils
 
   integer, parameter :: ncap = 3 ! Number of CAPs
   character(*), parameter :: capdir = 'caps'
@@ -167,7 +168,10 @@ contains
 
     call calc_cap(n1,g1,LG)
     write(fn,'(4A,I5.5,A)')outdir,'/',capdir,'/cap',myid+1,'.out'
-    call prnt_cap(fn)
+
+    if (get_proc_id() == 0) then
+      call prnt_cap(fn)
+    end if
   end subroutine
 
   !-----------------------------------------------------------------------

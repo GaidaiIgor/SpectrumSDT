@@ -187,6 +187,7 @@ module sdt
   character(*),parameter::expdir='exps'
 
   ! Number of groups (pathways)
+  ! Each group is a 60 deg area along phi (only the first 180 deg are considered because of symmetry)
   integer,parameter::ngr = 3
 
   ! Control variables

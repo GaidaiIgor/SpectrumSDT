@@ -8,7 +8,6 @@ set(formulas ${general_utils} ${constants} src/tools/formulas.f90)
 set(general_vars src/tools/general_vars.f90)
 set(debug_tools src/tools/debug_tools.f90)
 set(input_params src/tools/input_params.f90)
-set(cap ${constants} ${general_vars} ${input_params} src/tools/cap.f90)
 set(rovib_utils ${input_params} src/utils/rovib_utils.f90)
 set(mkl src/tools/deriv/mkl.f90)
 set(index_conversion src/tools/index_conversion.f90)
@@ -16,6 +15,7 @@ set(parabola src/tools/parabola.f90)
 
 set(algorithms ${general_utils} src/utils/algorithms/algorithms.f90)
 set(parallel_utils ${algorithms} ${general_utils} src/utils/parallel/parallel.f90)
+set(cap ${constants} ${general_vars} ${input_params} ${parallel_utils} src/tools/cap.f90)
 set(string ${general_utils} src/utils/string/string.f90)
 
 set(vector_integer ${general_utils} src/utils/vector/vector_integer.F90)
@@ -77,13 +77,29 @@ set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
 # Specify where to look for external module files (-I option)
+
+# original
 include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/debug_64/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64/include)
-# include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc/include external/petsc/arch-whatever/include external/slepc/include external/slepc/arch-whatever/include)
+
+# opt
+# include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/opt_64/include external/slepc-3.13.1/include external/slepc-3.13.1/opt_64/include)
+
+# cray
+# include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/slepc-3.12.2/include external/slepc-3.12.2/installed-arch-linux-c-opt-complex/include)
+
 # Specify where to look for libraries (-L option)
+# original
 link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/debug_64/lib external/slepc-3.13.1/debug_64/lib)
-# link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc/arch-whatever/lib external/slepc/arch-whatever/lib)
+
+# opt
+# link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/opt_64/lib external/slepc-3.13.1/opt_64/lib)
+
+# cray
+# link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/slepc-3.12.2/installed-arch-linux-c-opt-complex/lib)
+
 # Add common compile flag for all sources. -u forces implicitnone for all functions.
 add_compile_options(-mkl=cluster -assume bscc -g -traceback -u)
+# add_compile_options(-assume bscc -g -traceback -u)
 # Add common linker flags for all targets
 set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
 

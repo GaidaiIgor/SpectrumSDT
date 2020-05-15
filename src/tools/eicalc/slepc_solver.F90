@@ -1,7 +1,7 @@
 module slepc_solver_mod
 #include <slepc/finclude/slepceps.h>
   use general_utils, only: num2str
-  use matmul_operator_mod, only: active_matmul_operator, msize
+  use matmul_operator_mod, only: active_matmul_operator, msize, rovib_ham
   use parallel_utils, only: get_proc_id, get_proc_elem_range, print_parallel
   use slepceps
 
@@ -37,8 +37,8 @@ contains
     call MatShellSetOperation(A, MATOP_MULT, slepc_mult, ierr)
 
     call EPSCreate(PETSC_COMM_WORLD, eps, ierr)
-    call EPSGetDS(eps, ds, ierr)
-    call DSSetParallel(ds, DS_PARALLEL_SYNCHRONIZED, ierr)
+    ! call EPSGetDS(eps, ds, ierr)
+    ! call DSSetParallel(ds, DS_PARALLEL_SYNCHRONIZED, ierr)
 
     call EPSSetOperators(eps, A, PETSC_NULL_MAT, ierr)
     call EPSSetProblemType(eps, EPS_NHEP, ierr)
@@ -50,12 +50,23 @@ contains
     mpd_petsc = merge(PETSC_DEFAULT_INTEGER, mpd_petsc, mpd_petsc == -1)
     n_eigs_petsc = n_eigs
     call EPSSetDimensions(eps, n_eigs_petsc, ncv_petsc, mpd_petsc, ierr)
-
     call EPSSetFromOptions(eps, ierr)
+
+    if (debug_mode == 'stop_before_solve') then
+      stop 'Done stop_before_solve'
+    end if
+
     call EPSSolve(eps, ierr)
+
+    if (debug_mode == 'stop_after_solve') then
+      stop 'Done stop_after_solve'
+    end if
+
     call EPSGetConverged(eps, n_conv_petsc, ierr)
     n_conv = n_conv_petsc
     call print_parallel('Eigenpairs converged: ' // num2str(n_conv))
+    ! Ham is no longer needed
+    deallocate(rovib_ham % proc_chunk)
 
     ! Populate eigenvalues
     allocate(eivals(n_conv))

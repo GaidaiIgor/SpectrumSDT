@@ -615,6 +615,7 @@ contains
       call load_1D_expansion_coefficients(params, N, L, As, num_solutions_1d)
       call load_2D_expansion_coefficients(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
     end if
+    call print_parallel('1D and 2D expansion coefficients are loaded. Loading 3D.')
     call load_3D_expansion_coefficients(params, N, num_solutions_2d, Cs, Cs_plain)
     call print_parallel('Done loading expansion coefficients')
 
