@@ -66,7 +66,7 @@ contains
     n_conv = n_conv_petsc
     call print_parallel('Eigenpairs converged: ' // num2str(n_conv))
     ! Ham is no longer needed
-    deallocate(rovib_ham % proc_chunk)
+    ! deallocate(rovib_ham % proc_chunk)
 
     ! Populate eigenvalues
     allocate(eivals(n_conv))
