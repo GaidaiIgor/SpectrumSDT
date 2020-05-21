@@ -6,6 +6,7 @@
 program pesprint
   use config
   use input_params_mod
+  use parallel_utils
   use pesgeneral
   use pesinterface_mod
 
@@ -24,15 +25,16 @@ program pesprint
   endif
 
   if (params % debug_mode == 'use_calc_pots_mpi') then
+    print *, 'Using MPI version'
     call calc_pots_mpi(g1, g2, g3)
   else
     call calc_pots(n1,n2,n3,g1,g2,g3,3)
   end if
 
-  call blacs_pinfo(iam,nprocs)
-  call blacs_setup(iam,nprocs)
+  ! call blacs_pinfo(iam,nprocs)
+  ! call blacs_setup(iam,nprocs)
 
-  if (iam == 0) then
+  if (get_proc_id() == 0) then
     if (sdtcalc) then
       open(1,file='potvib.dat',form='unformatted')
       write(1)potvib
@@ -47,7 +49,8 @@ program pesprint
       call prnt_pottot
     endif
   endif
-  call blacs_exit(0)
+
+  ! call blacs_exit(0)
 
 contains
 

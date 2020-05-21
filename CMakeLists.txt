@@ -112,7 +112,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
 add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
 target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(pesprint ${config} ${input_params} ${pesgeneral} ${pesinterface} ${dawes} src/programs/pesprint.f90)
+add_executable(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${dawes} src/programs/pesprint.f90)
 target_link_libraries(pesprint fdict ftl pcreposix parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
 add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${parpack} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)
