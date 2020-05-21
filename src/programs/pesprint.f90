@@ -6,7 +6,8 @@
 program pesprint
   use config
   use input_params_mod
-  use pes
+  use pesgeneral
+  use pesinterface_mod
 
   implicit none
   real*8 min1,max1,min2,max2,min3,max3
@@ -15,17 +16,24 @@ program pesprint
   logical sdtcalc
   type(input_params) :: params
 
-  call init_parameters(params)
-  if(optgrid)then
+  call init_parameters_pesprint(params)
+  if (optgrid) then
     call load_optgrids
   else
     call load_equgrids
   endif
-  call calc_pots(n1,n2,n3,g1,g2,g3,3)
+
+  if (params % debug_mode == 'use_calc_pots_mpi') then
+    call calc_pots_mpi(g1, g2, g3)
+  else
+    call calc_pots(n1,n2,n3,g1,g2,g3,3)
+  end if
+
   call blacs_pinfo(iam,nprocs)
   call blacs_setup(iam,nprocs)
-  if(iam==0)then
-    if(sdtcalc)then
+
+  if (iam == 0) then
+    if (sdtcalc) then
       open(1,file='potvib.dat',form='unformatted')
       write(1)potvib
       close(1)
@@ -46,7 +54,7 @@ contains
 !-----------------------------------------------------------------------
 !  Loads parameters.
 !-----------------------------------------------------------------------
-  subroutine init_parameters(params)
+  subroutine init_parameters_pesprint(params)
     implicit none
     type(input_params), intent(inout) :: params
 

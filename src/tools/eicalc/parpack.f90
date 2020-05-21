@@ -1,6 +1,6 @@
 module parpack
   use algorithms
-  use index_conversion
+  use index_conversion_mod
   use matmul_operator_mod
   use parallel_utils
 

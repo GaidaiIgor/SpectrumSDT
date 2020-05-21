@@ -1,5 +1,7 @@
-module index_conversion
+module index_conversion_mod
+
 contains
+
 !-----------------------------------------------------------------------
 !  Convert global index to local index in block-cyclic distribution.
 !-----------------------------------------------------------------------

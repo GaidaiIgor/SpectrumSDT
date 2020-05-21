@@ -82,7 +82,7 @@ module sdt
   use cap_mod
   use constants
   use general_vars
-  use index_conversion
+  use index_conversion_mod
   use input_params_mod
   use io_utils
   use lapack95

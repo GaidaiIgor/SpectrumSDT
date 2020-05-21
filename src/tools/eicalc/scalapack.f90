@@ -4,8 +4,9 @@ module scalapack
 !  Calculates eigenpairs, adopted from sample code.
 !  Author: Alexander Teplukhin
 !-----------------------------------------------------------------------
-  use index_conversion
+  use index_conversion_mod
   use algorithms
+
 contains
   !-----------------------------------------------------------------------
   !  ScaLapack eigenproblem solver, real version.

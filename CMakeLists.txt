@@ -55,7 +55,7 @@ set(path_utils ${general_utils} ${input_params} ${parallel_utils} ${system} src/
 set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${string_utils} ${debug_tools} src/tools/config.f90)
 set(scalapack ${algorithms} ${index_conversion} src/tools/eicalc/scalapack.f90)
 set(pesgeneral ${constants} ${formulas} ${input_params} ${general_utils} ${general_vars} src/tools/pes/pesgeneral.f90)
-set(pes ${input_params} ${constants} ${pesgeneral} src/tools/pes/pesinterface.f90)
+set(pesinterface ${constants} ${input_params} ${index_conversion} ${parallel_utils} ${pesgeneral} src/tools/pes/pesinterface.f90)
 
 set(dawes_dynamic_parameters external/pes/dawes/src/dynamic_parameters_3D.f90)
 set(dawes_linkables external/pes/dawes/src/2D-spline.f external/pes/dawes/src/VLGRoo.f external/pes/dawes/src/CJe.f external/pes/dawes/src/C6Js.f external/pes/dawes/src/cleb.f external/pes/dawes/src/Celr.f external/pes/dawes/src/C6r.f external/pes/dawes/src/faclog.f external/pes/dawes/src/index.f90)
@@ -79,7 +79,10 @@ set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools
 # Specify where to look for external module files (-I option)
 
 # original
-include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/debug_64/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64/include)
+# include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/debug_64/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64/include)
+
+# mkl
+include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/debug_64_mkl/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64_mkl/include)
 
 # opt
 # include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/opt_64/include external/slepc-3.13.1/include external/slepc-3.13.1/opt_64/include)
@@ -89,7 +92,10 @@ include_directories(external/extras/mklmods external/include external/fdict/incl
 
 # Specify where to look for libraries (-L option)
 # original
-link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/debug_64/lib external/slepc-3.13.1/debug_64/lib)
+# link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/debug_64/lib external/slepc-3.13.1/debug_64/lib)
+
+# mkl
+link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/debug_64_mkl/lib external/slepc-3.13.1/debug_64_mkl/lib)
 
 # opt
 # link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/opt_64/lib external/slepc-3.13.1/opt_64/lib)
@@ -106,7 +112,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
 add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
 target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(pesprint ${config} ${input_params} ${pes} ${dawes} src/programs/pesprint.f90)
+add_executable(pesprint ${config} ${input_params} ${pesgeneral} ${pesinterface} ${dawes} src/programs/pesprint.f90)
 target_link_libraries(pesprint fdict ftl pcreposix parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
 add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${parpack} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)

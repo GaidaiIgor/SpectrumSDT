@@ -37,8 +37,8 @@ contains
     call MatShellSetOperation(A, MATOP_MULT, slepc_mult, ierr)
 
     call EPSCreate(PETSC_COMM_WORLD, eps, ierr)
-    ! call EPSGetDS(eps, ds, ierr)
-    ! call DSSetParallel(ds, DS_PARALLEL_SYNCHRONIZED, ierr)
+    call EPSGetDS(eps, ds, ierr)
+    call DSSetParallel(ds, DS_PARALLEL_SYNCHRONIZED, ierr)
 
     call EPSSetOperators(eps, A, PETSC_NULL_MAT, ierr)
     call EPSSetProblemType(eps, EPS_NHEP, ierr)

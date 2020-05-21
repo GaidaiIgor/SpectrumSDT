@@ -10,7 +10,7 @@ program spectrumsdt
   use debug_tools
   use distributed_rovib_hamiltonian_mod
   use general_vars
-  use index_conversion
+  use index_conversion_mod
   use input_params_mod
   use io_utils
   use matmul_operator_mod
