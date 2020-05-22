@@ -121,11 +121,11 @@ target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_l
 add_executable(kinetics ${pesgeneral} src/programs/kinetics.f90)
 # target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(test_prg ${io_utils} ${path_utils} src/test/test_prg.F90)
+add_executable(test_prg ${path_utils} src/test/test_prg.F90)
 target_link_libraries(test_prg parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
 
-add_executable(dawes_de ${utils} ${tools} ${dawes} src/programs/misc/dawes_de.f90)
-target_link_libraries(dawes_de parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
+# add_executable(dawes_de ${utils} ${tools} ${dawes} src/programs/misc/dawes_de.f90)
+# target_link_libraries(dawes_de parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-# add_executable(zpeO2 ${utils} ${tools} ${dawes} src/programs/zpeO2.f)
-# target_link_libraries(zpeO2 parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
+add_executable(zpeO2 ${config} ${constants} ${general_vars} ${input_params} ${mkl} ${pesinterface} ${dawes} src/programs/zpeO2.f)
+target_link_libraries(zpeO2 parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix)

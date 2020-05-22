@@ -15,7 +15,7 @@
    real*8 :: pes_mass(3)
 
    private
-   public :: init_pots, calc_pots, calc_pots_mpi
+   public :: init_pots, calc_pots, calc_pots_mpi, pes_mass
 
  contains
 

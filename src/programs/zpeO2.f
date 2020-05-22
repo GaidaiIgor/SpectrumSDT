@@ -4,7 +4,12 @@
 !  The coordinate is an interatomic distance
 !  Author: Alexander Teplukhin
 !-----------------------------------------------------------------------
-       use pes
+       use config
+       use constants
+       use general_vars
+       use input_params_mod
+       use mkl
+       use pesinterface_mod
        use lapack95
        implicit none
        real*8,allocatable::g(:),freq(:),pot(:)
@@ -12,8 +17,9 @@
        real*8 rmin,rmax,rl,js
        real*8 potmin
        integer n,nstate,costheta
+       type(input_params) :: params
 
-       call init_parameters
+       call init_parameters_zpe_o2(params)
        write(*,*)'Total potential optimization'
        call find_minimum(calc_ptot)
        write(*,*)'Vibrational potential optimization'
@@ -33,14 +39,20 @@
 !-----------------------------------------------------------------------
 !  Input parameters.
 !-----------------------------------------------------------------------
-       subroutine init_parameters
+       subroutine init_parameters_zpe_o2(params)
        implicit none
-       open(1,file='zpeO2.config')
-       call init_pots(1)
-       read(1,*)n,nstate
-       read(1,*)rl,rmin,rmax,costheta
-       read(1,*)js
-       close(1)
+       type(input_params), intent(inout) :: params
+       
+       ! open(1,file='zpeO2.config')
+       params = process_user_settings('spectrumsdt.config')
+       call init_pots(params)
+       n = 64
+       nstate = 16
+       rl = 60
+       rmin = 1.972625
+       rmax = 2.778875
+       costheta = 0
+       js = 0
        end subroutine
 
 !-----------------------------------------------------------------------
