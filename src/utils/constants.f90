@@ -9,12 +9,12 @@ module constants
                        isomass(3) = [15.99491461956d0, 16.99913170d0, 17.9991596129d0] * amutoau, & ! masses of isotopes of oxygen 16, 17 and 18 respectively
                        ang2bohr = 0.52917721092d0, & ! Angstroms to Bohr
   ! Zero point energies of O2 are taken as a result of program zpeO2
-                       zpe_66 = 791.633780122239d0 / autown, & ! J = 0
-                                  ! 794.507661944641
-                       ! zpe_66 = 794.5121300074147d0 / autown, & ! J = 1
-                       zpe_68 = 769.3708063017872d0 / autown, &
-                       zpe_88 = 746.427773959237d0 / autown, & ! J = 0
-                       ! zpe_88 = 748.9861634170745d0 / autown, & ! J = 1
+                       zpe_66 = 791.6373314827983d0 / autown, & ! J = 0
+                       ! zpe_66 = 794.5112391213112d0 / autown, & ! J = 1
+                       zpe_68 = 769.3702558802487d0 / autown, & ! J = 0
+                       ! zpe_68 = 772.0845812041375d0 / autown, & ! J = 1
+                       zpe_88 = 746.4311399198617d0 / autown, & ! J = 0
+                       ! zpe_88 = 748.9858447146220d0 / autown, & ! J = 1
   ! Obtained as energy of dissociated O3 on ozone PES of Dawes for r1 = 900 Bohr, angle = 90 deg (does not matter which one), r2 is optimized to 10^-15 precision (see dawes_de.f90)
                        De_dawes = 9274.99560025014d0 / autown
 end module
