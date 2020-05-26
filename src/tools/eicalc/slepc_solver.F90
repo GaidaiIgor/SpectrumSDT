@@ -44,6 +44,10 @@ contains
     call EPSSetProblemType(eps, EPS_NHEP, ierr)
     call EPSSetWhichEigenpairs(eps, EPS_SMALLEST_REAL, ierr)
 
+    if (debug_mode == 'unlimited_iterations') then
+      call EPSSetTolerances(eps, PETSC_DEFAULT_REAL, 1000000, ierr)
+    end if
+
     ncv_petsc = ncv
     mpd_petsc = mpd
     ncv_petsc = merge(PETSC_DEFAULT_INTEGER, ncv_petsc, ncv_petsc == -1)

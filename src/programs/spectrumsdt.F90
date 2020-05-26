@@ -67,7 +67,7 @@ contains
     else if (params % solver == 'slepc') then
       solver = 3
     else
-      stop 'This should never happen: unknown solver'
+      stop 'Error: unknown solver. Config check has failed.'
     end if
 
     realver  = .false.
@@ -295,7 +295,7 @@ contains
     end if
 
     if (params % cap_type /= 'none') then
-      cap = return_cap()
+      cap = get_complex_cap()
       call rovib_ham % build(params, kinetic, cap)
     else
       call rovib_ham % build(params, kinetic)
@@ -324,18 +324,6 @@ contains
       call find_eigenpairs_parpack(context, params % num_states, params % ncv, params % max_iterations, eivals, eivecs)
       call print_spectrum(params, eivals, eivecs)
     end if
-  end subroutine
-
-!-----------------------------------------------------------------------
-!  Solution of 3D problem using SDT.
-!-----------------------------------------------------------------------
-  subroutine calc_3dsdt(params, context)
-    type(input_params), intent(in) :: params
-    integer, optional, intent(in) :: context ! for parallel solvers
-
-    ! Initialize CAP for complex version
-    if (.not.realver) call init_caps(params, 0d0)
-    call calculate_states(params, context)
   end subroutine
 
 !-----------------------------------------------------------------------
@@ -420,13 +408,15 @@ contains
           call calculate_overlaps_extra(params, mu, g1, g2)
 
         case(MODE_3DSDT)
-          call calc_3dsdt(params, context)
+          call init_caps(params, 0d0)
+          call calculate_states(params, context)
 
         case(MODE_3DSDT_POST)
           if (params % rovib_coupling == 0) then
             call calc_3dsdt_post(params)
           else
-            call calculate_state_properties(params, size(g1), size(g2))
+            call init_caps(params, 0d0)
+            call calculate_state_properties(params, size(g1), size(g2), get_real_cap())
           end if
 
         case(MODE_3DSDT_STATES)

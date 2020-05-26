@@ -2,8 +2,10 @@ module general_utils
   use iso_fortran_env
   use ifcore
 
+  implicit none
+
   interface arg_or_default
-    module procedure :: arg_or_default_integer, arg_or_default_real, arg_or_default_char_str
+    module procedure :: arg_or_default_integer, arg_or_default_real, arg_or_default_real_array, arg_or_default_char_str
   end interface
   
   interface swap
@@ -22,6 +24,7 @@ module general_utils
   
 #include "general_integer.F90"
 #include "general_real.F90"
+#include "general_real_array.F90"
 #include "general_char_str.F90"
 
 !-----------------------------------------------------------------------
@@ -36,21 +39,22 @@ module general_utils
   end subroutine
 
 !-----------------------------------------------------------------------
-! compares given reals using comparisonPrecision variable
+! Compares given reals with specified precision
 !-----------------------------------------------------------------------
-  integer function compareReals(a, b, precision)
+  function compare_reals(a, b, comp_precision) result(res)
     real*8, intent(in) :: a, b
-    real*8, optional :: precision
+    real*8, optional :: comp_precision
+    integer :: res
     real*8 :: difference, precision_act
 
-    precision_act = merge(precision, 1d-5, present(precision))
+    precision_act = arg_or_default(comp_precision, 1d-10)
     difference = a - b
     if (abs(difference) < precision_act) then
-      compareReals = 0
+      res = 0
     else if (difference > 0) then
-      compareReals = 1
+      res = 1
     else if (difference < 0) then
-      compareReals = -1
+      res = -1
     end if
   end function
 
@@ -66,7 +70,7 @@ module general_utils
     npointsf = (end - start) / step
     npoints = npointsf
     ! If the last step is complete up to comparison accuracy
-    if (compareReals(npointsf - npoints, 1.d0) == 0) then
+    if (compare_reals(npointsf - npoints, 1.d0) == 0) then
       npoints = npoints + 1
     end if
     
@@ -82,6 +86,7 @@ module general_utils
     real*8, intent(in) :: start, end
     integer, intent(in) :: npoints
     real*8 :: grid(npoints)
+    integer :: i
     real*8 :: step
 
     step = (end - start) / (npoints - 1)
@@ -111,7 +116,7 @@ module general_utils
     if (progress > last_progress + progress_step_act) then
       last_progress = last_progress + progress_step_act
       print '(A,x,F6.2,A$)', '\r', last_progress * 100, '% done'
-      if (compareReals(last_progress, 1d0) == 0) then
+      if (compare_reals(last_progress, 1d0) == 0) then
         print *
       end if
     end if

@@ -1556,6 +1556,69 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
+  !  Loads 2D vector in basis repr or on grid.
+  !-----------------------------------------------------------------------
+  function getdir(m) result(res)
+    character(:),allocatable :: res
+    integer   m ! Mode
+    character c ! Character
+    res = trim(dirs(m))
+    if (m == MODE_OVERLAP) then
+      write(c,'(I1)')oltype
+      res = res // c
+    end if
+  end function
+
+  !-----------------------------------------------------------------------
+  !  Creates a sub directory.
+  !-----------------------------------------------------------------------
+  subroutine subdir(dir)
+    character(*) dir
+    call execute_command_line('mkdir -p ' // outdir // '/' // dir)
+  end subroutine
+
+  !-----------------------------------------------------------------------
+  !  Returns recognition load directory path.
+  !-----------------------------------------------------------------------
+  function getrecldpath() result(res)
+    character(:),allocatable::res
+    if (recld == RECLD_DEF) then
+      res = rpath // '/' // getdir(MODE_CHRECOG)
+    else
+      res = rpath // '/reccontr'
+    end if
+  end function
+  
+  !-----------------------------------------------------------------------
+  !  Loads properties of the lowest channel.
+  !-----------------------------------------------------------------------
+  subroutine load_lowest_barrier(barps,baren)
+    character(:),allocatable::ldir
+    real*8  barps(ngr)
+    real*8  baren(ngr)
+    integer found(ngr)
+    integer igr
+    integer isl
+    real*8  ps,en
+
+    ! Get channel recognition directory
+    ldir = getrecldpath()
+    ! Find lowest channel in channels file
+    found = 0
+    open(1,file=ldir//'/channels.dat')
+    do
+      read(1,*)igr,igr,ps,en
+      if (found(igr) == 0) then
+        found(igr) = 1
+        barps(igr) = ps
+        baren(igr) = en
+      end if
+      if (sum(found) == 3)exit
+    end do
+    close(1)
+  end subroutine
+
+  !-----------------------------------------------------------------------
   !  Post-processing.
   !-----------------------------------------------------------------------
   subroutine calc_3dsdt_post(params)
@@ -3361,69 +3424,6 @@ contains
     end if
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Loads 2D vector in basis repr or on grid.
-  !-----------------------------------------------------------------------
-  function getdir(m) result(res)
-    character(:),allocatable :: res
-    integer   m ! Mode
-    character c ! Character
-    res = trim(dirs(m))
-    if (m == MODE_OVERLAP) then
-      write(c,'(I1)')oltype
-      res = res // c
-    end if
-  end function
-
-  !-----------------------------------------------------------------------
-  !  Creates a sub directory.
-  !-----------------------------------------------------------------------
-  subroutine subdir(dir)
-    character(*) dir
-    call execute_command_line('mkdir -p ' // outdir // '/' // dir)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Loads properties of the lowest channel.
-  !-----------------------------------------------------------------------
-  subroutine load_lowest_barrier(barps,baren)
-    character(:),allocatable::ldir
-    real*8  barps(ngr)
-    real*8  baren(ngr)
-    integer found(ngr)
-    integer igr
-    integer isl
-    real*8  ps,en
-
-    ! Get channel recognition directory
-    ldir = getrecldpath()
-    ! Find lowest channel in channels file
-    found = 0
-    open(1,file=ldir//'/channels.dat')
-    do
-      read(1,*)igr,igr,ps,en
-      if (found(igr) == 0) then
-        found(igr) = 1
-        barps(igr) = ps
-        baren(igr) = en
-      end if
-      if (sum(found) == 3)exit
-    end do
-    close(1)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Returns recognition load directory path.
-  !-----------------------------------------------------------------------
-  function getrecldpath() result(res)
-    character(:),allocatable::res
-    if (recld == RECLD_DEF) then
-      res = rpath // '/' // getdir(MODE_CHRECOG)
-    else
-      res = rpath // '/reccontr'
-    end if
-  end function
-  
   !-----------------------------------------------------------------------
   !  Calculates 1D Hamiltonian for coordinate #1. Real version.
   !-----------------------------------------------------------------------

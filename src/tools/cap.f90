@@ -58,8 +58,6 @@ contains
     ac = (10d0 + dac) * 1000 / autown
     wc = 6d0 * d0 + dwc
     rc = 7d0 * d0 + drc
-    write(u,*)'Default CAP start:  ', rc
-    write(u,*)'Default CAP length: ', wc
 
     ! Fill in default CAP
     do ir=1,nr
@@ -78,14 +76,6 @@ contains
     damplen = ndbw       * dbl
     dampstr = strs(ndbw) * Eabs
     rc = g(nr) + (g(nr)-g(nr-1))/2 - damplen + drc
-    write(u,*)'Balint-Kurti CAP start:  ', rc
-    write(u,*)'Balint-Kurti CAP length: ', damplen
-
-    ! Check if grid CAP is too close to covalent well
-    if(rc < 5)then
-      write(u,*)'Balint-Kurti CAP is too close to covalent well'
-      write(u,*)'Required grid end: ', 5 + damplen
-    end if
 
     ! Fill in Balint-Kurti CAP
     do ir=1,nr
@@ -103,14 +93,6 @@ contains
     dM   = cM / (4 * pi)
     damplen = cM / (2 * dM * sqrt(2 * mu * eabs))
     rc = g(nr) + (g(nr)-g(nr-1))/2 - damplen + drc
-    write(u,*)'Manolopoulos CAP start:  ', rc
-    write(u,*)'Manolopoulos CAP length: ', damplen
-
-    ! Check if grid CAP is too close to covalent well
-    if(rc < 5)then
-      write(u,*)'Manolopoulos CAP is too close to covalent well'
-      write(u,*)'Required grid end: ', 5 + damplen
-    end if
 
     ! Fill in Manolopoulos CAP
     do ir=1,nr
@@ -149,8 +131,8 @@ contains
   subroutine init_caps(params, capebarin)
     implicit none
     class(input_params), intent(in) :: params
-    real*8 capebarin
-    character(256)fn
+    real*8 :: capebarin
+    character(256) :: fn
 
     if (params % cap_type == 'none') then
       capid = 0
@@ -169,27 +151,38 @@ contains
     call calc_cap(n1,g1,LG)
     write(fn,'(4A,I5.5,A)')outdir,'/',capdir,'/cap',myid+1,'.out'
 
-    if (get_proc_id() == 0) then
+    if (get_proc_id() == 0 .and. params % mode == 'diagonalization') then
       call prnt_cap(fn)
     end if
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Provides CAP to sdt for integration.
-  !-----------------------------------------------------------------------
+!-----------------------------------------------------------------------
+! Writes active (as specified by global capid) CAP/-i into *p*
+!-----------------------------------------------------------------------
   subroutine get_cap(p)
     implicit none
-    real*8 p(n1)
+    real*8 :: p(n1)
     p = all_caps(:, capid)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns complex absorbing potential specified by global variable capid
+! Returns active (as specified by global capid) CAP/-i as real*8
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function return_cap() result(cap)
+  function get_real_cap() result(cap)
+    real*8, allocatable :: cap(:)
+    call assert(allocated(all_caps), 'Error: caps are not initialized')
+    allocate(cap(n1))
+    call get_cap(cap)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns active (as specified by global capid) CAP as complex*16
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_complex_cap() result(cap)
     complex*16, allocatable :: cap(:)
     real*8, allocatable :: imag_part(:)
 
+    call assert(allocated(all_caps), 'Error: caps are not initialized')
     allocate(cap(n1), imag_part(n1))
     call get_cap(imag_part)
     cap = (0, -1d0) * imag_part
