@@ -43,10 +43,7 @@ contains
     call EPSSetOperators(eps, A, PETSC_NULL_MAT, ierr)
     call EPSSetProblemType(eps, EPS_NHEP, ierr)
     call EPSSetWhichEigenpairs(eps, EPS_SMALLEST_REAL, ierr)
-
-    if (debug_mode == 'unlimited_iterations') then
-      call EPSSetTolerances(eps, PETSC_DEFAULT_REAL, 1000000, ierr)
-    end if
+    call EPSSetTolerances(eps, PETSC_DEFAULT_REAL, 1000000, ierr) ! unlimited iterations
 
     ncv_petsc = ncv
     mpd_petsc = mpd

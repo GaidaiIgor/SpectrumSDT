@@ -416,7 +416,7 @@ contains
             call calc_3dsdt_post(params)
           else
             call init_caps(params, 0d0)
-            call calculate_state_properties(params, size(g1), size(g2), get_real_cap())
+            call calculate_state_properties(params, g1, size(g2), get_real_cap())
           end if
 
         case(MODE_3DSDT_STATES)

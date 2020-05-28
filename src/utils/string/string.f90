@@ -39,7 +39,7 @@ contains
     integer, intent(in) :: v_list(:)
     integer, intent(out) :: iostat
     character(*), intent(inout) :: iomsg
-    write(unit, *, iostat = iostat) this % s // ' '
+    write(unit, *, iostat = iostat) this % s
   end subroutine
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
@@ -136,7 +136,7 @@ contains
 ! MODULE FUNCTIONS
 !---------------------------------------------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Constructs a string from char string
+! Constructs a string from a char string
 !---------------------------------------------------------------------------------------------------------------------------------------------
   elemental function to_string_char_str(char_str) result(str)
     character(*), intent(in) :: char_str
@@ -144,6 +144,20 @@ contains
     str%s = char_str
   end function
   
+!---------------------------------------------------------------------------------------------------------------------------------------------
+! Constructs a string array from a char string array. Input char strings are trimmed.
+!---------------------------------------------------------------------------------------------------------------------------------------------
+  function to_string_char_str_arr_trim(char_str_arr) result(str_arr)
+    character(*), intent(in) :: char_str_arr(:)
+    type(string), allocatable :: str_arr(:)
+    integer :: i
+
+    allocate(str_arr(size(char_str_arr)))
+    do i = 1, size(char_str_arr)
+      str_arr(i) = string(trim(char_str_arr(i)))
+    end do
+  end function
+
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Asssigns a char string
 !---------------------------------------------------------------------------------------------------------------------------------------------

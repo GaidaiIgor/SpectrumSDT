@@ -455,4 +455,17 @@ contains
     res = append_path_tokens(channels_root, 'J' // num2str(J, '(I2.2)'), 'K' // num2str(K, '(I2.2)') // sym_letter)
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to channels file corresponding to given parameters
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_channels_file_path(channels_root, J, K, sym) result(res)
+    character(*), intent(in) :: channels_root
+    integer, intent(in) :: J, K, sym
+    character(:), allocatable :: res
+    character(:), allocatable :: parent
+
+    parent = get_channels_folder_parent_path(channels_root, J, K, sym)
+    res = append_path_tokens(parent, 'chrecog', 'channels.dat')
+  end function
+
 end module

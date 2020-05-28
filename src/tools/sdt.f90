@@ -91,6 +91,7 @@ module sdt
   use parabola
   use parpack
   use pesgeneral
+  use rovib_io_mod
   use scalapack
   use slepc_solver_mod
 
@@ -1592,30 +1593,13 @@ contains
   !-----------------------------------------------------------------------
   !  Loads properties of the lowest channel.
   !-----------------------------------------------------------------------
-  subroutine load_lowest_barrier(barps,baren)
-    character(:),allocatable::ldir
-    real*8  barps(ngr)
-    real*8  baren(ngr)
-    integer found(ngr)
-    integer igr
-    integer isl
-    real*8  ps,en
+  subroutine load_lowest_barrier(barps, baren)
+    character(:), allocatable :: ldir
+    real*8 :: barps(ngr)
+    real*8 :: baren(ngr)
 
-    ! Get channel recognition directory
     ldir = getrecldpath()
-    ! Find lowest channel in channels file
-    found = 0
-    open(1,file=ldir//'/channels.dat')
-    do
-      read(1,*)igr,igr,ps,en
-      if (found(igr) == 0) then
-        found(igr) = 1
-        barps(igr) = ps
-        baren(igr) = en
-      end if
-      if (sum(found) == 3)exit
-    end do
-    close(1)
+    call load_lowest_barrier_info(ldir // '/channels.dat', barps, baren)
   end subroutine
 
   !-----------------------------------------------------------------------

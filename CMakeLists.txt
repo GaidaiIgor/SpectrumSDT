@@ -65,14 +65,14 @@ set(dawes ${dawes_linkables} ${path_utils} ${dawes_ssplin} ${dawes_dynamic_param
 set(block_borders src/rovib/block_borders.f90)
 set(matrix_block_info ${block_borders} ${general_utils} src/rovib/matrix_block_info.f90)
 set(k_block_info ${matrix_block_info} ${io_utils} ${algorithms} src/rovib/k_block_info.f90)
-set(rovib_io ${array_1d} ${array_2d} ${io_utils} src/rovib/rovib_io.f90)
+set(rovib_io ${array_1d} ${array_2d} ${constants} ${io_utils} ${input_params} ${path_utils} ${rovib_utils} ${string} src/rovib/rovib_io.f90)
 set(overlaps_extra ${array_1d} ${array_2d} ${formulas} ${input_params} ${k_block_info} ${path_utils} ${parallel_utils} ${rovib_io} ${debug_tools} src/rovib/overlaps_extra.f90)
 set(distributed_rovib_hamiltonian ${block_borders} ${rovib_utils} ${formulas} ${general_utils} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/distributed_rovib_hamiltonian.f90)
 set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_block_info} src/tools/eicalc/matmul_operator.F90)
 set(parpack ${algorithms} ${index_conversion} ${matmul_operator} ${parallel_utils} src/tools/eicalc/parpack.f90)
-set(state_properties ${array_1d} ${array_2d} ${constants} ${rovib_io} ${rovib_utils} ${input_params} ${general_utils} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/state_properties.f90)
+set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${rovib_io} ${rovib_utils} ${input_params} ${general_utils} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${debug_tools} src/tools/eicalc/slepc_solver.F90)
-set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${mkl} ${parabola} ${parpack} ${pesgeneral} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
+set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${mkl} ${parabola} ${parpack} ${pesgeneral} ${rovib_io} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
 set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
@@ -121,7 +121,7 @@ target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_l
 add_executable(kinetics ${pesgeneral} src/programs/kinetics.f90)
 # target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(test_prg ${path_utils} src/test/test_prg.F90)
+add_executable(test_prg ${io_utils} ${string} src/test/test_prg.F90)
 target_link_libraries(test_prg parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
 
 # add_executable(dawes_de ${utils} ${tools} ${dawes} src/programs/misc/dawes_de.f90)
