@@ -184,52 +184,55 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates total probability of k-th state in symmetric molecule part of the PES (2*pi/3 <= phi <= 4*pi/3, regardless of rho)
-! Asymmetric can be obtained as 1 - symmetric
+! Calculates K probability distribution for a given state
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_symmetric_molecule_probability(params, As, Bs, proc_Cs, proc_k) result(sym_prob)
+  function calculate_gamma_channels(params, As, Bs, proc_Cs, cap, proc_k) result(gammas)
     class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
+    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
     type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+    real*8, intent(in) :: cap(:)
     integer, intent(in) :: proc_k ! local 3D state index
-    real*8 :: sym_prob
-    sym_prob = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [2*pi/3, pi])
+    real*8 :: gammas(2) ! 1 - channel A, 2 - channel B
+
+    ! One factor of 2 is due to phi symmetry, another is due to gamma definition
+    gammas(1) = 2 * 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [pi/3, pi], n_factors = cap)
+    gammas(2) = 2 * 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [0d0, pi/3], n_factors = cap)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates total probability of each state in symmetric molecule part of the PES (2*pi/3 <= phi <= 4*pi/3, regardless of rho)
-! Asymmetric can be obtained as 1 - symmetric
+! Calculates channel-specific gammas for all states
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_symmetric_molecule_probability_all(params, As, Bs, proc_Cs) result(sym_probs)
+  function calculate_gamma_channels_all(params, As, Bs, proc_Cs, cap) result(gammas)
     class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
+    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-    real*8, allocatable :: sym_probs(:)
-    integer :: proc_k
-    ! Parallel
-    integer :: proc_id, n_procs, proc_first_state, proc_states, ierr
+    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+    real*8, intent(in) :: cap(:)
+    real*8, allocatable :: gammas(:, :)
+    integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
     integer, allocatable :: recv_counts(:), recv_shifts(:)
-    real*8, allocatable :: sym_probs_chunk(:)
+    real*8, allocatable :: gammas_chunk(:, :)
 
     call get_proc_info(proc_id, n_procs)
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
 
     ! Calculate chunks
-    allocate(sym_probs_chunk(proc_states))
+    allocate(gammas_chunk(proc_states, 2))
     do proc_k = 1, proc_states
-      sym_probs_chunk(proc_k) = calculate_symmetric_molecule_probability(params, As, Bs, proc_Cs, proc_k)
+      gammas_chunk(proc_k, :) = calculate_gamma_channels(params, As, Bs, proc_Cs, cap, proc_k)
     end do
 
     ! Gather results
     if (n_procs == 1) then
-      sym_probs = sym_probs_chunk
+      gammas = gammas_chunk
       return
     end if
-
-    allocate(sym_probs(params % num_states))
-    call MPI_Gatherv(sym_probs_chunk, proc_states, MPI_DOUBLE_PRECISION, sym_probs, recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+    
+    allocate(gammas(params % num_states, 2))
+    do ind = 1, size(gammas, 2)
+      call MPI_Gatherv(gammas_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, gammas(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+    end do
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -310,6 +313,7 @@ contains
     integer :: K_val, K_sym, K_ind, K_ind_comp
 
     allocate(K_dist(params % J + 1))
+    K_dist = 0
     do K_val = params % K(1), params % K(2)
       call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
       K_dist(K_ind + params % K(1)) = calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, K_range = [K_val, K_val])
@@ -347,58 +351,6 @@ contains
     allocate(K_dists(params % num_states, params % J + 1))
     do ind = 1, size(K_dists, 2)
       call MPI_Gatherv(K_dists_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, K_dists(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-    end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates K probability distribution for a given state
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_gamma_channels(params, As, Bs, proc_Cs, cap, proc_k) result(gammas)
-    class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-    real*8, intent(in) :: cap(:)
-    integer, intent(in) :: proc_k ! local 3D state index
-    real*8 :: gammas(2) ! 1 - channel A, 2 - channel B
-
-    ! One factor of 2 is due to phi symmetry, another is due to gamma definition
-    gammas(1) = 2 * 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [pi/3, pi], n_factors = cap)
-    gammas(2) = 2 * 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [0d0, pi/3], n_factors = cap)
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates channel-specific gammas for all states
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_gamma_channels_all(params, As, Bs, proc_Cs, cap) result(gammas)
-    class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-    real*8, intent(in) :: cap(:)
-    real*8, allocatable :: gammas(:, :)
-    integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
-    integer, allocatable :: recv_counts(:), recv_shifts(:)
-    real*8, allocatable :: gammas_chunk(:, :)
-
-    call get_proc_info(proc_id, n_procs)
-    call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
-
-    ! Calculate chunks
-    allocate(gammas_chunk(proc_states, 2))
-    do proc_k = 1, proc_states
-      gammas_chunk(proc_k, :) = calculate_gamma_channels(params, As, Bs, proc_Cs, cap, proc_k)
-    end do
-
-    ! Gather results
-    if (n_procs == 1) then
-      gammas = gammas_chunk
-      return
-    end if
-    
-    allocate(gammas(params % num_states, 2))
-    do ind = 1, size(gammas, 2)
-      call MPI_Gatherv(gammas_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, gammas(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
     end do
   end function
 
@@ -533,9 +485,6 @@ contains
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
     type(array_2d_complex), allocatable :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
 
-    ! Debug
-    real*8 :: debug_prob, dpr1, dpr2, dpr3
-
     vdw_max = 11
     N = size(rho_grid)
     ! Load expansion coefficients
@@ -549,15 +498,6 @@ contains
     call print_parallel('1D and 2D expansion coefficients are loaded. Loading 3D.')
     call load_3D_expansion_coefficients(params, N, num_solutions_2d, proc_Cs)
     call print_parallel('Done loading expansion coefficients')
-
-    ! if (debug_mode == 'infinity_bug') then
-    !   ! debug_prob = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, 2400, n_range = [57, size(As, 2)])
-    !   dpr1 = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, 2400, n_range = [57, size(As, 2)], phi_range = [0d0, pi/3])
-    !   dpr2 = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, 2400, n_range = [57, size(As, 2)], phi_range = [pi/3, 2*pi/3])
-    !   dpr3 = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, 2400, n_range = [57, size(As, 2)], phi_range = [2*pi/3, pi])
-    !   print *, dpr1, dpr2, dpr3
-    !   stop 'infinity_bug'
-    ! end if
 
     ! Calculate properties
     ! sym_probs = calculate_symmetric_molecule_probability_all(params, As, Bs, proc_Cs)
@@ -579,4 +519,54 @@ contains
     call print_parallel('Writing results...')
     call write_state_properties(params, energies_3d, gammas * autown, region_probs, K_dists)
   end subroutine
+
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+! ! Calculates total probability of k-th state in symmetric molecule part of the PES (2*pi/3 <= phi <= 4*pi/3, regardless of rho)
+! ! Asymmetric can be obtained as 1 - symmetric
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+!   function calculate_symmetric_molecule_probability(params, As, Bs, proc_Cs, proc_k) result(sym_prob)
+!     class(input_params), intent(in) :: params
+!     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
+!     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
+!     type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+!     integer, intent(in) :: proc_k ! local 3D state index
+!     real*8 :: sym_prob
+!     sym_prob = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [2*pi/3, pi])
+!   end function
+!
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+! ! Calculates total probability of each state in symmetric molecule part of the PES (2*pi/3 <= phi <= 4*pi/3, regardless of rho)
+! ! Asymmetric can be obtained as 1 - symmetric
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+!   function calculate_symmetric_molecule_probability_all(params, As, Bs, proc_Cs) result(sym_probs)
+!     class(input_params), intent(in) :: params
+!     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
+!     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
+!     type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+!     real*8, allocatable :: sym_probs(:)
+!     integer :: proc_k
+!     ! Parallel
+!     integer :: proc_id, n_procs, proc_first_state, proc_states, ierr
+!     integer, allocatable :: recv_counts(:), recv_shifts(:)
+!     real*8, allocatable :: sym_probs_chunk(:)
+!
+!     call get_proc_info(proc_id, n_procs)
+!     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
+!
+!     ! Calculate chunks
+!     allocate(sym_probs_chunk(proc_states))
+!     do proc_k = 1, proc_states
+!       sym_probs_chunk(proc_k) = calculate_symmetric_molecule_probability(params, As, Bs, proc_Cs, proc_k)
+!     end do
+!
+!     ! Gather results
+!     if (n_procs == 1) then
+!       sym_probs = sym_probs_chunk
+!       return
+!     end if
+!
+!     allocate(sym_probs(params % num_states))
+!     call MPI_Gatherv(sym_probs_chunk, proc_states, MPI_DOUBLE_PRECISION, sym_probs, recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+!   end function
+
 end module
