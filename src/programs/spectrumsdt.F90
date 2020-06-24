@@ -273,7 +273,7 @@ contains
     do i = 1, size(eivals)
       energy = real(eivals(i)) * autown
       gamma = aimag(eivals(i)) * autown * -2
-      write(file_unit, '(I4,2F30.17)') i, energy, gamma
+      write(file_unit, '(I5,2F30.17)') i, energy, gamma
     end do
     close(file_unit)
   end subroutine
@@ -371,7 +371,7 @@ contains
     end if
 
     ! Setup directories
-    if (params % mode == 'properties' .and. params % rovib_coupling == 1) then
+    if (params % mode == 'properties') then
       ready = 1
     else
       if (params % sequential == 1) then
@@ -412,12 +412,12 @@ contains
           call calculate_states(params, context)
 
         case(MODE_3DSDT_POST)
-          if (params % rovib_coupling == 0) then
-            call calc_3dsdt_post(params)
-          else
+          ! if (params % rovib_coupling == 0) then
+          !   call calc_3dsdt_post(params)
+          ! else
             call init_caps(params, 0d0)
             call calculate_state_properties(params, g1, size(g2), get_real_cap())
-          end if
+          ! end if
 
         case(MODE_3DSDT_STATES)
           call calc_3dsdt_states
