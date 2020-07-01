@@ -80,7 +80,7 @@ module general_utils
   end function
   
 !-----------------------------------------------------------------------
-! generates equally spaced grid of points in the interval [start, end]
+! Generates equally spaced grid of points in the interval [start, end]
 !-----------------------------------------------------------------------
   function linspace(start, end, npoints) result(grid)
     real*8, intent(in) :: start, end

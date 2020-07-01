@@ -7,6 +7,9 @@ module rovib_io_mod
   use path_utils
   use rovib_utils_mod
   use string_mod
+
+  use debug_tools
+
   implicit none
   
 contains 
@@ -210,6 +213,7 @@ contains
     K_end = params % K(2)
     total_Ks = K_end - K_start + 1
     allocate(Bs(total_Ks, N, L), num_solutions_2d(total_Ks, N))
+    num_solutions_2d = 0
     if (present(Bs_plain)) then
       allocate(Bs_plain(total_Ks, N))
     end if
@@ -237,6 +241,7 @@ contains
     character(:), allocatable :: sym_path
 
     allocate(Bs(2, N, L), num_solutions_2d(2, N))
+    num_solutions_2d = 0
     if (present(Bs_plain)) then
       allocate(Bs_plain(2, N))
     end if
@@ -350,15 +355,21 @@ contains
     sym_path = get_sym_path_params(params)
     properties_result_path = get_properties_result_path(sym_path)
 
-    cols_bar_K = 8
+    cols_bar_K = 1 + size(gammas, 2) + size(region_probs, 2)
     cols_total = cols_bar_K + params % J + 1
+
     allocate(titles(cols_total))
-    titles(1:cols_bar_K) = to_string_char_str_arr_trim(['Energy (cm-1)', 'Gamma A (cm-1)', 'Gamma B (cm-1)', 'Symmetric covalent', 'Asymmetric covalent', 'VdW A', 'VdW B', &
+    titles(1:cols_bar_K) = to_string_char_str_arr_trim(['Energy (cm-1)', 'Gamma A (cm-1)', 'Gamma B (cm-1)', 'Covalent Sym', 'Covalent Asym', 'VdW A Sym', 'VdW A Asym', 'VdW B', &
       'Infinity'])
     do K_val = 0, params % J
       titles(cols_bar_K + K_val + 1) = string('K' // num2str(K_val))
     end do
     col_width = 25
+
+    if (debug_mode == 'print') then
+      print *, cols_bar_K, cols_total
+      print *, titles
+    end if
 
     open(newunit = file_unit, file = properties_result_path)
     do i = 1, size(titles)

@@ -129,85 +129,71 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates <Psi|O|Psi>-like expressions in the specified region. 
-! Operators O need to be supplied in form of multiplicative factors, which affect the overall sum at different stages.
-! Default operator is identity i.e. the function simply evaluates total probability of proc's k-th state in the specified region of the PES.
+! Calculates <Psi|Psi> expressions in all regions, for all proc states
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, K_range, n_range, phi_range, n_factors) result(res)
+  function calculate_wf_integral_all_regions(params, As, Bs, proc_Cs) result(p_dist)
     class(input_params), intent(in) :: params
     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
     class(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
     class(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-    integer, intent(in) :: proc_k ! local 3D state index
-    integer, optional, intent(in) :: K_range(2) ! values of K that should be considered in the sum
-    integer, optional, intent(in) :: n_range(2) ! indexes of the border rho points on the grid included in the corresponding range
-    real*8, optional, intent(in) :: phi_range(2) ! limits of phi integral
-    real*8, optional, intent(in) :: n_factors(:) ! multiplying factors in n-sum
-    real*8 :: res
-    integer :: K_val, K_ind, K_ind_comp, K_sym, n, l, m_ind, j
-    integer :: K_range_act(2), n_range_act(2)
-    real*8 :: i_sum, l_sum
-    real*8 :: phi_range_act(2)
-    real*8, allocatable :: n_factors_act(:), n_factors_default(:)
-    complex*16, allocatable :: j_sums(:) ! j-sums for different ms
+    real*8, allocatable :: p_dist(:, :, :, :) ! S x K x N x 3
+    integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, m_ind, j, phi_group_ind
+    real*8 :: i_sum
+    real*8 :: phi_range(2)
+    complex*16 :: j_sums(params % basis_size_phi) ! j-sums for different ms
 
-    K_range_act = arg_or_default(K_range, [params % K(1), params % K(2)])
-    n_range_act = arg_or_default(n_range, [1, size(As, 2)])
-    phi_range_act = arg_or_default(phi_range, [0d0, 2*pi])
+    call get_proc_elem_range(params % num_states, proc_first_state, proc_states)
+    allocate(p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), 3)) ! S x K x N x 3
+    p_dist = 0
 
-    allocate(n_factors_default(n_range_act(2) - n_range_act(1) + 1))
-    n_factors_default = 1
-    n_factors_act = arg_or_default(n_factors, n_factors_default)
-
-    call assert(size(n_factors_act) == size(n_factors_default), 'Error: size of n_factors does not match n_range')
-    call assert(phi_range_act(1) >= 0 .and. phi_range_act(2) <= 2*pi, 'Error: phi_range should be [0, 2*pi]')
-
-    allocate(j_sums(params % basis_size_phi))
-    res = 0
-    do K_val = K_range_act(1), K_range_act(2)
-      call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
-      do n = n_range_act(1), n_range_act(2)
-        l_sum = 0
-        do l = 1, size(As, 3)
-          j_sums = 0
-          do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
-            do j = 1, size(Bs(K_ind_comp, n, l) % p, 2)
-              i_sum = sum(Bs(K_ind_comp, n, l) % p(:, j) * As(K_ind_comp, n, l) % p(m_ind, :))
-              j_sums(m_ind) = j_sums(m_ind) + proc_Cs(K_ind, n) % p(j, proc_k) * i_sum
+    do proc_state_ind = 1, size(p_dist, 1)
+      do K_val = params % K(1), params % K(2)
+        call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
+        do n = 1, size(p_dist, 3)
+          do phi_group_ind = 1, size(p_dist, 4)
+            phi_range = [(phi_group_ind - 1) * pi / 3, phi_group_ind * pi / 3]
+            do l = 1, size(As, 3)
+              j_sums = 0
+              do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
+                do j = 1, size(Bs(K_ind_comp, n, l) % p, 2)
+                  i_sum = sum(Bs(K_ind_comp, n, l) % p(:, j) * As(K_ind_comp, n, l) % p(m_ind, :))
+                  j_sums(m_ind) = j_sums(m_ind) + proc_Cs(K_ind, n) % p(j, proc_state_ind) * i_sum
+                end do
+              end do
+              p_dist(proc_state_ind, K_ind, n, phi_group_ind) = p_dist(proc_state_ind, K_ind, n, phi_group_ind) + calc_m_sum(params, As, K_val, n, l, phi_range, j_sums)
             end do
           end do
-          l_sum = l_sum + calc_m_sum(params, As, K_val, n, l, phi_range_act, j_sums)
         end do
-        res = res + l_sum * n_factors_act(n - n_range_act(1) + 1)
       end do
     end do
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates K probability distribution for a given state
+! Calculates channel-specific values of gamma using probability distributions of a given state
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_gamma_channels(params, As, Bs, proc_Cs, cap, proc_k) result(gammas)
-    class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+  function calculate_gamma_channels(p_dist_k, cap) result(gammas)
+    real*8, intent(in) :: p_dist_k(:, :, :) ! K x n x 3
     real*8, intent(in) :: cap(:)
-    integer, intent(in) :: proc_k ! local 3D state index
     real*8 :: gammas(2) ! 1 - channel A, 2 - channel B
+    integer :: K_ind
 
+    call assert(size(cap) == size(p_dist_k, 2), 'Size of cap array does not match p_dist')
+    gammas = 0
+    do K_ind = 1, size(p_dist_k, 1)
+      gammas(1) = gammas(1) + sum(p_dist_k(K_ind, :, 2) * cap)
+      gammas(1) = gammas(1) + sum(p_dist_k(K_ind, :, 3) * cap)
+      gammas(2) = gammas(2) + sum(p_dist_k(K_ind, :, 1) * cap)
+    end do
     ! One factor of 2 is due to phi symmetry, another is due to gamma definition
-    gammas(1) = 2 * 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [pi/3, pi], n_factors = cap)
-    gammas(2) = 2 * 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [0d0, pi/3], n_factors = cap)
+    gammas = gammas * 2 * 2
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates channel-specific gammas for all states
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_gamma_channels_all(params, As, Bs, proc_Cs, cap) result(gammas)
+  function calculate_gamma_channels_all(params, p_dist, cap) result(gammas)
     class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+    real*8, intent(in) :: p_dist(:, :, :, :)
     real*8, intent(in) :: cap(:)
     real*8, allocatable :: gammas(:, :)
     integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
@@ -220,7 +206,7 @@ contains
     ! Calculate chunks
     allocate(gammas_chunk(proc_states, 2))
     do proc_k = 1, proc_states
-      gammas_chunk(proc_k, :) = calculate_gamma_channels(params, As, Bs, proc_Cs, cap, proc_k)
+      gammas_chunk(proc_k, :) = calculate_gamma_channels(p_dist(proc_k, :, :, :), cap)
     end do
 
     ! Gather results
@@ -240,38 +226,32 @@ contains
 ! *region_probs* contains probabilities in the following regions:
 ! 1 - symmetric molecule, covalent well
 ! 2 - asymmetric molecule, covalent well
-! 3 - vdw A
-! 4 - vdw B
-! 5 - infinity
+! 3 - vdw A (sym half)
+! 4 - vdw A (asym half)
+! 5 - vdw B
+! 6 - infinity
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_pes_region_probabilities(params, As, Bs, proc_Cs, proc_k, cov_n_inds, vdw_n_ind) result(region_probs)
-    class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-    integer, intent(in) :: proc_k ! local 3D state index
+  function calculate_pes_region_probabilities(p_dist_k, cov_n_inds, vdw_n_ind) result(region_probs)
+    real*8, intent(in) :: p_dist_k(:, :, :) ! K x n x 3
     integer, intent(in) :: cov_n_inds(3) ! indexes of the rho points that mark the border of well region in B, A and S regions respectively
     integer, intent(in) :: vdw_n_ind ! rho-index that marks the border of vdw area (common for all regions)
-    real*8 :: region_probs(5)
+    real*8 :: region_probs(6)
 
-    ! Integration is only carried out in the region [0, pi], thus * 2 is necessary to take into account the same probability in the [pi, 2*pi] region
-    region_probs(1) = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, n_range = [1, cov_n_inds(3)], phi_range = [2*pi/3, pi])
-    region_probs(2) = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, n_range = [1, cov_n_inds(2)], phi_range = [pi/3, 2*pi/3]) + &
-                      2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, n_range = [1, cov_n_inds(1)], phi_range = [0d0, pi/3])
-    region_probs(3) = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, n_range = [cov_n_inds(3) + 1, vdw_n_ind], phi_range = [2*pi/3, pi]) + &
-                      2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, n_range = [cov_n_inds(2) + 1, vdw_n_ind], phi_range = [pi/3, 2*pi/3])
-    region_probs(4) = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, n_range = [cov_n_inds(1) + 1, vdw_n_ind], phi_range = [0d0, pi/3])
-    region_probs(5) = calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, n_range = [vdw_n_ind + 1, size(As, 2)])
+    region_probs(1) = sum(p_dist_k(:, 1:cov_n_inds(3), 3))
+    region_probs(2) = sum(p_dist_k(:, 1:cov_n_inds(2), 2)) + sum(p_dist_k(:, 1:cov_n_inds(1), 1))
+    region_probs(3) = sum(p_dist_k(:, cov_n_inds(3)+1:vdw_n_ind, 3))
+    region_probs(4) = sum(p_dist_k(:, cov_n_inds(2)+1:vdw_n_ind, 2))
+    region_probs(5) = sum(p_dist_k(:, cov_n_inds(1)+1:vdw_n_ind, 1))
+    region_probs(6) = sum(p_dist_k(:, vdw_n_ind+1:size(p_dist_k, 2), :)) ! Calculated explicitly to make sure probabilities add up properly
+    region_probs = region_probs * 2 ! Due to phi symmetry
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calls calculate_pes_region_probabilities for all states and gathers results
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_pes_region_probabilities_all(params, As, Bs, proc_Cs, cov_n_inds, vdw_n_ind) result(region_probs)
+  function calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind) result(region_probs)
     class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+    real*8, intent(in) :: p_dist(:, :, :, :) ! state x K x n x 3
     integer, intent(in) :: cov_n_inds(3)
     integer, intent(in) :: vdw_n_ind
     real*8, allocatable :: region_probs(:, :)
@@ -283,9 +263,9 @@ contains
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
 
     ! Calculate chunks
-    allocate(region_probs_chunk(proc_states, 5))
+    allocate(region_probs_chunk(proc_states, 6))
     do proc_k = 1, proc_states
-      region_probs_chunk(proc_k, :) = calculate_pes_region_probabilities(params, As, Bs, proc_Cs, proc_k, cov_n_inds, vdw_n_ind)
+      region_probs_chunk(proc_k, :) = calculate_pes_region_probabilities(p_dist(proc_k, :, :, :), cov_n_inds, vdw_n_ind)
     end do
 
     ! Gather results
@@ -294,7 +274,7 @@ contains
       return
     end if
     
-    allocate(region_probs(params % num_states, 5))
+    allocate(region_probs(params % num_states, size(region_probs_chunk, 2)))
     do ind = 1, size(region_probs, 2)
       call MPI_Gatherv(region_probs_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, region_probs(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
     end do
@@ -303,31 +283,26 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates K probability distribution for a given state
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_K_dist(params, As, Bs, proc_Cs, proc_k) result(K_dist)
+  function calculate_K_dist(params, p_dist_k) result(K_dist)
     class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-    integer, intent(in) :: proc_k ! local 3D state index
-    real*8, allocatable :: K_dist(:) ! Distibution over all Ks, always includes K=0
+    real*8, intent(in) :: p_dist_k(:, :, :) ! K x n x 3
+    real*8 :: K_dist(params % J + 1) ! Distibution over all Ks, always includes all Ks
     integer :: K_val, K_sym, K_ind, K_ind_comp
 
-    allocate(K_dist(params % J + 1))
     K_dist = 0
     do K_val = params % K(1), params % K(2)
       call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
-      K_dist(K_ind + params % K(1)) = calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, K_range = [K_val, K_val])
+      K_dist(K_ind + params % K(1)) = sum(p_dist_k(K_ind, :, :))
     end do
+    K_dist = K_dist * 2 ! due to phi-symmetry
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates K probability distribution for all states
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_K_dist_all(params, As, Bs, proc_Cs) result(K_dists)
+  function calculate_K_dist_all(params, p_dist) result(K_dists)
     class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+    real*8, intent(in) :: p_dist(:, :, :, :) ! states x K x n x 3
     real*8, allocatable :: K_dists(:, :)
     integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
     integer, allocatable :: recv_counts(:), recv_shifts(:)
@@ -339,7 +314,7 @@ contains
     ! Calculate chunks
     allocate(K_dists_chunk(proc_states, params % J + 1))
     do proc_k = 1, proc_states
-      K_dists_chunk(proc_k, :) = calculate_K_dist(params, As, Bs, proc_Cs, proc_k)
+      K_dists_chunk(proc_k, :) = calculate_K_dist(params, p_dist(proc_k, :, :, :))
     end do
 
     ! Gather results
@@ -473,17 +448,23 @@ contains
     real*8, intent(in) :: cap(:)
     integer :: N, vdw_n_ind
     integer :: cov_n_inds(3)
-    integer, allocatable :: num_solutions_2d(:, :)
+    integer, allocatable :: num_solutions_2d(:, :) ! K x n
     integer, allocatable :: num_solutions_1d(:, :, :)
     real*8 :: vdw_max
     real*8, allocatable :: energies_3d(:), sym_probs(:)
     real*8, allocatable :: region_probs(:, :) ! nstate x 5
     real*8, allocatable :: K_dists(:, :) ! n_state x (J + 1)
     real*8, allocatable :: gammas(:, :) ! n_state x 2
+    real*8, allocatable :: p_dist(:, :, :, :) ! n_state x K x n x 3
     character(:), allocatable :: sym_path, spectrum_path
     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
     type(array_2d_complex), allocatable :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
+
+    ! Load energies
+    sym_path = get_sym_path_params(params)
+    spectrum_path = get_spectrum_path(sym_path)
+    energies_3d = load_energies_3D(spectrum_path)
 
     vdw_max = 11
     N = size(rho_grid)
@@ -495,26 +476,23 @@ contains
       call load_1D_expansion_coefficients(params, N, L, As, num_solutions_1d)
       call load_2D_expansion_coefficients(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
     end if
-    call print_parallel('1D and 2D expansion coefficients are loaded. Loading 3D.')
+
     call load_3D_expansion_coefficients(params, N, num_solutions_2d, proc_Cs)
     call print_parallel('Done loading expansion coefficients')
 
+    p_dist = calculate_wf_integral_all_regions(params, As, Bs, proc_Cs)
+    call print_parallel('Done calculating probability distributions')
+
     ! Calculate properties
-    ! sym_probs = calculate_symmetric_molecule_probability_all(params, As, Bs, proc_Cs)
-    gammas = calculate_gamma_channels_all(params, As, Bs, proc_Cs, cap)
+    gammas = calculate_gamma_channels_all(params, p_dist, cap)
     call print_parallel('Done calculating channel-specific gammas')
 
     call find_barriers_n_indices(params, rho_grid, vdw_max, cov_n_inds, vdw_n_ind)
-    region_probs = calculate_pes_region_probabilities_all(params, As, Bs, proc_Cs, cov_n_inds, vdw_n_ind)
+    region_probs = calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind)
     call print_parallel('Done calculating PES region probabilities')
 
-    K_dists = calculate_K_dist_all(params, As, Bs, proc_Cs)
+    K_dists = calculate_K_dist_all(params, p_dist)
     call print_parallel('Done calculating K-distributions')
-
-    ! Load energies
-    sym_path = get_sym_path_params(params)
-    spectrum_path = get_spectrum_path(sym_path)
-    energies_3d = load_energies_3D(spectrum_path)
 
     call print_parallel('Writing results...')
     call write_state_properties(params, energies_3d, gammas * autown, region_probs, K_dists)

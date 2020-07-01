@@ -65,7 +65,7 @@ set(dawes ${dawes_linkables} ${path_utils} ${dawes_ssplin} ${dawes_dynamic_param
 set(block_borders src/rovib/block_borders.f90)
 set(matrix_block_info ${block_borders} ${general_utils} src/rovib/matrix_block_info.f90)
 set(k_block_info ${matrix_block_info} ${io_utils} ${algorithms} src/rovib/k_block_info.f90)
-set(rovib_io ${array_1d} ${array_2d} ${constants} ${io_utils} ${input_params} ${path_utils} ${rovib_utils} ${string} src/rovib/rovib_io.f90)
+set(rovib_io ${array_1d} ${array_2d} ${constants} ${io_utils} ${input_params} ${path_utils} ${rovib_utils} ${string} ${debug_tools} src/rovib/rovib_io.f90)
 set(overlaps_extra ${array_1d} ${array_2d} ${formulas} ${input_params} ${k_block_info} ${path_utils} ${parallel_utils} ${rovib_io} ${debug_tools} src/rovib/overlaps_extra.f90)
 set(distributed_rovib_hamiltonian ${block_borders} ${rovib_utils} ${formulas} ${general_utils} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/distributed_rovib_hamiltonian.f90)
 set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_block_info} src/tools/eicalc/matmul_operator.F90)
