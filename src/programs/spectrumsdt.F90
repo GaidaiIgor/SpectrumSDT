@@ -273,7 +273,7 @@ contains
     do i = 1, size(eivals)
       energy = real(eivals(i)) * autown
       gamma = aimag(eivals(i)) * autown * -2
-      write(file_unit, '(I5,2F30.17)') i, energy, gamma
+      write(file_unit, '(I5,2G25.16)') i, energy, gamma
     end do
     close(file_unit)
   end subroutine
