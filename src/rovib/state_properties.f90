@@ -290,6 +290,11 @@ contains
     integer :: K_val, K_sym, K_ind, K_ind_comp
 
     K_dist = 0
+    if (params % rovib_coupling == 0) then
+      K_dist(K_ind + params % K(1)) = 1
+      return
+    end if
+
     do K_val = params % K(1), params % K(2)
       call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
       K_dist(K_ind + params % K(1)) = sum(p_dist_k(K_ind, :, :))
