@@ -290,7 +290,7 @@ contains
     integer :: K_val, K_sym, K_ind, K_ind_comp
 
     K_dist = 0
-    if (params % rovib_coupling == 0) then
+    if (size(p_dist_k, 1) == 1) then
       K_dist(params % K(1) + 1) = 1
       return
     end if
