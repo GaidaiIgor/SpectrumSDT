@@ -139,8 +139,16 @@ contains
     real*8, allocatable :: p_dist(:, :, :, :) ! S x K x N x 3
     integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, m_ind, j, phi_group_ind
     real*8 :: i_sum
-    real*8 :: phi_range(2)
+    real*8 :: phi_range(2), phi_borders(4)
     complex*16 :: j_sums(params % basis_size_phi) ! j-sums for different ms
+
+    if (params % molecule == '686') then
+      phi_borders = [0d0, 60d0, 117.65d0, 180d0] / 180 * pi
+    else if (params % molecule == '868') then
+      phi_borders = [0d0, 60d0, 122.35d0, 180d0] / 180 * pi
+    else
+      stop 'Error: Unknown molecule'
+    end if
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states)
     allocate(p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), 3)) ! S x K x N x 3
@@ -151,7 +159,7 @@ contains
         call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
         do n = 1, size(p_dist, 3)
           do phi_group_ind = 1, size(p_dist, 4)
-            phi_range = [(phi_group_ind - 1) * pi / 3, phi_group_ind * pi / 3]
+            phi_range = phi_borders(phi_group_ind : phi_group_ind+1)
             do l = 1, size(As, 3)
               j_sums = 0
               do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)

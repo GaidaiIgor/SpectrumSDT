@@ -15,7 +15,8 @@
    real*8 :: pes_mass(3)
 
    private
-   public :: init_pots, calc_pots, calc_pots_mpi, pes_mass
+   public :: pes_mass
+   public :: init_pots, calc_potvib, calc_pots, calc_pots_mpi
 
  contains
 
@@ -33,7 +34,8 @@
   end subroutine
 
 !-----------------------------------------------------------------------
-!  Calculates vibrational potential at given point.
+! Calculates vibrational potential at given point.
+! init_pots has to be called first to set pes_mass
 !-----------------------------------------------------------------------
   real*8 function calc_potvib(rho,tet,phi)
     implicit none
@@ -49,7 +51,7 @@
     r(1)=min(r2(1),r2(2))
     r(2)=max(r2(1),r2(2))
     r(3)=180d0*acos(r2(3))/pi
-    
+
     call IMLS(r, vpot, 1)
     vpot = vpot / autown - De_dawes
     calc_potvib = vpot + shift

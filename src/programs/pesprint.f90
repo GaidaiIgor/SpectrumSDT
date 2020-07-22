@@ -31,26 +31,16 @@ program pesprint
     call calc_pots(n1,n2,n3,g1,g2,g3,3)
   end if
 
-  ! call blacs_pinfo(iam,nprocs)
-  ! call blacs_setup(iam,nprocs)
-
   if (get_proc_id() == 0) then
-    if (sdtcalc) then
-      open(1,file='potvib.dat',form='unformatted')
-      write(1)potvib
+    if (sdtcalc .and. params % print_potential == 0) then
+      open(1, file='potvib.dat', form='unformatted')
+      write(1) potvib
       close(1)
-
-      if (params % print_potential == 1) then
-        call prnt_potvib
-        call prnt_pottot
-      end if
     else
       call prnt_potvib
       call prnt_pottot
     endif
   endif
-
-  ! call blacs_exit(0)
 
 contains
 

@@ -101,7 +101,7 @@ contains
     call put_string(mandatory_modes, 'rovib_coupling', '^[2-4].*')
     call put_string(mandatory_modes, 'fix_basis_jk', '^[2-4].*')
 
-    call put_string(mandatory_modes, 'molecule', '^([0-3]|40).*')
+    call put_string(mandatory_modes, 'molecule', '^([0-4]).*')
     call put_string(mandatory_modes, 'J', '^(1|[3-4]).*')
     call put_string(mandatory_modes, 'K', '^([1-2]|[3-4]0).*')
     call put_string(mandatory_modes, 'parity', '^[3-4]1.*')

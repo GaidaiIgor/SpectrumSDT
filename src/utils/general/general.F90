@@ -13,7 +13,7 @@ module general_utils
   end interface
   
   interface num2str
-    module procedure :: num2str_integer
+    module procedure :: num2str_integer, num2str_real
   end interface
 
   interface operator (.means.)
@@ -148,6 +148,21 @@ module general_utils
     format_act = arg_or_default(format, '(I0)')
     write(buffer, format_act) num
     str = trim(buffer)
+  end function
+  
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts real*8 to string
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function num2str_real(num, format) result(str)
+    real*8, intent(in) :: num
+    character(*), intent(in), optional :: format
+    character(:), allocatable :: str
+    character(256) :: buffer
+    character(:), allocatable :: format_act
+    
+    format_act = arg_or_default(format, '(G10.2)')
+    write(buffer, format_act) num
+    str = trim(adjustl(buffer))
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
