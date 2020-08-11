@@ -9,11 +9,6 @@ module matmul_operator_mod
   use matrix_block_info_mod
   use mpi_f08
 
-  ! Debug
-  use io_utils
-  use parallel_utils
-  use debug_tools
-
   abstract interface
     subroutine matmul_operator(proc_rows, vector, result)
       integer :: proc_rows

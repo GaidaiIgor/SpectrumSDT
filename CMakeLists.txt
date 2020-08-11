@@ -104,10 +104,9 @@ link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/p
 # link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/slepc-3.12.2/installed-arch-linux-c-opt-complex/lib)
 
 # Add common compile flag for all sources. -u forces implicitnone for all functions.
-add_compile_options(-mkl=cluster -assume bscc -g -traceback -u)
-# add_compile_options(-assume bscc -g -traceback -u)
+add_compile_options(-assume bscc -g -traceback -u)
 # Add common linker flags for all targets
-set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
+# set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
 
 add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
 target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
