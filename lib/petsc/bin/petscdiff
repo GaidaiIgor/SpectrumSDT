@@ -1,0 +1,173 @@
+#! /bin/sh -f
+#
+#  Replaces floating point numbers with XXX and then does a diff
+#  
+#
+# Method to print out general and script specific options
+#
+print_usage() {
+
+cat >&2 <<EOF
+Usage: $0 [options] file1 file2
+Replaces floating point numbers with XXX and then does a diff
+file1 is typically "expected result"
+
+OPTIONS
+  -m ............. mv file2 to file1 after diffing
+  -M ............. mv file2 to file1 after diffing if it is an alt file
+  -j ............. just use diff without modifying numbers
+  -h ............. print this message
+  -f ............. filter file1 with commands; e.g., 'sort -nr'
+  -F ............. filter file2 with commands; e.g., 'grep -v foo | grep -v bar'
+  -k ............. keep the filter files -- do not delete
+EOF
+  exit $1
+}
+# Unset some environment variables to avoid problems on cygwin
+# See: https://cygwin.com/pipermail/cygwin/2020-March/244153.html
+# Suspect that the problems are with gitlab's environment variables
+unset CI_ENVIRONMENT_NAME
+unset CI_COMMIT_BEFORE_SHA
+unset CI_COMMIT_DESCRIPTION
+unset CI_COMMIT_MESSAGE
+unset CI_CONFIG_PATH
+
+# parse options -- using getopts because it is so easily extensible
+mvfile=false
+mvfile_ifalt=false
+justdiff=false
+filter=false          # File2
+filter_output=false   # File1
+keep_files=false
+diffargs=""
+while getopts "f:F:hjJ:kmM" opt
+do
+  case $opt in
+    f ) filter_output=true;  filter_output_cmd=$OPTARG ;;
+    F ) filter=true;  filter_cmd=$OPTARG ;;
+    j ) justdiff=true ;;
+    J ) justdiff=true;  diffargs=$OPTARG;;
+    k ) keep_files=true;;
+    m ) mvfile=true;;
+    M ) mvfile_ifalt=true;;
+    h ) print_usage 0;;
+  esac
+done
+shift "$(( $OPTIND - 1 ))"
+
+if [ $# -lt 2 ]; then
+  echo Error! 
+  print_usage 1
+fi
+
+# Filter a file and sort output into a file with a unique suffix
+filter_suffix=".filter_tmp"
+filter_file() {
+  file="$1"
+  fcmds="$2"
+  eval "cat ${file} | ${fcmds} > ${file}${filter_suffix}"
+}
+
+if [ "x${RM}" = "x" ]; then RM="rm"; fi
+if [ "x${SED}" = "x" ]; then SED="sed"; fi
+if [ "x${DIFF}" = "x" ]; then DIFF="diff -w";
+elif [ "`basename ${DIFF}`" = "petscdiff" ]; then DIFF="diff -w";
+fi
+
+if [ "x${1}" = "x-" ]; then
+    file1=`mktemp -t petscdiff.XXXXXX` ;
+    $(cat /dev/stdin > ${file1})
+elif [ -f ${1} ]; then
+    file1=${1}
+else 
+  if ${mvfile}; then
+    echo "mv'ing $2 --> $1"
+    # If filter need to filter first
+    if ${filter}; then
+      filter_file "${2}" "${filter_cmd}" 
+      mv "${2}${filter_suffix}" "$1"
+    else
+      mv "$2" "$1"
+    fi
+    exit 0
+  else
+    echo Error! file1 check failed: "${1}"
+    exit 1
+  fi
+  if ${mvfile_ifalt}; then
+    echo "mvfile_ifalt"
+    if echo $1 | grep '_alt.out'; then 
+      echo "mv'ing $2 --> $1"
+      if ${filter}; then
+        filter_file "${2}" "${filter_cmd}" 
+        mv "${2}${filter_suffix}" "$1"
+      else
+        mv "$2" "$1"
+      fi 
+      exit 0
+    fi
+  fi
+fi
+
+if [ -f ${2} ]; then
+    file2=${2}
+else
+  echo Error! file2 check failed: "${2}"
+  exit 1
+fi
+
+if ${filter}; then
+      filter_file "${file2}" "${filter_cmd}" 
+      file2="${file2}${filter_suffix}"  # Will need to remove later
+fi
+if ${filter_output}; then
+      filter_file "${file1}" "${filter_output_cmd}" 
+      file1="${file1}${filter_suffix}"  # Will need to remove later
+fi
+
+if ! ${justdiff}; then
+    tmpA=`mktemp -t petscdiffA.XXXXXX` ;
+    tmpB=`mktemp -t petscdiffB.XXXXXX` ;
+
+    ${SED} "s/< [-+ ]*[0-9][0-9]*\.*[0-9]*[eE][-+][0-9][0-9]*/XXX/g" ${file1} | ${SED} "s/[-+ ]*[-]*[0-9][0-9]*\.*[0-9]*[eE][-+][0-9][0-9]*/XXX/g" | ${SED}  "s/[-+ ]*[-]*[0-9][0-9]*\.[0-9]*/XXX/g" | ${SED} "s/ \*\*\*\*\*\*\*\*\* /XXX/g" > ${tmpA}
+
+    ${SED} "s/< [-+ ]*[0-9][0-9]*\.*[0-9]*[eE][-+][0-9][0-9]*/XXX/g" ${file2} | ${SED} "s/[-+ ]*[-]*[0-9][0-9]*\.*[0-9]*[eE][-+][0-9][0-9]*/XXX/g" | ${SED}  "s/[-+ ]*[-]*[0-9][0-9]*\.[0-9]*/XXX/g" | ${SED} "s/ \*\*\*\*\*\*\*\*\* /XXX/g" > ${tmpB}
+    ${DIFF} ${tmpA} ${tmpB} > /dev/null
+    if [ $? -ne 0 ]; then
+      ${DIFF}  ${file1} ${file2}
+      err=1
+    else
+      err=0
+    fi
+    ${RM} -f ${tmpA} ${tmpB}
+else
+    ${DIFF} ${diffargs} ${file1} ${file2}
+    err=$?
+fi
+
+if [ "x${1}" = "x-" ]; then
+  ${RM} -f ${file1}
+fi
+
+if ${mvfile} && test ${err} -gt 0; then
+  echo "mv'ing $file2 --> $file1"
+  mv "$file2" "$file1"
+fi
+if ${mvfile_ifalt} && test ${err} -gt 0; then
+  if echo $file1 | grep '_alt.out'; then 
+    echo "mv'ing $file2 --> $file1"
+    mv "$file2" "$file1"
+  fi
+fi
+
+# For debugging filters, it is useful to be able to keep the files
+if ! ${keep_files}; then
+  if ${filter}; then
+        ${RM} -f ${file2}  # Temporary file.  See above
+  fi
+  if ${filter_output}; then
+        ${RM} -f ${file1}  # Temporary file.  See above
+  fi
+fi
+
+exit ${err};
