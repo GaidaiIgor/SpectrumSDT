@@ -1,0 +1,386 @@
+<center><a href="contig.c">Actual source code: contig.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/impls/contiguous/contig.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:44+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/impls/contiguous/contig.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> implemented as an array of Vecs sharing a contiguous array for elements</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line17"> 17: </a>  Vec         *V;
+<a name="line18"> 18: </a>  PetscScalar *array;
+<a name="line19"> 19: </a>  PetscBool   mpi;
+<a name="line20"> 20: </a>} BV_CONTIGUOUS;
+
+<a name="line22"> 22: </a><strong><font color="#4169E1"><a name="BVMult_Contiguous"></a>PetscErrorCode BVMult_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y,PetscScalar alpha,PetscScalar beta,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,Mat Q)</font></strong>
+<a name="line23"> 23: </a>{
+<a name="line25"> 25: </a>  BV_CONTIGUOUS  *y = (BV_CONTIGUOUS*)Y-&gt;data,*x = (BV_CONTIGUOUS*)X-&gt;data;
+<a name="line26"> 26: </a>  PetscScalar    *q;
+<a name="line27"> 27: </a>  PetscInt       ldq;
+
+<a name="line30"> 30: </a>  <font color="#4169E1">if</font> (Q) {
+<a name="line31"> 31: </a>    MatGetSize(Q,&amp;ldq,NULL);
+<a name="line32"> 32: </a>    MatDenseGetArray(Q,&amp;q);
+<a name="line33"> 33: </a>    BVMult_BLAS_Private(Y,Y-&gt;n,Y-&gt;k-Y-&gt;l,X-&gt;k-X-&gt;l,ldq,alpha,x-&gt;array+(X-&gt;nc+X-&gt;l)*X-&gt;n,q+Y-&gt;l*ldq+X-&gt;l,beta,y-&gt;array+(Y-&gt;nc+Y-&gt;l)*Y-&gt;n);
+<a name="line34"> 34: </a>    MatDenseRestoreArray(Q,&amp;q);
+<a name="line35"> 35: </a>  } <font color="#4169E1">else</font> {
+<a name="line36"> 36: </a>    BVAXPY_BLAS_Private(Y,Y-&gt;n,Y-&gt;k-Y-&gt;l,alpha,x-&gt;array+(X-&gt;nc+X-&gt;l)*X-&gt;n,beta,y-&gt;array+(Y-&gt;nc+Y-&gt;l)*Y-&gt;n);
+<a name="line37"> 37: </a>  }
+<a name="line38"> 38: </a>  <font color="#4169E1">return</font>(0);
+<a name="line39"> 39: </a>}
+
+<a name="line41"> 41: </a><strong><font color="#4169E1"><a name="BVMultVec_Contiguous"></a>PetscErrorCode BVMultVec_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,PetscScalar alpha,PetscScalar beta,Vec y,PetscScalar *q)</font></strong>
+<a name="line42"> 42: </a>{
+<a name="line44"> 44: </a>  BV_CONTIGUOUS  *x = (BV_CONTIGUOUS*)X-&gt;data;
+<a name="line45"> 45: </a>  PetscScalar    *py,*qq=q;
+
+<a name="line48"> 48: </a>  VecGetArray(y,&amp;py);
+<a name="line49"> 49: </a>  <font color="#4169E1">if</font> (!q) { VecGetArray(X-&gt;buffer,&amp;qq); }
+<a name="line50"> 50: </a>  BVMultVec_BLAS_Private(X,X-&gt;n,X-&gt;k-X-&gt;l,alpha,x-&gt;array+(X-&gt;nc+X-&gt;l)*X-&gt;n,qq,beta,py);
+<a name="line51"> 51: </a>  <font color="#4169E1">if</font> (!q) { VecRestoreArray(X-&gt;buffer,&amp;qq); }
+<a name="line52"> 52: </a>  VecRestoreArray(y,&amp;py);
+<a name="line53"> 53: </a>  <font color="#4169E1">return</font>(0);
+<a name="line54"> 54: </a>}
+
+<a name="line56"> 56: </a><strong><font color="#4169E1"><a name="BVMultInPlace_Contiguous"></a>PetscErrorCode BVMultInPlace_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line57"> 57: </a>{
+<a name="line59"> 59: </a>  BV_CONTIGUOUS  *ctx = (BV_CONTIGUOUS*)V-&gt;data;
+<a name="line60"> 60: </a>  PetscScalar    *q;
+<a name="line61"> 61: </a>  PetscInt       ldq;
+
+<a name="line64"> 64: </a>  MatGetSize(Q,&amp;ldq,NULL);
+<a name="line65"> 65: </a>  MatDenseGetArray(Q,&amp;q);
+<a name="line66"> 66: </a>  BVMultInPlace_BLAS_Private(V,V-&gt;n,V-&gt;k-V-&gt;l,ldq,s-V-&gt;l,e-V-&gt;l,ctx-&gt;array+(V-&gt;nc+V-&gt;l)*V-&gt;n,q+V-&gt;l*ldq+V-&gt;l,PETSC_FALSE);
+<a name="line67"> 67: </a>  MatDenseRestoreArray(Q,&amp;q);
+<a name="line68"> 68: </a>  <font color="#4169E1">return</font>(0);
+<a name="line69"> 69: </a>}
+
+<a name="line71"> 71: </a><strong><font color="#4169E1"><a name="BVMultInPlaceTranspose_Contiguous"></a>PetscErrorCode BVMultInPlaceTranspose_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line72"> 72: </a>{
+<a name="line74"> 74: </a>  BV_CONTIGUOUS  *ctx = (BV_CONTIGUOUS*)V-&gt;data;
+<a name="line75"> 75: </a>  PetscScalar    *q;
+<a name="line76"> 76: </a>  PetscInt       ldq;
+
+<a name="line79"> 79: </a>  MatGetSize(Q,&amp;ldq,NULL);
+<a name="line80"> 80: </a>  MatDenseGetArray(Q,&amp;q);
+<a name="line81"> 81: </a>  BVMultInPlace_BLAS_Private(V,V-&gt;n,V-&gt;k-V-&gt;l,ldq,s-V-&gt;l,e-V-&gt;l,ctx-&gt;array+(V-&gt;nc+V-&gt;l)*V-&gt;n,q+V-&gt;l*ldq+V-&gt;l,PETSC_TRUE);
+<a name="line82"> 82: </a>  MatDenseRestoreArray(Q,&amp;q);
+<a name="line83"> 83: </a>  <font color="#4169E1">return</font>(0);
+<a name="line84"> 84: </a>}
+
+<a name="line86"> 86: </a><strong><font color="#4169E1"><a name="BVDot_Contiguous"></a>PetscErrorCode BVDot_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y,Mat M)</font></strong>
+<a name="line87"> 87: </a>{
+<a name="line89"> 89: </a>  BV_CONTIGUOUS  *x = (BV_CONTIGUOUS*)X-&gt;data,*y = (BV_CONTIGUOUS*)Y-&gt;data;
+<a name="line90"> 90: </a>  PetscScalar    *m;
+<a name="line91"> 91: </a>  PetscInt       ldm;
+
+<a name="line94"> 94: </a>  MatGetSize(M,&amp;ldm,NULL);
+<a name="line95"> 95: </a>  MatDenseGetArray(M,&amp;m);
+<a name="line96"> 96: </a>  BVDot_BLAS_Private(X,Y-&gt;k-Y-&gt;l,X-&gt;k-X-&gt;l,X-&gt;n,ldm,y-&gt;array+(Y-&gt;nc+Y-&gt;l)*Y-&gt;n,x-&gt;array+(X-&gt;nc+X-&gt;l)*X-&gt;n,m+X-&gt;l*ldm+Y-&gt;l,x-&gt;mpi);
+<a name="line97"> 97: </a>  MatDenseRestoreArray(M,&amp;m);
+<a name="line98"> 98: </a>  <font color="#4169E1">return</font>(0);
+<a name="line99"> 99: </a>}
+
+<a name="line101">101: </a><strong><font color="#4169E1"><a name="BVDotVec_Contiguous"></a>PetscErrorCode BVDotVec_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,Vec y,PetscScalar *q)</font></strong>
+<a name="line102">102: </a>{
+<a name="line103">103: </a>  PetscErrorCode    ierr;
+<a name="line104">104: </a>  BV_CONTIGUOUS     *x = (BV_CONTIGUOUS*)X-&gt;data;
+<a name="line105">105: </a>  const PetscScalar *py;
+<a name="line106">106: </a>  PetscScalar       *qq=q;
+<a name="line107">107: </a>  Vec               z = y;
+
+<a name="line110">110: </a>  <font color="#4169E1">if</font> (X-&gt;matrix) {
+<a name="line111">111: </a>    BV_IPMatMult(X,y);
+<a name="line112">112: </a>    z = X-&gt;Bx;
+<a name="line113">113: </a>  }
+<a name="line114">114: </a>  VecGetArrayRead(z,&amp;py);
+<a name="line115">115: </a>  <font color="#4169E1">if</font> (!q) { VecGetArray(X-&gt;buffer,&amp;qq); }
+<a name="line116">116: </a>  BVDotVec_BLAS_Private(X,X-&gt;n,X-&gt;k-X-&gt;l,x-&gt;array+(X-&gt;nc+X-&gt;l)*X-&gt;n,py,qq,x-&gt;mpi);
+<a name="line117">117: </a>  <font color="#4169E1">if</font> (!q) { VecRestoreArray(X-&gt;buffer,&amp;qq); }
+<a name="line118">118: </a>  VecRestoreArrayRead(z,&amp;py);
+<a name="line119">119: </a>  <font color="#4169E1">return</font>(0);
+<a name="line120">120: </a>}
+
+<a name="line122">122: </a><strong><font color="#4169E1"><a name="BVDotVec_Local_Contiguous"></a>PetscErrorCode BVDotVec_Local_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,Vec y,PetscScalar *m)</font></strong>
+<a name="line123">123: </a>{
+<a name="line125">125: </a>  BV_CONTIGUOUS  *x = (BV_CONTIGUOUS*)X-&gt;data;
+<a name="line126">126: </a>  PetscScalar    *py;
+<a name="line127">127: </a>  Vec            z = y;
+
+<a name="line130">130: </a>  <font color="#4169E1">if</font> (X-&gt;matrix) {
+<a name="line131">131: </a>    BV_IPMatMult(X,y);
+<a name="line132">132: </a>    z = X-&gt;Bx;
+<a name="line133">133: </a>  }
+<a name="line134">134: </a>  VecGetArray(z,&amp;py);
+<a name="line135">135: </a>  BVDotVec_BLAS_Private(X,X-&gt;n,X-&gt;k-X-&gt;l,x-&gt;array+(X-&gt;nc+X-&gt;l)*X-&gt;n,py,m,PETSC_FALSE);
+<a name="line136">136: </a>  VecRestoreArray(z,&amp;py);
+<a name="line137">137: </a>  <font color="#4169E1">return</font>(0);
+<a name="line138">138: </a>}
+
+<a name="line140">140: </a><strong><font color="#4169E1"><a name="BVScale_Contiguous"></a>PetscErrorCode BVScale_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscScalar alpha)</font></strong>
+<a name="line141">141: </a>{
+<a name="line143">143: </a>  BV_CONTIGUOUS  *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+
+<a name="line146">146: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line147">147: </a>    BVScale_BLAS_Private(bv,(bv-&gt;k-bv-&gt;l)*bv-&gt;n,ctx-&gt;array+(bv-&gt;nc+bv-&gt;l)*bv-&gt;n,alpha);
+<a name="line148">148: </a>  } <font color="#4169E1">else</font> {
+<a name="line149">149: </a>    BVScale_BLAS_Private(bv,bv-&gt;n,ctx-&gt;array+(bv-&gt;nc+j)*bv-&gt;n,alpha);
+<a name="line150">150: </a>  }
+<a name="line151">151: </a>  <font color="#4169E1">return</font>(0);
+<a name="line152">152: </a>}
+
+<a name="line154">154: </a><strong><font color="#4169E1"><a name="BVNorm_Contiguous"></a>PetscErrorCode BVNorm_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,NormType type,PetscReal *val)</font></strong>
+<a name="line155">155: </a>{
+<a name="line157">157: </a>  BV_CONTIGUOUS  *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+
+<a name="line160">160: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line161">161: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,bv-&gt;k-bv-&gt;l,ctx-&gt;array+(bv-&gt;nc+bv-&gt;l)*bv-&gt;n,type,val,ctx-&gt;mpi);
+<a name="line162">162: </a>  } <font color="#4169E1">else</font> {
+<a name="line163">163: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,1,ctx-&gt;array+(bv-&gt;nc+j)*bv-&gt;n,type,val,ctx-&gt;mpi);
+<a name="line164">164: </a>  }
+<a name="line165">165: </a>  <font color="#4169E1">return</font>(0);
+<a name="line166">166: </a>}
+
+<a name="line168">168: </a><strong><font color="#4169E1"><a name="BVNorm_Local_Contiguous"></a>PetscErrorCode BVNorm_Local_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,NormType type,PetscReal *val)</font></strong>
+<a name="line169">169: </a>{
+<a name="line171">171: </a>  BV_CONTIGUOUS  *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+
+<a name="line174">174: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line175">175: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,bv-&gt;k-bv-&gt;l,ctx-&gt;array+(bv-&gt;nc+bv-&gt;l)*bv-&gt;n,type,val,PETSC_FALSE);
+<a name="line176">176: </a>  } <font color="#4169E1">else</font> {
+<a name="line177">177: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,1,ctx-&gt;array+(bv-&gt;nc+j)*bv-&gt;n,type,val,PETSC_FALSE);
+<a name="line178">178: </a>  }
+<a name="line179">179: </a>  <font color="#4169E1">return</font>(0);
+<a name="line180">180: </a>}
+
+<a name="line182">182: </a><strong><font color="#4169E1"><a name="BVMatMult_Contiguous"></a>PetscErrorCode BVMatMult_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> W)</font></strong>
+<a name="line183">183: </a>{
+<a name="line185">185: </a>  BV_CONTIGUOUS  *v = (BV_CONTIGUOUS*)V-&gt;data,*w = (BV_CONTIGUOUS*)W-&gt;data;
+<a name="line186">186: </a>  PetscInt       j;
+<a name="line187">187: </a>  PetscBool      flg;
+<a name="line188">188: </a>  Mat            Vmat,Wmat;
+
+<a name="line191">191: </a>  MatHasOperation(A,MATOP_MAT_MULT,&amp;flg);
+<a name="line192">192: </a>  <font color="#4169E1">if</font> (V-&gt;vmm &amp;&amp; flg) {
+<a name="line193">193: </a>    <a href="../../../../../../docs/manualpages/BV/BVGetMat.html#BVGetMat">BVGetMat</a>(V,&amp;Vmat);
+<a name="line194">194: </a>    <a href="../../../../../../docs/manualpages/BV/BVGetMat.html#BVGetMat">BVGetMat</a>(W,&amp;Wmat);
+<a name="line195">195: </a>    MatProductCreateWithMat(A,Vmat,NULL,Wmat);
+<a name="line196">196: </a>    MatProductSetType(Wmat,MATPRODUCT_AB);
+<a name="line197">197: </a>    MatProductSetFromOptions(Wmat);
+<a name="line198">198: </a>    MatProductSymbolic(Wmat);
+<a name="line199">199: </a>    MatProductNumeric(Wmat);
+<a name="line200">200: </a>    MatProductClear(Wmat);
+<a name="line201">201: </a>    <a href="../../../../../../docs/manualpages/BV/BVRestoreMat.html#BVRestoreMat">BVRestoreMat</a>(V,&amp;Vmat);
+<a name="line202">202: </a>    <a href="../../../../../../docs/manualpages/BV/BVRestoreMat.html#BVRestoreMat">BVRestoreMat</a>(W,&amp;Wmat);
+<a name="line203">203: </a>  } <font color="#4169E1">else</font> {
+<a name="line204">204: </a>    <font color="#4169E1">for</font> (j=0;j&lt;V-&gt;k-V-&gt;l;j++) {
+<a name="line205">205: </a>      MatMult(A,v-&gt;V[V-&gt;nc+V-&gt;l+j],w-&gt;V[W-&gt;nc+W-&gt;l+j]);
+<a name="line206">206: </a>    }
+<a name="line207">207: </a>  }
+<a name="line208">208: </a>  <font color="#4169E1">return</font>(0);
+<a name="line209">209: </a>}
+
+<a name="line211">211: </a><strong><font color="#4169E1"><a name="BVCopy_Contiguous"></a>PetscErrorCode BVCopy_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> W)</font></strong>
+<a name="line212">212: </a>{
+<a name="line214">214: </a>  BV_CONTIGUOUS  *v = (BV_CONTIGUOUS*)V-&gt;data,*w = (BV_CONTIGUOUS*)W-&gt;data;
+<a name="line215">215: </a>  PetscScalar    *pvc,*pwc;
+
+<a name="line218">218: </a>  pvc = v-&gt;array+(V-&gt;nc+V-&gt;l)*V-&gt;n;
+<a name="line219">219: </a>  pwc = w-&gt;array+(W-&gt;nc+W-&gt;l)*W-&gt;n;
+<a name="line220">220: </a>  PetscArraycpy(pwc,pvc,(V-&gt;k-V-&gt;l)*V-&gt;n);
+<a name="line221">221: </a>  <font color="#4169E1">return</font>(0);
+<a name="line222">222: </a>}
+
+<a name="line224">224: </a><strong><font color="#4169E1"><a name="BVCopyColumn_Contiguous"></a>PetscErrorCode BVCopyColumn_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt j,PetscInt i)</font></strong>
+<a name="line225">225: </a>{
+<a name="line227">227: </a>  BV_CONTIGUOUS  *v = (BV_CONTIGUOUS*)V-&gt;data;
+
+<a name="line230">230: </a>  PetscArraycpy(v-&gt;array+(V-&gt;nc+i)*V-&gt;n,v-&gt;array+(V-&gt;nc+j)*V-&gt;n,V-&gt;n);
+<a name="line231">231: </a>  <font color="#4169E1">return</font>(0);
+<a name="line232">232: </a>}
+
+<a name="line234">234: </a><strong><font color="#4169E1"><a name="BVResize_Contiguous"></a>PetscErrorCode BVResize_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt m,PetscBool copy)</font></strong>
+<a name="line235">235: </a>{
+<a name="line237">237: </a>  BV_CONTIGUOUS  *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+<a name="line238">238: </a>  PetscInt       j,bs,lsplit;
+<a name="line239">239: </a>  PetscScalar    *newarray;
+<a name="line240">240: </a>  Vec            *newV;
+<a name="line241">241: </a>  char           str[50];
+<a name="line242">242: </a>  <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>             parent;
+
+<a name="line245">245: </a>  <font color="#4169E1">if</font> (bv-&gt;issplit==2) {
+<a name="line246">246: </a>    parent = bv-&gt;splitparent;
+<a name="line247">247: </a>    lsplit = parent-&gt;lsplit;
+<a name="line248">248: </a>    ctx-&gt;V = ((BV_CONTIGUOUS*)parent-&gt;data)-&gt;V+lsplit;
+<a name="line249">249: </a>    ctx-&gt;array = ((BV_CONTIGUOUS*)parent-&gt;data)-&gt;array+lsplit*bv-&gt;n;
+<a name="line250">250: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!bv-&gt;issplit) {
+<a name="line251">251: </a>    VecGetBlockSize(bv-&gt;t,&amp;bs);
+<a name="line252">252: </a>    PetscMalloc1(m*bv-&gt;n,&amp;newarray);
+<a name="line253">253: </a>    PetscArrayzero(newarray,m*bv-&gt;n);
+<a name="line254">254: </a>    PetscMalloc1(m,&amp;newV);
+<a name="line255">255: </a>    <font color="#4169E1">for</font> (j=0;j&lt;m;j++) {
+<a name="line256">256: </a>      <font color="#4169E1">if</font> (ctx-&gt;mpi) {
+<a name="line257">257: </a>        VecCreateMPIWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,bv-&gt;n,PETSC_DECIDE,newarray+j*bv-&gt;n,newV+j);
+<a name="line258">258: </a>      } <font color="#4169E1">else</font> {
+<a name="line259">259: </a>        VecCreateSeqWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,bv-&gt;n,newarray+j*bv-&gt;n,newV+j);
+<a name="line260">260: </a>      }
+<a name="line261">261: </a>    }
+<a name="line262">262: </a>    PetscLogObjectParents(bv,m,newV);
+<a name="line263">263: </a>    <font color="#4169E1">if</font> (((PetscObject)bv)-&gt;name) {
+<a name="line264">264: </a>      <font color="#4169E1">for</font> (j=0;j&lt;m;j++) {
+<a name="line265">265: </a>        PetscSNPrintf(str,50,<font color="#666666">"%s_%d"</font>,((PetscObject)bv)-&gt;name,(int)j);
+<a name="line266">266: </a>        PetscObjectSetName((PetscObject)newV[j],str);
+<a name="line267">267: </a>      }
+<a name="line268">268: </a>    }
+<a name="line269">269: </a>    <font color="#4169E1">if</font> (copy) {
+<a name="line270">270: </a>      PetscArraycpy(newarray,ctx-&gt;array,PetscMin(m,bv-&gt;m)*bv-&gt;n);
+<a name="line271">271: </a>    }
+<a name="line272">272: </a>    VecDestroyVecs(bv-&gt;m,&amp;ctx-&gt;V);
+<a name="line273">273: </a>    ctx-&gt;V = newV;
+<a name="line274">274: </a>    PetscFree(ctx-&gt;array);
+<a name="line275">275: </a>    ctx-&gt;array = newarray;
+<a name="line276">276: </a>  }
+<a name="line277">277: </a>  <font color="#4169E1">return</font>(0);
+<a name="line278">278: </a>}
+
+<a name="line280">280: </a><strong><font color="#4169E1"><a name="BVGetColumn_Contiguous"></a>PetscErrorCode BVGetColumn_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,Vec *v)</font></strong>
+<a name="line281">281: </a>{
+<a name="line282">282: </a>  BV_CONTIGUOUS *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+<a name="line283">283: </a>  PetscInt      l;
+
+<a name="line286">286: </a>  l = BVAvailableVec;
+<a name="line287">287: </a>  bv-&gt;cv[l] = ctx-&gt;V[bv-&gt;nc+j];
+<a name="line288">288: </a>  <font color="#4169E1">return</font>(0);
+<a name="line289">289: </a>}
+
+<a name="line291">291: </a><strong><font color="#4169E1"><a name="BVGetArray_Contiguous"></a>PetscErrorCode BVGetArray_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscScalar **a)</font></strong>
+<a name="line292">292: </a>{
+<a name="line293">293: </a>  BV_CONTIGUOUS *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+
+<a name="line296">296: </a>  *a = ctx-&gt;array;
+<a name="line297">297: </a>  <font color="#4169E1">return</font>(0);
+<a name="line298">298: </a>}
+
+<a name="line300">300: </a><strong><font color="#4169E1"><a name="BVGetArrayRead_Contiguous"></a>PetscErrorCode BVGetArrayRead_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,const PetscScalar **a)</font></strong>
+<a name="line301">301: </a>{
+<a name="line302">302: </a>  BV_CONTIGUOUS *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+
+<a name="line305">305: </a>  *a = ctx-&gt;array;
+<a name="line306">306: </a>  <font color="#4169E1">return</font>(0);
+<a name="line307">307: </a>}
+
+<a name="line309">309: </a><strong><font color="#4169E1"><a name="BVDestroy_Contiguous"></a>PetscErrorCode BVDestroy_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line310">310: </a>{
+<a name="line312">312: </a>  BV_CONTIGUOUS  *ctx = (BV_CONTIGUOUS*)bv-&gt;data;
+
+<a name="line315">315: </a>  <font color="#4169E1">if</font> (!bv-&gt;issplit) {
+<a name="line316">316: </a>    VecDestroyVecs(bv-&gt;nc+bv-&gt;m,&amp;ctx-&gt;V);
+<a name="line317">317: </a>    PetscFree(ctx-&gt;array);
+<a name="line318">318: </a>  }
+<a name="line319">319: </a>  PetscFree(bv-&gt;data);
+<a name="line320">320: </a>  <font color="#4169E1">return</font>(0);
+<a name="line321">321: </a>}
+
+<a name="line323">323: </a><strong><font color="#4169E1"><a name="BVCreate_Contiguous"></a>SLEPC_EXTERN PetscErrorCode BVCreate_Contiguous(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line324">324: </a>{
+<a name="line326">326: </a>  BV_CONTIGUOUS  *ctx;
+<a name="line327">327: </a>  PetscInt       j,nloc,bs,lsplit;
+<a name="line328">328: </a>  PetscBool      seq;
+<a name="line329">329: </a>  PetscScalar    *aa;
+<a name="line330">330: </a>  char           str[50];
+<a name="line331">331: </a>  PetscScalar    *array;
+<a name="line332">332: </a>  <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>             parent;
+<a name="line333">333: </a>  Vec            *Vpar;
+
+<a name="line336">336: </a>  PetscNewLog(bv,&amp;ctx);
+<a name="line337">337: </a>  bv-&gt;data = (void*)ctx;
+
+<a name="line339">339: </a>  PetscObjectTypeCompare((PetscObject)bv-&gt;t,VECMPI,&amp;ctx-&gt;mpi);
+<a name="line340">340: </a>  <font color="#4169E1">if</font> (!ctx-&gt;mpi) {
+<a name="line341">341: </a>    PetscObjectTypeCompare((PetscObject)bv-&gt;t,VECSEQ,&amp;seq);
+<a name="line342">342: </a>    <font color="#4169E1">if</font> (!seq) SETERRQ(PetscObjectComm((PetscObject)bv),PETSC_ERR_SUP,<font color="#666666">"Cannot create a contiguous <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> from a non-standard template vector"</font>);
+<a name="line343">343: </a>  }
+
+<a name="line345">345: </a>  VecGetLocalSize(bv-&gt;t,&amp;nloc);
+<a name="line346">346: </a>  VecGetBlockSize(bv-&gt;t,&amp;bs);
+
+<a name="line348">348: </a>  <font color="#4169E1">if</font> (bv-&gt;issplit) {
+<a name="line349">349: </a>    <font color="#B22222">/* split <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>: share memory and Vecs of the parent <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> */</font>
+<a name="line350">350: </a>    parent = bv-&gt;splitparent;
+<a name="line351">351: </a>    lsplit = parent-&gt;lsplit;
+<a name="line352">352: </a>    Vpar   = ((BV_CONTIGUOUS*)parent-&gt;data)-&gt;V;
+<a name="line353">353: </a>    ctx-&gt;V = (bv-&gt;issplit==1)? Vpar: Vpar+lsplit;
+<a name="line354">354: </a>    array  = ((BV_CONTIGUOUS*)parent-&gt;data)-&gt;array;
+<a name="line355">355: </a>    ctx-&gt;array = (bv-&gt;issplit==1)? array: array+lsplit*nloc;
+<a name="line356">356: </a>  } <font color="#4169E1">else</font> {
+<a name="line357">357: </a>    <font color="#B22222">/* regular <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>: allocate memory and Vecs for the <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> entries */</font>
+<a name="line358">358: </a>    PetscCalloc1(bv-&gt;m*nloc,&amp;ctx-&gt;array);
+<a name="line359">359: </a>    PetscMalloc1(bv-&gt;m,&amp;ctx-&gt;V);
+<a name="line360">360: </a>    <font color="#4169E1">for</font> (j=0;j&lt;bv-&gt;m;j++) {
+<a name="line361">361: </a>      <font color="#4169E1">if</font> (ctx-&gt;mpi) {
+<a name="line362">362: </a>        VecCreateMPIWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,nloc,PETSC_DECIDE,ctx-&gt;array+j*nloc,ctx-&gt;V+j);
+<a name="line363">363: </a>      } <font color="#4169E1">else</font> {
+<a name="line364">364: </a>        VecCreateSeqWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,nloc,ctx-&gt;array+j*nloc,ctx-&gt;V+j);
+<a name="line365">365: </a>      }
+<a name="line366">366: </a>    }
+<a name="line367">367: </a>    PetscLogObjectParents(bv,bv-&gt;m,ctx-&gt;V);
+<a name="line368">368: </a>  }
+<a name="line369">369: </a>  <font color="#4169E1">if</font> (((PetscObject)bv)-&gt;name) {
+<a name="line370">370: </a>    <font color="#4169E1">for</font> (j=0;j&lt;bv-&gt;m;j++) {
+<a name="line371">371: </a>      PetscSNPrintf(str,50,<font color="#666666">"%s_%d"</font>,((PetscObject)bv)-&gt;name,(int)j);
+<a name="line372">372: </a>      PetscObjectSetName((PetscObject)ctx-&gt;V[j],str);
+<a name="line373">373: </a>    }
+<a name="line374">374: </a>  }
+
+<a name="line376">376: </a>  <font color="#4169E1">if</font> (bv-&gt;Acreate) {
+<a name="line377">377: </a>    MatDenseGetArray(bv-&gt;Acreate,&amp;aa);
+<a name="line378">378: </a>    PetscArraycpy(ctx-&gt;array,aa,bv-&gt;m*nloc);
+<a name="line379">379: </a>    MatDenseRestoreArray(bv-&gt;Acreate,&amp;aa);
+<a name="line380">380: </a>    MatDestroy(&amp;bv-&gt;Acreate);
+<a name="line381">381: </a>  }
+
+<a name="line383">383: </a>  bv-&gt;ops-&gt;mult             = BVMult_Contiguous;
+<a name="line384">384: </a>  bv-&gt;ops-&gt;multvec          = BVMultVec_Contiguous;
+<a name="line385">385: </a>  bv-&gt;ops-&gt;multinplace      = BVMultInPlace_Contiguous;
+<a name="line386">386: </a>  bv-&gt;ops-&gt;multinplacetrans = BVMultInPlaceTranspose_Contiguous;
+<a name="line387">387: </a>  bv-&gt;ops-&gt;dot              = BVDot_Contiguous;
+<a name="line388">388: </a>  bv-&gt;ops-&gt;dotvec           = BVDotVec_Contiguous;
+<a name="line389">389: </a>  bv-&gt;ops-&gt;dotvec_local     = BVDotVec_Local_Contiguous;
+<a name="line390">390: </a>  bv-&gt;ops-&gt;scale            = BVScale_Contiguous;
+<a name="line391">391: </a>  bv-&gt;ops-&gt;norm             = BVNorm_Contiguous;
+<a name="line392">392: </a>  bv-&gt;ops-&gt;norm_local       = BVNorm_Local_Contiguous;
+<a name="line393">393: </a>  bv-&gt;ops-&gt;matmult          = BVMatMult_Contiguous;
+<a name="line394">394: </a>  bv-&gt;ops-&gt;copy             = BVCopy_Contiguous;
+<a name="line395">395: </a>  bv-&gt;ops-&gt;copycolumn       = BVCopyColumn_Contiguous;
+<a name="line396">396: </a>  bv-&gt;ops-&gt;resize           = BVResize_Contiguous;
+<a name="line397">397: </a>  bv-&gt;ops-&gt;getcolumn        = BVGetColumn_Contiguous;
+<a name="line398">398: </a>  bv-&gt;ops-&gt;getarray         = BVGetArray_Contiguous;
+<a name="line399">399: </a>  bv-&gt;ops-&gt;getarrayread     = BVGetArrayRead_Contiguous;
+<a name="line400">400: </a>  bv-&gt;ops-&gt;destroy          = BVDestroy_Contiguous;
+<a name="line401">401: </a>  <font color="#4169E1">return</font>(0);
+<a name="line402">402: </a>}
+
+</pre>
+</body>
+
+</html>

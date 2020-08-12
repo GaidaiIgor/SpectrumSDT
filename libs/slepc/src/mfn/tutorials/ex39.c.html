@@ -1,0 +1,258 @@
+<center><a href="ex39.c">Actual source code: ex39.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/mfn/tutorials/ex39.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:14+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/mfn/tutorials/ex39.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This example illustrates the use of Phi functions in exponential integrators.</font>
+<a name="line12"> 12: </a><font color="#B22222">   In particular, it implements the Norsett-Euler scheme of stiff order 1.</font>
+
+<a name="line14"> 14: </a><font color="#B22222">   The problem is the 1-D heat equation with source term</font>
+
+<a name="line16"> 16: </a><font color="#B22222">             y_t = y_xx + 1/(1+u^2) + psi</font>
+
+<a name="line18"> 18: </a><font color="#B22222">   where psi is chosen so that the exact solution is yex = x*(1-x)*exp(tend).</font>
+<a name="line19"> 19: </a><font color="#B22222">   The space domain is [0,1] and the time interval is [0,tend].</font>
+
+<a name="line21"> 21: </a><font color="#B22222">       [1] M. Hochbruck and A. Ostermann, "Explicit exponential Runge-Kutta</font>
+<a name="line22"> 22: </a><font color="#B22222">           methods for semilinear parabolic problems", SIAM J. Numer. Anal. 43(3),</font>
+<a name="line23"> 23: </a><font color="#B22222">           1069-1090, 2005.</font>
+<a name="line24"> 24: </a><font color="#B22222">*/</font>
+
+<a name="line26"> 26: </a>static char help[] = <font color="#666666">"Exponential integrator for the heat equation with source term.\n\n"</font>
+<a name="line27"> 27: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line28"> 28: </a>  <font color="#666666">"  -n &lt;idim&gt;, where &lt;idim&gt; = dimension of the spatial discretization.\n"</font>
+<a name="line29"> 29: </a>  <font color="#666666">"  -tend &lt;rval&gt;, where &lt;rval&gt; = real value that corresponding to the final time.\n"</font>
+<a name="line30"> 30: </a>  <font color="#666666">"  -deltat &lt;rval&gt;, where &lt;rval&gt; = real value for the time increment.\n"</font>
+<a name="line31"> 31: </a>  <font color="#666666">"  -combine &lt;bool&gt;, to represent the phi function with FNCOMBINE instead of FNPHI.\n\n"</font>;
+
+<a name="line33"> 33: </a> #include <A href="../../../include/slepcmfn.h.html">&lt;slepcmfn.h&gt;</A>
+
+<a name="line35"> 35: </a><font color="#B22222">/*</font>
+<a name="line36"> 36: </a><font color="#B22222">   BuildFNPhi: builds an FNCOMBINE object representing the phi_1 function</font>
+
+<a name="line38"> 38: </a><font color="#B22222">        f(x) = (exp(x)-1)/x</font>
+
+<a name="line40"> 40: </a><font color="#B22222">   with the following tree:</font>
+
+<a name="line42"> 42: </a><font color="#B22222">            f(x)                  f(x)              (combined by division)</font>
+<a name="line43"> 43: </a><font color="#B22222">           /    \                 p(x) = x          (polynomial)</font>
+<a name="line44"> 44: </a><font color="#B22222">        a(x)    p(x)              a(x)              (combined by addition)</font>
+<a name="line45"> 45: </a><font color="#B22222">       /    \                     e(x) = exp(x)     (exponential)</font>
+<a name="line46"> 46: </a><font color="#B22222">     e(x)   c(x)                  c(x) = -1         (constant)</font>
+<a name="line47"> 47: </a><font color="#B22222">*/</font>
+<a name="line48"> 48: </a><strong><font color="#4169E1"><a name="BuildFNPhi"></a>PetscErrorCode BuildFNPhi(<a href="../../../docs/manualpages/FN/FN.html#FN">FN</a> fphi)</font></strong>
+<a name="line49"> 49: </a>{
+<a name="line51"> 51: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>             fexp,faux,fconst,fpol;
+<a name="line52"> 52: </a>  PetscScalar    coeffs[2];
+
+<a name="line55"> 55: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;fexp);
+<a name="line56"> 56: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;fconst);
+<a name="line57"> 57: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;faux);
+<a name="line58"> 58: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;fpol);
+
+<a name="line60"> 60: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fexp,FNEXP);
+
+<a name="line62"> 62: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fconst,FNRATIONAL);
+<a name="line63"> 63: </a>  coeffs[0] = -1.0;
+<a name="line64"> 64: </a>  <a href="../../../docs/manualpages/FN/FNRationalSetNumerator.html#FNRationalSetNumerator">FNRationalSetNumerator</a>(fconst,1,coeffs);
+
+<a name="line66"> 66: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(faux,FNCOMBINE);
+<a name="line67"> 67: </a>  <a href="../../../docs/manualpages/FN/FNCombineSetChildren.html#FNCombineSetChildren">FNCombineSetChildren</a>(faux,<a href="../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_ADD</a>,fexp,fconst);
+
+<a name="line69"> 69: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fpol,FNRATIONAL);
+<a name="line70"> 70: </a>  coeffs[0] = 1.0; coeffs[1] = 0.0;
+<a name="line71"> 71: </a>  <a href="../../../docs/manualpages/FN/FNRationalSetNumerator.html#FNRationalSetNumerator">FNRationalSetNumerator</a>(fpol,2,coeffs);
+
+<a name="line73"> 73: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fphi,FNCOMBINE);
+<a name="line74"> 74: </a>  <a href="../../../docs/manualpages/FN/FNCombineSetChildren.html#FNCombineSetChildren">FNCombineSetChildren</a>(fphi,<a href="../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_DIVIDE</a>,faux,fpol);
+
+<a name="line76"> 76: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;faux);
+<a name="line77"> 77: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;fpol);
+<a name="line78"> 78: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;fconst);
+<a name="line79"> 79: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;fexp);
+<a name="line80"> 80: </a>  <font color="#4169E1">return</font>(0);
+<a name="line81"> 81: </a>}
+
+<a name="line83"> 83: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line84"> 84: </a>{
+<a name="line85"> 85: </a>  Mat               L;
+<a name="line86"> 86: </a>  Vec               u,w,z,yex;
+<a name="line87"> 87: </a>  <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a>               mfnexp,mfnphi;
+<a name="line88"> 88: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>                fexp,fphi;
+<a name="line89"> 89: </a>  PetscBool         combine=PETSC_FALSE;
+<a name="line90"> 90: </a>  PetscInt          i,k,Istart,Iend,n=199,steps;
+<a name="line91"> 91: </a>  PetscReal         t,tend=1.0,deltat=0.01,nrmd,nrmu,x,h;
+<a name="line92"> 92: </a>  const PetscReal   half=0.5;
+<a name="line93"> 93: </a>  PetscScalar       value,c,uval,*warray;
+<a name="line94"> 94: </a>  const PetscScalar *uarray;
+<a name="line95"> 95: </a>  PetscErrorCode    ierr;
+
+<a name="line97"> 97: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line99"> 99: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line100">100: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-tend"</font>,&amp;tend,NULL);
+<a name="line101">101: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-deltat"</font>,&amp;deltat,NULL);
+<a name="line102">102: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-combine"</font>,&amp;combine,NULL);
+<a name="line103">103: </a>  h = 1.0/(n+1.0);
+<a name="line104">104: </a>  c = (n+1)*(n+1);
+
+<a name="line106">106: </a>  steps = (PetscInt)(tend/deltat);
+<a name="line107">107: </a>  <font color="#4169E1">if</font> (PetscAbsReal(tend-steps*deltat)&gt;10*PETSC_MACHINE_EPSILON) SETERRQ(PETSC_COMM_WORLD,1,<font color="#666666">"This example requires tend being a multiple of deltat"</font>);
+<a name="line108">108: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nHeat equation via phi functions, n=%D, tend=%g, deltat=%g%s\n\n"</font>,n,(double)tend,(double)deltat,combine?<font color="#666666">" (combine)"</font>:<font color="#666666">""</font>);
+
+<a name="line110">110: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line111">111: </a><font color="#B22222">                 Build the 1-D Laplacian and various vectors</font>
+<a name="line112">112: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line113">113: </a>  MatCreate(PETSC_COMM_WORLD,&amp;L);
+<a name="line114">114: </a>  MatSetSizes(L,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line115">115: </a>  MatSetFromOptions(L);
+<a name="line116">116: </a>  MatSetUp(L);
+<a name="line117">117: </a>  MatGetOwnershipRange(L,&amp;Istart,&amp;Iend);
+<a name="line118">118: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line119">119: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(L,i,i-1,c,INSERT_VALUES); }
+<a name="line120">120: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(L,i,i+1,c,INSERT_VALUES); }
+<a name="line121">121: </a>    MatSetValue(L,i,i,-2.0*c,INSERT_VALUES);
+<a name="line122">122: </a>  }
+<a name="line123">123: </a>  MatAssemblyBegin(L,MAT_FINAL_ASSEMBLY);
+<a name="line124">124: </a>  MatAssemblyEnd(L,MAT_FINAL_ASSEMBLY);
+<a name="line125">125: </a>  MatCreateVecs(L,NULL,&amp;u);
+<a name="line126">126: </a>  VecDuplicate(u,&amp;yex);
+<a name="line127">127: </a>  VecDuplicate(u,&amp;w);
+<a name="line128">128: </a>  VecDuplicate(u,&amp;z);
+
+<a name="line130">130: </a>  <font color="#B22222">/*</font>
+<a name="line131">131: </a><font color="#B22222">     Compute various vectors:</font>
+<a name="line132">132: </a><font color="#B22222">     - the exact solution yex = x*(1-x)*exp(tend)</font>
+<a name="line133">133: </a><font color="#B22222">     - the initial condition u = abs(x-0.5)-0.5</font>
+<a name="line134">134: </a><font color="#B22222">  */</font>
+<a name="line135">135: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line136">136: </a>    x = (i+1)*h;
+<a name="line137">137: </a>    value = x*(1.0-x)*PetscExpReal(tend);
+<a name="line138">138: </a>    VecSetValue(yex,i,value,INSERT_VALUES);
+<a name="line139">139: </a>    value = PetscAbsReal(x-half)-half;
+<a name="line140">140: </a>    VecSetValue(u,i,value,INSERT_VALUES);
+<a name="line141">141: </a>  }
+<a name="line142">142: </a>  VecAssemblyBegin(yex);
+<a name="line143">143: </a>  VecAssemblyBegin(u);
+<a name="line144">144: </a>  VecAssemblyEnd(yex);
+<a name="line145">145: </a>  VecAssemblyEnd(u);
+<a name="line146">146: </a>  VecViewFromOptions(yex,NULL,<font color="#666666">"-exact_sol"</font>);
+<a name="line147">147: </a>  VecViewFromOptions(u,NULL,<font color="#666666">"-initial_cond"</font>);
+
+<a name="line149">149: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line150">150: </a><font color="#B22222">              Create two <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> solvers, for exp() and phi_1()</font>
+<a name="line151">151: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line152">152: </a>  <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>(PETSC_COMM_WORLD,&amp;mfnexp);
+<a name="line153">153: </a>  <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>(mfnexp,L);
+<a name="line154">154: </a>  <a href="../../../docs/manualpages/MFN/MFNGetFN.html#MFNGetFN">MFNGetFN</a>(mfnexp,&amp;fexp);
+<a name="line155">155: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fexp,FNEXP);
+<a name="line156">156: </a>  <a href="../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(fexp,deltat,1.0);
+<a name="line157">157: </a>  <a href="../../../docs/manualpages/MFN/MFNSetErrorIfNotConverged.html#MFNSetErrorIfNotConverged">MFNSetErrorIfNotConverged</a>(mfnexp,PETSC_TRUE);
+<a name="line158">158: </a>  <a href="../../../docs/manualpages/MFN/MFNSetFromOptions.html#MFNSetFromOptions">MFNSetFromOptions</a>(mfnexp);
+
+<a name="line160">160: </a>  <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>(PETSC_COMM_WORLD,&amp;mfnphi);
+<a name="line161">161: </a>  <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>(mfnphi,L);
+<a name="line162">162: </a>  <a href="../../../docs/manualpages/MFN/MFNGetFN.html#MFNGetFN">MFNGetFN</a>(mfnphi,&amp;fphi);
+<a name="line163">163: </a>  <font color="#4169E1">if</font> (combine) {
+<a name="line164">164: </a>    BuildFNPhi(fphi);
+<a name="line165">165: </a>  } <font color="#4169E1">else</font> {
+<a name="line166">166: </a>    <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fphi,FNPHI);
+<a name="line167">167: </a>    <a href="../../../docs/manualpages/FN/FNPhiSetIndex.html#FNPhiSetIndex">FNPhiSetIndex</a>(fphi,1);
+<a name="line168">168: </a>  }
+<a name="line169">169: </a>  <a href="../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(fphi,deltat,1.0);
+<a name="line170">170: </a>  <a href="../../../docs/manualpages/MFN/MFNSetErrorIfNotConverged.html#MFNSetErrorIfNotConverged">MFNSetErrorIfNotConverged</a>(mfnphi,PETSC_TRUE);
+<a name="line171">171: </a>  <a href="../../../docs/manualpages/MFN/MFNSetFromOptions.html#MFNSetFromOptions">MFNSetFromOptions</a>(mfnphi);
+
+<a name="line173">173: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line174">174: </a><font color="#B22222">             Solve the problem with the Norsett-Euler scheme</font>
+<a name="line175">175: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line176">176: </a>  t = 0.0;
+<a name="line177">177: </a>  <font color="#4169E1">for</font> (k=0;k&lt;steps;k++) {
+
+<a name="line179">179: </a>    <font color="#B22222">/* evaluate nonlinear part */</font>
+<a name="line180">180: </a>    VecGetArrayRead(u,&amp;uarray);
+<a name="line181">181: </a>    VecGetArray(w,&amp;warray);
+<a name="line182">182: </a>    <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line183">183: </a>      x = (i+1)*h;
+<a name="line184">184: </a>      uval = uarray[i-Istart];
+<a name="line185">185: </a>      value = x*(1.0-x)*PetscExpReal(t);
+<a name="line186">186: </a>      value = value + 2.0*PetscExpReal(t) - 1.0/(1.0+value*value);
+<a name="line187">187: </a>      value = value + 1.0/(1.0+uval*uval);
+<a name="line188">188: </a>      warray[i-Istart] = deltat*value;
+<a name="line189">189: </a>    }
+<a name="line190">190: </a>    VecRestoreArrayRead(u,&amp;uarray);
+<a name="line191">191: </a>    VecRestoreArray(w,&amp;warray);
+<a name="line192">192: </a>    <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(mfnphi,w,z);
+
+<a name="line194">194: </a>    <font color="#B22222">/* evaluate linear part */</font>
+<a name="line195">195: </a>    <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(mfnexp,u,u);
+<a name="line196">196: </a>    VecAXPY(u,1.0,z);
+<a name="line197">197: </a>    t = t + deltat;
+
+<a name="line199">199: </a>  }
+<a name="line200">200: </a>  VecViewFromOptions(u,NULL,<font color="#666666">"-computed_sol"</font>);
+
+<a name="line202">202: </a>  <font color="#B22222">/*</font>
+<a name="line203">203: </a><font color="#B22222">     Compare with exact solution and show error norm</font>
+<a name="line204">204: </a><font color="#B22222">  */</font>
+<a name="line205">205: </a>  VecCopy(u,z);
+<a name="line206">206: </a>  VecAXPY(z,-1.0,yex);
+<a name="line207">207: </a>  VecNorm(z,NORM_2,&amp;nrmd);
+<a name="line208">208: </a>  VecNorm(u,NORM_2,&amp;nrmu);
+<a name="line209">209: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" The relative error at t=%g is %.4f\n\n"</font>,(double)t,(double)(nrmd/nrmu));
+
+<a name="line211">211: </a>  <font color="#B22222">/*</font>
+<a name="line212">212: </a><font color="#B22222">     Free work space</font>
+<a name="line213">213: </a><font color="#B22222">  */</font>
+<a name="line214">214: </a>  <a href="../../../docs/manualpages/MFN/MFNDestroy.html#MFNDestroy">MFNDestroy</a>(&amp;mfnexp);
+<a name="line215">215: </a>  <a href="../../../docs/manualpages/MFN/MFNDestroy.html#MFNDestroy">MFNDestroy</a>(&amp;mfnphi);
+<a name="line216">216: </a>  MatDestroy(&amp;L);
+<a name="line217">217: </a>  VecDestroy(&amp;u);
+<a name="line218">218: </a>  VecDestroy(&amp;yex);
+<a name="line219">219: </a>  VecDestroy(&amp;w);
+<a name="line220">220: </a>  VecDestroy(&amp;z);
+<a name="line221">221: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line222">222: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line223">223: </a>}
+
+<a name="line225">225: </a><font color="#B22222">/*TEST</font>
+
+<a name="line227">227: </a><font color="#B22222">   build:</font>
+<a name="line228">228: </a><font color="#B22222">      requires: c99</font>
+
+<a name="line230">230: </a><font color="#B22222">   test:</font>
+<a name="line231">231: </a><font color="#B22222">      suffix: 1</font>
+<a name="line232">232: </a><font color="#B22222">      args: -n 127 -tend 0.125 -mfn_tol 1e-3 -deltat 0.025</font>
+<a name="line233">233: </a><font color="#B22222">      timeoutfactor: 2</font>
+
+<a name="line235">235: </a><font color="#B22222">   test:</font>
+<a name="line236">236: </a><font color="#B22222">      suffix: 2</font>
+<a name="line237">237: </a><font color="#B22222">      args: -n 127 -tend 0.125 -mfn_tol 1e-3 -deltat 0.025 -combine</font>
+<a name="line238">238: </a><font color="#B22222">      filter: sed -e "s/ (combine)//"</font>
+<a name="line239">239: </a><font color="#B22222">      requires: !single</font>
+<a name="line240">240: </a><font color="#B22222">      output_file: output/ex39_1.out</font>
+<a name="line241">241: </a><font color="#B22222">      timeoutfactor: 2</font>
+
+<a name="line243">243: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

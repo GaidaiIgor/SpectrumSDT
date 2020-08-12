@@ -1,0 +1,1038 @@
+<center><a href="filtlan.c">Actual source code: filtlan.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/st/impls/filter/filtlan.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:47+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/st/impls/filter/filtlan.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This file is an adaptation of several subroutines from FILTLAN, the</font>
+<a name="line12"> 12: </a><font color="#B22222">   Filtered Lanczos Package, authored by Haw-ren Fang and Yousef Saad.</font>
+
+<a name="line14"> 14: </a><font color="#B22222">   More information at:</font>
+<a name="line15"> 15: </a><font color="#B22222">   https://www-users.cs.umn.edu/~saad/software/filtlan</font>
+
+<a name="line17"> 17: </a><font color="#B22222">   References:</font>
+
+<a name="line19"> 19: </a><font color="#B22222">       [1] H. Fang and Y. Saad, "A filtered Lanczos procedure for extreme and interior</font>
+<a name="line20"> 20: </a><font color="#B22222">           eigenvalue problems", SIAM J. Sci. Comput. 34(4):A2220-A2246, 2012.</font>
+<a name="line21"> 21: </a><font color="#B22222">*/</font>
+
+<a name="line23"> 23: </a> #include <A href="../../../../../../include/slepc/private/stimpl.h.html">&lt;slepc/private/stimpl.h&gt;</A>
+<a name="line24"> 24: </a><font color="#A020F0">#include </font><font color="#666666">"filter.h"</font><font color="#A020F0"></font>
+
+<a name="line26"> 26: </a><strong><font color="#4169E1">static PetscErrorCode FILTLAN_FilteredConjugateResidualPolynomial(PetscReal*,PetscReal*,PetscInt,PetscReal*,PetscInt,PetscReal*,PetscInt)</font></strong>;
+<a name="line27"> 27: </a><strong><font color="#4169E1">static PetscReal FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(PetscReal*,PetscInt,PetscReal*,PetscInt,PetscReal)</font></strong>;
+<a name="line28"> 28: </a><strong><font color="#4169E1">static PetscErrorCode FILTLAN_ExpandNewtonPolynomialInChebyshevBasis(PetscInt,PetscReal,PetscReal,PetscReal*,PetscReal*,PetscReal*,PetscReal*)</font></strong>;
+
+<a name="line30"> 30: </a><font color="#B22222">/* ////////////////////////////////////////////////////////////////////////////</font>
+<a name="line31"> 31: </a><font color="#B22222">   //    Newton - Hermite Polynomial Interpolation</font>
+<a name="line32"> 32: </a><font color="#B22222">   //////////////////////////////////////////////////////////////////////////// */</font>
+
+<a name="line34"> 34: </a><font color="#B22222">/*</font>
+<a name="line35"> 35: </a><font color="#B22222">   FILTLAN function NewtonPolynomial</font>
+
+<a name="line37"> 37: </a><font color="#B22222">   build P(z) by Newton's divided differences in the form</font>
+<a name="line38"> 38: </a><font color="#B22222">       P(z) = a(1) + a(2)*(z-x(1)) + a(3)*(z-x(1))*(z-x(2)) + ... + a(n)*(z-x(1))*...*(z-x(n-1)),</font>
+<a name="line39"> 39: </a><font color="#B22222">   such that P(x(i)) = y(i) for i=1,...,n, where</font>
+<a name="line40"> 40: </a><font color="#B22222">       x,y are input vectors of length n, and a is the output vector of length n</font>
+<a name="line41"> 41: </a><font color="#B22222">   if x(i)==x(j) for some i!=j, then it is assumed that the derivative of P(z) is to be zero at x(i),</font>
+<a name="line42"> 42: </a><font color="#B22222">       and the Hermite polynomial interpolation is applied</font>
+<a name="line43"> 43: </a><font color="#B22222">   in general, if there are k x(i)'s with the same value x0, then</font>
+<a name="line44"> 44: </a><font color="#B22222">       the j-th order derivative of P(z) is zero at z=x0 for j=1,...,k-1</font>
+<a name="line45"> 45: </a><font color="#B22222">*/</font>
+<a name="line46"> 46: </a><strong><font color="#4169E1"><a name="FILTLAN_NewtonPolynomial"></a>PETSC_STATIC_INLINE PetscErrorCode FILTLAN_NewtonPolynomial(PetscInt n,PetscReal *x,PetscReal *y,PetscReal *sa,PetscReal *sf)</font></strong>
+<a name="line47"> 47: </a>{
+<a name="line49"> 49: </a>  PetscReal      d,*sx=x,*sy=y;
+<a name="line50"> 50: </a>  PetscInt       j,k;
+
+<a name="line53"> 53: </a>  PetscArraycpy(sf,sy,n);
+
+<a name="line55"> 55: </a>  <font color="#B22222">/* apply Newton's finite difference method */</font>
+<a name="line56"> 56: </a>  sa[0] = sf[0];
+<a name="line57"> 57: </a>  <font color="#4169E1">for</font> (j=1;j&lt;n;j++) {
+<a name="line58"> 58: </a>    <font color="#4169E1">for</font> (k=n-1;k&gt;=j;k--) {
+<a name="line59"> 59: </a>      d = sx[k]-sx[k-j];
+<a name="line60"> 60: </a>      <font color="#4169E1">if</font> (d == 0.0) sf[k] = 0.0;  <font color="#B22222">/* assume that the derivative is 0.0 and apply the Hermite interpolation */</font>
+<a name="line61"> 61: </a>      <font color="#4169E1">else</font> sf[k] = (sf[k]-sf[k-1]) / d;
+<a name="line62"> 62: </a>    }
+<a name="line63"> 63: </a>    sa[j] = sf[j];
+<a name="line64"> 64: </a>  }
+<a name="line65"> 65: </a>  <font color="#4169E1">return</font>(0);
+<a name="line66"> 66: </a>}
+
+<a name="line68"> 68: </a><font color="#B22222">/*</font>
+<a name="line69"> 69: </a><font color="#B22222">   FILTLAN function HermiteBaseFilterInChebyshevBasis</font>
+
+<a name="line71"> 71: </a><font color="#B22222">   compute a base filter P(z) which is a continuous, piecewise polynomial P(z) expanded</font>
+<a name="line72"> 72: </a><font color="#B22222">   in a basis of `translated' (i.e. scale-and-shift) Chebyshev polynomials in each interval</font>
+
+<a name="line74"> 74: </a><font color="#B22222">   The base filter P(z) equals P_j(z) for z in the j-th interval [intv(j), intv(j+1)), where</font>
+<a name="line75"> 75: </a><font color="#B22222">   P_j(z) a Hermite interpolating polynomial</font>
+
+<a name="line77"> 77: </a><font color="#B22222">   input:</font>
+<a name="line78"> 78: </a><font color="#B22222">   intv is a vector which defines the intervals; the j-th interval is [intv(j), intv(j+1))</font>
+<a name="line79"> 79: </a><font color="#B22222">   HiLowFlags determines the shape of the base filter P(z)</font>
+<a name="line80"> 80: </a><font color="#B22222">   Consider the j-th interval [intv(j), intv(j+1)]</font>
+<a name="line81"> 81: </a><font color="#B22222">   HighLowFlag[j-1]==1,  P(z)==1 for z in [intv(j), intv(j+1)]</font>
+<a name="line82"> 82: </a><font color="#B22222">                   ==0,  P(z)==0 for z in [intv(j), intv(j+1)]</font>
+<a name="line83"> 83: </a><font color="#B22222">                   ==-1, [intv(j), intv(j+1)] is a transition interval;</font>
+<a name="line84"> 84: </a><font color="#B22222">                         P(intv(j)) and P(intv(j+1)) are defined such that P(z) is continuous</font>
+<a name="line85"> 85: </a><font color="#B22222">   baseDeg is the degree of smoothness of the Hermite (piecewise polynomial) interpolation</font>
+<a name="line86"> 86: </a><font color="#B22222">   to be precise, the i-th derivative of P(z) is zero, i.e. d^{i}P(z)/dz^i==0, at all interval</font>
+<a name="line87"> 87: </a><font color="#B22222">   end points z=intv(j) for i=1,...,baseDeg</font>
+
+<a name="line89"> 89: </a><font color="#B22222">   output:</font>
+<a name="line90"> 90: </a><font color="#B22222">   P(z) expanded in a basis of `translated' (scale-and-shift) Chebyshev polynomials</font>
+<a name="line91"> 91: </a><font color="#B22222">   to be precise, for z in the j-th interval [intv(j),intv(j+1)), P(z) equals</font>
+<a name="line92"> 92: </a><font color="#B22222">       P_j(z) = pp(1,j)*S_0(z) + pp(2,j)*S_1(z) + ... + pp(n,j)*S_{n-1}(z),</font>
+<a name="line93"> 93: </a><font color="#B22222">   where S_i(z) is the `translated' Chebyshev polynomial in that interval,</font>
+<a name="line94"> 94: </a><font color="#B22222">       S_i((z-c)/h) = T_i(z),  c = (intv(j)+intv(j+1))) / 2,  h = (intv(j+1)-intv(j)) / 2,</font>
+<a name="line95"> 95: </a><font color="#B22222">   with T_i(z) the Chebyshev polynomial of the first kind,</font>
+<a name="line96"> 96: </a><font color="#B22222">       T_0(z) = 1, T_1(z) = z, and T_i(z) = 2*z*T_{i-1}(z) - T_{i-2}(z) for i&gt;=2</font>
+<a name="line97"> 97: </a><font color="#B22222">   the return matrix is the matrix of Chebyshev coefficients pp just described</font>
+
+<a name="line99"> 99: </a><font color="#B22222">   note that the degree of P(z) in each interval is (at most) 2*baseDeg+1, with 2*baseDeg+2 coefficients</font>
+<a name="line100">100: </a><font color="#B22222">   let n be the length of intv; then there are n-1 intervals</font>
+<a name="line101">101: </a><font color="#B22222">   therefore the return matrix pp is of size (2*baseDeg+2)-by-(n-1)</font>
+<a name="line102">102: </a><font color="#B22222">*/</font>
+<a name="line103">103: </a><strong><font color="#4169E1"><a name="FILTLAN_HermiteBaseFilterInChebyshevBasis"></a>static PetscErrorCode FILTLAN_HermiteBaseFilterInChebyshevBasis(PetscReal *baseFilter,PetscReal *intv,PetscInt npoints,const PetscInt *HighLowFlags,PetscInt baseDeg)</font></strong>
+<a name="line104">104: </a>{
+<a name="line106">106: </a>  PetscInt       m,ii,jj;
+<a name="line107">107: </a>  PetscReal      flag,flag0,flag2,aa,bb,*px,*py,*sx,*sy,*pp,*qq,*sq,*sbf,*work,*currentPoint = intv;
+<a name="line108">108: </a>  const PetscInt *hilo = HighLowFlags;
+
+<a name="line111">111: </a>  m = 2*baseDeg+2;
+<a name="line112">112: </a>  jj = npoints-1;  <font color="#B22222">/* jj is initialized as the number of intervals */</font>
+<a name="line113">113: </a>  PetscMalloc5(m,&amp;px,m,&amp;py,m,&amp;pp,m,&amp;qq,m,&amp;work);
+<a name="line114">114: </a>  sbf = baseFilter;
+
+<a name="line116">116: </a>  <font color="#4169E1">while</font> (jj--) {  <font color="#B22222">/* the main loop to compute the Chebyshev coefficients */</font>
+
+<a name="line118">118: </a>    flag = (PetscReal)(*hilo++);  <font color="#B22222">/* get the flag of the current interval */</font>
+<a name="line119">119: </a>    <font color="#4169E1">if</font> (flag == -1.0) {  <font color="#B22222">/* flag == -1 means that the current interval is a transition polynomial */</font>
+
+<a name="line121">121: </a>      flag2 = (PetscReal)(*hilo);  <font color="#B22222">/* get flag2, the flag of the next interval */</font>
+<a name="line122">122: </a>      flag0 = 1.0-flag2;       <font color="#B22222">/* the flag of the previous interval is 1-flag2 */</font>
+
+<a name="line124">124: </a>      <font color="#B22222">/* two pointers for traversing x[] and y[] */</font>
+<a name="line125">125: </a>      sx = px;
+<a name="line126">126: </a>      sy = py;
+
+<a name="line128">128: </a>      <font color="#B22222">/* find the current interval [aa,bb] */</font>
+<a name="line129">129: </a>      aa = *currentPoint++;
+<a name="line130">130: </a>      bb = *currentPoint;
+
+<a name="line132">132: </a>      <font color="#B22222">/* now left-hand side */</font>
+<a name="line133">133: </a>      ii = baseDeg+1;
+<a name="line134">134: </a>      <font color="#4169E1">while</font> (ii--) {
+<a name="line135">135: </a>        *sy++ = flag0;
+<a name="line136">136: </a>        *sx++ = aa;
+<a name="line137">137: </a>      }
+
+<a name="line139">139: </a>      <font color="#B22222">/* now right-hand side */</font>
+<a name="line140">140: </a>      ii = baseDeg+1;
+<a name="line141">141: </a>      <font color="#4169E1">while</font> (ii--) {
+<a name="line142">142: </a>        *sy++ = flag2;
+<a name="line143">143: </a>        *sx++ = bb;
+<a name="line144">144: </a>      }
+
+<a name="line146">146: </a>      <font color="#B22222">/* build a Newton polynomial (indeed, the generalized Hermite interpolating polynomial) with x[] and y[] */</font>
+<a name="line147">147: </a>      FILTLAN_NewtonPolynomial(m,px,py,pp,work);
+
+<a name="line149">149: </a>      <font color="#B22222">/* pp contains coefficients of the Newton polynomial P(z) in the current interval [aa,bb], where</font>
+<a name="line150">150: </a><font color="#B22222">         P(z) = pp(1) + pp(2)*(z-px(1)) + pp(3)*(z-px(1))*(z-px(2)) + ... + pp(n)*(z-px(1))*...*(z-px(n-1)) */</font>
+
+<a name="line152">152: </a>      <font color="#B22222">/* translate the Newton coefficients to the Chebyshev coefficients */</font>
+<a name="line153">153: </a>      FILTLAN_ExpandNewtonPolynomialInChebyshevBasis(m,aa,bb,pp,px,qq,work);
+<a name="line154">154: </a>      <font color="#B22222">/* qq contains coefficients of the polynomial in [aa,bb] in the `translated' Chebyshev basis */</font>
+
+<a name="line156">156: </a>      <font color="#B22222">/* copy the Chebyshev coefficients to baseFilter</font>
+<a name="line157">157: </a><font color="#B22222">         OCTAVE/MATLAB: B(:,j) = qq, where j = (npoints-1)-jj and B is the return matrix */</font>
+<a name="line158">158: </a>      sq = qq;
+<a name="line159">159: </a>      ii = 2*baseDeg+2;
+<a name="line160">160: </a>      <font color="#4169E1">while</font> (ii--) *sbf++ = *sq++;
+
+<a name="line162">162: </a>    } <font color="#4169E1">else</font> {
+
+<a name="line164">164: </a>      <font color="#B22222">/* a constant polynomial P(z)=flag, where either flag==0 or flag==1</font>
+<a name="line165">165: </a><font color="#B22222">       OCTAVE/MATLAB: B(1,j) = flag, where j = (npoints-1)-jj and B is the return matrix */</font>
+<a name="line166">166: </a>      *sbf++ = flag;
+
+<a name="line168">168: </a>      <font color="#B22222">/* the other coefficients are all zero, since P(z) is a constant</font>
+<a name="line169">169: </a><font color="#B22222">       OCTAVE/MATLAB: B(1,j) = 0, where j = (npoints-1)-jj and B is the return matrix */</font>
+<a name="line170">170: </a>      ii = 2*baseDeg+1;
+<a name="line171">171: </a>      <font color="#4169E1">while</font> (ii--) *sbf++ = 0.0;
+
+<a name="line173">173: </a>      <font color="#B22222">/* for the next point */</font>
+<a name="line174">174: </a>      currentPoint++;
+<a name="line175">175: </a>    }
+<a name="line176">176: </a>  }
+<a name="line177">177: </a>  PetscFree5(px,py,pp,qq,work);
+<a name="line178">178: </a>  <font color="#4169E1">return</font>(0);
+<a name="line179">179: </a>}
+
+<a name="line181">181: </a><font color="#B22222">/* ////////////////////////////////////////////////////////////////////////////</font>
+<a name="line182">182: </a><font color="#B22222">   //    Base Filter</font>
+<a name="line183">183: </a><font color="#B22222">   //////////////////////////////////////////////////////////////////////////// */</font>
+
+<a name="line185">185: </a><font color="#B22222">/*</font>
+<a name="line186">186: </a><font color="#B22222">   FILTLAN function GetIntervals</font>
+
+<a name="line188">188: </a><font color="#B22222">   this routine determines the intervals (including the transition one(s)) by an iterative process</font>
+
+<a name="line190">190: </a><font color="#B22222">   frame is a vector consisting of 4 ordered elements:</font>
+<a name="line191">191: </a><font color="#B22222">       [frame(1),frame(4)] is the interval which (tightly) contains all eigenvalues, and</font>
+<a name="line192">192: </a><font color="#B22222">       [frame(2),frame(3)] is the interval in which the eigenvalues are sought</font>
+<a name="line193">193: </a><font color="#B22222">   baseDeg is the left-and-right degree of the base filter for each interval</font>
+<a name="line194">194: </a><font color="#B22222">   polyDeg is the (maximum possible) degree of s(z), with z*s(z) the polynomial filter</font>
+<a name="line195">195: </a><font color="#B22222">   intv is the output; the j-th interval is [intv(j),intv(j+1))</font>
+<a name="line196">196: </a><font color="#B22222">   opts is a collection of interval options</font>
+
+<a name="line198">198: </a><font color="#B22222">   the base filter P(z) is a piecewise polynomial from Hermite interpolation with degree baseDeg</font>
+<a name="line199">199: </a><font color="#B22222">   at each end point of intervals</font>
+
+<a name="line201">201: </a><font color="#B22222">   the polynomial filter Q(z) is in the form z*s(z), i.e. Q(0)==0, such that ||(1-P(z))-z*s(z)||_w is</font>
+<a name="line202">202: </a><font color="#B22222">   minimized with s(z) a polynomial of degree up to polyDeg</font>
+
+<a name="line204">204: </a><font color="#B22222">   the resulting polynomial filter Q(z) satisfies Q(x)&gt;=Q(y) for x in [frame[1],frame[2]], and</font>
+<a name="line205">205: </a><font color="#B22222">   y in [frame[0],frame[3]] but not in [frame[1],frame[2]]</font>
+
+<a name="line207">207: </a><font color="#B22222">   the routine fills a PolynomialFilterInfo struct which gives some information of the polynomial filter</font>
+<a name="line208">208: </a><font color="#B22222">*/</font>
+<a name="line209">209: </a><strong><font color="#4169E1"><a name="FILTLAN_GetIntervals"></a>static PetscErrorCode FILTLAN_GetIntervals(PetscReal *intervals,PetscReal *frame,PetscInt polyDeg,PetscInt baseDeg,FILTLAN_IOP opts,FILTLAN_PFI filterInfo)</font></strong>
+<a name="line210">210: </a>{
+<a name="line211">211: </a>  PetscErrorCode  ierr;
+<a name="line212">212: </a>  PetscReal       intv[6],x,y,z1,z2,c,c1,c2,fc,fc2,halfPlateau,leftDelta,rightDelta,gridSize;
+<a name="line213">213: </a>  PetscReal       yLimit,ySummit,yLeftLimit,yRightLimit,bottom,qIndex,*baseFilter,*polyFilter;
+<a name="line214">214: </a>  PetscReal       yLimitGap=0.0,yLeftSummit=0.0,yLeftBottom=0.0,yRightSummit=0.0,yRightBottom=0.0;
+<a name="line215">215: </a>  PetscInt        i,ii,npoints,numIter,numLeftSteps=1,numRightSteps=1,numMoreLooked=0;
+<a name="line216">216: </a>  PetscBool       leftBoundaryMet=PETSC_FALSE,rightBoundaryMet=PETSC_FALSE,stepLeft,stepRight;
+<a name="line217">217: </a>  const PetscReal a=frame[0],a1=frame[1],b1=frame[2],b=frame[3];
+<a name="line218">218: </a>  const PetscInt  HighLowFlags[5] = { 1, -1, 0, -1, 1 };  <font color="#B22222">/* if filterType is 1, only first 3 elements will be used */</font>
+<a name="line219">219: </a>  const PetscInt  numLookMore = 2*(PetscInt)(0.5+(PetscLogReal(2.0)/PetscLogReal(opts-&gt;shiftStepExpanRate)));
+
+<a name="line222">222: </a>  <font color="#4169E1">if</font> (a&gt;a1 || a1&gt;b1 || b1&gt;b) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Values in the frame vector should be non-decreasing"</font>);
+<a name="line223">223: </a>  <font color="#4169E1">if</font> (a1 == b1) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"The range of wanted eigenvalues cannot be of size zero"</font>);
+<a name="line224">224: </a>  filterInfo-&gt;filterType = 2;      <font color="#B22222">/* mid-pass filter, for interior eigenvalues */</font>
+<a name="line225">225: </a>  <font color="#4169E1">if</font> (b == b1) {
+<a name="line226">226: </a>    <font color="#4169E1">if</font> (a == a1) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"A polynomial filter should not cover all eigenvalues"</font>);
+<a name="line227">227: </a>    filterInfo-&gt;filterType = 1;    <font color="#B22222">/* high-pass filter, for largest eigenvalues */</font>
+<a name="line228">228: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (a == a1) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"filterType==3 for smallest eigenvalues should be pre-converted to filterType==1 for largest eigenvalues"</font>);
+
+<a name="line230">230: </a>  <font color="#B22222">/* the following recipe follows Yousef Saad (2005, 2006) with a few minor adaptations / enhancements */</font>
+<a name="line231">231: </a>  halfPlateau = 0.5*(b1-a1)*opts-&gt;initialPlateau;    <font color="#B22222">/* half length of the "plateau" of the (dual) base filter */</font>
+<a name="line232">232: </a>  leftDelta = (b1-a1)*opts-&gt;initialShiftStep;        <font color="#B22222">/* initial left shift */</font>
+<a name="line233">233: </a>  rightDelta = leftDelta;                            <font color="#B22222">/* initial right shift */</font>
+<a name="line234">234: </a>  opts-&gt;numGridPoints = PetscMax(opts-&gt;numGridPoints,(PetscInt)(2.0*(b-a)/halfPlateau));
+<a name="line235">235: </a>  gridSize = (b-a) / (PetscReal)(opts-&gt;numGridPoints);
+
+<a name="line237">237: </a>  <font color="#4169E1">for</font> (i=0;i&lt;6;i++) intv[i] = 0.0;
+<a name="line238">238: </a>  <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) {  <font color="#B22222">/* for interior eigenvalues */</font>
+<a name="line239">239: </a>    npoints = 6;
+<a name="line240">240: </a>    intv[0] = a;
+<a name="line241">241: </a>    intv[5] = b;
+<a name="line242">242: </a>    <font color="#B22222">/* intv[1], intv[2], intv[3], and intv[4] to be determined */</font>
+<a name="line243">243: </a>  } <font color="#4169E1">else</font> { <font color="#B22222">/* filterType == 1 (or 3 with conversion), for extreme eigenvalues */</font>
+<a name="line244">244: </a>    npoints = 4;
+<a name="line245">245: </a>    intv[0] = a;
+<a name="line246">246: </a>    intv[3] = b;
+<a name="line247">247: </a>    <font color="#B22222">/* intv[1], and intv[2] to be determined */</font>
+<a name="line248">248: </a>  }
+<a name="line249">249: </a>  z1 = a1 - leftDelta;
+<a name="line250">250: </a>  z2 = b1 + rightDelta;
+<a name="line251">251: </a>  filterInfo-&gt;filterOK = 0;  <font color="#B22222">/* not yet found any OK filter */</font>
+
+<a name="line253">253: </a>  <font color="#B22222">/* allocate matrices */</font>
+<a name="line254">254: </a>  PetscMalloc2((polyDeg+2)*(npoints-1),&amp;polyFilter,(2*baseDeg+2)*(npoints-1),&amp;baseFilter);
+
+<a name="line256">256: </a>  <font color="#B22222">/* initialize the intervals, mainly for the case opts-&gt;maxOuterIter == 0 */</font>
+<a name="line257">257: </a>  intervals[0] = intv[0];
+<a name="line258">258: </a>  intervals[3] = intv[3];
+<a name="line259">259: </a>  intervals[5] = intv[5];
+<a name="line260">260: </a>  intervals[1] = z1;
+<a name="line261">261: </a>  <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) {  <font color="#B22222">/* a mid-pass filter for interior eigenvalues */</font>
+<a name="line262">262: </a>    intervals[4] = z2;
+<a name="line263">263: </a>    c = (a1+b1) / 2.0;
+<a name="line264">264: </a>    intervals[2] = c - halfPlateau;
+<a name="line265">265: </a>    intervals[3] = c + halfPlateau;
+<a name="line266">266: </a>  } <font color="#4169E1">else</font> {  <font color="#B22222">/* filterType == 1 (or 3 with conversion) for extreme eigenvalues */</font>
+<a name="line267">267: </a>    intervals[2] = z1 + (b1-z1)*opts-&gt;transIntervalRatio;
+<a name="line268">268: </a>  }
+
+<a name="line270">270: </a>  <font color="#B22222">/* the main loop */</font>
+<a name="line271">271: </a>  <font color="#4169E1">for</font> (numIter=1;numIter&lt;=opts-&gt;maxOuterIter;numIter++) {
+<a name="line272">272: </a>    <font color="#4169E1">if</font> (z1 &lt;= a) {  <font color="#B22222">/* outer loop updates z1 and z2 */</font>
+<a name="line273">273: </a>      z1 = a;
+<a name="line274">274: </a>      leftBoundaryMet = PETSC_TRUE;
+<a name="line275">275: </a>    }
+<a name="line276">276: </a>    <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) {  <font color="#B22222">/* a &lt;= z1 &lt; (a1) */</font>
+<a name="line277">277: </a>      <font color="#4169E1">if</font> (z2 &gt;= b) {  <font color="#B22222">/* a mid-pass filter for interior eigenvalues */</font>
+<a name="line278">278: </a>        z2 = b;
+<a name="line279">279: </a>        rightBoundaryMet = PETSC_TRUE;
+<a name="line280">280: </a>      }
+<a name="line281">281: </a>      <font color="#B22222">/* a &lt;= z1 &lt; c-h &lt; c+h &lt; z2 &lt;= b, where h is halfPlateau */</font>
+<a name="line282">282: </a>      <font color="#B22222">/* [z1, c-h] and [c+h, z2] are transition interval */</font>
+<a name="line283">283: </a>      intv[1] = z1;
+<a name="line284">284: </a>      intv[4] = z2;
+<a name="line285">285: </a>      c1 = z1 + halfPlateau;
+<a name="line286">286: </a>      intv[2] = z1;           <font color="#B22222">/* i.e. c1 - halfPlateau */</font>
+<a name="line287">287: </a>      intv[3] = c1 + halfPlateau;
+<a name="line288">288: </a>      FILTLAN_HermiteBaseFilterInChebyshevBasis(baseFilter,intv,6,HighLowFlags,baseDeg);
+<a name="line289">289: </a>      FILTLAN_FilteredConjugateResidualPolynomial(polyFilter,baseFilter,2*baseDeg+2,intv,6,opts-&gt;intervalWeights,polyDeg);
+<a name="line290">290: </a>      <font color="#B22222">/* fc1 = FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,b1) - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,a1); */</font>
+<a name="line291">291: </a>      c2 = z2 - halfPlateau;
+<a name="line292">292: </a>      intv[2] = c2 - halfPlateau;
+<a name="line293">293: </a>      intv[3] = z2;           <font color="#B22222">/* i.e. c2 + halfPlateau */</font>
+<a name="line294">294: </a>      FILTLAN_HermiteBaseFilterInChebyshevBasis(baseFilter,intv,6,HighLowFlags,baseDeg);
+<a name="line295">295: </a>      FILTLAN_FilteredConjugateResidualPolynomial(polyFilter,baseFilter,2*baseDeg+2,intv,6,opts-&gt;intervalWeights,polyDeg);
+<a name="line296">296: </a>      fc2 = FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,b1) - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,a1);
+<a name="line297">297: </a>      yLimitGap = PETSC_MAX_REAL;
+<a name="line298">298: </a>      ii = opts-&gt;maxInnerIter;
+<a name="line299">299: </a>      <font color="#4169E1">while</font> (ii-- &amp;&amp; !(yLimitGap &lt;= opts-&gt;yLimitTol)) {
+<a name="line300">300: </a>        <font color="#B22222">/* recursive bisection to get c such that p(a1) are p(b1) approximately the same */</font>
+<a name="line301">301: </a>        c = (c1+c2) / 2.0;
+<a name="line302">302: </a>        intv[2] = c - halfPlateau;
+<a name="line303">303: </a>        intv[3] = c + halfPlateau;
+<a name="line304">304: </a>        FILTLAN_HermiteBaseFilterInChebyshevBasis(baseFilter,intv,6,HighLowFlags,baseDeg);
+<a name="line305">305: </a>        FILTLAN_FilteredConjugateResidualPolynomial(polyFilter,baseFilter,2*baseDeg+2,intv,6,opts-&gt;intervalWeights,polyDeg);
+<a name="line306">306: </a>        fc = FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,b1) - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,a1);
+<a name="line307">307: </a>        <font color="#4169E1">if</font> (fc*fc2 &lt; 0.0) {
+<a name="line308">308: </a>          c1 = c;
+<a name="line309">309: </a>          <font color="#B22222">/* fc1 = fc; */</font>
+<a name="line310">310: </a>        } <font color="#4169E1">else</font> {
+<a name="line311">311: </a>          c2 = c;
+<a name="line312">312: </a>          fc2 = fc;
+<a name="line313">313: </a>        }
+<a name="line314">314: </a>        yLimitGap = PetscAbsReal(fc);
+<a name="line315">315: </a>      }
+<a name="line316">316: </a>    } <font color="#4169E1">else</font> {  <font color="#B22222">/* filterType == 1 (or 3 with conversion) for extreme eigenvalues */</font>
+<a name="line317">317: </a>      intv[1] = z1;
+<a name="line318">318: </a>      intv[2] = z1 + (b1-z1)*opts-&gt;transIntervalRatio;
+<a name="line319">319: </a>      FILTLAN_HermiteBaseFilterInChebyshevBasis(baseFilter,intv,4,HighLowFlags,baseDeg);
+<a name="line320">320: </a>      FILTLAN_FilteredConjugateResidualPolynomial(polyFilter,baseFilter,2*baseDeg+2,intv,4,opts-&gt;intervalWeights,polyDeg);
+<a name="line321">321: </a>    }
+<a name="line322">322: </a>    <font color="#B22222">/* polyFilter contains the coefficients of the polynomial filter which approximates phi(x)</font>
+<a name="line323">323: </a><font color="#B22222">       expanded in the `translated' Chebyshev basis */</font>
+<a name="line324">324: </a>    <font color="#B22222">/* psi(x) = 1.0 - phi(x) is the dual base filter approximated by a polynomial in the form x*p(x) */</font>
+<a name="line325">325: </a>    yLeftLimit  = 1.0 - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,a1);
+<a name="line326">326: </a>    yRightLimit = 1.0 - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,b1);
+<a name="line327">327: </a>    yLimit  = (yLeftLimit &lt; yRightLimit) ? yLeftLimit : yRightLimit;
+<a name="line328">328: </a>    ySummit = (yLeftLimit &gt; yRightLimit) ? yLeftLimit : yRightLimit;
+<a name="line329">329: </a>    x = a1;
+<a name="line330">330: </a>    <font color="#4169E1">while</font> ((x+=gridSize) &lt; b1) {
+<a name="line331">331: </a>      y = 1.0 - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,x);
+<a name="line332">332: </a>      <font color="#4169E1">if</font> (y &lt; yLimit)  yLimit  = y;
+<a name="line333">333: </a>      <font color="#4169E1">if</font> (y &gt; ySummit) ySummit = y;
+<a name="line334">334: </a>    }
+<a name="line335">335: </a>    <font color="#B22222">/* now yLimit is the minimum of x*p(x) for x in [a1, b1] */</font>
+<a name="line336">336: </a>    stepLeft  = PETSC_FALSE;
+<a name="line337">337: </a>    stepRight = PETSC_FALSE;
+<a name="line338">338: </a>    <font color="#4169E1">if</font> ((yLimit &lt; yLeftLimit &amp;&amp; yLimit &lt; yRightLimit) || yLimit &lt; opts-&gt;yBottomLine) {
+<a name="line339">339: </a>      <font color="#B22222">/* very bad, step to see what will happen */</font>
+<a name="line340">340: </a>      stepLeft = PETSC_TRUE;
+<a name="line341">341: </a>      <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) stepRight = PETSC_TRUE;
+<a name="line342">342: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) {
+<a name="line343">343: </a>      <font color="#4169E1">if</font> (yLeftLimit &lt; yRightLimit) {
+<a name="line344">344: </a>        <font color="#4169E1">if</font> (yRightLimit-yLeftLimit &gt; opts-&gt;yLimitTol) stepLeft = PETSC_TRUE;
+<a name="line345">345: </a>      } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (yLeftLimit-yRightLimit &gt; opts-&gt;yLimitTol) stepRight = PETSC_TRUE;
+<a name="line346">346: </a>    }
+<a name="line347">347: </a>    <font color="#4169E1">if</font> (!stepLeft) {
+<a name="line348">348: </a>      yLeftBottom = yLeftLimit;
+<a name="line349">349: </a>      x = a1;
+<a name="line350">350: </a>      <font color="#4169E1">while</font> ((x-=gridSize) &gt;= a) {
+<a name="line351">351: </a>        y = 1.0 - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,x);
+<a name="line352">352: </a>        <font color="#4169E1">if</font> (y &lt; yLeftBottom) yLeftBottom = y;
+<a name="line353">353: </a>        <font color="#4169E1">else</font> <font color="#4169E1">if</font> (y &gt; yLeftBottom) <font color="#4169E1">break</font>;
+<a name="line354">354: </a>      }
+<a name="line355">355: </a>      yLeftSummit = yLeftBottom;
+<a name="line356">356: </a>      <font color="#4169E1">while</font> ((x-=gridSize) &gt;= a) {
+<a name="line357">357: </a>        y = 1.0 - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,x);
+<a name="line358">358: </a>        <font color="#4169E1">if</font> (y &gt; yLeftSummit) {
+<a name="line359">359: </a>          yLeftSummit = y;
+<a name="line360">360: </a>          <font color="#4169E1">if</font> (yLeftSummit &gt; yLimit*opts-&gt;yRippleLimit) {
+<a name="line361">361: </a>            stepLeft = PETSC_TRUE;
+<a name="line362">362: </a>            <font color="#4169E1">break</font>;
+<a name="line363">363: </a>          }
+<a name="line364">364: </a>        }
+<a name="line365">365: </a>        <font color="#4169E1">if</font> (y &lt; yLeftBottom) yLeftBottom = y;
+<a name="line366">366: </a>      }
+<a name="line367">367: </a>    }
+<a name="line368">368: </a>    <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2 &amp;&amp; !stepRight) {
+<a name="line369">369: </a>      yRightBottom = yRightLimit;
+<a name="line370">370: </a>      x = b1;
+<a name="line371">371: </a>      <font color="#4169E1">while</font> ((x+=gridSize) &lt;= b) {
+<a name="line372">372: </a>        y = 1.0 - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,x);
+<a name="line373">373: </a>        <font color="#4169E1">if</font> (y &lt; yRightBottom) yRightBottom = y;
+<a name="line374">374: </a>        <font color="#4169E1">else</font> <font color="#4169E1">if</font> (y &gt; yRightBottom) <font color="#4169E1">break</font>;
+<a name="line375">375: </a>      }
+<a name="line376">376: </a>      yRightSummit = yRightBottom;
+<a name="line377">377: </a>      <font color="#4169E1">while</font> ((x+=gridSize) &lt;= b) {
+<a name="line378">378: </a>        y = 1.0 - FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(polyFilter,polyDeg+2,intv,npoints,x);
+<a name="line379">379: </a>        <font color="#4169E1">if</font> (y &gt; yRightSummit) {
+<a name="line380">380: </a>          yRightSummit = y;
+<a name="line381">381: </a>          <font color="#4169E1">if</font> (yRightSummit &gt; yLimit*opts-&gt;yRippleLimit) {
+<a name="line382">382: </a>            stepRight = PETSC_TRUE;
+<a name="line383">383: </a>            <font color="#4169E1">break</font>;
+<a name="line384">384: </a>          }
+<a name="line385">385: </a>        }
+<a name="line386">386: </a>        <font color="#4169E1">if</font> (y &lt; yRightBottom) yRightBottom = y;
+<a name="line387">387: </a>      }
+<a name="line388">388: </a>    }
+<a name="line389">389: </a>    <font color="#4169E1">if</font> (!stepLeft &amp;&amp; !stepRight) {
+<a name="line390">390: </a>      <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) bottom = PetscMin(yLeftBottom,yRightBottom);
+<a name="line391">391: </a>      <font color="#4169E1">else</font> bottom = yLeftBottom;
+<a name="line392">392: </a>      qIndex = 1.0 - (yLimit-bottom) / (ySummit-bottom);
+<a name="line393">393: </a>      <font color="#4169E1">if</font> (filterInfo-&gt;filterOK == 0 || filterInfo-&gt;filterQualityIndex &lt; qIndex) {
+<a name="line394">394: </a>        <font color="#B22222">/* found the first OK filter or a better filter */</font>
+<a name="line395">395: </a>        <font color="#4169E1">for</font> (i=0;i&lt;6;i++) intervals[i] = intv[i];
+<a name="line396">396: </a>        filterInfo-&gt;filterOK           = 1;
+<a name="line397">397: </a>        filterInfo-&gt;filterQualityIndex = qIndex;
+<a name="line398">398: </a>        filterInfo-&gt;numIter            = numIter;
+<a name="line399">399: </a>        filterInfo-&gt;yLimit             = yLimit;
+<a name="line400">400: </a>        filterInfo-&gt;ySummit            = ySummit;
+<a name="line401">401: </a>        filterInfo-&gt;numLeftSteps       = numLeftSteps;
+<a name="line402">402: </a>        filterInfo-&gt;yLeftSummit        = yLeftSummit;
+<a name="line403">403: </a>        filterInfo-&gt;yLeftBottom        = yLeftBottom;
+<a name="line404">404: </a>        <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) {
+<a name="line405">405: </a>          filterInfo-&gt;yLimitGap        = yLimitGap;
+<a name="line406">406: </a>          filterInfo-&gt;numRightSteps    = numRightSteps;
+<a name="line407">407: </a>          filterInfo-&gt;yRightSummit     = yRightSummit;
+<a name="line408">408: </a>          filterInfo-&gt;yRightBottom     = yRightBottom;
+<a name="line409">409: </a>        }
+<a name="line410">410: </a>        numMoreLooked = 0;
+<a name="line411">411: </a>      } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (++numMoreLooked == numLookMore) {
+<a name="line412">412: </a>        <font color="#B22222">/* filter has been optimal */</font>
+<a name="line413">413: </a>        filterInfo-&gt;filterOK = 2;
+<a name="line414">414: </a>        <font color="#4169E1">break</font>;
+<a name="line415">415: </a>      }
+<a name="line416">416: </a>      <font color="#B22222">/* try stepping further to see whether it can improve */</font>
+<a name="line417">417: </a>      stepLeft = PETSC_TRUE;
+<a name="line418">418: </a>      <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) stepRight = PETSC_TRUE;
+<a name="line419">419: </a>    }
+<a name="line420">420: </a>    <font color="#B22222">/* check whether we can really "step" */</font>
+<a name="line421">421: </a>    <font color="#4169E1">if</font> (leftBoundaryMet) {
+<a name="line422">422: </a>      <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 1 || rightBoundaryMet) <font color="#4169E1">break</font>;  <font color="#B22222">/* cannot step further, so break the loop */</font>
+<a name="line423">423: </a>      <font color="#4169E1">if</font> (stepLeft) {
+<a name="line424">424: </a>        <font color="#B22222">/* cannot step left, so try stepping right */</font>
+<a name="line425">425: </a>        stepLeft  = PETSC_FALSE;
+<a name="line426">426: </a>        stepRight = PETSC_TRUE;
+<a name="line427">427: </a>      }
+<a name="line428">428: </a>    }
+<a name="line429">429: </a>    <font color="#4169E1">if</font> (rightBoundaryMet &amp;&amp; stepRight) {
+<a name="line430">430: </a>      <font color="#B22222">/* cannot step right, so try stepping left */</font>
+<a name="line431">431: </a>      stepRight = PETSC_FALSE;
+<a name="line432">432: </a>      stepLeft  = PETSC_TRUE;
+<a name="line433">433: </a>    }
+<a name="line434">434: </a>    <font color="#B22222">/* now "step" */</font>
+<a name="line435">435: </a>    <font color="#4169E1">if</font> (stepLeft) {
+<a name="line436">436: </a>      numLeftSteps++;
+<a name="line437">437: </a>      <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) leftDelta *= opts-&gt;shiftStepExpanRate; <font color="#B22222">/* expand the step for faster convergence */</font>
+<a name="line438">438: </a>      z1 -= leftDelta;
+<a name="line439">439: </a>    }
+<a name="line440">440: </a>    <font color="#4169E1">if</font> (stepRight) {
+<a name="line441">441: </a>      numRightSteps++;
+<a name="line442">442: </a>      rightDelta *= opts-&gt;shiftStepExpanRate;  <font color="#B22222">/* expand the step for faster convergence */</font>
+<a name="line443">443: </a>      z2 += rightDelta;
+<a name="line444">444: </a>    }
+<a name="line445">445: </a>    <font color="#4169E1">if</font> (filterInfo-&gt;filterType == 2) {
+<a name="line446">446: </a>      <font color="#B22222">/* shrink the "plateau" of the (dual) base filter */</font>
+<a name="line447">447: </a>      <font color="#4169E1">if</font> (stepLeft &amp;&amp; stepRight) halfPlateau /= opts-&gt;plateauShrinkRate;
+<a name="line448">448: </a>      <font color="#4169E1">else</font> halfPlateau /= PetscSqrtReal(opts-&gt;plateauShrinkRate);
+<a name="line449">449: </a>    }
+<a name="line450">450: </a>  }
+<a name="line451">451: </a>  <font color="#4169E1">if</font> (!filterInfo-&gt;filterOK) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"STFILTER cannot get the filter specified; please adjust your filter parameters (e.g. increasing the polynomial degree)"</font>);
+
+<a name="line453">453: </a>  filterInfo-&gt;totalNumIter = numIter;
+<a name="line454">454: </a>  PetscFree2(polyFilter,baseFilter);
+<a name="line455">455: </a>  <font color="#4169E1">return</font>(0);
+<a name="line456">456: </a>}
+
+<a name="line458">458: </a><font color="#B22222">/* ////////////////////////////////////////////////////////////////////////////</font>
+<a name="line459">459: </a><font color="#B22222">   //    Chebyshev Polynomials</font>
+<a name="line460">460: </a><font color="#B22222">   //////////////////////////////////////////////////////////////////////////// */</font>
+
+<a name="line462">462: </a><font color="#B22222">/*</font>
+<a name="line463">463: </a><font color="#B22222">   FILTLAN function ExpandNewtonPolynomialInChebyshevBasis</font>
+
+<a name="line465">465: </a><font color="#B22222">   translate the coefficients of a Newton polynomial to the coefficients</font>
+<a name="line466">466: </a><font color="#B22222">   in a basis of the `translated' (scale-and-shift) Chebyshev polynomials</font>
+
+<a name="line468">468: </a><font color="#B22222">   input:</font>
+<a name="line469">469: </a><font color="#B22222">   a Newton polynomial defined by vectors a and x:</font>
+<a name="line470">470: </a><font color="#B22222">       P(z) = a(1) + a(2)*(z-x(1)) + a(3)*(z-x(1))*(z-x(2)) + ... + a(n)*(z-x(1))*...*(z-x(n-1))</font>
+<a name="line471">471: </a><font color="#B22222">   the interval [aa,bb] defines the `translated' Chebyshev polynomials S_i(z) = T_i((z-c)/h),</font>
+<a name="line472">472: </a><font color="#B22222">       where c=(aa+bb)/2 and h=(bb-aa)/2, and T_i is the Chebyshev polynomial of the first kind</font>
+<a name="line473">473: </a><font color="#B22222">   note that T_i is defined by T_0(z)=1, T_1(z)=z, and T_i(z)=2*z*T_{i-1}(z)+T_{i-2}(z) for i&gt;=2</font>
+
+<a name="line475">475: </a><font color="#B22222">   output:</font>
+<a name="line476">476: </a><font color="#B22222">   a vector q containing the Chebyshev coefficients:</font>
+<a name="line477">477: </a><font color="#B22222">       P(z) = q(1)*S_0(z) + q(2)*S_1(z) + ... + q(n)*S_{n-1}(z)</font>
+<a name="line478">478: </a><font color="#B22222">*/</font>
+<a name="line479">479: </a><strong><font color="#4169E1"><a name="FILTLAN_ExpandNewtonPolynomialInChebyshevBasis"></a>PETSC_STATIC_INLINE PetscErrorCode FILTLAN_ExpandNewtonPolynomialInChebyshevBasis(PetscInt n,PetscReal aa,PetscReal bb,PetscReal *a,PetscReal *x,PetscReal *q,PetscReal *q2)</font></strong>
+<a name="line480">480: </a>{
+<a name="line481">481: </a>  PetscInt  m,mm;
+<a name="line482">482: </a>  PetscReal *sa,*sx,*sq,*sq2,c,c2,h,h2;
+
+<a name="line485">485: </a>  sa = a+n;    <font color="#B22222">/* pointers for traversing a and x */</font>
+<a name="line486">486: </a>  sx = x+n-1;
+<a name="line487">487: </a>  *q = *--sa;  <font color="#B22222">/* set q[0] = a(n) */</font>
+
+<a name="line489">489: </a>  c = (aa+bb)/2.0;
+<a name="line490">490: </a>  h = (bb-aa)/2.0;
+<a name="line491">491: </a>  h2 = h/2.0;
+
+<a name="line493">493: </a>  <font color="#4169E1">for</font> (m=1;m&lt;=n-1;m++) {  <font color="#B22222">/* the main loop for translation */</font>
+
+<a name="line495">495: </a>    <font color="#B22222">/* compute q2[0:m-1] = (c-x[n-m-1])*q[0:m-1] */</font>
+<a name="line496">496: </a>    mm = m;
+<a name="line497">497: </a>    sq = q;
+<a name="line498">498: </a>    sq2 = q2;
+<a name="line499">499: </a>    c2 = c-(*--sx);
+<a name="line500">500: </a>    <font color="#4169E1">while</font> (mm--) *(sq2++) = c2*(*sq++);
+<a name="line501">501: </a>    *sq2 = 0.0;         <font color="#B22222">/* q2[m] = 0.0 */</font>
+<a name="line502">502: </a>    *(q2+1) += h*(*q);  <font color="#B22222">/* q2[1] = q2[1] + h*q[0] */</font>
+
+<a name="line504">504: </a>    <font color="#B22222">/* compute q2[0:m-2] = q2[0:m-2] + h2*q[1:m-1] */</font>
+<a name="line505">505: </a>    mm = m-1;
+<a name="line506">506: </a>    sq2 = q2;
+<a name="line507">507: </a>    sq = q+1;
+<a name="line508">508: </a>    <font color="#4169E1">while</font> (mm--) *(sq2++) += h2*(*sq++);
+
+<a name="line510">510: </a>    <font color="#B22222">/* compute q2[2:m] = q2[2:m] + h2*q[1:m-1] */</font>
+<a name="line511">511: </a>    mm = m-1;
+<a name="line512">512: </a>    sq2 = q2+2;
+<a name="line513">513: </a>    sq = q+1;
+<a name="line514">514: </a>    <font color="#4169E1">while</font> (mm--) *(sq2++) += h2*(*sq++);
+
+<a name="line516">516: </a>    <font color="#B22222">/* compute q[0:m] = q2[0:m] */</font>
+<a name="line517">517: </a>    mm = m+1;
+<a name="line518">518: </a>    sq2 = q2;
+<a name="line519">519: </a>    sq = q;
+<a name="line520">520: </a>    <font color="#4169E1">while</font> (mm--) *sq++ = *sq2++;
+<a name="line521">521: </a>    *q += (*--sa);      <font color="#B22222">/* q[0] = q[0] + p[n-m-1] */</font>
+<a name="line522">522: </a>  }
+<a name="line523">523: </a>  <font color="#4169E1">return</font>(0);
+<a name="line524">524: </a>}
+
+<a name="line526">526: </a><font color="#B22222">/*</font>
+<a name="line527">527: </a><font color="#B22222">   FILTLAN function PolynomialEvaluationInChebyshevBasis</font>
+
+<a name="line529">529: </a><font color="#B22222">   evaluate P(z) at z=z0, where P(z) is a polynomial expanded in a basis of</font>
+<a name="line530">530: </a><font color="#B22222">   the `translated' (i.e. scale-and-shift) Chebyshev polynomials</font>
+
+<a name="line532">532: </a><font color="#B22222">   input:</font>
+<a name="line533">533: </a><font color="#B22222">   c is a vector of Chebyshev coefficients which defines the polynomial</font>
+<a name="line534">534: </a><font color="#B22222">       P(z) = c(1)*S_0(z) + c(2)*S_1(z) + ... + c(n)*S_{n-1}(z),</font>
+<a name="line535">535: </a><font color="#B22222">   where S_i is the `translated' Chebyshev polynomial S_i((z-c)/h) = T_i(z), with</font>
+<a name="line536">536: </a><font color="#B22222">       c = (intv(j)+intv(j+1)) / 2,  h = (intv(j+1)-intv(j)) / 2</font>
+<a name="line537">537: </a><font color="#B22222">   note that T_i(z) is the Chebyshev polynomial of the first kind,</font>
+<a name="line538">538: </a><font color="#B22222">       T_0(z) = 1, T_1(z) = z, and T_i(z) = 2*z*T_{i-1}(z) - T_{i-2}(z) for i&gt;=2</font>
+
+<a name="line540">540: </a><font color="#B22222">   output:</font>
+<a name="line541">541: </a><font color="#B22222">   the evaluated value of P(z) at z=z0</font>
+<a name="line542">542: </a><font color="#B22222">*/</font>
+<a name="line543">543: </a><strong><font color="#4169E1"><a name="FILTLAN_PolynomialEvaluationInChebyshevBasis"></a>PETSC_STATIC_INLINE PetscReal FILTLAN_PolynomialEvaluationInChebyshevBasis(PetscReal *pp,PetscInt m,PetscInt idx,PetscReal z0,PetscReal aa,PetscReal bb)</font></strong>
+<a name="line544">544: </a>{
+<a name="line545">545: </a>  PetscInt  ii,deg1;
+<a name="line546">546: </a>  PetscReal y,zz,t0,t1,t2,*sc;
+
+<a name="line549">549: </a>  deg1 = m;
+<a name="line550">550: </a>  <font color="#4169E1">if</font> (aa==-1.0 &amp;&amp; bb==1.0) zz = z0;  <font color="#B22222">/* treat it as a special case to reduce rounding errors */</font>
+<a name="line551">551: </a>  <font color="#4169E1">else</font> zz = (aa==bb)? 0.0 : -1.0+2.0*(z0-aa)/(bb-aa);
+
+<a name="line553">553: </a>  <font color="#B22222">/* compute y = P(z0), where we utilize the Chebyshev recursion */</font>
+<a name="line554">554: </a>  sc = pp+(idx-1)*m;   <font color="#B22222">/* sc points to column idx of pp */</font>
+<a name="line555">555: </a>  y = *sc++;
+<a name="line556">556: </a>  t1 = 1.0; t2 = zz;
+<a name="line557">557: </a>  ii = deg1-1;
+<a name="line558">558: </a>  <font color="#4169E1">while</font> (ii--) {
+<a name="line559">559: </a>    <font color="#B22222">/* Chebyshev recursion: T_0(zz)=1, T_1(zz)=zz, and T_{i+1}(zz) = 2*zz*T_i(zz) + T_{i-1}(zz) for i&gt;=2</font>
+<a name="line560">560: </a><font color="#B22222">       the values of T_{i+1}(zz), T_i(zz), T_{i-1}(zz) are stored in t0, t1, t2, respectively */</font>
+<a name="line561">561: </a>    t0 = 2*zz*t1 - t2;
+<a name="line562">562: </a>    <font color="#B22222">/* it also works for the base case / the first iteration, where t0 equals 2*zz*1-zz == zz which is T_1(zz) */</font>
+<a name="line563">563: </a>    t2 = t1;
+<a name="line564">564: </a>    t1 = t0;
+<a name="line565">565: </a>    y += (*sc++)*t0;
+<a name="line566">566: </a>  }
+<a name="line567">567: </a>  PetscFunctionReturn(y);
+<a name="line568">568: </a>}
+
+<a name="line570">570: </a><strong><font color="#228B22">#define basisTranslated PETSC_TRUE</font></strong>
+<a name="line571">571: </a><font color="#B22222">/*</font>
+<a name="line572">572: </a><font color="#B22222">   FILTLAN function PiecewisePolynomialEvaluationInChebyshevBasis</font>
+
+<a name="line574">574: </a><font color="#B22222">   evaluate P(z) at z=z0, where P(z) is a piecewise polynomial expanded</font>
+<a name="line575">575: </a><font color="#B22222">   in a basis of the (optionally translated, i.e. scale-and-shift) Chebyshev polynomials for each interval</font>
+
+<a name="line577">577: </a><font color="#B22222">   input:</font>
+<a name="line578">578: </a><font color="#B22222">   intv is a vector which defines the intervals; the j-th interval is [intv(j), intv(j+1))</font>
+<a name="line579">579: </a><font color="#B22222">   pp is a matrix of Chebyshev coefficients which defines a piecewise polynomial P(z)</font>
+<a name="line580">580: </a><font color="#B22222">   in a basis of the `translated' Chebyshev polynomials in each interval</font>
+<a name="line581">581: </a><font color="#B22222">   the polynomial P_j(z) in the j-th interval, i.e. when z is in [intv(j), intv(j+1)), is defined by the j-th column of pp:</font>
+<a name="line582">582: </a><font color="#B22222">       if basisTranslated == false, then</font>
+<a name="line583">583: </a><font color="#B22222">           P_j(z) = pp(1,j)*T_0(z) + pp(2,j)*T_1(z) + ... + pp(n,j)*T_{n-1}(z),</font>
+<a name="line584">584: </a><font color="#B22222">       where T_i(z) is the Chebyshev polynomial of the first kind,</font>
+<a name="line585">585: </a><font color="#B22222">           T_0(z) = 1, T_1(z) = z, and T_i(z) = 2*z*T_{i-1}(z) - T_{i-2}(z) for i&gt;=2</font>
+<a name="line586">586: </a><font color="#B22222">       if basisTranslated == true, then</font>
+<a name="line587">587: </a><font color="#B22222">           P_j(z) = pp(1,j)*S_0(z) + pp(2,j)*S_1(z) + ... + pp(n,j)*S_{n-1}(z),</font>
+<a name="line588">588: </a><font color="#B22222">       where S_i is the `translated' Chebyshev polynomial S_i((z-c)/h) = T_i(z), with</font>
+<a name="line589">589: </a><font color="#B22222">           c = (intv(j)+intv(j+1)) / 2,  h = (intv(j+1)-intv(j)) / 2</font>
+
+<a name="line591">591: </a><font color="#B22222">   output:</font>
+<a name="line592">592: </a><font color="#B22222">   the evaluated value of P(z) at z=z0</font>
+
+<a name="line594">594: </a><font color="#B22222">   note that if z0 falls below the first interval, then the polynomial in the first interval will be used to evaluate P(z0)</font>
+<a name="line595">595: </a><font color="#B22222">             if z0 flies over  the last  interval, then the polynomial in the last  interval will be used to evaluate P(z0)</font>
+<a name="line596">596: </a><font color="#B22222">*/</font>
+<a name="line597">597: </a><strong><font color="#4169E1"><a name="FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis"></a>PETSC_STATIC_INLINE PetscReal FILTLAN_PiecewisePolynomialEvaluationInChebyshevBasis(PetscReal *pp,PetscInt m,PetscReal *intv,PetscInt npoints,PetscReal z0)</font></strong>
+<a name="line598">598: </a>{
+<a name="line599">599: </a>  PetscReal *sintv,aa,bb,resul;
+<a name="line600">600: </a>  PetscInt  idx;
+
+<a name="line603">603: </a>  <font color="#B22222">/* determine the interval which contains z0 */</font>
+<a name="line604">604: </a>  sintv = &amp;intv[1];
+<a name="line605">605: </a>  idx = 1;
+<a name="line606">606: </a>  <font color="#4169E1">if</font> (npoints&gt;2 &amp;&amp; z0 &gt;= *sintv) {
+<a name="line607">607: </a>    sintv++;
+<a name="line608">608: </a>    <font color="#4169E1">while</font> (++idx &lt; npoints-1) {
+<a name="line609">609: </a>      <font color="#4169E1">if</font> (z0 &lt; *sintv) <font color="#4169E1">break</font>;
+<a name="line610">610: </a>      sintv++;
+<a name="line611">611: </a>    }
+<a name="line612">612: </a>  }
+<a name="line613">613: </a>  <font color="#B22222">/* idx==1 if npoints&lt;=2; otherwise idx satisfies:</font>
+<a name="line614">614: </a><font color="#B22222">         intv(idx) &lt;= z0 &lt; intv(idx+1),  if 2 &lt;= idx &lt;= npoints-2</font>
+<a name="line615">615: </a><font color="#B22222">         z0 &lt; intv(idx+1),               if idx == 1</font>
+<a name="line616">616: </a><font color="#B22222">         intv(idx) &lt;= z0,                if idx == npoints-1</font>
+<a name="line617">617: </a><font color="#B22222">     in addition, sintv points to &amp;intv(idx+1) */</font>
+<a name="line618">618: </a>  <font color="#4169E1">if</font> (basisTranslated) {
+<a name="line619">619: </a>    <font color="#B22222">/* the basis consists of `translated' Chebyshev polynomials */</font>
+<a name="line620">620: </a>    <font color="#B22222">/* find the interval of concern, [aa,bb] */</font>
+<a name="line621">621: </a>    aa = *(sintv-1);
+<a name="line622">622: </a>    bb = *sintv;
+<a name="line623">623: </a>    resul = FILTLAN_PolynomialEvaluationInChebyshevBasis(pp,m,idx,z0,aa,bb);
+<a name="line624">624: </a>  } <font color="#4169E1">else</font> {
+<a name="line625">625: </a>    <font color="#B22222">/* the basis consists of standard Chebyshev polynomials, with interval [-1.0,1.0] for integration */</font>
+<a name="line626">626: </a>    resul = FILTLAN_PolynomialEvaluationInChebyshevBasis(pp,m,idx,z0,-1.0,1.0);
+<a name="line627">627: </a>  }
+<a name="line628">628: </a>  PetscFunctionReturn(resul);
+<a name="line629">629: </a>}
+
+<a name="line631">631: </a><font color="#B22222">/*</font>
+<a name="line632">632: </a><font color="#B22222">   FILTLAN function PiecewisePolynomialInnerProductInChebyshevBasis</font>
+
+<a name="line634">634: </a><font color="#B22222">   compute the weighted inner product of two piecewise polynomials expanded</font>
+<a name="line635">635: </a><font color="#B22222">   in a basis of `translated' (i.e. scale-and-shift) Chebyshev polynomials for each interval</font>
+
+<a name="line637">637: </a><font color="#B22222">   pp and qq are two matrices of Chebyshev coefficients which define the piecewise polynomials P(z) and Q(z), respectively</font>
+<a name="line638">638: </a><font color="#B22222">   for z in the j-th interval, P(z) equals</font>
+<a name="line639">639: </a><font color="#B22222">       P_j(z) = pp(1,j)*S_0(z) + pp(2,j)*S_1(z) + ... + pp(n,j)*S_{n-1}(z),</font>
+<a name="line640">640: </a><font color="#B22222">   and Q(z) equals</font>
+<a name="line641">641: </a><font color="#B22222">       Q_j(z) = qq(1,j)*S_0(z) + qq(2,j)*S_1(z) + ... + qq(n,j)*S_{n-1}(z),</font>
+<a name="line642">642: </a><font color="#B22222">   where S_i(z) is the `translated' Chebyshev polynomial in that interval,</font>
+<a name="line643">643: </a><font color="#B22222">       S_i((z-c)/h) = T_i(z),  c = (aa+bb)) / 2,  h = (bb-aa) / 2,</font>
+<a name="line644">644: </a><font color="#B22222">   with T_i(z) the Chebyshev polynomial of the first kind</font>
+<a name="line645">645: </a><font color="#B22222">       T_0(z) = 1, T_1(z) = z, and T_i(z) = 2*z*T_{i-1}(z) - T_{i-2}(z) for i&gt;=2</font>
+
+<a name="line647">647: </a><font color="#B22222">   the (scaled) j-th interval inner product is defined by</font>
+<a name="line648">648: </a><font color="#B22222">       &lt;P_j,Q_j&gt; = (Pi/2)*(pp(1,j)*qq(1,j) + sum_{k} pp(k,j)*qq(k,j)),</font>
+<a name="line649">649: </a><font color="#B22222">   which comes from the property</font>
+<a name="line650">650: </a><font color="#B22222">       &lt;T_0,T_0&gt;=pi, &lt;T_i,T_i&gt;=pi/2 for i&gt;=1, and &lt;T_i,T_j&gt;=0 for i!=j</font>
+
+<a name="line652">652: </a><font color="#B22222">   the weighted inner product is &lt;P,Q&gt; = sum_{j} intervalWeights(j)*&lt;P_j,Q_j&gt;,</font>
+<a name="line653">653: </a><font color="#B22222">   which is the return value</font>
+
+<a name="line655">655: </a><font color="#B22222">   note that for unit weights, pass an empty vector of intervalWeights (i.e. of length 0)</font>
+<a name="line656">656: </a><font color="#B22222">*/</font>
+<a name="line657">657: </a><strong><font color="#4169E1"><a name="FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis"></a>PETSC_STATIC_INLINE PetscReal FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(PetscReal *pp,PetscInt prows,PetscInt pcols,PetscInt ldp,PetscReal *qq,PetscInt qrows,PetscInt qcols,PetscInt ldq,const PetscReal *intervalWeights)</font></strong>
+<a name="line658">658: </a>{
+<a name="line659">659: </a>  PetscInt  nintv,deg1,i,k;
+<a name="line660">660: </a>  PetscReal *sp,*sq,ans=0.0,ans2;
+
+<a name="line663">663: </a>  deg1 = PetscMin(prows,qrows);  <font color="#B22222">/* number of effective coefficients, one more than the effective polynomial degree */</font>
+<a name="line664">664: </a>  <font color="#4169E1">if</font> (!deg1) PetscFunctionReturn(0.0);
+<a name="line665">665: </a>  nintv = PetscMin(pcols,qcols);  <font color="#B22222">/* number of intervals */</font>
+
+<a name="line667">667: </a>  <font color="#B22222">/* scaled by intervalWeights(i) in the i-th interval (we assume intervalWeights[] are always provided).</font>
+<a name="line668">668: </a><font color="#B22222">     compute ans = sum_{i=1,...,nintv} intervalWeights(i)*[ pp(1,i)*qq(1,i) + sum_{k=1,...,deg} pp(k,i)*qq(k,i) ] */</font>
+<a name="line669">669: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nintv;i++) {   <font color="#B22222">/* compute ans2 = pp(1,i)*qq(1,i) + sum_{k=1,...,deg} pp(k,i)*qq(k,i) */</font>
+<a name="line670">670: </a>    sp = pp+i*ldp;
+<a name="line671">671: </a>    sq = qq+i*ldq;
+<a name="line672">672: </a>    ans2 = (*sp) * (*sq);  <font color="#B22222">/* the first term pp(1,i)*qq(1,i) is being added twice */</font>
+<a name="line673">673: </a>    <font color="#4169E1">for</font> (k=0;k&lt;deg1;k++) ans2 += (*sp++)*(*sq++);  <font color="#B22222">/* add pp(k,i)*qq(k,i) */</font>
+<a name="line674">674: </a>    ans += ans2*intervalWeights[i];  <font color="#B22222">/* compute ans += ans2*intervalWeights(i) */</font>
+<a name="line675">675: </a>  }
+<a name="line676">676: </a>  PetscFunctionReturn(ans*PETSC_PI/2.0);
+<a name="line677">677: </a>}
+
+<a name="line679">679: </a><font color="#B22222">/*</font>
+<a name="line680">680: </a><font color="#B22222">   FILTLAN function PiecewisePolynomialInChebyshevBasisMultiplyX</font>
+
+<a name="line682">682: </a><font color="#B22222">   compute Q(z) = z*P(z), where P(z) and Q(z) are piecewise polynomials expanded</font>
+<a name="line683">683: </a><font color="#B22222">   in a basis of `translated' (i.e. scale-and-shift) Chebyshev polynomials for each interval</font>
+
+<a name="line685">685: </a><font color="#B22222">   P(z) and Q(z) are stored as matrices of Chebyshev coefficients pp and qq, respectively</font>
+
+<a name="line687">687: </a><font color="#B22222">   For z in the j-th interval, P(z) equals</font>
+<a name="line688">688: </a><font color="#B22222">       P_j(z) = pp(1,j)*S_0(z) + pp(2,j)*S_1(z) + ... + pp(n,j)*S_{n-1}(z),</font>
+<a name="line689">689: </a><font color="#B22222">   and Q(z) equals</font>
+<a name="line690">690: </a><font color="#B22222">       Q_j(z) = qq(1,j)*S_0(z) + qq(2,j)*S_1(z) + ... + qq(n,j)*S_{n-1}(z),</font>
+<a name="line691">691: </a><font color="#B22222">   where S_i(z) is the `translated' Chebyshev polynomial in that interval,</font>
+<a name="line692">692: </a><font color="#B22222">       S_i((z-c)/h) = T_i(z),  c = (intv(j)+intv(j+1))) / 2,  h = (intv(j+1)-intv(j)) / 2,</font>
+<a name="line693">693: </a><font color="#B22222">   with T_i(z) the Chebyshev polynomial of the first kind</font>
+<a name="line694">694: </a><font color="#B22222">       T_0(z) = 1, T_1(z) = z, and T_i(z) = 2*z*T_{i-1}(z) - T_{i-2}(z) for i&gt;=2</font>
+
+<a name="line696">696: </a><font color="#B22222">   the returned matrix is qq which represents Q(z) = z*P(z)</font>
+<a name="line697">697: </a><font color="#B22222">*/</font>
+<a name="line698">698: </a><strong><font color="#4169E1"><a name="FILTLAN_PiecewisePolynomialInChebyshevBasisMultiplyX"></a>PETSC_STATIC_INLINE PetscErrorCode FILTLAN_PiecewisePolynomialInChebyshevBasisMultiplyX(PetscReal *pp,PetscInt deg1,PetscInt ldp,PetscReal *intv,PetscInt nintv,PetscReal *qq,PetscInt ldq)</font></strong>
+<a name="line699">699: </a>{
+<a name="line700">700: </a>  PetscInt  i,j;
+<a name="line701">701: </a>  PetscReal c,h,h2,tmp,*sp,*sq,*sp2,*sq2;
+
+<a name="line704">704: </a>  <font color="#4169E1">for</font> (j=0;j&lt;nintv;j++) {    <font color="#B22222">/* consider interval between intv(j) and intv(j+1) */</font>
+<a name="line705">705: </a>    sp = pp+j*ldp;
+<a name="line706">706: </a>    sq = qq+j*ldq;
+<a name="line707">707: </a>    sp2 = sp;
+<a name="line708">708: </a>    sq2 = sq+1;
+<a name="line709">709: </a>    c = 0.5*(intv[j] + intv[j+1]);   <font color="#B22222">/* compute c = (intv(j) + intv(j+1))/2 */</font>
+<a name="line710">710: </a>    h = 0.5*(intv[j+1] - intv[j]);   <font color="#B22222">/* compute h = (intv(j+1) - intv(j))/2  and  h2 = h/2 */</font>
+<a name="line711">711: </a>    h2 = 0.5*h;
+<a name="line712">712: </a>    i = deg1;
+<a name="line713">713: </a>    <font color="#4169E1">while</font> (i--) *sq++ = c*(*sp++);    <font color="#B22222">/* compute q(1:deg1,j) = c*p(1:deg1,j) */</font>
+<a name="line714">714: </a>    *sq++ = 0.0;                      <font color="#B22222">/* set q(deg1+1,j) = 0.0 */</font>
+<a name="line715">715: </a>    *(sq2++) += h*(*sp2++);           <font color="#B22222">/* compute q(2,j) = q(2,j) + h*p(1,j) */</font>
+<a name="line716">716: </a>    i = deg1-1;
+<a name="line717">717: </a>    <font color="#4169E1">while</font> (i--) {       <font color="#B22222">/* compute q(3:deg1+1,j) += h2*p(2:deg1,j) and then q(1:deg1-1,j) += h2*p(2:deg1,j) */</font>
+<a name="line718">718: </a>      tmp = h2*(*sp2++);
+<a name="line719">719: </a>      *(sq2-2) += tmp;
+<a name="line720">720: </a>      *(sq2++) += tmp;
+<a name="line721">721: </a>    }
+<a name="line722">722: </a>  }
+<a name="line723">723: </a>  <font color="#4169E1">return</font>(0);
+<a name="line724">724: </a>}
+
+<a name="line726">726: </a><font color="#B22222">/* ////////////////////////////////////////////////////////////////////////////</font>
+<a name="line727">727: </a><font color="#B22222">   //    Conjugate Residual Method in the Polynomial Space</font>
+<a name="line728">728: </a><font color="#B22222">   //////////////////////////////////////////////////////////////////////////// */</font>
+
+<a name="line730">730: </a><font color="#B22222">/*</font>
+<a name="line731">731: </a><font color="#B22222">    B := alpha*A + beta*B</font>
+
+<a name="line733">733: </a><font color="#B22222">    A,B are nxk</font>
+<a name="line734">734: </a><font color="#B22222">*/</font>
+<a name="line735">735: </a><strong><font color="#4169E1"><a name="Mat_AXPY_BLAS"></a>PETSC_STATIC_INLINE PetscErrorCode Mat_AXPY_BLAS(PetscInt n,PetscInt k,PetscReal alpha,const PetscReal *A,PetscInt lda,PetscReal beta,PetscReal *B,PetscInt ldb)</font></strong>
+<a name="line736">736: </a>{
+<a name="line738">738: </a>  PetscInt       i,j;
+
+<a name="line741">741: </a>  <font color="#4169E1">if</font> (beta==(PetscReal)1.0) {
+<a name="line742">742: </a>    <font color="#4169E1">for</font> (j=0;j&lt;k;j++) <font color="#4169E1">for</font> (i=0;i&lt;n;i++) B[i+j*ldb] += alpha*A[i+j*lda];
+<a name="line743">743: </a>    PetscLogFlops(2.0*n*k);
+<a name="line744">744: </a>  } <font color="#4169E1">else</font> {
+<a name="line745">745: </a>    <font color="#4169E1">for</font> (j=0;j&lt;k;j++) <font color="#4169E1">for</font> (i=0;i&lt;n;i++) B[i+j*ldb] = alpha*A[i+j*lda] + beta*B[i+j*ldb];
+<a name="line746">746: </a>    PetscLogFlops(3.0*n*k);
+<a name="line747">747: </a>  }
+<a name="line748">748: </a>  <font color="#4169E1">return</font>(0);
+<a name="line749">749: </a>}
+
+<a name="line751">751: </a><font color="#B22222">/*</font>
+<a name="line752">752: </a><font color="#B22222">   FILTLAN function FilteredConjugateResidualPolynomial</font>
+
+<a name="line754">754: </a><font color="#B22222">   ** Conjugate Residual Method in the Polynomial Space</font>
+
+<a name="line756">756: </a><font color="#B22222">   this routine employs a conjugate-residual-type algorithm in polynomial space to minimize ||P(z)-Q(z)||_w,</font>
+<a name="line757">757: </a><font color="#B22222">   where P(z), the base filter, is the input piecewise polynomial, and</font>
+<a name="line758">758: </a><font color="#B22222">         Q(z) is the output polynomial satisfying Q(0)==1, i.e. the constant term of Q(z) is 1</font>
+<a name="line759">759: </a><font color="#B22222">   niter is the number of conjugate-residual iterations; therefore, the degree of Q(z) is up to niter+1</font>
+<a name="line760">760: </a><font color="#B22222">   both P(z) and Q(z) are expanded in the `translated' (scale-and-shift) Chebyshev basis for each interval,</font>
+<a name="line761">761: </a><font color="#B22222">   and presented as matrices of Chebyshev coefficients, denoted by pp and qq, respectively</font>
+
+<a name="line763">763: </a><font color="#B22222">   input:</font>
+<a name="line764">764: </a><font color="#B22222">   intv is a vector which defines the intervals; the j-th interval is [intv(j),intv(j+1))</font>
+<a name="line765">765: </a><font color="#B22222">   w is a vector of Chebyshev weights; the weight of j-th interval is w(j)</font>
+<a name="line766">766: </a><font color="#B22222">       the interval weights define the inner product of two continuous functions and then</font>
+<a name="line767">767: </a><font color="#B22222">       the derived w-norm ||P(z)-Q(z)||_w</font>
+<a name="line768">768: </a><font color="#B22222">   pp is a matrix of Chebyshev coefficients which defines the piecewise polynomial P(z)</font>
+<a name="line769">769: </a><font color="#B22222">   to be specific, for z in [intv(j), intv(j+1)), P(z) equals</font>
+<a name="line770">770: </a><font color="#B22222">       P_j(z) = pp(1,j)*S_0(z) + pp(2,j)*S_1(z) + ... + pp(niter+2,j)*S_{niter+1}(z),</font>
+<a name="line771">771: </a><font color="#B22222">   where S_i(z) is the `translated' Chebyshev polynomial in that interval,</font>
+<a name="line772">772: </a><font color="#B22222">       S_i((z-c)/h) = T_i(z),  c = (intv(j)+intv(j+1))) / 2,  h = (intv(j+1)-intv(j)) / 2,</font>
+<a name="line773">773: </a><font color="#B22222">   with T_i(z) the Chebyshev polynomial of the first kind,</font>
+<a name="line774">774: </a><font color="#B22222">       T_0(z) = 1, T_1(z) = z, and T_i(z) = 2*z*T_{i-1}(z) - T_{i-2}(z) for i&gt;=2</font>
+
+<a name="line776">776: </a><font color="#B22222">   output:</font>
+<a name="line777">777: </a><font color="#B22222">   the return matrix, denoted by qq, represents a polynomial Q(z) with degree up to 1+niter</font>
+<a name="line778">778: </a><font color="#B22222">   and satisfying Q(0)==1, such that ||P(z))-Q(z)||_w is minimized</font>
+<a name="line779">779: </a><font color="#B22222">   this polynomial Q(z) is expanded in the `translated' Chebyshev basis for each interval</font>
+<a name="line780">780: </a><font color="#B22222">   to be precise, considering z in [intv(j), intv(j+1)), Q(z) equals</font>
+<a name="line781">781: </a><font color="#B22222">       Q_j(z) = qq(1,j)*S_0(z) + qq(2,j)*S_1(z) + ... + qq(niter+2,j)*S_{niter+1}(z)</font>
+
+<a name="line783">783: </a><font color="#B22222">   note:</font>
+<a name="line784">784: </a><font color="#B22222">   1. since Q(0)==1, P(0)==1 is expected; if P(0)!=1, one can translate P(z)</font>
+<a name="line785">785: </a><font color="#B22222">      for example, if P(0)==0, one can use 1-P(z) as input instead of P(z)</font>
+<a name="line786">786: </a><font color="#B22222">   2. typically, the base filter, defined by pp and intv, is from Hermite interpolation</font>
+<a name="line787">787: </a><font color="#B22222">      in intervals [intv(j),intv(j+1)) for j=1,...,nintv, with nintv the number of intervals</font>
+<a name="line788">788: </a><font color="#B22222">*/</font>
+<a name="line789">789: </a><strong><font color="#4169E1"><a name="FILTLAN_FilteredConjugateResidualPolynomial"></a>static PetscErrorCode FILTLAN_FilteredConjugateResidualPolynomial(PetscReal *cpol,PetscReal *baseFilter,PetscInt nbase,PetscReal *intv,PetscInt m,PetscReal *intervalWeights,PetscInt niter)</font></strong>
+<a name="line790">790: </a>{
+<a name="line792">792: </a>  PetscInt       i,j,srpol,scpol,sarpol,sppol,sappol,ld,nintv;
+<a name="line793">793: </a>  PetscReal      rho,rho0,rho1,den,bet,alp,alp0,*ppol,*rpol,*appol,*arpol;
+
+<a name="line796">796: </a>  nintv = m-1;
+<a name="line797">797: </a>  ld = niter+2;  <font color="#B22222">/* leading dimension */</font>
+<a name="line798">798: </a>  PetscCalloc4(ld*nintv,&amp;ppol,ld*nintv,&amp;rpol,ld*nintv,&amp;appol,ld*nintv,&amp;arpol);
+<a name="line799">799: </a>  PetscArrayzero(cpol,ld*nintv);
+<a name="line800">800: </a>  <font color="#B22222">/* initialize polynomial ppol to be 1 (i.e. multiplicative identity) in all intervals */</font>
+<a name="line801">801: </a>  sppol = 2;
+<a name="line802">802: </a>  srpol = 2;
+<a name="line803">803: </a>  scpol = 2;
+<a name="line804">804: </a>  <font color="#4169E1">for</font> (j=0;j&lt;nintv;j++) {
+<a name="line805">805: </a>    ppol[j*ld] = 1.0;
+<a name="line806">806: </a>    rpol[j*ld] = 1.0;
+<a name="line807">807: </a>    cpol[j*ld] = 1.0;
+<a name="line808">808: </a>  }
+<a name="line809">809: </a>  <font color="#B22222">/* ppol is the initial p-polynomial (corresponding to the A-conjugate vector p in CG)</font>
+<a name="line810">810: </a><font color="#B22222">     rpol is the r-polynomial (corresponding to the residual vector r in CG)</font>
+<a name="line811">811: </a><font color="#B22222">     cpol is the "corrected" residual polynomial (result of this function) */</font>
+<a name="line812">812: </a>  sappol = 3;
+<a name="line813">813: </a>  sarpol = 3;
+<a name="line814">814: </a>  FILTLAN_PiecewisePolynomialInChebyshevBasisMultiplyX(ppol,sppol,ld,intv,nintv,appol,ld);
+<a name="line815">815: </a>  <font color="#4169E1">for</font> (i=0;i&lt;3;i++) <font color="#4169E1">for</font> (j=0;j&lt;nintv;j++) arpol[i+j*ld] = appol[i+j*ld];
+<a name="line816">816: </a>  rho = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(rpol,srpol,nintv,ld,arpol,sarpol,nintv,ld,intervalWeights);
+<a name="line817">817: </a>  <font color="#4169E1">for</font> (i=0;i&lt;niter;i++) {
+<a name="line818">818: </a>    den = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(appol,sappol,nintv,ld,appol,sappol,nintv,ld,intervalWeights);
+<a name="line819">819: </a>    alp0 = rho/den;
+<a name="line820">820: </a>    rho1 = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(baseFilter,nbase,nintv,nbase,appol,sappol,nintv,ld,intervalWeights);
+<a name="line821">821: </a>    alp  = (rho-rho1)/den;
+<a name="line822">822: </a>    srpol++;
+<a name="line823">823: </a>    scpol++;
+<a name="line824">824: </a>    Mat_AXPY_BLAS(srpol,nintv,-alp0,appol,ld,1.0,rpol,ld);
+<a name="line825">825: </a>    Mat_AXPY_BLAS(scpol,nintv,-alp,appol,ld,1.0,cpol,ld);
+<a name="line826">826: </a>    <font color="#4169E1">if</font> (i+1 == niter) <font color="#4169E1">break</font>;
+<a name="line827">827: </a>    sarpol++;
+<a name="line828">828: </a>    FILTLAN_PiecewisePolynomialInChebyshevBasisMultiplyX(rpol,srpol,ld,intv,nintv,arpol,ld);
+<a name="line829">829: </a>    rho0 = rho;
+<a name="line830">830: </a>    rho = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(rpol,srpol,nintv,ld,arpol,sarpol,nintv,ld,intervalWeights);
+<a name="line831">831: </a>    bet  = rho / rho0;
+<a name="line832">832: </a>    sppol++;
+<a name="line833">833: </a>    sappol++;
+<a name="line834">834: </a>    Mat_AXPY_BLAS(sppol,nintv,1.0,rpol,ld,bet,ppol,ld);
+<a name="line835">835: </a>    Mat_AXPY_BLAS(sappol,nintv,1.0,arpol,ld,bet,appol,ld);
+<a name="line836">836: </a>  }
+<a name="line837">837: </a>  PetscFree4(ppol,rpol,appol,arpol);
+<a name="line838">838: </a>  <font color="#4169E1">return</font>(0);
+<a name="line839">839: </a>}
+
+<a name="line841">841: </a><font color="#B22222">/*</font>
+<a name="line842">842: </a><font color="#B22222">   FILTLAN function FilteredConjugateResidualMatrixPolynomialVectorProduct</font>
+
+<a name="line844">844: </a><font color="#B22222">   this routine employs a conjugate-residual-type algorithm in polynomial space to compute</font>
+<a name="line845">845: </a><font color="#B22222">   x = x0 + s(A)*r0 with r0 = b - A*x0, such that ||(1-P(z))-z*s(z)||_w is minimized, where</font>
+<a name="line846">846: </a><font color="#B22222">   P(z) is a given piecewise polynomial, called the base filter,</font>
+<a name="line847">847: </a><font color="#B22222">   s(z) is a polynomial of degree up to niter, the number of conjugate-residual iterations,</font>
+<a name="line848">848: </a><font color="#B22222">   and b and x0 are given vectors</font>
+
+<a name="line850">850: </a><font color="#B22222">   note that P(z) is expanded in the `translated' (scale-and-shift) Chebyshev basis for each interval,</font>
+<a name="line851">851: </a><font color="#B22222">   and presented as a matrix of Chebyshev coefficients pp</font>
+
+<a name="line853">853: </a><font color="#B22222">   input:</font>
+<a name="line854">854: </a><font color="#B22222">   A is a sparse matrix</font>
+<a name="line855">855: </a><font color="#B22222">   x0, b are vectors</font>
+<a name="line856">856: </a><font color="#B22222">   niter is the number of conjugate-residual iterations</font>
+<a name="line857">857: </a><font color="#B22222">   intv is a vector which defines the intervals; the j-th interval is [intv(j),intv(j+1))</font>
+<a name="line858">858: </a><font color="#B22222">   w is a vector of Chebyshev weights; the weight of j-th interval is w(j)</font>
+<a name="line859">859: </a><font color="#B22222">       the interval weights define the inner product of two continuous functions and then</font>
+<a name="line860">860: </a><font color="#B22222">       the derived w-norm ||P(z)-Q(z)||_w</font>
+<a name="line861">861: </a><font color="#B22222">   pp is a matrix of Chebyshev coefficients which defines the piecewise polynomial P(z)</font>
+<a name="line862">862: </a><font color="#B22222">   to be specific, for z in [intv(j), intv(j+1)), P(z) equals</font>
+<a name="line863">863: </a><font color="#B22222">       P_j(z) = pp(1,j)*S_0(z) + pp(2,j)*S_1(z) + ... + pp(niter+2,j)*S_{niter+1}(z),</font>
+<a name="line864">864: </a><font color="#B22222">   where S_i(z) is the `translated' Chebyshev polynomial in that interval,</font>
+<a name="line865">865: </a><font color="#B22222">       S_i((z-c)/h) = T_i(z),  c = (intv(j)+intv(j+1))) / 2,  h = (intv(j+1)-intv(j)) / 2,</font>
+<a name="line866">866: </a><font color="#B22222">   with T_i(z) the Chebyshev polynomial of the first kind,</font>
+<a name="line867">867: </a><font color="#B22222">       T_0(z) = 1, T_1(z) = z, and T_i(z) = 2*z*T_{i-1}(z) - T_{i-2}(z) for i&gt;=2</font>
+<a name="line868">868: </a><font color="#B22222">   tol is the tolerance; if the residual polynomial in z-norm is dropped by a factor lower</font>
+<a name="line869">869: </a><font color="#B22222">       than tol, then stop the conjugate-residual iteration</font>
+
+<a name="line871">871: </a><font color="#B22222">   output:</font>
+<a name="line872">872: </a><font color="#B22222">   the return vector is x = x0 + s(A)*r0 with r0 = b - A*x0, such that ||(1-P(z))-z*s(z)||_w is minimized,</font>
+<a name="line873">873: </a><font color="#B22222">   subject to that s(z) is a polynomial of degree up to niter, where P(z) is the base filter</font>
+<a name="line874">874: </a><font color="#B22222">   in short, z*s(z) approximates 1-P(z)</font>
+
+<a name="line876">876: </a><font color="#B22222">   note:</font>
+<a name="line877">877: </a><font color="#B22222">   1. since z*s(z) approximates 1-P(z), P(0)==1 is expected; if P(0)!=1, one can translate P(z)</font>
+<a name="line878">878: </a><font color="#B22222">      for example, if P(0)==0, one can use 1-P(z) as input instead of P(z)</font>
+<a name="line879">879: </a><font color="#B22222">   2. typically, the base filter, defined by pp and intv, is from Hermite interpolation</font>
+<a name="line880">880: </a><font color="#B22222">      in intervals [intv(j),intv(j+1)) for j=1,...,nintv, with nintv the number of intervals</font>
+<a name="line881">881: </a><font color="#B22222">   3. a common application is to compute R(A)*b, where R(z) approximates 1-P(z)</font>
+<a name="line882">882: </a><font color="#B22222">      in this case, one can set x0 = 0 and then the return vector is x = s(A)*b, where</font>
+<a name="line883">883: </a><font color="#B22222">      z*s(z) approximates 1-P(z); therefore, A*x is the wanted R(A)*b</font>
+<a name="line884">884: </a><font color="#B22222">*/</font>
+<a name="line885">885: </a><strong><font color="#4169E1"><a name="FILTLAN_FilteredConjugateResidualMatrixPolynomialVectorProduct"></a>static PetscErrorCode FILTLAN_FilteredConjugateResidualMatrixPolynomialVectorProduct(Mat A,Vec b,Vec x,PetscReal *baseFilter,PetscInt nbase,PetscReal *intv,PetscInt nintv,PetscReal *intervalWeights,PetscInt niter,Vec *work)</font></strong>
+<a name="line886">886: </a>{
+<a name="line888">888: </a>  PetscInt       i,j,srpol,scpol,sarpol,sppol,sappol,ld;
+<a name="line889">889: </a>  PetscReal      rho,rho0,rho00,rho1,den,bet,alp,alp0,*cpol,*ppol,*rpol,*appol,*arpol,tol=0.0;
+<a name="line890">890: </a>  Vec            r=work[0],p=work[1],ap=work[2],w=work[3];
+<a name="line891">891: </a>  PetscScalar    alpha;
+
+<a name="line894">894: </a>  ld = niter+3;  <font color="#B22222">/* leading dimension */</font>
+<a name="line895">895: </a>  PetscCalloc5(ld*nintv,&amp;ppol,ld*nintv,&amp;rpol,ld*nintv,&amp;cpol,ld*nintv,&amp;appol,ld*nintv,&amp;arpol);
+<a name="line896">896: </a>  <font color="#B22222">/* initialize polynomial ppol to be 1 (i.e. multiplicative identity) in all intervals */</font>
+<a name="line897">897: </a>  sppol = 2;
+<a name="line898">898: </a>  srpol = 2;
+<a name="line899">899: </a>  scpol = 2;
+<a name="line900">900: </a>  <font color="#4169E1">for</font> (j=0;j&lt;nintv;j++) {
+<a name="line901">901: </a>    ppol[j*ld] = 1.0;
+<a name="line902">902: </a>    rpol[j*ld] = 1.0;
+<a name="line903">903: </a>    cpol[j*ld] = 1.0;
+<a name="line904">904: </a>  }
+<a name="line905">905: </a>  <font color="#B22222">/* ppol is the initial p-polynomial (corresponding to the A-conjugate vector p in CG)</font>
+<a name="line906">906: </a><font color="#B22222">     rpol is the r-polynomial (corresponding to the residual vector r in CG)</font>
+<a name="line907">907: </a><font color="#B22222">     cpol is the "corrected" residual polynomial */</font>
+<a name="line908">908: </a>  sappol = 3;
+<a name="line909">909: </a>  sarpol = 3;
+<a name="line910">910: </a>  FILTLAN_PiecewisePolynomialInChebyshevBasisMultiplyX(ppol,sppol,ld,intv,nintv,appol,ld);
+<a name="line911">911: </a>  <font color="#4169E1">for</font> (i=0;i&lt;3;i++) <font color="#4169E1">for</font> (j=0;j&lt;nintv;j++) arpol[i+j*ld] = appol[i+j*ld];
+<a name="line912">912: </a>  rho00 = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(rpol,srpol,nintv,ld,arpol,sarpol,nintv,ld,intervalWeights);
+<a name="line913">913: </a>  rho = rho00;
+
+<a name="line915">915: </a>  <font color="#B22222">/* corrected CR in vector space */</font>
+<a name="line916">916: </a>  <font color="#B22222">/* we assume x0 is always 0 */</font>
+<a name="line917">917: </a>  VecSet(x,0.0);
+<a name="line918">918: </a>  VecCopy(b,r);     <font color="#B22222">/* initial residual r = b-A*x0 */</font>
+<a name="line919">919: </a>  VecCopy(r,p);     <font color="#B22222">/* p = r */</font>
+<a name="line920">920: </a>  MatMult(A,p,ap);  <font color="#B22222">/* ap = A*p */</font>
+
+<a name="line922">922: </a>  <font color="#4169E1">for</font> (i=0;i&lt;niter;i++) {
+<a name="line923">923: </a>    <font color="#B22222">/* iteration in the polynomial space */</font>
+<a name="line924">924: </a>    den = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(appol,sappol,nintv,ld,appol,sappol,nintv,ld,intervalWeights);
+<a name="line925">925: </a>    alp0 = rho/den;
+<a name="line926">926: </a>    rho1 = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(baseFilter,nbase,nintv,nbase,appol,sappol,nintv,ld,intervalWeights);
+<a name="line927">927: </a>    alp  = (rho-rho1)/den;
+<a name="line928">928: </a>    srpol++;
+<a name="line929">929: </a>    scpol++;
+<a name="line930">930: </a>    Mat_AXPY_BLAS(srpol,nintv,-alp0,appol,ld,1.0,rpol,ld);
+<a name="line931">931: </a>    Mat_AXPY_BLAS(scpol,nintv,-alp,appol,ld,1.0,cpol,ld);
+<a name="line932">932: </a>    sarpol++;
+<a name="line933">933: </a>    FILTLAN_PiecewisePolynomialInChebyshevBasisMultiplyX(rpol,srpol,ld,intv,nintv,arpol,ld);
+<a name="line934">934: </a>    rho0 = rho;
+<a name="line935">935: </a>    rho = FILTLAN_PiecewisePolynomialInnerProductInChebyshevBasis(rpol,srpol,nintv,ld,arpol,sarpol,nintv,ld,intervalWeights);
+
+<a name="line937">937: </a>    <font color="#B22222">/* update x in the vector space */</font>
+<a name="line938">938: </a>    alpha = alp;
+<a name="line939">939: </a>    VecAXPY(x,alpha,p);   <font color="#B22222">/* x += alp*p */</font>
+<a name="line940">940: </a>    <font color="#4169E1">if</font> (rho &lt; tol*rho00) <font color="#4169E1">break</font>;
+
+<a name="line942">942: </a>    <font color="#B22222">/* finish the iteration in the polynomial space */</font>
+<a name="line943">943: </a>    bet = rho / rho0;
+<a name="line944">944: </a>    sppol++;
+<a name="line945">945: </a>    sappol++;
+<a name="line946">946: </a>    Mat_AXPY_BLAS(sppol,nintv,1.0,rpol,ld,bet,ppol,ld);
+<a name="line947">947: </a>    Mat_AXPY_BLAS(sappol,nintv,1.0,arpol,ld,bet,appol,ld);
+
+<a name="line949">949: </a>    <font color="#B22222">/* finish the iteration in the vector space */</font>
+<a name="line950">950: </a>    alpha = -alp0;
+<a name="line951">951: </a>    VecAXPY(r,alpha,ap);    <font color="#B22222">/* r -= alp0*ap */</font>
+<a name="line952">952: </a>    alpha = bet;
+<a name="line953">953: </a>    VecAYPX(p,alpha,r);     <font color="#B22222">/* p = r + bet*p */</font>
+<a name="line954">954: </a>    MatMult(A,r,w);         <font color="#B22222">/* ap = A*r + bet*ap */</font>
+<a name="line955">955: </a>    VecAYPX(ap,alpha,w);
+<a name="line956">956: </a>  }
+<a name="line957">957: </a>  PetscFree5(ppol,rpol,cpol,appol,arpol);
+<a name="line958">958: </a>  <font color="#4169E1">return</font>(0);
+<a name="line959">959: </a>}
+
+<a name="line961">961: </a><font color="#B22222">/*</font>
+<a name="line962">962: </a><font color="#B22222">   Gateway to FILTLAN for evaluating y=p(A)*x</font>
+<a name="line963">963: </a><font color="#B22222">*/</font>
+<a name="line964">964: </a><strong><font color="#4169E1"><a name="MatMult_FILTLAN"></a>PetscErrorCode MatMult_FILTLAN(Mat A,Vec x,Vec y)</font></strong>
+<a name="line965">965: </a>{
+<a name="line967">967: </a>  <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+<a name="line968">968: </a>  ST_FILTER      *ctx;
+<a name="line969">969: </a>  PetscInt       npoints;
+
+<a name="line972">972: </a>  MatShellGetContext(A,(void**)&amp;st);
+<a name="line973">973: </a>  ctx = (ST_FILTER*)st-&gt;data;
+<a name="line974">974: </a>  npoints = (ctx-&gt;filterInfo-&gt;filterType == 2)? 6: 4;
+<a name="line975">975: </a>  FILTLAN_FilteredConjugateResidualMatrixPolynomialVectorProduct(ctx-&gt;T,x,y,ctx-&gt;baseFilter,2*ctx-&gt;baseDegree+2,ctx-&gt;intervals,npoints-1,ctx-&gt;opts-&gt;intervalWeights,ctx-&gt;polyDegree,st-&gt;work);
+<a name="line976">976: </a>  VecCopy(y,st-&gt;work[0]);
+<a name="line977">977: </a>  MatMult(ctx-&gt;T,st-&gt;work[0],y);
+<a name="line978">978: </a>  <font color="#4169E1">return</font>(0);
+<a name="line979">979: </a>}
+
+<a name="line981">981: </a><font color="#B22222">/*</font>
+<a name="line982">982: </a><font color="#B22222">   FILTLAN function PolynomialFilterInterface::setFilter</font>
+
+<a name="line984">984: </a><font color="#B22222">   Creates the shifted (and scaled) matrix and the base filter P(z).</font>
+<a name="line985">985: </a><font color="#B22222">   M is a shell matrix whose MatMult() applies the filter.</font>
+<a name="line986">986: </a><font color="#B22222">*/</font>
+<a name="line987">987: </a><strong><font color="#4169E1"><a name="STFilter_FILTLAN_setFilter"></a>PetscErrorCode STFilter_FILTLAN_setFilter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Mat *G)</font></strong>
+<a name="line988">988: </a>{
+<a name="line990">990: </a>  ST_FILTER      *ctx = (ST_FILTER*)st-&gt;data;
+<a name="line991">991: </a>  PetscInt       i,npoints,n,m,N,M;
+<a name="line992">992: </a>  PetscReal      frame2[4];
+<a name="line993">993: </a>  PetscScalar    alpha;
+<a name="line994">994: </a>  const PetscInt HighLowFlags[5] = { 1, -1, 0, -1, 1 };
+
+<a name="line997">997: </a>  <font color="#4169E1">if</font> (ctx-&gt;frame[0] == ctx-&gt;frame[1]) {  <font color="#B22222">/* low pass filter, convert it to high pass filter */</font>
+<a name="line998">998: </a>    <font color="#B22222">/* T = frame[3]*eye(n) - A */</font>
+<a name="line999">999: </a>    MatDestroy(&amp;ctx-&gt;T);
+<a name="line1000">1000: </a>    MatDuplicate(st-&gt;A[0],MAT_COPY_VALUES,&amp;ctx-&gt;T);
+<a name="line1001">1001: </a>    MatScale(ctx-&gt;T,-1.0);
+<a name="line1002">1002: </a>    alpha = ctx-&gt;frame[3];
+<a name="line1003">1003: </a>    MatShift(ctx-&gt;T,alpha);
+<a name="line1004">1004: </a>    <font color="#4169E1">for</font> (i=0;i&lt;4;i++) frame2[i] = ctx-&gt;frame[3] - ctx-&gt;frame[3-i];
+<a name="line1005">1005: </a>    FILTLAN_GetIntervals(ctx-&gt;intervals,frame2,ctx-&gt;polyDegree,ctx-&gt;baseDegree,ctx-&gt;opts,ctx-&gt;filterInfo);
+<a name="line1006">1006: </a>    <font color="#B22222">/* translate the intervals back */</font>
+<a name="line1007">1007: </a>    <font color="#4169E1">for</font> (i=0;i&lt;4;i++) ctx-&gt;intervals2[i] = ctx-&gt;frame[3] - ctx-&gt;intervals[3-i];
+<a name="line1008">1008: </a>  } <font color="#4169E1">else</font> {  <font color="#B22222">/* it can be a mid-pass filter or a high-pass filter */</font>
+<a name="line1009">1009: </a>    <font color="#4169E1">if</font> (ctx-&gt;frame[0] == 0.0) {
+<a name="line1010">1010: </a>      PetscObjectReference((PetscObject)st-&gt;A[0]);
+<a name="line1011">1011: </a>      MatDestroy(&amp;ctx-&gt;T);
+<a name="line1012">1012: </a>      ctx-&gt;T = st-&gt;A[0];
+<a name="line1013">1013: </a>      FILTLAN_GetIntervals(ctx-&gt;intervals,ctx-&gt;frame,ctx-&gt;polyDegree,ctx-&gt;baseDegree,ctx-&gt;opts,ctx-&gt;filterInfo);
+<a name="line1014">1014: </a>      <font color="#4169E1">for</font> (i=0;i&lt;6;i++) ctx-&gt;intervals2[i] = ctx-&gt;intervals[i];
+<a name="line1015">1015: </a>    } <font color="#4169E1">else</font> {
+<a name="line1016">1016: </a>      <font color="#B22222">/* T = A - frame[0]*eye(n) */</font>
+<a name="line1017">1017: </a>      MatDestroy(&amp;ctx-&gt;T);
+<a name="line1018">1018: </a>      MatDuplicate(st-&gt;A[0],MAT_COPY_VALUES,&amp;ctx-&gt;T);
+<a name="line1019">1019: </a>      alpha = -ctx-&gt;frame[0];
+<a name="line1020">1020: </a>      MatShift(ctx-&gt;T,alpha);
+<a name="line1021">1021: </a>      <font color="#4169E1">for</font> (i=0;i&lt;4;i++) frame2[i] = ctx-&gt;frame[i] - ctx-&gt;frame[0];
+<a name="line1022">1022: </a>      FILTLAN_GetIntervals(ctx-&gt;intervals,frame2,ctx-&gt;polyDegree,ctx-&gt;baseDegree,ctx-&gt;opts,ctx-&gt;filterInfo);
+<a name="line1023">1023: </a>      <font color="#B22222">/* translate the intervals back */</font>
+<a name="line1024">1024: </a>      <font color="#4169E1">for</font> (i=0;i&lt;6;i++) ctx-&gt;intervals2[i] = ctx-&gt;intervals[i] + ctx-&gt;frame[0];
+<a name="line1025">1025: </a>    }
+<a name="line1026">1026: </a>  }
+<a name="line1027">1027: </a>  npoints = (ctx-&gt;filterInfo-&gt;filterType == 2)? 6: 4;
+<a name="line1028">1028: </a>  PetscFree(ctx-&gt;baseFilter);
+<a name="line1029">1029: </a>  PetscMalloc1((2*ctx-&gt;baseDegree+2)*(npoints-1),&amp;ctx-&gt;baseFilter);
+<a name="line1030">1030: </a>  FILTLAN_HermiteBaseFilterInChebyshevBasis(ctx-&gt;baseFilter,ctx-&gt;intervals,npoints,HighLowFlags,ctx-&gt;baseDegree);
+<a name="line1031">1031: </a>  PetscInfo1(st,<font color="#666666">"Computed value of yLimit = %g\n"</font>,ctx-&gt;filterInfo-&gt;yLimit);
+
+<a name="line1033">1033: </a>  <font color="#B22222">/* create shell matrix*/</font>
+<a name="line1034">1034: </a>  MatGetSize(ctx-&gt;T,&amp;N,&amp;M);
+<a name="line1035">1035: </a>  MatGetLocalSize(ctx-&gt;T,&amp;n,&amp;m);
+<a name="line1036">1036: </a>  MatCreateShell(PetscObjectComm((PetscObject)st),n,m,N,M,st,G);
+<a name="line1037">1037: </a>  MatShellSetOperation(*G,MATOP_MULT,(void(*)(void))MatMult_FILTLAN);
+<a name="line1038">1038: </a>  PetscLogObjectParent((PetscObject)st,(PetscObject)*G);
+<a name="line1039">1039: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1040">1040: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,207 @@
+<center><a href="test7.c">Actual source code: test7.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/tests/test7.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:06+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/tests/test7.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Test interface functions of spectrum-slicing STOAR.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"This is based on ex38.c. The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;n&gt; ... dimension of the matrices.\n\n"</font>;
+
+<a name="line15"> 15: </a> #include <A href="../../../include/slepcpep.h.html">&lt;slepcpep.h&gt;</A>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line18"> 18: </a>{
+<a name="line19"> 19: </a>  Mat            M,C,K,A[3]; <font color="#B22222">/* problem matrices */</font>
+<a name="line20"> 20: </a>  <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>            pep;        <font color="#B22222">/* polynomial eigenproblem solver context */</font>
+<a name="line21"> 21: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;         <font color="#B22222">/* spectral transformation context */</font>
+<a name="line22"> 22: </a>  KSP            ksp;
+<a name="line23"> 23: </a>  PC             pc;
+<a name="line24"> 24: </a>  PetscBool      showinertia=PETSC_TRUE,lock,detect,checket;
+<a name="line25"> 25: </a>  PetscInt       n=100,Istart,Iend,i,*inertias,ns,nev,ncv,mpd;
+<a name="line26"> 26: </a>  PetscReal      mu=1,tau=10,kappa=5,int0,int1,*shifts;
+
+<a name="line29"> 29: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line31"> 31: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line32"> 32: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-showinertia"</font>,&amp;showinertia,NULL);
+<a name="line33"> 33: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nSpectrum slicing on <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>, n=%D\n\n"</font>,n);
+
+<a name="line35"> 35: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line36"> 36: </a><font color="#B22222">     Compute the matrices that define the eigensystem, (k^2*M+k*C+K)x=0</font>
+<a name="line37"> 37: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line39"> 39: </a>  <font color="#B22222">/* K is a tridiagonal */</font>
+<a name="line40"> 40: </a>  MatCreate(PETSC_COMM_WORLD,&amp;K);
+<a name="line41"> 41: </a>  MatSetSizes(K,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line42"> 42: </a>  MatSetFromOptions(K);
+<a name="line43"> 43: </a>  MatSetUp(K);
+
+<a name="line45"> 45: </a>  MatGetOwnershipRange(K,&amp;Istart,&amp;Iend);
+<a name="line46"> 46: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line47"> 47: </a>    <font color="#4169E1">if</font> (i&gt;0) {
+<a name="line48"> 48: </a>      MatSetValue(K,i,i-1,-kappa,INSERT_VALUES);
+<a name="line49"> 49: </a>    }
+<a name="line50"> 50: </a>    MatSetValue(K,i,i,kappa*3.0,INSERT_VALUES);
+<a name="line51"> 51: </a>    <font color="#4169E1">if</font> (i&lt;n-1) {
+<a name="line52"> 52: </a>      MatSetValue(K,i,i+1,-kappa,INSERT_VALUES);
+<a name="line53"> 53: </a>    }
+<a name="line54"> 54: </a>  }
+
+<a name="line56"> 56: </a>  MatAssemblyBegin(K,MAT_FINAL_ASSEMBLY);
+<a name="line57"> 57: </a>  MatAssemblyEnd(K,MAT_FINAL_ASSEMBLY);
+
+<a name="line59"> 59: </a>  <font color="#B22222">/* C is a tridiagonal */</font>
+<a name="line60"> 60: </a>  MatCreate(PETSC_COMM_WORLD,&amp;C);
+<a name="line61"> 61: </a>  MatSetSizes(C,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line62"> 62: </a>  MatSetFromOptions(C);
+<a name="line63"> 63: </a>  MatSetUp(C);
+
+<a name="line65"> 65: </a>  MatGetOwnershipRange(C,&amp;Istart,&amp;Iend);
+<a name="line66"> 66: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line67"> 67: </a>    <font color="#4169E1">if</font> (i&gt;0) {
+<a name="line68"> 68: </a>      MatSetValue(C,i,i-1,-tau,INSERT_VALUES);
+<a name="line69"> 69: </a>    }
+<a name="line70"> 70: </a>    MatSetValue(C,i,i,tau*3.0,INSERT_VALUES);
+<a name="line71"> 71: </a>    <font color="#4169E1">if</font> (i&lt;n-1) {
+<a name="line72"> 72: </a>      MatSetValue(C,i,i+1,-tau,INSERT_VALUES);
+<a name="line73"> 73: </a>    }
+<a name="line74"> 74: </a>  }
+
+<a name="line76"> 76: </a>  MatAssemblyBegin(C,MAT_FINAL_ASSEMBLY);
+<a name="line77"> 77: </a>  MatAssemblyEnd(C,MAT_FINAL_ASSEMBLY);
+
+<a name="line79"> 79: </a>  <font color="#B22222">/* M is a diagonal matrix */</font>
+<a name="line80"> 80: </a>  MatCreate(PETSC_COMM_WORLD,&amp;M);
+<a name="line81"> 81: </a>  MatSetSizes(M,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line82"> 82: </a>  MatSetFromOptions(M);
+<a name="line83"> 83: </a>  MatSetUp(M);
+<a name="line84"> 84: </a>  MatGetOwnershipRange(M,&amp;Istart,&amp;Iend);
+<a name="line85"> 85: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line86"> 86: </a>    MatSetValue(M,i,i,mu,INSERT_VALUES);
+<a name="line87"> 87: </a>  }
+<a name="line88"> 88: </a>  MatAssemblyBegin(M,MAT_FINAL_ASSEMBLY);
+<a name="line89"> 89: </a>  MatAssemblyEnd(M,MAT_FINAL_ASSEMBLY);
+
+<a name="line91"> 91: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line92"> 92: </a><font color="#B22222">                Create the eigensolver and solve the problem</font>
+<a name="line93"> 93: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line95"> 95: </a>  <a href="../../../docs/manualpages/PEP/PEPCreate.html#PEPCreate">PEPCreate</a>(PETSC_COMM_WORLD,&amp;pep);
+<a name="line96"> 96: </a>  A[0] = K; A[1] = C; A[2] = M;
+<a name="line97"> 97: </a>  <a href="../../../docs/manualpages/PEP/PEPSetOperators.html#PEPSetOperators">PEPSetOperators</a>(pep,3,A);
+<a name="line98"> 98: </a>  <a href="../../../docs/manualpages/PEP/PEPSetProblemType.html#PEPSetProblemType">PEPSetProblemType</a>(pep,<a href="../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_HYPERBOLIC</a>);
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/PEP/PEPSetType.html#PEPSetType">PEPSetType</a>(pep,PEPSTOAR);
+
+<a name="line101">101: </a>  <font color="#B22222">/*</font>
+<a name="line102">102: </a><font color="#B22222">     Set interval and other settings for spectrum slicing</font>
+<a name="line103">103: </a><font color="#B22222">  */</font>
+<a name="line104">104: </a>  int0 = -11.3;
+<a name="line105">105: </a>  int1 = -9.5;
+<a name="line106">106: </a>  <a href="../../../docs/manualpages/PEP/PEPSetInterval.html#PEPSetInterval">PEPSetInterval</a>(pep,int0,int1);
+<a name="line107">107: </a>  <a href="../../../docs/manualpages/PEP/PEPSetWhichEigenpairs.html#PEPSetWhichEigenpairs">PEPSetWhichEigenpairs</a>(pep,<a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_ALL</a>);
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/PEP/PEPGetST.html#PEPGetST">PEPGetST</a>(pep,&amp;st);
+<a name="line109">109: </a>  <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STSINVERT);
+<a name="line110">110: </a>  <a href="../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;ksp);
+<a name="line111">111: </a>  KSPSetType(ksp,KSPPREONLY);
+<a name="line112">112: </a>  KSPGetPC(ksp,&amp;pc);
+<a name="line113">113: </a>  PCSetType(pc,PCCHOLESKY);
+
+<a name="line115">115: </a>  <font color="#B22222">/*</font>
+<a name="line116">116: </a><font color="#B22222">     Test interface functions of STOAR solver</font>
+<a name="line117">117: </a><font color="#B22222">  */</font>
+<a name="line118">118: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetDetectZeros.html#PEPSTOARGetDetectZeros">PEPSTOARGetDetectZeros</a>(pep,&amp;detect);
+<a name="line119">119: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Detect zeros before changing = %d"</font>,(int)detect);
+<a name="line120">120: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARSetDetectZeros.html#PEPSTOARSetDetectZeros">PEPSTOARSetDetectZeros</a>(pep,PETSC_TRUE);
+<a name="line121">121: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetDetectZeros.html#PEPSTOARGetDetectZeros">PEPSTOARGetDetectZeros</a>(pep,&amp;detect);
+<a name="line122">122: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to %d\n"</font>,(int)detect);
+
+<a name="line124">124: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetLocking.html#PEPSTOARGetLocking">PEPSTOARGetLocking</a>(pep,&amp;lock);
+<a name="line125">125: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Locking flag before changing = %d"</font>,(int)lock);
+<a name="line126">126: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARSetLocking.html#PEPSTOARSetLocking">PEPSTOARSetLocking</a>(pep,PETSC_TRUE);
+<a name="line127">127: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetLocking.html#PEPSTOARGetLocking">PEPSTOARGetLocking</a>(pep,&amp;lock);
+<a name="line128">128: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to %d\n"</font>,(int)lock);
+
+<a name="line130">130: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetCheckEigenvalueType.html#PEPSTOARGetCheckEigenvalueType">PEPSTOARGetCheckEigenvalueType</a>(pep,&amp;checket);
+<a name="line131">131: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Check eigenvalue type flag before changing = %d"</font>,(int)checket);
+<a name="line132">132: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARSetCheckEigenvalueType.html#PEPSTOARSetCheckEigenvalueType">PEPSTOARSetCheckEigenvalueType</a>(pep,PETSC_FALSE);
+<a name="line133">133: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetCheckEigenvalueType.html#PEPSTOARGetCheckEigenvalueType">PEPSTOARGetCheckEigenvalueType</a>(pep,&amp;checket);
+<a name="line134">134: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to %d\n"</font>,(int)checket);
+
+<a name="line136">136: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetDimensions.html#PEPSTOARGetDimensions">PEPSTOARGetDimensions</a>(pep,&amp;nev,&amp;ncv,&amp;mpd);
+<a name="line137">137: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Sub-solve dimensions before changing = [%D,%D,%D]"</font>,nev,ncv,mpd);
+<a name="line138">138: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARSetDimensions.html#PEPSTOARSetDimensions">PEPSTOARSetDimensions</a>(pep,30,60,60);
+<a name="line139">139: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetDimensions.html#PEPSTOARGetDimensions">PEPSTOARGetDimensions</a>(pep,&amp;nev,&amp;ncv,&amp;mpd);
+<a name="line140">140: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to [%D,%D,%D]\n"</font>,nev,ncv,mpd);
+
+<a name="line142">142: </a>  <a href="../../../docs/manualpages/PEP/PEPSetFromOptions.html#PEPSetFromOptions">PEPSetFromOptions</a>(pep);
+
+<a name="line144">144: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line145">145: </a><font color="#B22222">             Compute all eigenvalues in interval and display info</font>
+<a name="line146">146: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line148">148: </a>  <a href="../../../docs/manualpages/PEP/PEPSetUp.html#PEPSetUp">PEPSetUp</a>(pep);
+<a name="line149">149: </a>  <a href="../../../docs/manualpages/PEP/PEPSTOARGetInertias.html#PEPSTOARGetInertias">PEPSTOARGetInertias</a>(pep,&amp;ns,&amp;shifts,&amp;inertias);
+<a name="line150">150: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Inertias (after setup):\n"</font>);
+<a name="line151">151: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ns;i++) {
+<a name="line152">152: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" .. %g (%D)\n"</font>,(double)shifts[i],inertias[i]);
+<a name="line153">153: </a>  }
+<a name="line154">154: </a>  PetscFree(shifts);
+<a name="line155">155: </a>  PetscFree(inertias);
+
+<a name="line157">157: </a>  <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(pep);
+<a name="line158">158: </a>  <a href="../../../docs/manualpages/PEP/PEPGetDimensions.html#PEPGetDimensions">PEPGetDimensions</a>(pep,&amp;nev,NULL,NULL);
+<a name="line159">159: </a>  <a href="../../../docs/manualpages/PEP/PEPGetInterval.html#PEPGetInterval">PEPGetInterval</a>(pep,&amp;int0,&amp;int1);
+<a name="line160">160: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Found %D eigenvalues in interval [%g,%g]\n"</font>,nev,(double)int0,(double)int1);
+
+<a name="line162">162: </a>  <font color="#4169E1">if</font> (showinertia) {
+<a name="line163">163: </a>    <a href="../../../docs/manualpages/PEP/PEPSTOARGetInertias.html#PEPSTOARGetInertias">PEPSTOARGetInertias</a>(pep,&amp;ns,&amp;shifts,&amp;inertias);
+<a name="line164">164: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Used %D shifts (inertia):\n"</font>,ns);
+<a name="line165">165: </a>    <font color="#4169E1">for</font> (i=0;i&lt;ns;i++) {
+<a name="line166">166: </a>      PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" .. %g (%D)\n"</font>,(double)shifts[i],inertias[i]);
+<a name="line167">167: </a>    }
+<a name="line168">168: </a>    PetscFree(shifts);
+<a name="line169">169: </a>    PetscFree(inertias);
+<a name="line170">170: </a>  }
+
+<a name="line172">172: </a>  <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,NULL);
+
+<a name="line174">174: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line175">175: </a><font color="#B22222">                    Clean up</font>
+<a name="line176">176: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line177">177: </a>  <a href="../../../docs/manualpages/PEP/PEPDestroy.html#PEPDestroy">PEPDestroy</a>(&amp;pep);
+<a name="line178">178: </a>  MatDestroy(&amp;M);
+<a name="line179">179: </a>  MatDestroy(&amp;C);
+<a name="line180">180: </a>  MatDestroy(&amp;K);
+<a name="line181">181: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line182">182: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line183">183: </a>}
+
+<a name="line185">185: </a><font color="#B22222">/*TEST</font>
+
+<a name="line187">187: </a><font color="#B22222">   test:</font>
+<a name="line188">188: </a><font color="#B22222">      requires: !single</font>
+<a name="line189">189: </a><font color="#B22222">      args: -showinertia 0</font>
+
+<a name="line191">191: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

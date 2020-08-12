@@ -1,0 +1,706 @@
+<center><a href="lobpcg.c">Actual source code: lobpcg.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/cg/lobpcg/lobpcg.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:53+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/cg/lobpcg/lobpcg.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "lobpcg"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Locally Optimal Block Preconditioned Conjugate Gradient</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       LOBPCG with soft and hard locking. Follows the implementation</font>
+<a name="line18"> 18: </a><font color="#B22222">       in BLOPEX [2].</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   References:</font>
+
+<a name="line22"> 22: </a><font color="#B22222">       [1] A. V. Knyazev, "Toward the optimal preconditioned eigensolver:</font>
+<a name="line23"> 23: </a><font color="#B22222">           locally optimal block preconditioned conjugate gradient method",</font>
+<a name="line24"> 24: </a><font color="#B22222">           SIAM J. Sci. Comput. 23(2):517-541, 2001.</font>
+
+<a name="line26"> 26: </a><font color="#B22222">       [2] A. V. Knyazev et al., "Block Locally Optimal Preconditioned</font>
+<a name="line27"> 27: </a><font color="#B22222">           Eigenvalue Xolvers (BLOPEX) in Hypre and PETSc", SIAM J. Sci.</font>
+<a name="line28"> 28: </a><font color="#B22222">           Comput. 29(5):2224-2239, 2007.</font>
+<a name="line29"> 29: </a><font color="#B22222">*/</font>
+
+<a name="line31"> 31: </a> #include <A href="../../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+
+<a name="line33"> 33: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line34"> 34: </a>  PetscInt  bs;        <font color="#B22222">/* block size */</font>
+<a name="line35"> 35: </a>  PetscBool lock;      <font color="#B22222">/* soft locking active/inactive */</font>
+<a name="line36"> 36: </a>  PetscReal restart;   <font color="#B22222">/* restart parameter */</font>
+<a name="line37"> 37: </a>  PetscInt  guard;     <font color="#B22222">/* number of guard vectors */</font>
+<a name="line38"> 38: </a>} EPS_LOBPCG;
+
+<a name="line40"> 40: </a><strong><font color="#4169E1"><a name="EPSSetDimensions_LOBPCG"></a>PetscErrorCode EPSSetDimensions_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt nev,PetscInt *ncv,PetscInt *mpd)</font></strong>
+<a name="line41"> 41: </a>{
+<a name="line42"> 42: </a>  EPS_LOBPCG *ctx = (EPS_LOBPCG*)eps-&gt;data;
+<a name="line43"> 43: </a>  PetscInt   k;
+
+<a name="line46"> 46: </a>  k = PetscMax(3*ctx-&gt;bs,((eps-&gt;nev-1)/ctx-&gt;bs+3)*ctx-&gt;bs);
+<a name="line47"> 47: </a>  <font color="#4169E1">if</font> (*ncv!=PETSC_DEFAULT) { <font color="#B22222">/* ncv set */</font>
+<a name="line48"> 48: </a>    <font color="#4169E1">if</font> (*ncv&lt;k) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"The value of ncv is not sufficiently large"</font>);
+<a name="line49"> 49: </a>  } <font color="#4169E1">else</font> *ncv = k;
+<a name="line50"> 50: </a>  <font color="#4169E1">if</font> (*mpd==PETSC_DEFAULT) *mpd = 3*ctx-&gt;bs;
+<a name="line51"> 51: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*mpd!=3*ctx-&gt;bs) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"This solver does not allow a value of mpd different from 3*blocksize"</font>);
+<a name="line52"> 52: </a>  <font color="#4169E1">return</font>(0);
+<a name="line53"> 53: </a>}
+
+<a name="line55"> 55: </a><strong><font color="#4169E1"><a name="EPSSetUp_LOBPCG"></a>PetscErrorCode EPSSetUp_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line56"> 56: </a>{
+<a name="line58"> 58: </a>  EPS_LOBPCG     *ctx = (EPS_LOBPCG*)eps-&gt;data;
+<a name="line59"> 59: </a>  PetscBool      istrivial;
+
+<a name="line62"> 62: </a>  <font color="#4169E1">if</font> (!eps-&gt;ishermitian || (eps-&gt;isgeneralized &amp;&amp; !eps-&gt;ispositive)) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"LOBPCG only works for Hermitian problems"</font>);
+<a name="line63"> 63: </a>  <font color="#4169E1">if</font> (!ctx-&gt;bs) ctx-&gt;bs = PetscMin(16,eps-&gt;nev);
+<a name="line64"> 64: </a>  <font color="#4169E1">if</font> (eps-&gt;n-eps-&gt;nds&lt;5*ctx-&gt;bs) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"The problem size is too small relative to the block size"</font>);
+<a name="line65"> 65: </a>  EPSSetDimensions_LOBPCG(eps,eps-&gt;nev,&amp;eps-&gt;ncv,&amp;eps-&gt;mpd);
+<a name="line66"> 66: </a>  <font color="#4169E1">if</font> (eps-&gt;max_it==PETSC_DEFAULT) eps-&gt;max_it = PetscMax(100,2*eps-&gt;n/eps-&gt;ncv);
+<a name="line67"> 67: </a>  <font color="#4169E1">if</font> (!eps-&gt;which) eps-&gt;which = <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>;
+<a name="line68"> 68: </a>  <font color="#4169E1">if</font> (eps-&gt;which!=<a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a> &amp;&amp; eps-&gt;which!=<a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"Wrong value of eps-&gt;which"</font>);
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (eps-&gt;arbitrary) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Arbitrary selection of eigenpairs not supported in this solver"</font>);
+<a name="line70"> 70: </a>  <font color="#4169E1">if</font> (eps-&gt;extraction) { PetscInfo(eps,<font color="#666666">"Warning: extraction type ignored\n"</font>); }
+<a name="line71"> 71: </a>  <a href="../../../../../docs/manualpages/RG/RGIsTrivial.html#RGIsTrivial">RGIsTrivial</a>(eps-&gt;rg,&amp;istrivial);
+<a name="line72"> 72: </a>  <font color="#4169E1">if</font> (!istrivial) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"This solver does not support region filtering"</font>);
+
+<a name="line74"> 74: </a>  <font color="#4169E1">if</font> (!ctx-&gt;restart) ctx-&gt;restart = 0.9;
+
+<a name="line76"> 76: </a>  <font color="#B22222">/* number of guard vectors */</font>
+<a name="line77"> 77: </a>  <font color="#4169E1">if</font> (ctx-&gt;bs==1) ctx-&gt;guard = 0;
+<a name="line78"> 78: </a>  <font color="#4169E1">else</font> ctx-&gt;guard = PetscMin((PetscInt)((1.0-ctx-&gt;restart)*ctx-&gt;bs+0.45),ctx-&gt;bs-1);
+
+<a name="line80"> 80: </a>  <a href="../../../../../docs/manualpages/EPS/EPSAllocateSolution.html#EPSAllocateSolution">EPSAllocateSolution</a>(eps,0);
+<a name="line81"> 81: </a>  EPS_SetInnerProduct(eps);
+<a name="line82"> 82: </a>  <a href="../../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(eps-&gt;ds,DSGHEP);
+<a name="line83"> 83: </a>  <a href="../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(eps-&gt;ds,eps-&gt;mpd);
+<a name="line84"> 84: </a>  <a href="../../../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(eps,1);
+<a name="line85"> 85: </a>  <font color="#4169E1">return</font>(0);
+<a name="line86"> 86: </a>}
+
+<a name="line88"> 88: </a><strong><font color="#4169E1"><a name="EPSSolve_LOBPCG"></a>PetscErrorCode EPSSolve_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line89"> 89: </a>{
+<a name="line91"> 91: </a>  EPS_LOBPCG     *ctx = (EPS_LOBPCG*)eps-&gt;data;
+<a name="line92"> 92: </a>  PetscInt       i,j,k,ld,nv,ini,nmat,nc,nconv,locked,its;
+<a name="line93"> 93: </a>  PetscReal      norm;
+<a name="line94"> 94: </a>  PetscScalar    *eigr,dot;
+<a name="line95"> 95: </a>  PetscBool      breakdown,countc,flip=PETSC_FALSE,checkprecond=PETSC_FALSE;
+<a name="line96"> 96: </a>  Mat            A,B,M;
+<a name="line97"> 97: </a>  Vec            v,z,w=eps-&gt;work[0];
+<a name="line98"> 98: </a>  <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>             X,Y=NULL,Z,R,P,AX,BX;
+<a name="line99"> 99: </a>  SlepcSC        sc;
+
+<a name="line102">102: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(eps-&gt;ds,&amp;ld);
+<a name="line103">103: </a>  <a href="../../../../../docs/manualpages/ST/STGetNumMatrices.html#STGetNumMatrices">STGetNumMatrices</a>(eps-&gt;st,&amp;nmat);
+<a name="line104">104: </a>  <a href="../../../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,0,&amp;A);
+<a name="line105">105: </a>  <font color="#4169E1">if</font> (nmat&gt;1) { <a href="../../../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,1,&amp;B); }
+<a name="line106">106: </a>  <font color="#4169E1">else</font> B = NULL;
+
+<a name="line108">108: </a>  <font color="#4169E1">if</font> (eps-&gt;which==<a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>) {  <font color="#B22222">/* flip spectrum */</font>
+<a name="line109">109: </a>    flip = PETSC_TRUE;
+<a name="line110">110: </a>    <a href="../../../../../docs/manualpages/DS/DSGetSlepcSC.html#DSGetSlepcSC">DSGetSlepcSC</a>(eps-&gt;ds,&amp;sc);
+<a name="line111">111: </a>    sc-&gt;comparison = SlepcCompareSmallestReal;
+<a name="line112">112: </a>  }
+
+<a name="line114">114: </a>  <font color="#B22222">/* undocumented option to check for a positive-definite preconditioner (turn-off by default) */</font>
+<a name="line115">115: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-eps_lobpcg_checkprecond"</font>,&amp;checkprecond,NULL);
+
+<a name="line117">117: </a>  <font color="#B22222">/* 1. Allocate memory */</font>
+<a name="line118">118: </a>  PetscCalloc1(3*ctx-&gt;bs,&amp;eigr);
+<a name="line119">119: </a>  <a href="../../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,3*ctx-&gt;bs,&amp;Z);
+<a name="line120">120: </a>  <a href="../../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,ctx-&gt;bs,&amp;X);
+<a name="line121">121: </a>  <a href="../../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,ctx-&gt;bs,&amp;R);
+<a name="line122">122: </a>  <a href="../../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,ctx-&gt;bs,&amp;P);
+<a name="line123">123: </a>  <a href="../../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,ctx-&gt;bs,&amp;AX);
+<a name="line124">124: </a>  <font color="#4169E1">if</font> (B) {
+<a name="line125">125: </a>    <a href="../../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,ctx-&gt;bs,&amp;BX);
+<a name="line126">126: </a>  }
+<a name="line127">127: </a>  nc = eps-&gt;nds;
+<a name="line128">128: </a>  <font color="#4169E1">if</font> (nc&gt;0 || eps-&gt;nev&gt;ctx-&gt;bs-ctx-&gt;guard) {
+<a name="line129">129: </a>    <a href="../../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,nc+eps-&gt;nev,&amp;Y);
+<a name="line130">130: </a>  }
+<a name="line131">131: </a>  <font color="#4169E1">if</font> (nc&gt;0) {
+<a name="line132">132: </a>    <font color="#4169E1">for</font> (j=0;j&lt;nc;j++) {
+<a name="line133">133: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,-nc+j,&amp;v);
+<a name="line134">134: </a>      <a href="../../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(Y,j,v);
+<a name="line135">135: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,-nc+j,&amp;v);
+<a name="line136">136: </a>    }
+<a name="line137">137: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Y,0,nc);
+<a name="line138">138: </a>  }
+
+<a name="line140">140: </a>  <font color="#B22222">/* 2. Apply the constraints to the initial vectors */</font>
+<a name="line141">141: </a>  <font color="#B22222">/* 3. B-orthogonalize initial vectors */</font>
+<a name="line142">142: </a>  <font color="#4169E1">for</font> (k=eps-&gt;nini;k&lt;eps-&gt;ncv-ctx-&gt;bs;k++) { <font color="#B22222">/* Generate more initial vectors if necessary */</font>
+<a name="line143">143: </a>    <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(eps-&gt;V,k);
+<a name="line144">144: </a>    <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>(eps-&gt;V,k,PETSC_TRUE,NULL,NULL);
+<a name="line145">145: </a>  }
+<a name="line146">146: </a>  nv = ctx-&gt;bs;
+<a name="line147">147: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,nv);
+<a name="line148">148: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,0,nv);
+<a name="line149">149: </a>  <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(eps-&gt;V,Z);
+<a name="line150">150: </a>  <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(Z,X);
+
+<a name="line152">152: </a>  <font color="#B22222">/* 4. Compute initial Ritz vectors */</font>
+<a name="line153">153: </a>  <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(X,A,AX);
+<a name="line154">154: </a>  <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,nv,0,0,0);
+<a name="line155">155: </a>  <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;M);
+<a name="line156">156: </a>  <a href="../../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(AX,NULL,X,M);
+<a name="line157">157: </a>  <font color="#4169E1">if</font> (flip) { MatScale(M,-1.0); }
+<a name="line158">158: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;M);
+<a name="line159">159: </a>  <a href="../../../../../docs/manualpages/DS/DSSetIdentity.html#DSSetIdentity">DSSetIdentity</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>);
+<a name="line160">160: </a>  <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line161">161: </a>  <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;ds,eigr,NULL);
+<a name="line162">162: </a>  <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;ds,eigr,NULL,NULL,NULL,NULL);
+<a name="line163">163: </a>  <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;ds,eigr,NULL);
+<a name="line164">164: </a>  <font color="#4169E1">for</font> (j=0;j&lt;nv;j++) eps-&gt;eigr[j] = flip? -eigr[j]: eigr[j];
+<a name="line165">165: </a>  <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line166">166: </a>  <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;M);
+<a name="line167">167: </a>  <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(X,M,0,nv);
+<a name="line168">168: </a>  <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(AX,M,0,nv);
+<a name="line169">169: </a>  MatDestroy(&amp;M);
+
+<a name="line171">171: </a>  <font color="#B22222">/* 5. Initialize range of active iterates */</font>
+<a name="line172">172: </a>  locked = 0;  <font color="#B22222">/* hard-locked vectors, the leading locked columns of V are eigenvectors */</font>
+<a name="line173">173: </a>  nconv  = 0;  <font color="#B22222">/* number of converged eigenvalues in the current block */</font>
+<a name="line174">174: </a>  its    = 0;  <font color="#B22222">/* iterations for the current block */</font>
+
+<a name="line176">176: </a>  <font color="#B22222">/* 6. Main loop */</font>
+<a name="line177">177: </a>  <font color="#4169E1">while</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+
+<a name="line179">179: </a>    <font color="#4169E1">if</font> (ctx-&gt;lock) {
+<a name="line180">180: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(R,nconv,ctx-&gt;bs);
+<a name="line181">181: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(AX,nconv,ctx-&gt;bs);
+<a name="line182">182: </a>      <font color="#4169E1">if</font> (B) {
+<a name="line183">183: </a>        <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(BX,nconv,ctx-&gt;bs);
+<a name="line184">184: </a>      }
+<a name="line185">185: </a>    }
+
+<a name="line187">187: </a>    <font color="#B22222">/* 7. Compute residuals */</font>
+<a name="line188">188: </a>    ini = (ctx-&gt;lock)? nconv: 0;
+<a name="line189">189: </a>    <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(AX,R);
+<a name="line190">190: </a>    <font color="#4169E1">if</font> (B) { <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(X,B,BX); }
+<a name="line191">191: </a>    <font color="#4169E1">for</font> (j=ini;j&lt;ctx-&gt;bs;j++) {
+<a name="line192">192: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(R,j,&amp;v);
+<a name="line193">193: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(B?BX:X,j,&amp;z);
+<a name="line194">194: </a>      VecAXPY(v,-eps-&gt;eigr[locked+j],z);
+<a name="line195">195: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(R,j,&amp;v);
+<a name="line196">196: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(B?BX:X,j,&amp;z);
+<a name="line197">197: </a>    }
+
+<a name="line199">199: </a>    <font color="#B22222">/* 8. Compute residual norms and update index set of active iterates */</font>
+<a name="line200">200: </a>    k = ini;
+<a name="line201">201: </a>    countc = PETSC_TRUE;
+<a name="line202">202: </a>    <font color="#4169E1">for</font> (j=ini;j&lt;ctx-&gt;bs;j++) {
+<a name="line203">203: </a>      i = locked+j;
+<a name="line204">204: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(R,j,&amp;v);
+<a name="line205">205: </a>      VecNorm(v,NORM_2,&amp;norm);
+<a name="line206">206: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(R,j,&amp;v);
+<a name="line207">207: </a>      (*eps-&gt;converged)(eps,eps-&gt;eigr[i],eps-&gt;eigi[i],norm,&amp;eps-&gt;errest[i],eps-&gt;convergedctx);
+<a name="line208">208: </a>      <font color="#4169E1">if</font> (countc) {
+<a name="line209">209: </a>        <font color="#4169E1">if</font> (eps-&gt;errest[i] &lt; eps-&gt;tol) k++;
+<a name="line210">210: </a>        <font color="#4169E1">else</font> countc = PETSC_FALSE;
+<a name="line211">211: </a>      }
+<a name="line212">212: </a>      <font color="#4169E1">if</font> (!countc &amp;&amp; !eps-&gt;trackall) <font color="#4169E1">break</font>;
+<a name="line213">213: </a>    }
+<a name="line214">214: </a>    nconv = k;
+<a name="line215">215: </a>    eps-&gt;nconv = locked + nconv;
+<a name="line216">216: </a>    <font color="#4169E1">if</font> (its) {
+<a name="line217">217: </a>      EPSMonitor(eps,eps-&gt;its+its,eps-&gt;nconv,eps-&gt;eigr,eps-&gt;eigi,eps-&gt;errest,locked+ctx-&gt;bs);
+<a name="line218">218: </a>    }
+<a name="line219">219: </a>    (*eps-&gt;stopping)(eps,eps-&gt;its+its,eps-&gt;max_it,eps-&gt;nconv,eps-&gt;nev,&amp;eps-&gt;reason,eps-&gt;stoppingctx);
+<a name="line220">220: </a>    <font color="#4169E1">if</font> (eps-&gt;reason != <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a> || nconv &gt;= ctx-&gt;bs-ctx-&gt;guard) {
+<a name="line221">221: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,locked,eps-&gt;nconv);
+<a name="line222">222: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(X,0,nconv);
+<a name="line223">223: </a>      <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(X,eps-&gt;V);
+<a name="line224">224: </a>    }
+<a name="line225">225: </a>    <font color="#4169E1">if</font> (eps-&gt;reason != <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+<a name="line226">226: </a>      <font color="#4169E1">break</font>;
+<a name="line227">227: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (nconv &gt;= ctx-&gt;bs-ctx-&gt;guard) {
+<a name="line228">228: </a>      eps-&gt;its += its-1;
+<a name="line229">229: </a>      its = 0;
+<a name="line230">230: </a>    } <font color="#4169E1">else</font> its++;
+
+<a name="line232">232: </a>    <font color="#4169E1">if</font> (nconv &gt;= ctx-&gt;bs-ctx-&gt;guard) {  <font color="#B22222">/* force hard locking of vectors and compute new R */</font>
+
+<a name="line234">234: </a>      <font color="#B22222">/* extend constraints */</font>
+<a name="line235">235: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Y,nc+locked,nc+locked+nconv);
+<a name="line236">236: </a>      <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(X,Y);
+<a name="line237">237: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Y,0,nc+locked+nconv);
+
+<a name="line239">239: </a>      <font color="#B22222">/* shift work <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>'s */</font>
+<a name="line240">240: </a>      <font color="#4169E1">for</font> (j=nconv;j&lt;ctx-&gt;bs;j++) {
+<a name="line241">241: </a>        <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(X,j,j-nconv);
+<a name="line242">242: </a>        <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(R,j,j-nconv);
+<a name="line243">243: </a>        <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(P,j,j-nconv);
+<a name="line244">244: </a>        <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(AX,j,j-nconv);
+<a name="line245">245: </a>        <font color="#4169E1">if</font> (B) {
+<a name="line246">246: </a>          <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(BX,j,j-nconv);
+<a name="line247">247: </a>        }
+<a name="line248">248: </a>      }
+
+<a name="line250">250: </a>      <font color="#B22222">/* set new initial vectors */</font>
+<a name="line251">251: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,locked+ctx-&gt;bs,locked+ctx-&gt;bs+nconv);
+<a name="line252">252: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(X,ctx-&gt;bs-nconv,ctx-&gt;bs);
+<a name="line253">253: </a>      <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(eps-&gt;V,X);
+<a name="line254">254: </a>      <font color="#4169E1">for</font> (j=ctx-&gt;bs-nconv;j&lt;ctx-&gt;bs;j++) {
+<a name="line255">255: </a>        <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(X,j,&amp;v);
+<a name="line256">256: </a>        <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(Y,v,NULL,&amp;norm,&amp;breakdown);
+<a name="line257">257: </a>        <font color="#4169E1">if</font> (norm&gt;0.0 &amp;&amp; !breakdown) {
+<a name="line258">258: </a>          VecScale(v,1.0/norm);
+<a name="line259">259: </a>        } <font color="#4169E1">else</font> {
+<a name="line260">260: </a>          PetscInfo(eps,<font color="#666666">"Orthogonalization of initial vector failed\n"</font>);
+<a name="line261">261: </a>          eps-&gt;reason = <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_BREAKDOWN</a>;
+<a name="line262">262: </a>          <font color="#4169E1">goto</font> diverged;
+<a name="line263">263: </a>        }
+<a name="line264">264: </a>        <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(X,j,&amp;v);
+<a name="line265">265: </a>      }
+<a name="line266">266: </a>      locked += nconv;
+<a name="line267">267: </a>      nconv = 0;
+<a name="line268">268: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(X,nconv,ctx-&gt;bs);
+
+<a name="line270">270: </a>      <font color="#B22222">/* B-orthogonalize initial vectors */</font>
+<a name="line271">271: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(X,NULL);
+<a name="line272">272: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,nconv,ctx-&gt;bs);
+<a name="line273">273: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(AX,nconv,ctx-&gt;bs);
+<a name="line274">274: </a>      <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(X,Z);
+
+<a name="line276">276: </a>      <font color="#B22222">/* compute initial Ritz vectors */</font>
+<a name="line277">277: </a>      nv = ctx-&gt;bs;
+<a name="line278">278: </a>      <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(X,A,AX);
+<a name="line279">279: </a>      <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,nv,0,0,0);
+<a name="line280">280: </a>      <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;M);
+<a name="line281">281: </a>      <a href="../../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(AX,NULL,X,M);
+<a name="line282">282: </a>      <font color="#4169E1">if</font> (flip) { MatScale(M,-1.0); }
+<a name="line283">283: </a>      <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;M);
+<a name="line284">284: </a>      <a href="../../../../../docs/manualpages/DS/DSSetIdentity.html#DSSetIdentity">DSSetIdentity</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>);
+<a name="line285">285: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line286">286: </a>      <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;ds,eigr,NULL);
+<a name="line287">287: </a>      <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;ds,eigr,NULL,NULL,NULL,NULL);
+<a name="line288">288: </a>      <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;ds,eigr,NULL);
+<a name="line289">289: </a>      <font color="#4169E1">for</font> (j=0;j&lt;nv;j++) <font color="#4169E1">if</font> (locked+j&lt;eps-&gt;ncv) eps-&gt;eigr[locked+j] = flip? -eigr[j]: eigr[j];
+<a name="line290">290: </a>      <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line291">291: </a>      <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;M);
+<a name="line292">292: </a>      <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(X,M,0,nv);
+<a name="line293">293: </a>      <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(AX,M,0,nv);
+<a name="line294">294: </a>      MatDestroy(&amp;M);
+
+<a name="line296">296: </a>      <font color="#4169E1">continue</font>;   <font color="#B22222">/* skip the rest of the iteration */</font>
+<a name="line297">297: </a>    }
+
+<a name="line299">299: </a>    ini = (ctx-&gt;lock)? nconv: 0;
+<a name="line300">300: </a>    <font color="#4169E1">if</font> (ctx-&gt;lock) {
+<a name="line301">301: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(R,nconv,ctx-&gt;bs);
+<a name="line302">302: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(P,nconv,ctx-&gt;bs);
+<a name="line303">303: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(AX,nconv,ctx-&gt;bs);
+<a name="line304">304: </a>      <font color="#4169E1">if</font> (B) {
+<a name="line305">305: </a>        <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(BX,nconv,ctx-&gt;bs);
+<a name="line306">306: </a>      }
+<a name="line307">307: </a>    }
+
+<a name="line309">309: </a>    <font color="#B22222">/* 9. Apply preconditioner to the residuals */</font>
+<a name="line310">310: </a>    <font color="#4169E1">for</font> (j=ini;j&lt;ctx-&gt;bs;j++) {
+<a name="line311">311: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(R,j,&amp;v);
+<a name="line312">312: </a>      <a href="../../../../../docs/manualpages/ST/STApply.html#STApply">STApply</a>(eps-&gt;st,v,w);
+<a name="line313">313: </a>      <font color="#4169E1">if</font> (checkprecond) {
+<a name="line314">314: </a>        VecDot(v,w,&amp;dot);
+<a name="line315">315: </a>        <font color="#4169E1">if</font> (PetscRealPart(dot)&lt;0.0) {
+<a name="line316">316: </a>          PetscInfo(eps,<font color="#666666">"The preconditioner is not positive-definite\n"</font>);
+<a name="line317">317: </a>          eps-&gt;reason = <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_BREAKDOWN</a>;
+<a name="line318">318: </a>          <font color="#4169E1">goto</font> diverged;
+<a name="line319">319: </a>        }
+<a name="line320">320: </a>      }
+<a name="line321">321: </a>      <font color="#4169E1">if</font> (nc+locked&gt;0) {
+<a name="line322">322: </a>        <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(Y,w,NULL,&amp;norm,&amp;breakdown);
+<a name="line323">323: </a>        <font color="#4169E1">if</font> (norm&gt;0.0 &amp;&amp; !breakdown) {
+<a name="line324">324: </a>          VecScale(w,1.0/norm);
+<a name="line325">325: </a>        } <font color="#4169E1">else</font> {
+<a name="line326">326: </a>          PetscInfo(eps,<font color="#666666">"Orthogonalization of preconditioned residual failed\n"</font>);
+<a name="line327">327: </a>          eps-&gt;reason = <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_BREAKDOWN</a>;
+<a name="line328">328: </a>          <font color="#4169E1">goto</font> diverged;
+<a name="line329">329: </a>        }
+<a name="line330">330: </a>      }
+<a name="line331">331: </a>      VecCopy(w,v);
+<a name="line332">332: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(R,j,&amp;v);
+<a name="line333">333: </a>    }
+
+<a name="line335">335: </a>    <font color="#B22222">/* 11. B-orthonormalize preconditioned residuals */</font>
+<a name="line336">336: </a>    <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(R,NULL);
+
+<a name="line338">338: </a>    <font color="#B22222">/* 13-16. B-orthonormalize conjugate directions */</font>
+<a name="line339">339: </a>    <font color="#4169E1">if</font> (its&gt;1) {
+<a name="line340">340: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(P,NULL);
+<a name="line341">341: </a>    }
+
+<a name="line343">343: </a>    <font color="#B22222">/* 17-23. Compute symmetric Gram matrices */</font>
+<a name="line344">344: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,0,ctx-&gt;bs);
+<a name="line345">345: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(X,0,ctx-&gt;bs);
+<a name="line346">346: </a>    <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(X,Z);
+<a name="line347">347: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,ctx-&gt;bs,2*ctx-&gt;bs-ini);
+<a name="line348">348: </a>    <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(R,Z);
+<a name="line349">349: </a>    <font color="#4169E1">if</font> (its&gt;1) {
+<a name="line350">350: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,2*ctx-&gt;bs-ini,3*ctx-&gt;bs-2*ini);
+<a name="line351">351: </a>      <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(P,Z);
+<a name="line352">352: </a>    }
+
+<a name="line354">354: </a>    <font color="#4169E1">if</font> (its&gt;1) nv = 3*ctx-&gt;bs-2*ini;
+<a name="line355">355: </a>    <font color="#4169E1">else</font> nv = 2*ctx-&gt;bs-ini;
+
+<a name="line357">357: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,0,nv);
+<a name="line358">358: </a>    <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,nv,0,0,0);
+<a name="line359">359: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;M);
+<a name="line360">360: </a>    <a href="../../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(Z,A,Z,M);
+<a name="line361">361: </a>    <font color="#4169E1">if</font> (flip) { MatScale(M,-1.0); }
+<a name="line362">362: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;M);
+<a name="line363">363: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,&amp;M);
+<a name="line364">364: </a>    <a href="../../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(Z,B,Z,M); <font color="#B22222">/* covers also the case B=NULL */</font>
+<a name="line365">365: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,&amp;M);
+
+<a name="line367">367: </a>    <font color="#B22222">/* 24. Solve the generalized eigenvalue problem */</font>
+<a name="line368">368: </a>    <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line369">369: </a>    <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;ds,eigr,NULL);
+<a name="line370">370: </a>    <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;ds,eigr,NULL,NULL,NULL,NULL);
+<a name="line371">371: </a>    <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;ds,eigr,NULL);
+<a name="line372">372: </a>    <font color="#4169E1">for</font> (j=0;j&lt;nv;j++) <font color="#4169E1">if</font> (locked+j&lt;eps-&gt;ncv) eps-&gt;eigr[locked+j] = flip? -eigr[j]: eigr[j];
+<a name="line373">373: </a>    <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+
+<a name="line375">375: </a>    <font color="#B22222">/* 25-33. Compute Ritz vectors */</font>
+<a name="line376">376: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;M);
+<a name="line377">377: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,ctx-&gt;bs,nv);
+<a name="line378">378: </a>    <font color="#4169E1">if</font> (ctx-&gt;lock) {
+<a name="line379">379: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(P,0,ctx-&gt;bs);
+<a name="line380">380: </a>    }
+<a name="line381">381: </a>    <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(P,1.0,0.0,Z,M);
+<a name="line382">382: </a>    <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(P,X);
+<a name="line383">383: </a>    <font color="#4169E1">if</font> (ctx-&gt;lock) {
+<a name="line384">384: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(P,nconv,ctx-&gt;bs);
+<a name="line385">385: </a>    }
+<a name="line386">386: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(Z,0,ctx-&gt;bs);
+<a name="line387">387: </a>    <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(X,1.0,1.0,Z,M);
+<a name="line388">388: </a>    <font color="#4169E1">if</font> (ctx-&gt;lock) {
+<a name="line389">389: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(X,nconv,ctx-&gt;bs);
+<a name="line390">390: </a>    }
+<a name="line391">391: </a>    <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(X,A,AX);
+<a name="line392">392: </a>    MatDestroy(&amp;M);
+<a name="line393">393: </a>  }
+
+<a name="line395">395: </a><strong><font color="#FF0000">diverged:</font></strong>
+<a name="line396">396: </a>  eps-&gt;its += its;
+
+<a name="line398">398: </a>  <font color="#4169E1">if</font> (flip) sc-&gt;comparison = SlepcCompareLargestReal;
+<a name="line399">399: </a>  PetscFree(eigr);
+<a name="line400">400: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;Z);
+<a name="line401">401: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;X);
+<a name="line402">402: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;R);
+<a name="line403">403: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;P);
+<a name="line404">404: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;AX);
+<a name="line405">405: </a>  <font color="#4169E1">if</font> (B) {
+<a name="line406">406: </a>    <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;BX);
+<a name="line407">407: </a>  }
+<a name="line408">408: </a>  <font color="#4169E1">if</font> (nc&gt;0 || eps-&gt;nev&gt;ctx-&gt;bs-ctx-&gt;guard) {
+<a name="line409">409: </a>    <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;Y);
+<a name="line410">410: </a>  }
+<a name="line411">411: </a>  <font color="#4169E1">return</font>(0);
+<a name="line412">412: </a>}
+
+<a name="line414">414: </a><strong><font color="#4169E1"><a name="EPSLOBPCGSetBlockSize_LOBPCG"></a>static PetscErrorCode EPSLOBPCGSetBlockSize_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt bs)</font></strong>
+<a name="line415">415: </a>{
+<a name="line416">416: </a>  EPS_LOBPCG *ctx = (EPS_LOBPCG*)eps-&gt;data;
+
+<a name="line419">419: </a>  <font color="#4169E1">if</font> (bs == PETSC_DEFAULT || bs == PETSC_DECIDE) bs = 1;
+<a name="line420">420: </a>  <font color="#4169E1">if</font> (bs &lt;= 0) SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid block size %D"</font>,bs);
+<a name="line421">421: </a>  <font color="#4169E1">if</font> (ctx-&gt;bs != bs) {
+<a name="line422">422: </a>    ctx-&gt;bs = bs;
+<a name="line423">423: </a>    eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line424">424: </a>  }
+<a name="line425">425: </a>  <font color="#4169E1">return</font>(0);
+<a name="line426">426: </a>}
+
+<a name="line428">428: </a><font color="#B22222">/*@</font>
+<a name="line429">429: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetBlockSize.html#EPSLOBPCGSetBlockSize">EPSLOBPCGSetBlockSize</a> - Sets the block size of the LOBPCG method.</font>
+
+<a name="line431">431: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line433">433: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line434">434: </a><font color="#B22222">+  eps - the eigenproblem solver context</font>
+<a name="line435">435: </a><font color="#B22222">-  bs  - the block size</font>
+
+<a name="line437">437: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line438">438: </a><font color="#B22222">.  -eps_lobpcg_blocksize - Sets the block size</font>
+
+<a name="line440">440: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line442">442: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetBlockSize.html#EPSLOBPCGGetBlockSize">EPSLOBPCGGetBlockSize</a>()</font>
+<a name="line443">443: </a><font color="#B22222">@*/</font>
+<a name="line444">444: </a><strong><font color="#4169E1"><a name="EPSLOBPCGSetBlockSize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetBlockSize.html#EPSLOBPCGSetBlockSize">EPSLOBPCGSetBlockSize</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt bs)</font></strong>
+<a name="line445">445: </a>{
+
+<a name="line451">451: </a>  PetscTryMethod(eps,<font color="#666666">"EPSLOBPCGSetBlockSize_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt),(eps,bs));
+<a name="line452">452: </a>  <font color="#4169E1">return</font>(0);
+<a name="line453">453: </a>}
+
+<a name="line455">455: </a><strong><font color="#4169E1"><a name="EPSLOBPCGGetBlockSize_LOBPCG"></a>static PetscErrorCode EPSLOBPCGGetBlockSize_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *bs)</font></strong>
+<a name="line456">456: </a>{
+<a name="line457">457: </a>  EPS_LOBPCG *ctx = (EPS_LOBPCG*)eps-&gt;data;
+
+<a name="line460">460: </a>  *bs = ctx-&gt;bs;
+<a name="line461">461: </a>  <font color="#4169E1">return</font>(0);
+<a name="line462">462: </a>}
+
+<a name="line464">464: </a><font color="#B22222">/*@</font>
+<a name="line465">465: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetBlockSize.html#EPSLOBPCGGetBlockSize">EPSLOBPCGGetBlockSize</a> - Gets the block size used in the LOBPCG method.</font>
+
+<a name="line467">467: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line469">469: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line470">470: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line472">472: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line473">473: </a><font color="#B22222">.  bs - the block size</font>
+
+<a name="line475">475: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line477">477: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetBlockSize.html#EPSLOBPCGSetBlockSize">EPSLOBPCGSetBlockSize</a>()</font>
+<a name="line478">478: </a><font color="#B22222">@*/</font>
+<a name="line479">479: </a><strong><font color="#4169E1"><a name="EPSLOBPCGGetBlockSize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetBlockSize.html#EPSLOBPCGGetBlockSize">EPSLOBPCGGetBlockSize</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *bs)</font></strong>
+<a name="line480">480: </a>{
+
+<a name="line486">486: </a>  PetscUseMethod(eps,<font color="#666666">"EPSLOBPCGGetBlockSize_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt*),(eps,bs));
+<a name="line487">487: </a>  <font color="#4169E1">return</font>(0);
+<a name="line488">488: </a>}
+
+<a name="line490">490: </a><strong><font color="#4169E1"><a name="EPSLOBPCGSetRestart_LOBPCG"></a>static PetscErrorCode EPSLOBPCGSetRestart_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal restart)</font></strong>
+<a name="line491">491: </a>{
+<a name="line492">492: </a>  EPS_LOBPCG *ctx = (EPS_LOBPCG*)eps-&gt;data;
+
+<a name="line495">495: </a>  <font color="#4169E1">if</font> (restart==PETSC_DEFAULT) restart = 0.9;
+<a name="line496">496: </a>  <font color="#4169E1">if</font> (restart&lt;0.1 || restart&gt;1.0) SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The restart argument %g must be in the range [0.1,1.0]"</font>,(double)restart);
+<a name="line497">497: </a>  <font color="#4169E1">if</font> (restart != ctx-&gt;restart) {
+<a name="line498">498: </a>    ctx-&gt;restart = restart;
+<a name="line499">499: </a>    eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line500">500: </a>  }
+<a name="line501">501: </a>  <font color="#4169E1">return</font>(0);
+<a name="line502">502: </a>}
+
+<a name="line504">504: </a><font color="#B22222">/*@</font>
+<a name="line505">505: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetRestart.html#EPSLOBPCGSetRestart">EPSLOBPCGSetRestart</a> - Sets the restart parameter for the LOBPCG method.</font>
+<a name="line506">506: </a><font color="#B22222">   The meaning of this parameter is the proportion of vectors within the</font>
+<a name="line507">507: </a><font color="#B22222">   current block iterate that must have converged in order to force a</font>
+<a name="line508">508: </a><font color="#B22222">   restart with hard locking.</font>
+
+<a name="line510">510: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line512">512: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line513">513: </a><font color="#B22222">+  eps - the eigenproblem solver context</font>
+<a name="line514">514: </a><font color="#B22222">-  restart - the percentage of the block of vectors to force a restart</font>
+
+<a name="line516">516: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line517">517: </a><font color="#B22222">.  -eps_lobpcg_restart - Sets the restart parameter</font>
+
+<a name="line519">519: </a><font color="#B22222">   Notes:</font>
+<a name="line520">520: </a><font color="#B22222">   Allowed values are in the range [0.1,1.0]. The default is 0.6.</font>
+
+<a name="line522">522: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line524">524: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetRestart.html#EPSLOBPCGGetRestart">EPSLOBPCGGetRestart</a>()</font>
+<a name="line525">525: </a><font color="#B22222">@*/</font>
+<a name="line526">526: </a><strong><font color="#4169E1"><a name="EPSLOBPCGSetRestart"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetRestart.html#EPSLOBPCGSetRestart">EPSLOBPCGSetRestart</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal restart)</font></strong>
+<a name="line527">527: </a>{
+
+<a name="line533">533: </a>  PetscTryMethod(eps,<font color="#666666">"EPSLOBPCGSetRestart_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscReal),(eps,restart));
+<a name="line534">534: </a>  <font color="#4169E1">return</font>(0);
+<a name="line535">535: </a>}
+
+<a name="line537">537: </a><strong><font color="#4169E1"><a name="EPSLOBPCGGetRestart_LOBPCG"></a>static PetscErrorCode EPSLOBPCGGetRestart_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal *restart)</font></strong>
+<a name="line538">538: </a>{
+<a name="line539">539: </a>  EPS_LOBPCG *ctx = (EPS_LOBPCG*)eps-&gt;data;
+
+<a name="line542">542: </a>  *restart = ctx-&gt;restart;
+<a name="line543">543: </a>  <font color="#4169E1">return</font>(0);
+<a name="line544">544: </a>}
+
+<a name="line546">546: </a><font color="#B22222">/*@</font>
+<a name="line547">547: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetRestart.html#EPSLOBPCGGetRestart">EPSLOBPCGGetRestart</a> - Gets the restart parameter used in the LOBPCG method.</font>
+
+<a name="line549">549: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line551">551: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line552">552: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line554">554: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line555">555: </a><font color="#B22222">.  restart - the restart parameter</font>
+
+<a name="line557">557: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line559">559: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetRestart.html#EPSLOBPCGSetRestart">EPSLOBPCGSetRestart</a>()</font>
+<a name="line560">560: </a><font color="#B22222">@*/</font>
+<a name="line561">561: </a><strong><font color="#4169E1"><a name="EPSLOBPCGGetRestart"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetRestart.html#EPSLOBPCGGetRestart">EPSLOBPCGGetRestart</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal *restart)</font></strong>
+<a name="line562">562: </a>{
+
+<a name="line568">568: </a>  PetscUseMethod(eps,<font color="#666666">"EPSLOBPCGGetRestart_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscReal*),(eps,restart));
+<a name="line569">569: </a>  <font color="#4169E1">return</font>(0);
+<a name="line570">570: </a>}
+
+<a name="line572">572: </a><strong><font color="#4169E1"><a name="EPSLOBPCGSetLocking_LOBPCG"></a>static PetscErrorCode EPSLOBPCGSetLocking_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool lock)</font></strong>
+<a name="line573">573: </a>{
+<a name="line574">574: </a>  EPS_LOBPCG *ctx = (EPS_LOBPCG*)eps-&gt;data;
+
+<a name="line577">577: </a>  ctx-&gt;lock = lock;
+<a name="line578">578: </a>  <font color="#4169E1">return</font>(0);
+<a name="line579">579: </a>}
+
+<a name="line581">581: </a><font color="#B22222">/*@</font>
+<a name="line582">582: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetLocking.html#EPSLOBPCGSetLocking">EPSLOBPCGSetLocking</a> - Choose between locking and non-locking variants of</font>
+<a name="line583">583: </a><font color="#B22222">   the LOBPCG method.</font>
+
+<a name="line585">585: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line587">587: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line588">588: </a><font color="#B22222">+  eps  - the eigenproblem solver context</font>
+<a name="line589">589: </a><font color="#B22222">-  lock - true if the locking variant must be selected</font>
+
+<a name="line591">591: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line592">592: </a><font color="#B22222">.  -eps_lobpcg_locking - Sets the locking flag</font>
+
+<a name="line594">594: </a><font color="#B22222">   Notes:</font>
+<a name="line595">595: </a><font color="#B22222">   This flag refers to soft locking (converged vectors within the current</font>
+<a name="line596">596: </a><font color="#B22222">   block iterate), since hard locking is always used (when nev is larger</font>
+<a name="line597">597: </a><font color="#B22222">   than the block size).</font>
+
+<a name="line599">599: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line601">601: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetLocking.html#EPSLOBPCGGetLocking">EPSLOBPCGGetLocking</a>()</font>
+<a name="line602">602: </a><font color="#B22222">@*/</font>
+<a name="line603">603: </a><strong><font color="#4169E1"><a name="EPSLOBPCGSetLocking"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetLocking.html#EPSLOBPCGSetLocking">EPSLOBPCGSetLocking</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool lock)</font></strong>
+<a name="line604">604: </a>{
+
+<a name="line610">610: </a>  PetscTryMethod(eps,<font color="#666666">"EPSLOBPCGSetLocking_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscBool),(eps,lock));
+<a name="line611">611: </a>  <font color="#4169E1">return</font>(0);
+<a name="line612">612: </a>}
+
+<a name="line614">614: </a><strong><font color="#4169E1"><a name="EPSLOBPCGGetLocking_LOBPCG"></a>static PetscErrorCode EPSLOBPCGGetLocking_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool *lock)</font></strong>
+<a name="line615">615: </a>{
+<a name="line616">616: </a>  EPS_LOBPCG *ctx = (EPS_LOBPCG*)eps-&gt;data;
+
+<a name="line619">619: </a>  *lock = ctx-&gt;lock;
+<a name="line620">620: </a>  <font color="#4169E1">return</font>(0);
+<a name="line621">621: </a>}
+
+<a name="line623">623: </a><font color="#B22222">/*@</font>
+<a name="line624">624: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetLocking.html#EPSLOBPCGGetLocking">EPSLOBPCGGetLocking</a> - Gets the locking flag used in the LOBPCG method.</font>
+
+<a name="line626">626: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line628">628: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line629">629: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line631">631: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line632">632: </a><font color="#B22222">.  lock - the locking flag</font>
+
+<a name="line634">634: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line636">636: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetLocking.html#EPSLOBPCGSetLocking">EPSLOBPCGSetLocking</a>()</font>
+<a name="line637">637: </a><font color="#B22222">@*/</font>
+<a name="line638">638: </a><strong><font color="#4169E1"><a name="EPSLOBPCGGetLocking"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGGetLocking.html#EPSLOBPCGGetLocking">EPSLOBPCGGetLocking</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool *lock)</font></strong>
+<a name="line639">639: </a>{
+
+<a name="line645">645: </a>  PetscUseMethod(eps,<font color="#666666">"EPSLOBPCGGetLocking_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscBool*),(eps,lock));
+<a name="line646">646: </a>  <font color="#4169E1">return</font>(0);
+<a name="line647">647: </a>}
+
+<a name="line649">649: </a><strong><font color="#4169E1"><a name="EPSView_LOBPCG"></a>PetscErrorCode EPSView_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscViewer viewer)</font></strong>
+<a name="line650">650: </a>{
+<a name="line652">652: </a>  EPS_LOBPCG     *ctx = (EPS_LOBPCG*)eps-&gt;data;
+<a name="line653">653: </a>  PetscBool      isascii;
+
+<a name="line656">656: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line657">657: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line658">658: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  block size %D\n"</font>,ctx-&gt;bs);
+<a name="line659">659: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  restart parameter=%g (using %D guard vectors)\n"</font>,(double)ctx-&gt;restart,ctx-&gt;guard);
+<a name="line660">660: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  soft locking %sactivated\n"</font>,ctx-&gt;lock?<font color="#666666">""</font>:<font color="#666666">"de"</font>);
+<a name="line661">661: </a>  }
+<a name="line662">662: </a>  <font color="#4169E1">return</font>(0);
+<a name="line663">663: </a>}
+
+<a name="line665">665: </a><strong><font color="#4169E1"><a name="EPSSetFromOptions_LOBPCG"></a>PetscErrorCode EPSSetFromOptions_LOBPCG(PetscOptionItems *PetscOptionsObject,<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line666">666: </a>{
+<a name="line668">668: </a>  PetscBool      lock,flg;
+<a name="line669">669: </a>  PetscInt       bs;
+<a name="line670">670: </a>  PetscReal      restart;
+
+<a name="line673">673: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> LOBPCG Options"</font>);
+
+<a name="line675">675: </a>    PetscOptionsInt(<font color="#666666">"-eps_lobpcg_blocksize"</font>,<font color="#666666">"Block size"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetBlockSize.html#EPSLOBPCGSetBlockSize">EPSLOBPCGSetBlockSize</a>"</font>,20,&amp;bs,&amp;flg);
+<a name="line676">676: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetBlockSize.html#EPSLOBPCGSetBlockSize">EPSLOBPCGSetBlockSize</a>(eps,bs); }
+
+<a name="line678">678: </a>    PetscOptionsReal(<font color="#666666">"-eps_lobpcg_restart"</font>,<font color="#666666">"Percentage of the block of vectors to force a restart"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetRestart.html#EPSLOBPCGSetRestart">EPSLOBPCGSetRestart</a>"</font>,0.5,&amp;restart,&amp;flg);
+<a name="line679">679: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetRestart.html#EPSLOBPCGSetRestart">EPSLOBPCGSetRestart</a>(eps,restart); }
+
+<a name="line681">681: </a>    PetscOptionsBool(<font color="#666666">"-eps_lobpcg_locking"</font>,<font color="#666666">"Choose between locking and non-locking variants"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetLocking.html#EPSLOBPCGSetLocking">EPSLOBPCGSetLocking</a>"</font>,PETSC_TRUE,&amp;lock,&amp;flg);
+<a name="line682">682: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/EPS/EPSLOBPCGSetLocking.html#EPSLOBPCGSetLocking">EPSLOBPCGSetLocking</a>(eps,lock); }
+
+<a name="line684">684: </a>  PetscOptionsTail();
+<a name="line685">685: </a>  <font color="#4169E1">return</font>(0);
+<a name="line686">686: </a>}
+
+<a name="line688">688: </a><strong><font color="#4169E1"><a name="EPSDestroy_LOBPCG"></a>PetscErrorCode EPSDestroy_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line689">689: </a>{
+
+<a name="line693">693: </a>  PetscFree(eps-&gt;data);
+<a name="line694">694: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGSetBlockSize_C"</font>,NULL);
+<a name="line695">695: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGGetBlockSize_C"</font>,NULL);
+<a name="line696">696: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGSetRestart_C"</font>,NULL);
+<a name="line697">697: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGGetRestart_C"</font>,NULL);
+<a name="line698">698: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGSetLocking_C"</font>,NULL);
+<a name="line699">699: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGGetLocking_C"</font>,NULL);
+<a name="line700">700: </a>  <font color="#4169E1">return</font>(0);
+<a name="line701">701: </a>}
+
+<a name="line703">703: </a><strong><font color="#4169E1"><a name="EPSCreate_LOBPCG"></a>SLEPC_EXTERN PetscErrorCode EPSCreate_LOBPCG(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line704">704: </a>{
+<a name="line705">705: </a>  EPS_LOBPCG     *lobpcg;
+
+<a name="line709">709: </a>  PetscNewLog(eps,&amp;lobpcg);
+<a name="line710">710: </a>  eps-&gt;data = (void*)lobpcg;
+<a name="line711">711: </a>  lobpcg-&gt;lock = PETSC_TRUE;
+
+<a name="line713">713: </a>  eps-&gt;useds = PETSC_TRUE;
+<a name="line714">714: </a>  eps-&gt;categ = EPS_CATEGORY_PRECOND;
+
+<a name="line716">716: </a>  eps-&gt;ops-&gt;solve          = EPSSolve_LOBPCG;
+<a name="line717">717: </a>  eps-&gt;ops-&gt;setup          = EPSSetUp_LOBPCG;
+<a name="line718">718: </a>  eps-&gt;ops-&gt;setfromoptions = EPSSetFromOptions_LOBPCG;
+<a name="line719">719: </a>  eps-&gt;ops-&gt;destroy        = EPSDestroy_LOBPCG;
+<a name="line720">720: </a>  eps-&gt;ops-&gt;view           = EPSView_LOBPCG;
+<a name="line721">721: </a>  eps-&gt;ops-&gt;backtransform  = EPSBackTransform_Default;
+<a name="line722">722: </a>  eps-&gt;ops-&gt;setdefaultst   = EPSSetDefaultST_GMRES;
+
+<a name="line724">724: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGSetBlockSize_C"</font>,EPSLOBPCGSetBlockSize_LOBPCG);
+<a name="line725">725: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGGetBlockSize_C"</font>,EPSLOBPCGGetBlockSize_LOBPCG);
+<a name="line726">726: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGSetRestart_C"</font>,EPSLOBPCGSetRestart_LOBPCG);
+<a name="line727">727: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGGetRestart_C"</font>,EPSLOBPCGGetRestart_LOBPCG);
+<a name="line728">728: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGSetLocking_C"</font>,EPSLOBPCGSetLocking_LOBPCG);
+<a name="line729">729: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLOBPCGGetLocking_C"</font>,EPSLOBPCGGetLocking_LOBPCG);
+<a name="line730">730: </a>  <font color="#4169E1">return</font>(0);
+<a name="line731">731: </a>}
+
+</pre>
+</body>
+
+</html>

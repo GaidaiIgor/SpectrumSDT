@@ -1,0 +1,239 @@
+<center><a href="pepkrylov.c">Actual source code: pepkrylov.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/impls/krylov/pepkrylov.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:05+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/impls/krylov/pepkrylov.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Common subroutines for all Krylov-type <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> solvers</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../include/slepc/private/pepimpl.h.html">&lt;slepc/private/pepimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+<a name="line16"> 16: </a><font color="#A020F0">#include </font><font color="#666666">"pepkrylov.h"</font><font color="#A020F0"></font>
+
+<a name="line18"> 18: </a><strong><font color="#4169E1"><a name="PEPExtractVectors_TOAR"></a>PetscErrorCode PEPExtractVectors_TOAR(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line19"> 19: </a>{
+<a name="line21"> 21: </a>  PetscInt       i,j,nq,deg=pep-&gt;nmat-1,lds,idxcpy=0,ldds,k,ld;
+<a name="line22"> 22: </a>  PetscScalar    *X,*er,*ei,*SS,*vals,*ivals,sone=1.0,szero=0.0,*yi,*yr,*tr,*ti,alpha,t,*S,*pS0;
+<a name="line23"> 23: </a>  PetscBLASInt   k_,nq_,lds_,one=1,ldds_;
+<a name="line24"> 24: </a>  PetscBool      flg;
+<a name="line25"> 25: </a>  PetscReal      norm,max,factor=1.0;
+<a name="line26"> 26: </a>  Vec            xr,xi,w[4];
+<a name="line27"> 27: </a>  PEP_TOAR       *ctx = (PEP_TOAR*)pep-&gt;data;
+<a name="line28"> 28: </a>  Mat            S0,MS;
+
+<a name="line31"> 31: </a>  <a href="../../../../docs/manualpages/BV/BVTensorGetFactors.html#BVTensorGetFactors">BVTensorGetFactors</a>(ctx-&gt;V,NULL,&amp;MS);
+<a name="line32"> 32: </a>  MatDenseGetArray(MS,&amp;S);
+<a name="line33"> 33: </a>  <a href="../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(pep-&gt;V,NULL,NULL,&amp;ld);
+<a name="line34"> 34: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(pep-&gt;V,NULL,&amp;nq);
+<a name="line35"> 35: </a>  k = pep-&gt;nconv;
+<a name="line36"> 36: </a>  <font color="#4169E1">if</font> (k==0) <font color="#4169E1">return</font>(0);
+<a name="line37"> 37: </a>  lds = deg*ld;
+<a name="line38"> 38: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(pep-&gt;ds,&amp;ldds);
+<a name="line39"> 39: </a>  PetscCalloc5(k,&amp;er,k,&amp;ei,nq*k,&amp;SS,pep-&gt;nmat,&amp;vals,pep-&gt;nmat,&amp;ivals);
+<a name="line40"> 40: </a>  <a href="../../../../docs/manualpages/ST/STGetTransform.html#STGetTransform">STGetTransform</a>(pep-&gt;st,&amp;flg);
+<a name="line41"> 41: </a>  <font color="#4169E1">if</font> (flg) factor = pep-&gt;sfactor;
+<a name="line42"> 42: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line43"> 43: </a>    er[i] = factor*pep-&gt;eigr[i];
+<a name="line44"> 44: </a>    ei[i] = factor*pep-&gt;eigi[i];
+<a name="line45"> 45: </a>  }
+<a name="line46"> 46: </a>  <a href="../../../../docs/manualpages/ST/STBackTransform.html#STBackTransform">STBackTransform</a>(pep-&gt;st,k,er,ei);
+
+<a name="line48"> 48: </a>  <a href="../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line49"> 49: </a>  <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;X);
+
+<a name="line51"> 51: </a>  PetscBLASIntCast(k,&amp;k_);
+<a name="line52"> 52: </a>  PetscBLASIntCast(nq,&amp;nq_);
+<a name="line53"> 53: </a>  PetscBLASIntCast(lds,&amp;lds_);
+<a name="line54"> 54: </a>  PetscBLASIntCast(ldds,&amp;ldds_);
+
+<a name="line56"> 56: </a>  <font color="#4169E1">if</font> (pep-&gt;extract==<a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_NONE</a> || pep-&gt;refine==<a href="../../../../docs/manualpages/PEP/PEPRefine.html#PEPRefine">PEP_REFINE_MULTIPLE</a>) {
+<a name="line57"> 57: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;k_,&amp;sone,S,&amp;lds_,X,&amp;ldds_,&amp;szero,SS,&amp;nq_));
+<a name="line58"> 58: </a>  } <font color="#4169E1">else</font> {
+<a name="line59"> 59: </a>    <font color="#4169E1">switch</font> (pep-&gt;extract) {
+<a name="line60"> 60: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_NONE</a>:
+<a name="line61"> 61: </a>      <font color="#4169E1">break</font>;
+<a name="line62"> 62: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_NORM</a>:
+<a name="line63"> 63: </a>      <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line64"> 64: </a>        PEPEvaluateBasis(pep,er[i],ei[i],vals,ivals);
+<a name="line65"> 65: </a>        max = 1.0;
+<a name="line66"> 66: </a>        <font color="#4169E1">for</font> (j=1;j&lt;deg;j++) {
+<a name="line67"> 67: </a>          norm = SlepcAbsEigenvalue(vals[j],ivals[j]);
+<a name="line68"> 68: </a>          <font color="#4169E1">if</font> (max &lt; norm) { max = norm; idxcpy = j; }
+<a name="line69"> 69: </a>        }
+<a name="line70"> 70: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;sone,S+idxcpy*ld,&amp;lds_,X+i*ldds,&amp;one,&amp;szero,SS+i*nq,&amp;one));
+<a name="line71"> 71: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line72"> 72: </a>        <font color="#4169E1">if</font> (PetscRealPart(ei[i])!=0.0) {
+<a name="line73"> 73: </a>          i++;
+<a name="line74"> 74: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;sone,S+idxcpy*ld,&amp;lds_,X+i*ldds,&amp;one,&amp;szero,SS+i*nq,&amp;one));
+<a name="line75"> 75: </a>        }
+<a name="line76"> 76: </a><font color="#A020F0">#endif</font>
+<a name="line77"> 77: </a>      }
+<a name="line78"> 78: </a>      <font color="#4169E1">break</font>;
+<a name="line79"> 79: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_RESIDUAL</a>:
+<a name="line80"> 80: </a>      VecDuplicate(pep-&gt;work[0],&amp;xr);
+<a name="line81"> 81: </a>      VecDuplicate(pep-&gt;work[0],&amp;w[0]);
+<a name="line82"> 82: </a>      VecDuplicate(pep-&gt;work[0],&amp;w[1]);
+<a name="line83"> 83: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line84"> 84: </a>      VecDuplicate(pep-&gt;work[0],&amp;w[2]);
+<a name="line85"> 85: </a>      VecDuplicate(pep-&gt;work[0],&amp;w[3]);
+<a name="line86"> 86: </a>      VecDuplicate(pep-&gt;work[0],&amp;xi);
+<a name="line87"> 87: </a><font color="#A020F0">#else</font>
+<a name="line88"> 88: </a>      xi = NULL;
+<a name="line89"> 89: </a><font color="#A020F0">#endif</font>
+<a name="line90"> 90: </a>      <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line91"> 91: </a>        max = 0.0;
+<a name="line92"> 92: </a>        <font color="#4169E1">for</font> (j=0;j&lt;deg;j++) {
+<a name="line93"> 93: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;sone,S+j*ld,&amp;lds_,X+i*ldds,&amp;one,&amp;szero,SS+i*nq,&amp;one));
+<a name="line94"> 94: </a>          <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pep-&gt;V,1.0,0.0,xr,SS+i*nq);
+<a name="line95"> 95: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line96"> 96: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;sone,S+j*ld,&amp;lds_,X+(i+1)*ldds,&amp;one,&amp;szero,SS+i*nq,&amp;one));
+<a name="line97"> 97: </a>          <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pep-&gt;V,1.0,0.0,xi,SS+i*nq);
+<a name="line98"> 98: </a><font color="#A020F0">#endif</font>
+<a name="line99"> 99: </a>          PEPComputeResidualNorm_Private(pep,er[i],ei[i],xr,xi,w,&amp;norm);
+<a name="line100">100: </a>          <font color="#4169E1">if</font> (norm&gt;max) { max = norm; idxcpy=j; }
+<a name="line101">101: </a>        }
+<a name="line102">102: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;sone,S+idxcpy*ld,&amp;lds_,X+i*ldds,&amp;one,&amp;szero,SS+i*nq,&amp;one));
+<a name="line103">103: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line104">104: </a>        <font color="#4169E1">if</font> (PetscRealPart(ei[i])!=0.0) {
+<a name="line105">105: </a>          i++;
+<a name="line106">106: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;sone,S+idxcpy*ld,&amp;lds_,X+i*ldds,&amp;one,&amp;szero,SS+i*nq,&amp;one));
+<a name="line107">107: </a>        }
+<a name="line108">108: </a><font color="#A020F0">#endif</font>
+<a name="line109">109: </a>      }
+<a name="line110">110: </a>      VecDestroy(&amp;xr);
+<a name="line111">111: </a>      VecDestroy(&amp;w[0]);
+<a name="line112">112: </a>      VecDestroy(&amp;w[1]);
+<a name="line113">113: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line114">114: </a>      VecDestroy(&amp;w[2]);
+<a name="line115">115: </a>      VecDestroy(&amp;w[3]);
+<a name="line116">116: </a>      VecDestroy(&amp;xi);
+<a name="line117">117: </a><font color="#A020F0">#endif</font>
+<a name="line118">118: </a>      <font color="#4169E1">break</font>;
+<a name="line119">119: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_STRUCTURED</a>:
+<a name="line120">120: </a>      PetscMalloc2(k,&amp;tr,k,&amp;ti);
+<a name="line121">121: </a>      <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line122">122: </a>        t = 0.0;
+<a name="line123">123: </a>        PEPEvaluateBasis(pep,er[i],ei[i],vals,ivals);
+<a name="line124">124: </a>        yr = X+i*ldds; yi = NULL;
+<a name="line125">125: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line126">126: </a>        <font color="#4169E1">if</font> (ei[i]!=0.0) { yr = tr; yi = ti; }
+<a name="line127">127: </a><font color="#A020F0">#endif</font>
+<a name="line128">128: </a>        <font color="#4169E1">for</font> (j=0;j&lt;deg;j++) {
+<a name="line129">129: </a>          alpha = PetscConj(vals[j]);
+<a name="line130">130: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line131">131: </a>          <font color="#4169E1">if</font> (ei[i]!=0.0) {
+<a name="line132">132: </a>            PetscArrayzero(tr,k);
+<a name="line133">133: </a>            PetscStackCallBLAS(<font color="#666666">"BLASaxpy"</font>,BLASaxpy_(&amp;k_,&amp;vals[j],X+i*ldds,&amp;one,tr,&amp;one));
+<a name="line134">134: </a>            PetscStackCallBLAS(<font color="#666666">"BLASaxpy"</font>,BLASaxpy_(&amp;k_,&amp;ivals[j],X+(i+1)*ldds,&amp;one,tr,&amp;one));
+<a name="line135">135: </a>            PetscArrayzero(ti,k);
+<a name="line136">136: </a>            PetscStackCallBLAS(<font color="#666666">"BLASaxpy"</font>,BLASaxpy_(&amp;k_,&amp;vals[j],X+(i+1)*ldds,&amp;one,ti,&amp;one));
+<a name="line137">137: </a>            alpha = -ivals[j];
+<a name="line138">138: </a>            PetscStackCallBLAS(<font color="#666666">"BLASaxpy"</font>,BLASaxpy_(&amp;k_,&amp;alpha,X+i*ldds,&amp;one,ti,&amp;one));
+<a name="line139">139: </a>            alpha = 1.0;
+<a name="line140">140: </a>          }
+<a name="line141">141: </a><font color="#A020F0">#endif</font>
+<a name="line142">142: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;alpha,S+j*ld,&amp;lds_,yr,&amp;one,&amp;sone,SS+i*nq,&amp;one));
+<a name="line143">143: </a>          t += SlepcAbsEigenvalue(vals[j],ivals[j])*SlepcAbsEigenvalue(vals[j],ivals[j]);
+<a name="line144">144: </a>          <font color="#4169E1">if</font> (yi) {
+<a name="line145">145: </a>            PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;nq_,&amp;k_,&amp;alpha,S+j*ld,&amp;lds_,yi,&amp;one,&amp;sone,SS+(i+1)*nq,&amp;one));
+<a name="line146">146: </a>          }
+<a name="line147">147: </a>        }
+<a name="line148">148: </a>        t = 1.0/t;
+<a name="line149">149: </a>        PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;nq_,&amp;t,SS+i*nq,&amp;one));
+<a name="line150">150: </a>        <font color="#4169E1">if</font> (yi) {
+<a name="line151">151: </a>          PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;nq_,&amp;t,SS+(i+1)*nq,&amp;one));
+<a name="line152">152: </a>          i++;
+<a name="line153">153: </a>        }
+<a name="line154">154: </a>      }
+<a name="line155">155: </a>      PetscFree2(tr,ti);
+<a name="line156">156: </a>      <font color="#4169E1">break</font>;
+<a name="line157">157: </a>    }
+<a name="line158">158: </a>  }
+
+<a name="line160">160: </a>  <font color="#B22222">/* update vectors V = V*S */</font>
+<a name="line161">161: </a>  MatCreateSeqDense(PETSC_COMM_SELF,nq,k,NULL,&amp;S0);
+<a name="line162">162: </a>  MatDenseGetArray(S0,&amp;pS0);
+<a name="line163">163: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line164">164: </a>    PetscArraycpy(pS0+i*nq,SS+i*nq,nq);
+<a name="line165">165: </a>  }
+<a name="line166">166: </a>  MatDenseRestoreArray(S0,&amp;pS0);
+<a name="line167">167: </a>  <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(pep-&gt;V,S0,0,k);
+<a name="line168">168: </a>  MatDestroy(&amp;S0);
+<a name="line169">169: </a>  PetscFree5(er,ei,SS,vals,ivals);
+<a name="line170">170: </a>  <font color="#4169E1">if</font> (ctx-&gt;V) {
+<a name="line171">171: </a>    MatDenseRestoreArray(MS,&amp;S);
+<a name="line172">172: </a>    <a href="../../../../docs/manualpages/BV/BVTensorRestoreFactors.html#BVTensorRestoreFactors">BVTensorRestoreFactors</a>(ctx-&gt;V,NULL,&amp;MS);
+<a name="line173">173: </a>  }
+<a name="line174">174: </a>  <font color="#4169E1">return</font>(0);
+<a name="line175">175: </a>}
+
+<a name="line177">177: </a><font color="#B22222">/*</font>
+<a name="line178">178: </a><font color="#B22222">   PEPKrylovConvergence - This is the analogue to EPSKrylovConvergence, but</font>
+<a name="line179">179: </a><font color="#B22222">   for polynomial Krylov methods.</font>
+
+<a name="line181">181: </a><font color="#B22222">   Differences:</font>
+<a name="line182">182: </a><font color="#B22222">   - Always non-symmetric</font>
+<a name="line183">183: </a><font color="#B22222">   - Does not check for STSHIFT</font>
+<a name="line184">184: </a><font color="#B22222">   - No correction factor</font>
+<a name="line185">185: </a><font color="#B22222">   - No support for true residual</font>
+<a name="line186">186: </a><font color="#B22222">*/</font>
+<a name="line187">187: </a><strong><font color="#4169E1"><a name="PEPKrylovConvergence"></a>PetscErrorCode PEPKrylovConvergence(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool getall,PetscInt kini,PetscInt nits,PetscReal beta,PetscInt *kout)</font></strong>
+<a name="line188">188: </a>{
+<a name="line190">190: </a>  PetscInt       k,newk,marker,inside;
+<a name="line191">191: </a>  PetscScalar    re,im;
+<a name="line192">192: </a>  PetscReal      resnorm;
+<a name="line193">193: </a>  PetscBool      istrivial;
+
+<a name="line196">196: </a>  <a href="../../../../docs/manualpages/RG/RGIsTrivial.html#RGIsTrivial">RGIsTrivial</a>(pep-&gt;rg,&amp;istrivial);
+<a name="line197">197: </a>  marker = -1;
+<a name="line198">198: </a>  <font color="#4169E1">if</font> (pep-&gt;trackall) getall = PETSC_TRUE;
+<a name="line199">199: </a>  <font color="#4169E1">for</font> (k=kini;k&lt;kini+nits;k++) {
+<a name="line200">200: </a>    <font color="#B22222">/* eigenvalue */</font>
+<a name="line201">201: </a>    re = pep-&gt;eigr[k];
+<a name="line202">202: </a>    im = pep-&gt;eigi[k];
+<a name="line203">203: </a>    <font color="#4169E1">if</font> (!istrivial) {
+<a name="line204">204: </a>      <a href="../../../../docs/manualpages/ST/STBackTransform.html#STBackTransform">STBackTransform</a>(pep-&gt;st,1,&amp;re,&amp;im);
+<a name="line205">205: </a>      <a href="../../../../docs/manualpages/RG/RGCheckInside.html#RGCheckInside">RGCheckInside</a>(pep-&gt;rg,1,&amp;re,&amp;im,&amp;inside);
+<a name="line206">206: </a>      <font color="#4169E1">if</font> (marker==-1 &amp;&amp; inside&lt;0) marker = k;
+<a name="line207">207: </a>      re = pep-&gt;eigr[k];
+<a name="line208">208: </a>      im = pep-&gt;eigi[k];
+<a name="line209">209: </a>    }
+<a name="line210">210: </a>    newk = k;
+<a name="line211">211: </a>    <a href="../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;newk,&amp;resnorm);
+<a name="line212">212: </a>    resnorm *= beta;
+<a name="line213">213: </a>    <font color="#B22222">/* error estimate */</font>
+<a name="line214">214: </a>    (*pep-&gt;converged)(pep,re,im,resnorm,&amp;pep-&gt;errest[k],pep-&gt;convergedctx);
+<a name="line215">215: </a>    <font color="#4169E1">if</font> (marker==-1 &amp;&amp; pep-&gt;errest[k] &gt;= pep-&gt;tol) marker = k;
+<a name="line216">216: </a>    <font color="#4169E1">if</font> (newk==k+1) {
+<a name="line217">217: </a>      pep-&gt;errest[k+1] = pep-&gt;errest[k];
+<a name="line218">218: </a>      k++;
+<a name="line219">219: </a>    }
+<a name="line220">220: </a>    <font color="#4169E1">if</font> (marker!=-1 &amp;&amp; !getall) <font color="#4169E1">break</font>;
+<a name="line221">221: </a>  }
+<a name="line222">222: </a>  <font color="#4169E1">if</font> (marker!=-1) k = marker;
+<a name="line223">223: </a>  *kout = k;
+<a name="line224">224: </a>  <font color="#4169E1">return</font>(0);
+<a name="line225">225: </a>}
+
+</pre>
+</body>
+
+</html>

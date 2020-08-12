@@ -1,0 +1,301 @@
+<center><a href="veccomp0.h">Actual source code: veccomp0.h</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/vec/veccomp0.h.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:35+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/vec/veccomp0.h.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a><font color="#A020F0">#include &lt;petsc/private/vecimpl.h&gt;</font>
+
+<a name="line13"> 13: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line15"> 15: </a><font color="#A020F0">#else</font>
+<a name="line17"> 17: </a><font color="#A020F0">#endif</font>
+
+<a name="line22"> 22: </a><strong><font color="#4169E1"><a name="__SUF__"></a>PetscErrorCode __SUF__(VecDot_Comp)(Vec a,Vec b,PetscScalar *z)</font></strong>
+<a name="line23"> 23: </a>{
+<a name="line24"> 24: </a>  PetscScalar    sum = 0.0,work;
+<a name="line25"> 25: </a>  PetscInt       i;
+<a name="line27"> 27: </a>  Vec_Comp       *as = (Vec_Comp*)a-&gt;data,*bs = (Vec_Comp*)b-&gt;data;
+
+<a name="line30"> 30: </a>  SlepcValidVecComp(a,1);
+<a name="line31"> 31: </a>  SlepcValidVecComp(b,2);
+<a name="line32"> 32: </a>  <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;dot_local) {
+<a name="line33"> 33: </a>    <font color="#4169E1">for</font> (i=0,sum=0.0;i&lt;as-&gt;n-&gt;n;i++) {
+<a name="line34"> 34: </a>      as-&gt;x[i]-&gt;ops-&gt;dot_local(as-&gt;x[i],bs-&gt;x[i],&amp;work);
+<a name="line35"> 35: </a>      sum += work;
+<a name="line36"> 36: </a>    }
+<a name="line37"> 37: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line38"> 38: </a>    work = sum;
+<a name="line39"> 39: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(&amp;work,&amp;sum,1,MPIU_SCALAR,MPIU_SUM,PetscObjectComm((PetscObject)a));
+<a name="line40"> 40: </a><font color="#A020F0">#endif</font>
+<a name="line41"> 41: </a>  } <font color="#4169E1">else</font> {
+<a name="line42"> 42: </a>    <font color="#4169E1">for</font> (i=0,sum=0.0;i&lt;as-&gt;n-&gt;n;i++) {
+<a name="line43"> 43: </a>      VecDot(as-&gt;x[i],bs-&gt;x[i],&amp;work);
+<a name="line44"> 44: </a>      sum += work;
+<a name="line45"> 45: </a>    }
+<a name="line46"> 46: </a>  }
+<a name="line47"> 47: </a>  *z = sum;
+<a name="line48"> 48: </a>  <font color="#4169E1">return</font>(0);
+<a name="line49"> 49: </a>}
+
+<a name="line51"> 51: </a><strong><font color="#4169E1"><a name="__SUF__"></a>PetscErrorCode __SUF__(VecMDot_Comp)(Vec a,PetscInt n,const Vec b[],PetscScalar *z)</font></strong>
+<a name="line52"> 52: </a>{
+<a name="line53"> 53: </a>  PetscScalar    *work,*work0,*r;
+<a name="line55"> 55: </a>  Vec_Comp       *as = (Vec_Comp*)a-&gt;data;
+<a name="line56"> 56: </a>  Vec            *bx;
+<a name="line57"> 57: </a>  PetscInt       i,j;
+
+<a name="line60"> 60: </a>  SlepcValidVecComp(a,1);
+<a name="line61"> 61: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) SlepcValidVecComp(b[i],3);
+
+<a name="line63"> 63: </a>  <font color="#4169E1">if</font> (as-&gt;n-&gt;n == 0) {
+<a name="line64"> 64: </a>    *z = 0;
+<a name="line65"> 65: </a>    <font color="#4169E1">return</font>(0);
+<a name="line66"> 66: </a>  }
+
+<a name="line68"> 68: </a>  PetscMalloc2(n,&amp;work0,n,&amp;bx);
+
+<a name="line70"> 70: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line71"> 71: </a>  <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;mdot_local) {
+<a name="line72"> 72: </a>    r = work0; work = z;
+<a name="line73"> 73: </a>  } <font color="#4169E1">else</font>
+<a name="line74"> 74: </a><font color="#A020F0">#endif</font>
+<a name="line75"> 75: </a>  {
+<a name="line76"> 76: </a>    r = z; work = work0;
+<a name="line77"> 77: </a>  }
+
+<a name="line79"> 79: </a>  <font color="#B22222">/* z[i] &lt;- a.x' * b[i].x */</font>
+<a name="line80"> 80: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) r[i] = 0.0;
+<a name="line81"> 81: </a>  <font color="#4169E1">for</font> (j=0;j&lt;as-&gt;n-&gt;n;j++) {
+<a name="line82"> 82: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) bx[i] = ((Vec_Comp*)b[i]-&gt;data)-&gt;x[j];
+<a name="line83"> 83: </a>    <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;mdot_local) {
+<a name="line84"> 84: </a>      as-&gt;x[j]-&gt;ops-&gt;mdot_local(as-&gt;x[j],n,bx,work);
+<a name="line85"> 85: </a>    } <font color="#4169E1">else</font> {
+<a name="line86"> 86: </a>      VecMDot(as-&gt;x[j],n,bx,work);
+<a name="line87"> 87: </a>    }
+<a name="line88"> 88: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) r[i] += work[i];
+<a name="line89"> 89: </a>  }
+
+<a name="line91"> 91: </a>  <font color="#B22222">/* If def(__WITH_MPI__) and exists mdot_local */</font>
+<a name="line92"> 92: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line93"> 93: </a>  <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;mdot_local) {
+<a name="line94"> 94: </a>    <font color="#B22222">/* z[i] &lt;- Allreduce(work[i]) */</font>
+<a name="line95"> 95: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(r,z,n,MPIU_SCALAR,MPIU_SUM,PetscObjectComm((PetscObject)a));
+<a name="line96"> 96: </a>  }
+<a name="line97"> 97: </a><font color="#A020F0">#endif</font>
+
+<a name="line99"> 99: </a>  PetscFree2(work0,bx);
+<a name="line100">100: </a>  <font color="#4169E1">return</font>(0);
+<a name="line101">101: </a>}
+
+<a name="line103">103: </a><strong><font color="#4169E1"><a name="__SUF__"></a>PetscErrorCode __SUF__(VecTDot_Comp)(Vec a,Vec b,PetscScalar *z)</font></strong>
+<a name="line104">104: </a>{
+<a name="line105">105: </a>  PetscScalar    sum = 0.0,work;
+<a name="line106">106: </a>  PetscInt       i;
+<a name="line108">108: </a>  Vec_Comp       *as = (Vec_Comp*)a-&gt;data,*bs = (Vec_Comp*)b-&gt;data;
+
+<a name="line111">111: </a>  SlepcValidVecComp(a,1);
+<a name="line112">112: </a>  SlepcValidVecComp(b,2);
+<a name="line113">113: </a>  <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;tdot_local) {
+<a name="line114">114: </a>    <font color="#4169E1">for</font> (i=0,sum=0.0;i&lt;as-&gt;n-&gt;n;i++) {
+<a name="line115">115: </a>      as-&gt;x[i]-&gt;ops-&gt;tdot_local(as-&gt;x[i],bs-&gt;x[i],&amp;work);
+<a name="line116">116: </a>      sum += work;
+<a name="line117">117: </a>    }
+<a name="line118">118: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line119">119: </a>    work = sum;
+<a name="line120">120: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(&amp;work,&amp;sum,1,MPIU_SCALAR,MPIU_SUM,PetscObjectComm((PetscObject)a));
+<a name="line121">121: </a><font color="#A020F0">#endif</font>
+<a name="line122">122: </a>  } <font color="#4169E1">else</font> {
+<a name="line123">123: </a>    <font color="#4169E1">for</font> (i=0,sum=0.0;i&lt;as-&gt;n-&gt;n;i++) {
+<a name="line124">124: </a>      VecTDot(as-&gt;x[i],bs-&gt;x[i],&amp;work);
+<a name="line125">125: </a>      sum += work;
+<a name="line126">126: </a>    }
+<a name="line127">127: </a>  }
+<a name="line128">128: </a>  *z = sum;
+<a name="line129">129: </a>  <font color="#4169E1">return</font>(0);
+<a name="line130">130: </a>}
+
+<a name="line132">132: </a><strong><font color="#4169E1"><a name="__SUF__"></a>PetscErrorCode __SUF__(VecMTDot_Comp)(Vec a,PetscInt n,const Vec b[],PetscScalar *z)</font></strong>
+<a name="line133">133: </a>{
+<a name="line134">134: </a>  PetscScalar    *work,*work0,*r;
+<a name="line136">136: </a>  Vec_Comp       *as = (Vec_Comp*)a-&gt;data;
+<a name="line137">137: </a>  Vec            *bx;
+<a name="line138">138: </a>  PetscInt       i,j;
+
+<a name="line141">141: </a>  SlepcValidVecComp(a,1);
+<a name="line142">142: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) SlepcValidVecComp(b[i],3);
+
+<a name="line144">144: </a>  <font color="#4169E1">if</font> (as-&gt;n-&gt;n == 0) {
+<a name="line145">145: </a>    *z = 0;
+<a name="line146">146: </a>    <font color="#4169E1">return</font>(0);
+<a name="line147">147: </a>  }
+
+<a name="line149">149: </a>  PetscMalloc2(n,&amp;work0,n,&amp;bx);
+
+<a name="line151">151: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line152">152: </a>  <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;mtdot_local) {
+<a name="line153">153: </a>    r = work0; work = z;
+<a name="line154">154: </a>  } <font color="#4169E1">else</font>
+<a name="line155">155: </a><font color="#A020F0">#endif</font>
+<a name="line156">156: </a>  {
+<a name="line157">157: </a>    r = z; work = work0;
+<a name="line158">158: </a>  }
+
+<a name="line160">160: </a>  <font color="#B22222">/* z[i] &lt;- a.x' * b[i].x */</font>
+<a name="line161">161: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) r[i] = 0.0;
+<a name="line162">162: </a>  <font color="#4169E1">for</font> (j=0;j&lt;as-&gt;n-&gt;n;j++) {
+<a name="line163">163: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) bx[i] = ((Vec_Comp*)b[i]-&gt;data)-&gt;x[j];
+<a name="line164">164: </a>    <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;mtdot_local) {
+<a name="line165">165: </a>      as-&gt;x[j]-&gt;ops-&gt;mtdot_local(as-&gt;x[j],n,bx,work);
+<a name="line166">166: </a>    } <font color="#4169E1">else</font> {
+<a name="line167">167: </a>      VecMTDot(as-&gt;x[j],n,bx,work);
+<a name="line168">168: </a>    }
+<a name="line169">169: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) r[i] += work[i];
+<a name="line170">170: </a>  }
+
+<a name="line172">172: </a>  <font color="#B22222">/* If def(__WITH_MPI__) and exists mtdot_local */</font>
+<a name="line173">173: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line174">174: </a>  <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;mtdot_local) {
+<a name="line175">175: </a>    <font color="#B22222">/* z[i] &lt;- Allreduce(work[i]) */</font>
+<a name="line176">176: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(r,z,n,MPIU_SCALAR,MPIU_SUM,PetscObjectComm((PetscObject)a));
+<a name="line177">177: </a>  }
+<a name="line178">178: </a><font color="#A020F0">#endif</font>
+
+<a name="line180">180: </a>  PetscFree2(work0,bx);
+<a name="line181">181: </a>  <font color="#4169E1">return</font>(0);
+<a name="line182">182: </a>}
+
+<a name="line184">184: </a><strong><font color="#4169E1"><a name="__SUF__"></a>PetscErrorCode __SUF__(VecNorm_Comp)(Vec a,NormType t,PetscReal *norm)</font></strong>
+<a name="line185">185: </a>{
+<a name="line186">186: </a>  PetscReal      work[3],s=0.0;
+<a name="line188">188: </a>  Vec_Comp       *as = (Vec_Comp*)a-&gt;data;
+<a name="line189">189: </a>  PetscInt       i;
+
+<a name="line192">192: </a>  SlepcValidVecComp(a,1);
+<a name="line193">193: </a>  <font color="#B22222">/* Initialize norm */</font>
+<a name="line194">194: </a>  <font color="#4169E1">switch</font> (t) {
+<a name="line195">195: </a>    <font color="#4169E1">case</font> NORM_1: <font color="#4169E1">case</font> NORM_INFINITY: *norm = 0.0; <font color="#4169E1">break</font>;
+<a name="line196">196: </a>    <font color="#4169E1">case</font> NORM_2: <font color="#4169E1">case</font> NORM_FROBENIUS: *norm = 1.0; s = 0.0; <font color="#4169E1">break</font>;
+<a name="line197">197: </a>    <font color="#4169E1">case</font> NORM_1_AND_2: norm[0] = 0.0; norm[1] = 1.0; s = 0.0; <font color="#4169E1">break</font>;
+<a name="line198">198: </a>  }
+<a name="line199">199: </a>  <font color="#4169E1">for</font> (i=0;i&lt;as-&gt;n-&gt;n;i++) {
+<a name="line200">200: </a>    <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;norm_local) {
+<a name="line201">201: </a>      as-&gt;x[0]-&gt;ops-&gt;norm_local(as-&gt;x[i],t,work);
+<a name="line202">202: </a>    } <font color="#4169E1">else</font> {
+<a name="line203">203: </a>      VecNorm(as-&gt;x[i],t,work);
+<a name="line204">204: </a>    }
+<a name="line205">205: </a>    <font color="#B22222">/* norm+= work */</font>
+<a name="line206">206: </a>    <font color="#4169E1">switch</font> (t) {
+<a name="line207">207: </a>      <font color="#4169E1">case</font> NORM_1: *norm+= *work; <font color="#4169E1">break</font>;
+<a name="line208">208: </a>      <font color="#4169E1">case</font> NORM_2: <font color="#4169E1">case</font> NORM_FROBENIUS: AddNorm2(norm,&amp;s,*work); <font color="#4169E1">break</font>;
+<a name="line209">209: </a>      <font color="#4169E1">case</font> NORM_1_AND_2: norm[0]+= work[0]; AddNorm2(&amp;norm[1],&amp;s,work[1]); <font color="#4169E1">break</font>;
+<a name="line210">210: </a>      <font color="#4169E1">case</font> NORM_INFINITY: *norm = PetscMax(*norm,*work); <font color="#4169E1">break</font>;
+<a name="line211">211: </a>    }
+<a name="line212">212: </a>  }
+
+<a name="line214">214: </a>  <font color="#B22222">/* If def(__WITH_MPI__) and exists norm_local */</font>
+<a name="line215">215: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line216">216: </a>  <font color="#4169E1">if</font> (as-&gt;x[0]-&gt;ops-&gt;norm_local) {
+<a name="line217">217: </a>    PetscReal work0[3];
+<a name="line218">218: </a>    <font color="#B22222">/* norm &lt;- Allreduce(work) */</font>
+<a name="line219">219: </a>    <font color="#4169E1">switch</font> (t) {
+<a name="line220">220: </a>    <font color="#4169E1">case</font> NORM_1:
+<a name="line221">221: </a>      work[0] = *norm;
+<a name="line222">222: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(work,norm,1,MPIU_REAL,MPIU_SUM,PetscObjectComm((PetscObject)a));
+<a name="line223">223: </a>      <font color="#4169E1">break</font>;
+<a name="line224">224: </a>    <font color="#4169E1">case</font> NORM_2: <font color="#4169E1">case</font> NORM_FROBENIUS:
+<a name="line225">225: </a>      work[0] = *norm; work[1] = s;
+<a name="line226">226: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(work,work0,1,MPIU_NORM2,MPIU_NORM2_SUM,PetscObjectComm((PetscObject)a));
+<a name="line227">227: </a>      *norm = GetNorm2(work0[0],work0[1]);
+<a name="line228">228: </a>      <font color="#4169E1">break</font>;
+<a name="line229">229: </a>    <font color="#4169E1">case</font> NORM_1_AND_2:
+<a name="line230">230: </a>      work[0] = norm[0]; work[1] = norm[1]; work[2] = s;
+<a name="line231">231: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(work,work0,1,MPIU_NORM1_AND_2,MPIU_NORM2_SUM,PetscObjectComm((PetscObject)a));
+<a name="line232">232: </a>      norm[0] = work0[0];
+<a name="line233">233: </a>      norm[1] = GetNorm2(work0[1],work0[2]);
+<a name="line234">234: </a>      <font color="#4169E1">break</font>;
+<a name="line235">235: </a>    <font color="#4169E1">case</font> NORM_INFINITY:
+<a name="line236">236: </a>      work[0] = *norm;
+<a name="line237">237: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(work,norm,1,MPIU_REAL,MPIU_MAX,PetscObjectComm((PetscObject)a));
+<a name="line238">238: </a>      <font color="#4169E1">break</font>;
+<a name="line239">239: </a>    }
+<a name="line240">240: </a>  }
+<a name="line241">241: </a><font color="#A020F0">#else</font>
+<a name="line242">242: </a>  <font color="#B22222">/* Norm correction */</font>
+<a name="line243">243: </a>  <font color="#4169E1">switch</font> (t) {
+<a name="line244">244: </a>    <font color="#4169E1">case</font> NORM_2: <font color="#4169E1">case</font> NORM_FROBENIUS: *norm = GetNorm2(*norm,s); <font color="#4169E1">break</font>;
+<a name="line245">245: </a>    <font color="#4169E1">case</font> NORM_1_AND_2: norm[1] = GetNorm2(norm[1],s); <font color="#4169E1">break</font>;
+<a name="line246">246: </a><strong><font color="#FF0000">    default:</font></strong> ;
+<a name="line247">247: </a>  }
+<a name="line248">248: </a><font color="#A020F0">#endif</font>
+<a name="line249">249: </a>  <font color="#4169E1">return</font>(0);
+<a name="line250">250: </a>}
+
+<a name="line252">252: </a><strong><font color="#4169E1"><a name="__SUF__"></a>PetscErrorCode __SUF__(VecDotNorm2_Comp)(Vec v,Vec w,PetscScalar *dp,PetscScalar *nm)</font></strong>
+<a name="line253">253: </a>{
+<a name="line254">254: </a>  PetscErrorCode    ierr;
+<a name="line255">255: </a>  PetscScalar       dp0,nm0,dp1,nm1;
+<a name="line256">256: </a>  const PetscScalar *vx,*wx;
+<a name="line257">257: </a>  Vec_Comp          *vs = (Vec_Comp*)v-&gt;data,*ws = (Vec_Comp*)w-&gt;data;
+<a name="line258">258: </a>  PetscInt          i,n;
+<a name="line259">259: </a>  PetscBool         t0,t1;
+<a name="line260">260: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line261">261: </a>  PetscScalar       work[4];
+<a name="line262">262: </a><font color="#A020F0">#endif</font>
+
+<a name="line265">265: </a>  <font color="#B22222">/* Compute recursively the local part */</font>
+<a name="line266">266: </a>  dp0 = nm0 = 0.0;
+<a name="line267">267: </a>  PetscObjectTypeCompare((PetscObject)v,VECCOMP,&amp;t0);
+<a name="line268">268: </a>  PetscObjectTypeCompare((PetscObject)w,VECCOMP,&amp;t1);
+<a name="line269">269: </a>  <font color="#4169E1">if</font> (t0 &amp;&amp; t1) {
+<a name="line270">270: </a>    SlepcValidVecComp(v,1);
+<a name="line271">271: </a>    SlepcValidVecComp(w,2);
+<a name="line272">272: </a>    <font color="#4169E1">for</font> (i=0;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line273">273: </a>      VecDotNorm2_Comp_Seq(vs-&gt;x[i],ws-&gt;x[i],&amp;dp1,&amp;nm1);
+<a name="line274">274: </a>      dp0 += dp1;
+<a name="line275">275: </a>      nm0 += nm1;
+<a name="line276">276: </a>    }
+<a name="line277">277: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!t0 &amp;&amp; !t1) {
+<a name="line278">278: </a>    VecGetLocalSize(v,&amp;n);
+<a name="line279">279: </a>    VecGetArrayRead(v,&amp;vx);
+<a name="line280">280: </a>    VecGetArrayRead(w,&amp;wx);
+<a name="line281">281: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line282">282: </a>      dp0 += vx[i]*PetscConj(wx[i]);
+<a name="line283">283: </a>      nm0 += wx[i]*PetscConj(wx[i]);
+<a name="line284">284: </a>    }
+<a name="line285">285: </a>    VecRestoreArrayRead(v,&amp;vx);
+<a name="line286">286: </a>    VecRestoreArrayRead(w,&amp;wx);
+<a name="line287">287: </a>  } <font color="#4169E1">else</font> SETERRQ(PetscObjectComm((PetscObject)v),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Incompatible vector types"</font>);
+
+<a name="line289">289: </a><font color="#A020F0">#if defined(__WITH_MPI__)</font>
+<a name="line290">290: </a>    <font color="#B22222">/* [dp, nm] &lt;- Allreduce([dp0, nm0]) */</font>
+<a name="line291">291: </a>    work[0] = dp0; work[1] = nm0;
+<a name="line292">292: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(work,&amp;work[2],2,MPIU_SCALAR,MPIU_SUM,PetscObjectComm((PetscObject)v));
+<a name="line293">293: </a>    *dp = work[2]; *nm = work[3];
+<a name="line294">294: </a><font color="#A020F0">#else</font>
+<a name="line295">295: </a>    *dp = dp0; *nm = nm0;
+<a name="line296">296: </a><font color="#A020F0">#endif</font>
+<a name="line297">297: </a>  <font color="#4169E1">return</font>(0);
+<a name="line298">298: </a>}
+
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,383 @@
+<center><a href="lmesetup.c">Actual source code: lmesetup.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/lme/interface/lmesetup.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:15+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/lme/interface/lmesetup.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> routines related to problem setup</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/lmeimpl.h.html">&lt;slepc/private/lmeimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><strong><font color="#4169E1"><a name="LMESetUp_Lyapunov"></a>PETSC_STATIC_INLINE PetscErrorCode LMESetUp_Lyapunov(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme)</font></strong>
+<a name="line17"> 17: </a>{
+<a name="line19"> 19: </a>  Mat            C1,C2,X1,X2;
+<a name="line20"> 20: </a>  Vec            dc,dx;
+
+<a name="line23"> 23: </a>  MatLRCGetMats(lme-&gt;C,NULL,&amp;C1,&amp;dc,&amp;C2);
+<a name="line24"> 24: </a>  <font color="#4169E1">if</font> (C1!=C2) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Lyapunov matrix equation requires symmetric right-hand side C"</font>);
+<a name="line25"> 25: </a>  <font color="#4169E1">if</font> (dc) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Lyapunov solvers currently require positive-definite right-hand side C"</font>);
+<a name="line26"> 26: </a>  <font color="#4169E1">if</font> (lme-&gt;X) {
+<a name="line27"> 27: </a>    MatLRCGetMats(lme-&gt;X,NULL,&amp;X1,&amp;dx,&amp;X2);
+<a name="line28"> 28: </a>    <font color="#4169E1">if</font> (X1!=X2) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Lyapunov matrix equation requires symmetric solution X"</font>);
+<a name="line29"> 29: </a>    <font color="#4169E1">if</font> (dx) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Lyapunov solvers currently assume a positive-definite solution X"</font>);
+<a name="line30"> 30: </a>  }
+<a name="line31"> 31: </a>  <font color="#4169E1">return</font>(0);
+<a name="line32"> 32: </a>}
+
+<a name="line34"> 34: </a><font color="#B22222">/*@</font>
+<a name="line35"> 35: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMESetUp.html#LMESetUp">LMESetUp</a> - Sets up all the internal data structures necessary for the</font>
+<a name="line36"> 36: </a><font color="#B22222">   execution of the linear matrix equation solver.</font>
+
+<a name="line38"> 38: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line40"> 40: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line41"> 41: </a><font color="#B22222">.  lme   - linear matrix equation solver context</font>
+
+<a name="line43"> 43: </a><font color="#B22222">   Notes:</font>
+<a name="line44"> 44: </a><font color="#B22222">   This function need not be called explicitly in most cases, since <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>()</font>
+<a name="line45"> 45: </a><font color="#B22222">   calls it. It can be useful when one wants to measure the set-up time</font>
+<a name="line46"> 46: </a><font color="#B22222">   separately from the solve time.</font>
+
+<a name="line48"> 48: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line50"> 50: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMECreate.html#LMECreate">LMECreate</a>(), <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(), <a href="../../../docs/manualpages/LME/LMEDestroy.html#LMEDestroy">LMEDestroy</a>()</font>
+<a name="line51"> 51: </a><font color="#B22222">@*/</font>
+<a name="line52"> 52: </a><strong><font color="#4169E1"><a name="LMESetUp"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMESetUp.html#LMESetUp">LMESetUp</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme)</font></strong>
+<a name="line53"> 53: </a>{
+<a name="line55"> 55: </a>  PetscInt       N;
+
+
+<a name="line60"> 60: </a>  <font color="#B22222">/* reset the convergence flag from the previous solves */</font>
+<a name="line61"> 61: </a>  lme-&gt;reason = <a href="../../../docs/manualpages/LME/LMEConvergedReason.html#LMEConvergedReason">LME_CONVERGED_ITERATING</a>;
+
+<a name="line63"> 63: </a>  <font color="#4169E1">if</font> (lme-&gt;setupcalled) <font color="#4169E1">return</font>(0);
+<a name="line64"> 64: </a>  PetscLogEventBegin(LME_SetUp,lme,0,0,0);
+
+<a name="line66"> 66: </a>  <font color="#B22222">/* Set default solver type (<a href="../../../docs/manualpages/LME/LMESetFromOptions.html#LMESetFromOptions">LMESetFromOptions</a> was not called) */</font>
+<a name="line67"> 67: </a>  <font color="#4169E1">if</font> (!((PetscObject)lme)-&gt;type_name) {
+<a name="line68"> 68: </a>    <a href="../../../docs/manualpages/LME/LMESetType.html#LMESetType">LMESetType</a>(lme,LMEKRYLOV);
+<a name="line69"> 69: </a>  }
+
+<a name="line71"> 71: </a>  <font color="#B22222">/* Check problem dimensions */</font>
+<a name="line72"> 72: </a>  <font color="#4169E1">if</font> (!lme-&gt;A) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"<a href="../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a> must be called first"</font>);
+<a name="line73"> 73: </a>  MatGetSize(lme-&gt;A,&amp;N,NULL);
+<a name="line74"> 74: </a>  <font color="#4169E1">if</font> (lme-&gt;ncv &gt; N) lme-&gt;ncv = N;
+
+<a name="line76"> 76: </a>  <font color="#B22222">/* setup options for the particular equation type */</font>
+<a name="line77"> 77: </a>  <font color="#4169E1">switch</font> (lme-&gt;problem_type) {
+<a name="line78"> 78: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_LYAPUNOV</a>:
+<a name="line79"> 79: </a>      LMESetUp_Lyapunov(lme);
+<a name="line80"> 80: </a>      <font color="#4169E1">break</font>;
+<a name="line81"> 81: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_SYLVESTER</a>:
+<a name="line82"> 82: </a>      LMECheckCoeff(lme,lme-&gt;B,<font color="#666666">"B"</font>,<font color="#666666">"Sylvester"</font>);
+<a name="line83"> 83: </a>      <font color="#4169E1">break</font>;
+<a name="line84"> 84: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_GEN_LYAPUNOV</a>:
+<a name="line85"> 85: </a>      LMECheckCoeff(lme,lme-&gt;D,<font color="#666666">"D"</font>,<font color="#666666">"Generalized Lyapunov"</font>);
+<a name="line86"> 86: </a>      <font color="#4169E1">break</font>;
+<a name="line87"> 87: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_GEN_SYLVESTER</a>:
+<a name="line88"> 88: </a>      LMECheckCoeff(lme,lme-&gt;B,<font color="#666666">"B"</font>,<font color="#666666">"Generalized Sylvester"</font>);
+<a name="line89"> 89: </a>      LMECheckCoeff(lme,lme-&gt;D,<font color="#666666">"D"</font>,<font color="#666666">"Generalized Sylvester"</font>);
+<a name="line90"> 90: </a>      LMECheckCoeff(lme,lme-&gt;E,<font color="#666666">"E"</font>,<font color="#666666">"Generalized Sylvester"</font>);
+<a name="line91"> 91: </a>      <font color="#4169E1">break</font>;
+<a name="line92"> 92: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_DT_LYAPUNOV</a>:
+<a name="line93"> 93: </a>      <font color="#4169E1">break</font>;
+<a name="line94"> 94: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_STEIN</a>:
+<a name="line95"> 95: </a>      LMECheckCoeff(lme,lme-&gt;D,<font color="#666666">"D"</font>,<font color="#666666">"Stein"</font>);
+<a name="line96"> 96: </a>      <font color="#4169E1">break</font>;
+<a name="line97"> 97: </a>  }
+<a name="line98"> 98: </a>  <font color="#4169E1">if</font> (lme-&gt;problem_type!=<a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_LYAPUNOV</a>) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_SUP,<font color="#666666">"There is no solver yet for this matrix equation type"</font>);
+
+<a name="line100">100: </a>  <font color="#B22222">/* call specific solver setup */</font>
+<a name="line101">101: </a>  (*lme-&gt;ops-&gt;setup)(lme);
+
+<a name="line103">103: </a>  <font color="#B22222">/* set tolerance if not yet set */</font>
+<a name="line104">104: </a>  <font color="#4169E1">if</font> (lme-&gt;tol==PETSC_DEFAULT) lme-&gt;tol = SLEPC_DEFAULT_TOL;
+
+<a name="line106">106: </a>  PetscLogEventEnd(LME_SetUp,lme,0,0,0);
+<a name="line107">107: </a>  lme-&gt;setupcalled = 1;
+<a name="line108">108: </a>  <font color="#4169E1">return</font>(0);
+<a name="line109">109: </a>}
+
+<a name="line111">111: </a><strong><font color="#4169E1"><a name="LMESetCoefficients_Private"></a>PETSC_STATIC_INLINE PetscErrorCode LMESetCoefficients_Private(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat A,Mat *lmeA)</font></strong>
+<a name="line112">112: </a>{
+<a name="line114">114: </a>  PetscInt       m,n;
+
+<a name="line117">117: </a>  MatGetSize(A,&amp;m,&amp;n);
+<a name="line118">118: </a>  <font color="#4169E1">if</font> (m!=n) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_ARG_WRONG,<font color="#666666">"Matrix is non-square"</font>);
+<a name="line119">119: </a>  <font color="#4169E1">if</font> (!lme-&gt;setupcalled) { MatDestroy(lmeA); }
+<a name="line120">120: </a>  PetscObjectReference((PetscObject)A);
+<a name="line121">121: </a>  *lmeA = A;
+<a name="line122">122: </a>  <font color="#4169E1">return</font>(0);
+<a name="line123">123: </a>}
+
+<a name="line125">125: </a><font color="#B22222">/*@</font>
+<a name="line126">126: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a> - Sets the coefficient matrices that define the linear matrix</font>
+<a name="line127">127: </a><font color="#B22222">   equation to be solved.</font>
+
+<a name="line129">129: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line131">131: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line132">132: </a><font color="#B22222">+  lme - the matrix function context</font>
+<a name="line133">133: </a><font color="#B22222">.  A   - first coefficient matrix</font>
+<a name="line134">134: </a><font color="#B22222">.  B   - second coefficient matrix</font>
+<a name="line135">135: </a><font color="#B22222">.  D   - third coefficient matrix</font>
+<a name="line136">136: </a><font color="#B22222">-  E   - fourth coefficient matrix</font>
+
+<a name="line138">138: </a><font color="#B22222">   Notes:</font>
+<a name="line139">139: </a><font color="#B22222">   The matrix equation takes the general form A*X*E+D*X*B=C, where matrix C is not</font>
+<a name="line140">140: </a><font color="#B22222">   provided here but with <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>(). Not all four matrices must be passed, some</font>
+<a name="line141">141: </a><font color="#B22222">   can be NULL instead, see <a href="../../../docs/manualpages/LME/LMESetProblemType.html#LMESetProblemType">LMESetProblemType</a>() for details.</font>
+
+<a name="line143">143: </a><font color="#B22222">   It must be called before <a href="../../../docs/manualpages/LME/LMESetUp.html#LMESetUp">LMESetUp</a>(). If it is called again after <a href="../../../docs/manualpages/LME/LMESetUp.html#LMESetUp">LMESetUp</a>() then</font>
+<a name="line144">144: </a><font color="#B22222">   the <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> object is reset.</font>
+
+<a name="line146">146: </a><font color="#B22222">   In order to delete a previously set matrix, pass a NULL in the corresponding</font>
+<a name="line147">147: </a><font color="#B22222">   argument.</font>
+
+<a name="line149">149: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line151">151: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(), <a href="../../../docs/manualpages/LME/LMESetUp.html#LMESetUp">LMESetUp</a>(), <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>(), <a href="../../../docs/manualpages/LME/LMESetProblemType.html#LMESetProblemType">LMESetProblemType</a>()</font>
+<a name="line152">152: </a><font color="#B22222">@*/</font>
+<a name="line153">153: </a><strong><font color="#4169E1"><a name="LMESetCoefficients"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat A,Mat B,Mat D,Mat E)</font></strong>
+<a name="line154">154: </a>{
+
+<a name="line161">161: </a>  <font color="#4169E1">if</font> (B) {
+<a name="line164">164: </a>  }
+<a name="line165">165: </a>  <font color="#4169E1">if</font> (D) {
+<a name="line168">168: </a>  }
+<a name="line169">169: </a>  <font color="#4169E1">if</font> (E) {
+<a name="line172">172: </a>  }
+
+<a name="line174">174: </a>  <font color="#4169E1">if</font> (lme-&gt;setupcalled) { <a href="../../../docs/manualpages/LME/LMEReset.html#LMEReset">LMEReset</a>(lme); }
+
+<a name="line176">176: </a>  LMESetCoefficients_Private(lme,A,&amp;lme-&gt;A);
+<a name="line177">177: </a>  <font color="#4169E1">if</font> (B) { LMESetCoefficients_Private(lme,B,&amp;lme-&gt;B); }
+<a name="line178">178: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!lme-&gt;setupcalled) { MatDestroy(&amp;lme-&gt;B); }
+<a name="line179">179: </a>  <font color="#4169E1">if</font> (D) { LMESetCoefficients_Private(lme,D,&amp;lme-&gt;D); }
+<a name="line180">180: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!lme-&gt;setupcalled) { MatDestroy(&amp;lme-&gt;D); }
+<a name="line181">181: </a>  <font color="#4169E1">if</font> (E) { LMESetCoefficients_Private(lme,E,&amp;lme-&gt;E); }
+<a name="line182">182: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!lme-&gt;setupcalled) { MatDestroy(&amp;lme-&gt;E); }
+
+<a name="line184">184: </a>  lme-&gt;setupcalled = 0;
+<a name="line185">185: </a>  <font color="#4169E1">return</font>(0);
+<a name="line186">186: </a>}
+
+<a name="line188">188: </a><font color="#B22222">/*@</font>
+<a name="line189">189: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEGetCoefficients.html#LMEGetCoefficients">LMEGetCoefficients</a> - Gets the coefficient matrices of the matrix equation.</font>
+
+<a name="line191">191: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line193">193: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line194">194: </a><font color="#B22222">.  lme - the <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> context</font>
+
+<a name="line196">196: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line197">197: </a><font color="#B22222">+  A   - first coefficient matrix</font>
+<a name="line198">198: </a><font color="#B22222">.  B   - second coefficient matrix</font>
+<a name="line199">199: </a><font color="#B22222">.  D   - third coefficient matrix</font>
+<a name="line200">200: </a><font color="#B22222">-  E   - fourth coefficient matrix</font>
+
+<a name="line202">202: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line204">204: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(), <a href="../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a>()</font>
+<a name="line205">205: </a><font color="#B22222">@*/</font>
+<a name="line206">206: </a><strong><font color="#4169E1"><a name="LMEGetCoefficients"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEGetCoefficients.html#LMEGetCoefficients">LMEGetCoefficients</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat *A,Mat *B,Mat *D,Mat *E)</font></strong>
+<a name="line207">207: </a>{
+<a name="line210">210: </a>  <font color="#4169E1">if</font> (A) *A = lme-&gt;A;
+<a name="line211">211: </a>  <font color="#4169E1">if</font> (B) *B = lme-&gt;B;
+<a name="line212">212: </a>  <font color="#4169E1">if</font> (D) *D = lme-&gt;D;
+<a name="line213">213: </a>  <font color="#4169E1">if</font> (E) *E = lme-&gt;E;
+<a name="line214">214: </a>  <font color="#4169E1">return</font>(0);
+<a name="line215">215: </a>}
+
+<a name="line217">217: </a><font color="#B22222">/*@</font>
+<a name="line218">218: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a> - Sets the right-hand side of the matrix equation, as a low-rank</font>
+<a name="line219">219: </a><font color="#B22222">   matrix.</font>
+
+<a name="line221">221: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line223">223: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line224">224: </a><font color="#B22222">+  lme - the matrix function context</font>
+<a name="line225">225: </a><font color="#B22222">-  C   - the right-hand side matrix</font>
+
+<a name="line227">227: </a><font color="#B22222">   Notes:</font>
+<a name="line228">228: </a><font color="#B22222">   The matrix equation takes the general form A*X*E+D*X*B=C, where matrix C is</font>
+<a name="line229">229: </a><font color="#B22222">   given with this function. C must be a low-rank matrix of type MATLRC, that is,</font>
+<a name="line230">230: </a><font color="#B22222">   C = U*D*V' where D is diagonal of order k, and U, V are dense tall-skinny</font>
+<a name="line231">231: </a><font color="#B22222">   matrices with k columns. No sparse matrix must be provided when creating the</font>
+<a name="line232">232: </a><font color="#B22222">   MATLRC matrix.</font>
+
+<a name="line234">234: </a><font color="#B22222">   In equation types that require C to be symmetric, such as Lyapunov, C must be</font>
+<a name="line235">235: </a><font color="#B22222">   created with V=U (or V=NULL).</font>
+
+<a name="line237">237: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line239">239: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMESetSolution.html#LMESetSolution">LMESetSolution</a>(), <a href="../../../docs/manualpages/LME/LMESetProblemType.html#LMESetProblemType">LMESetProblemType</a>()</font>
+<a name="line240">240: </a><font color="#B22222">@*/</font>
+<a name="line241">241: </a><strong><font color="#4169E1"><a name="LMESetRHS"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat C)</font></strong>
+<a name="line242">242: </a>{
+<a name="line244">244: </a>  PetscBool      match;
+<a name="line245">245: </a>  Mat            A;
+
+
+<a name="line252">252: </a>  PetscObjectTypeCompare((PetscObject)C,MATLRC,&amp;match);
+<a name="line253">253: </a>  <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)C),PETSC_ERR_SUP,<font color="#666666">"Mat argument must have been created with MatCreateLRC"</font>);
+<a name="line254">254: </a>  MatLRCGetMats(C,&amp;A,NULL,NULL,NULL);
+<a name="line255">255: </a>  <font color="#4169E1">if</font> (A) SETERRQ(PetscObjectComm((PetscObject)C),PETSC_ERR_SUP,<font color="#666666">"The MatLRC must not have a sparse matrix term"</font>);
+
+<a name="line257">257: </a>  PetscObjectReference((PetscObject)C);
+<a name="line258">258: </a>  MatDestroy(&amp;lme-&gt;C);
+<a name="line259">259: </a>  lme-&gt;C = C;
+<a name="line260">260: </a>  <font color="#4169E1">return</font>(0);
+<a name="line261">261: </a>}
+
+<a name="line263">263: </a><font color="#B22222">/*@</font>
+<a name="line264">264: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEGetRHS.html#LMEGetRHS">LMEGetRHS</a> - Gets the right-hand side of the matrix equation.</font>
+
+<a name="line266">266: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line268">268: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line269">269: </a><font color="#B22222">.  lme - the <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> context</font>
+
+<a name="line271">271: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line272">272: </a><font color="#B22222">.  C   - the low-rank matrix</font>
+
+<a name="line274">274: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line276">276: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(), <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>()</font>
+<a name="line277">277: </a><font color="#B22222">@*/</font>
+<a name="line278">278: </a><strong><font color="#4169E1"><a name="LMEGetRHS"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEGetRHS.html#LMEGetRHS">LMEGetRHS</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat *C)</font></strong>
+<a name="line279">279: </a>{
+<a name="line283">283: </a>  *C = lme-&gt;C;
+<a name="line284">284: </a>  <font color="#4169E1">return</font>(0);
+<a name="line285">285: </a>}
+
+<a name="line287">287: </a><font color="#B22222">/*@</font>
+<a name="line288">288: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMESetSolution.html#LMESetSolution">LMESetSolution</a> - Sets the placeholder for the solution of the matrix</font>
+<a name="line289">289: </a><font color="#B22222">   equation, as a low-rank matrix.</font>
+
+<a name="line291">291: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line293">293: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line294">294: </a><font color="#B22222">+  lme - the matrix function context</font>
+<a name="line295">295: </a><font color="#B22222">-  X   - the solution matrix</font>
+
+<a name="line297">297: </a><font color="#B22222">   Notes:</font>
+<a name="line298">298: </a><font color="#B22222">   The matrix equation takes the general form A*X*E+D*X*B=C, where the solution</font>
+<a name="line299">299: </a><font color="#B22222">   matrix is of low rank and is written in factored form X = U*D*V'. This function</font>
+<a name="line300">300: </a><font color="#B22222">   provides a Mat object of type MATLRC that stores U, V and (optionally) D.</font>
+<a name="line301">301: </a><font color="#B22222">   These factors will be computed during <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>().</font>
+
+<a name="line303">303: </a><font color="#B22222">   In equation types whose solution X is symmetric, such as Lyapunov, X must be</font>
+<a name="line304">304: </a><font color="#B22222">   created with V=U (or V=NULL).</font>
+
+<a name="line306">306: </a><font color="#B22222">   If the user provides X with this function, then the solver will</font>
+<a name="line307">307: </a><font color="#B22222">   return a solution with rank at most the number of columns of U. Alternatively,</font>
+<a name="line308">308: </a><font color="#B22222">   it is possible to let the solver choose the rank of the solution, by</font>
+<a name="line309">309: </a><font color="#B22222">   setting X to NULL and then calling <a href="../../../docs/manualpages/LME/LMEGetSolution.html#LMEGetSolution">LMEGetSolution</a>() after <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>().</font>
+
+<a name="line311">311: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line313">313: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMEGetSolution.html#LMEGetSolution">LMEGetSolution</a>(), <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>(), <a href="../../../docs/manualpages/LME/LMESetProblemType.html#LMESetProblemType">LMESetProblemType</a>(), <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>()</font>
+<a name="line314">314: </a><font color="#B22222">@*/</font>
+<a name="line315">315: </a><strong><font color="#4169E1"><a name="LMESetSolution"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMESetSolution.html#LMESetSolution">LMESetSolution</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat X)</font></strong>
+<a name="line316">316: </a>{
+<a name="line318">318: </a>  PetscBool      match;
+<a name="line319">319: </a>  Mat            A;
+
+<a name="line323">323: </a>  <font color="#4169E1">if</font> (X) {
+<a name="line326">326: </a>    PetscObjectTypeCompare((PetscObject)X,MATLRC,&amp;match);
+<a name="line327">327: </a>    <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)X),PETSC_ERR_SUP,<font color="#666666">"Mat argument must have been created with MatCreateLRC"</font>);
+<a name="line328">328: </a>    MatLRCGetMats(X,&amp;A,NULL,NULL,NULL);
+<a name="line329">329: </a>    <font color="#4169E1">if</font> (A) SETERRQ(PetscObjectComm((PetscObject)X),PETSC_ERR_SUP,<font color="#666666">"The MatLRC must not have a sparse matrix term"</font>);
+<a name="line330">330: </a>    PetscObjectReference((PetscObject)X);
+<a name="line331">331: </a>  }
+<a name="line332">332: </a>  MatDestroy(&amp;lme-&gt;X);
+<a name="line333">333: </a>  lme-&gt;X = X;
+<a name="line334">334: </a>  <font color="#4169E1">return</font>(0);
+<a name="line335">335: </a>}
+
+<a name="line337">337: </a><font color="#B22222">/*@</font>
+<a name="line338">338: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEGetSolution.html#LMEGetSolution">LMEGetSolution</a> - Gets the solution of the matrix equation.</font>
+
+<a name="line340">340: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line342">342: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line343">343: </a><font color="#B22222">.  lme - the <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> context</font>
+
+<a name="line345">345: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line346">346: </a><font color="#B22222">.  X   - the low-rank matrix</font>
+
+<a name="line348">348: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line350">350: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(), <a href="../../../docs/manualpages/LME/LMESetSolution.html#LMESetSolution">LMESetSolution</a>()</font>
+<a name="line351">351: </a><font color="#B22222">@*/</font>
+<a name="line352">352: </a><strong><font color="#4169E1"><a name="LMEGetSolution"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEGetSolution.html#LMEGetSolution">LMEGetSolution</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat *X)</font></strong>
+<a name="line353">353: </a>{
+<a name="line357">357: </a>  *X = lme-&gt;X;
+<a name="line358">358: </a>  <font color="#4169E1">return</font>(0);
+<a name="line359">359: </a>}
+
+<a name="line361">361: </a><font color="#B22222">/*@</font>
+<a name="line362">362: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEAllocateSolution.html#LMEAllocateSolution">LMEAllocateSolution</a> - Allocate memory storage for common variables such</font>
+<a name="line363">363: </a><font color="#B22222">   as the basis vectors.</font>
+
+<a name="line365">365: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line367">367: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line368">368: </a><font color="#B22222">+  lme   - linear matrix equation solver context</font>
+<a name="line369">369: </a><font color="#B22222">-  extra - number of additional positions, used for methods that require a</font>
+<a name="line370">370: </a><font color="#B22222">           working basis slightly larger than ncv</font>
+
+<a name="line372">372: </a><font color="#B22222">   Developers Note:</font>
+<a name="line373">373: </a><font color="#B22222">   This is SLEPC_EXTERN because it may be required by user plugin <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a></font>
+<a name="line374">374: </a><font color="#B22222">   implementations.</font>
+
+<a name="line376">376: </a><font color="#B22222">   Level: developer</font>
+<a name="line377">377: </a><font color="#B22222">@*/</font>
+<a name="line378">378: </a><strong><font color="#4169E1"><a name="LMEAllocateSolution"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEAllocateSolution.html#LMEAllocateSolution">LMEAllocateSolution</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscInt extra)</font></strong>
+<a name="line379">379: </a>{
+<a name="line381">381: </a>  PetscInt       oldsize,requested;
+<a name="line382">382: </a>  Vec            t;
+
+<a name="line385">385: </a>  requested = lme-&gt;ncv + extra;
+
+<a name="line387">387: </a>  <font color="#B22222">/* oldsize is zero if this is the first time setup is called */</font>
+<a name="line388">388: </a>  <a href="../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(lme-&gt;V,NULL,NULL,&amp;oldsize);
+
+<a name="line390">390: </a>  <font color="#B22222">/* allocate basis vectors */</font>
+<a name="line391">391: </a>  <font color="#4169E1">if</font> (!lme-&gt;V) { <a href="../../../docs/manualpages/LME/LMEGetBV.html#LMEGetBV">LMEGetBV</a>(lme,&amp;lme-&gt;V); }
+<a name="line392">392: </a>  <font color="#4169E1">if</font> (!oldsize) {
+<a name="line393">393: </a>    <font color="#4169E1">if</font> (!((PetscObject)(lme-&gt;V))-&gt;type_name) {
+<a name="line394">394: </a>      <a href="../../../docs/manualpages/BV/BVSetType.html#BVSetType">BVSetType</a>(lme-&gt;V,BVSVEC);
+<a name="line395">395: </a>    }
+<a name="line396">396: </a>    <a href="../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(lme-&gt;A,&amp;t,NULL);
+<a name="line397">397: </a>    <a href="../../../docs/manualpages/BV/BVSetSizesFromVec.html#BVSetSizesFromVec">BVSetSizesFromVec</a>(lme-&gt;V,t,requested);
+<a name="line398">398: </a>    VecDestroy(&amp;t);
+<a name="line399">399: </a>  } <font color="#4169E1">else</font> {
+<a name="line400">400: </a>    <a href="../../../docs/manualpages/BV/BVResize.html#BVResize">BVResize</a>(lme-&gt;V,requested,PETSC_FALSE);
+<a name="line401">401: </a>  }
+<a name="line402">402: </a>  <font color="#4169E1">return</font>(0);
+<a name="line403">403: </a>}
+
+</pre>
+</body>
+
+</html>

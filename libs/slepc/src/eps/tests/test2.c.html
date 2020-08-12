@@ -1,0 +1,176 @@
+<center><a href="test2.c">Actual source code: test2.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tests/test2.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:55+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tests/test2.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Tests multiple calls to <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a> with the same matrix.\n\n"</font>;
+
+<a name="line13"> 13: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line15"> 15: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line16"> 16: </a>{
+<a name="line17"> 17: </a>  Mat            A;           <font color="#B22222">/* problem matrix */</font>
+<a name="line18"> 18: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;         <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line19"> 19: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+<a name="line20"> 20: </a>  PetscReal      tol=PetscMax(1000*PETSC_MACHINE_EPSILON,1e-9);
+<a name="line21"> 21: </a>  PetscInt       n=30,i,Istart,Iend;
+<a name="line22"> 22: </a>  PetscBool      flg;
+<a name="line24"> 24: </a>  <a href="../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a> reorth;
+
+<a name="line26"> 26: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line28"> 28: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line29"> 29: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n1-D Laplacian Eigenproblem, n=%D\n\n"</font>,n);
+
+<a name="line31"> 31: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line32"> 32: </a><font color="#B22222">     Compute the operator matrix that defines the eigensystem, Ax=kx</font>
+<a name="line33"> 33: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line35"> 35: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line36"> 36: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line37"> 37: </a>  MatSetFromOptions(A);
+<a name="line38"> 38: </a>  MatSetUp(A);
+
+<a name="line40"> 40: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line41"> 41: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line42"> 42: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,i,i-1,-1.0,INSERT_VALUES); }
+<a name="line43"> 43: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(A,i,i+1,-1.0,INSERT_VALUES); }
+<a name="line44"> 44: </a>    MatSetValue(A,i,i,2.0,INSERT_VALUES);
+<a name="line45"> 45: </a>  }
+<a name="line46"> 46: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line47"> 47: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line49"> 49: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line50"> 50: </a><font color="#B22222">                        Create the eigensolver</font>
+<a name="line51"> 51: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line52"> 52: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line53"> 53: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,NULL);
+<a name="line54"> 54: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>);
+<a name="line55"> 55: </a>  <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(eps,tol,PETSC_DEFAULT);
+<a name="line56"> 56: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line58"> 58: </a>  <font color="#B22222">/* illustrate how to extract parameters from specific solver types */</font>
+<a name="line59"> 59: </a>  PetscObjectTypeCompare((PetscObject)eps,EPSLANCZOS,&amp;flg);
+<a name="line60"> 60: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line61"> 61: </a>    <a href="../../../docs/manualpages/EPS/EPSLanczosGetReorthog.html#EPSLanczosGetReorthog">EPSLanczosGetReorthog</a>(eps,&amp;reorth);
+<a name="line62"> 62: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Reorthogonalization type used in Lanczos: %s\n"</font>,EPSLanczosReorthogTypes[reorth]);
+<a name="line63"> 63: </a>  }
+
+<a name="line65"> 65: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line66"> 66: </a><font color="#B22222">                    Solve for largest eigenvalues</font>
+<a name="line67"> 67: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line68"> 68: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>);
+<a name="line69"> 69: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line70"> 70: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" - - - Largest eigenvalues - - -\n"</font>);
+<a name="line71"> 71: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+
+<a name="line73"> 73: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line74"> 74: </a><font color="#B22222">                    Solve for smallest eigenvalues</font>
+<a name="line75"> 75: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line76"> 76: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>);
+<a name="line77"> 77: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line78"> 78: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" - - - Smallest eigenvalues - - -\n"</font>);
+<a name="line79"> 79: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+
+<a name="line81"> 81: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line82"> 82: </a><font color="#B22222">                    Solve for interior eigenvalues (target=2.1)</font>
+<a name="line83"> 83: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line84"> 84: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a>);
+<a name="line85"> 85: </a>  <a href="../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(eps,2.1);
+<a name="line86"> 86: </a>  PetscObjectTypeCompare((PetscObject)eps,EPSLANCZOS,&amp;flg);
+<a name="line87"> 87: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line88"> 88: </a>    <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line89"> 89: </a>    <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STSINVERT);
+<a name="line90"> 90: </a>  } <font color="#4169E1">else</font> {
+<a name="line91"> 91: </a>    PetscObjectTypeCompare((PetscObject)eps,EPSKRYLOVSCHUR,&amp;flg);
+<a name="line92"> 92: </a>    <font color="#4169E1">if</font> (!flg) {
+<a name="line93"> 93: </a>      PetscObjectTypeCompare((PetscObject)eps,EPSARNOLDI,&amp;flg);
+<a name="line94"> 94: </a>    }
+<a name="line95"> 95: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line96"> 96: </a>      <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_HARMONIC</a>);
+<a name="line97"> 97: </a>    }
+<a name="line98"> 98: </a>  }
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line100">100: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" - - - Interior eigenvalues - - -\n"</font>);
+<a name="line101">101: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+
+<a name="line103">103: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line104">104: </a>  MatDestroy(&amp;A);
+<a name="line105">105: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line106">106: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line107">107: </a>}
+
+<a name="line109">109: </a><font color="#B22222">/*TEST</font>
+
+<a name="line111">111: </a><font color="#B22222">   testset:</font>
+<a name="line112">112: </a><font color="#B22222">      args: -eps_nev 4</font>
+<a name="line113">113: </a><font color="#B22222">      requires: !single</font>
+<a name="line114">114: </a><font color="#B22222">      output_file: output/test2_1.out</font>
+<a name="line115">115: </a><font color="#B22222">      test:</font>
+<a name="line116">116: </a><font color="#B22222">         suffix: 1</font>
+<a name="line117">117: </a><font color="#B22222">         args: -eps_type {{arnoldi gd jd lapack}}</font>
+<a name="line118">118: </a><font color="#B22222">      test:</font>
+<a name="line119">119: </a><font color="#B22222">         suffix: 1_gd2</font>
+<a name="line120">120: </a><font color="#B22222">         args: -eps_type gd -eps_gd_double_expansion</font>
+<a name="line121">121: </a><font color="#B22222">         timeoutfactor: 2</font>
+<a name="line122">122: </a><font color="#B22222">      test:</font>
+<a name="line123">123: </a><font color="#B22222">         suffix: 1_krylovschur</font>
+<a name="line124">124: </a><font color="#B22222">         args: -eps_type krylovschur -eps_krylovschur_locking {{0 1}}</font>
+
+<a name="line126">126: </a><font color="#B22222">   testset:</font>
+<a name="line127">127: </a><font color="#B22222">      args: -eps_type lanczos -eps_nev 4</font>
+<a name="line128">128: </a><font color="#B22222">      requires: !single</font>
+<a name="line129">129: </a><font color="#B22222">      filter: grep -v "Lanczos"</font>
+<a name="line130">130: </a><font color="#B22222">      output_file: output/test2_1.out</font>
+<a name="line131">131: </a><font color="#B22222">      test:</font>
+<a name="line132">132: </a><font color="#B22222">         suffix: 2</font>
+<a name="line133">133: </a><font color="#B22222">         args: -eps_lanczos_reorthog {{local full selective periodic partial}}</font>
+
+<a name="line135">135: </a><font color="#B22222">   testset:</font>
+<a name="line136">136: </a><font color="#B22222">      args: -n 32 -eps_nev 4</font>
+<a name="line137">137: </a><font color="#B22222">      requires: !single</font>
+<a name="line138">138: </a><font color="#B22222">      output_file: output/test2_3.out</font>
+<a name="line139">139: </a><font color="#B22222">      test:</font>
+<a name="line140">140: </a><font color="#B22222">         nsize: 2</font>
+<a name="line141">141: </a><font color="#B22222">         suffix: 3</font>
+<a name="line142">142: </a><font color="#B22222">         args: -eps_type {{krylovschur lapack}}</font>
+<a name="line143">143: </a><font color="#B22222">      test:</font>
+<a name="line144">144: </a><font color="#B22222">         nsize: 2</font>
+<a name="line145">145: </a><font color="#B22222">         suffix: 3_gd</font>
+<a name="line146">146: </a><font color="#B22222">         args: -eps_type gd -eps_gd_krylov_start</font>
+<a name="line147">147: </a><font color="#B22222">         timeoutfactor: 2</font>
+<a name="line148">148: </a><font color="#B22222">      test:</font>
+<a name="line149">149: </a><font color="#B22222">         suffix: 3_jd</font>
+<a name="line150">150: </a><font color="#B22222">         args: -eps_type jd -eps_jd_krylov_start -eps_ncv 18</font>
+
+<a name="line152">152: </a><font color="#B22222">   testset:</font>
+<a name="line153">153: </a><font color="#B22222">      args: -eps_nev 4 -mat_type aijcusparse</font>
+<a name="line154">154: </a><font color="#B22222">      requires: cuda !single</font>
+<a name="line155">155: </a><font color="#B22222">      output_file: output/test2_1.out</font>
+<a name="line156">156: </a><font color="#B22222">      test:</font>
+<a name="line157">157: </a><font color="#B22222">         suffix: 4_cuda</font>
+<a name="line158">158: </a><font color="#B22222">         args: -eps_type {{krylovschur arnoldi gd jd}}</font>
+
+<a name="line160">160: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

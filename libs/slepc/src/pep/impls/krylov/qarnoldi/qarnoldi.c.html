@@ -1,0 +1,544 @@
+<center><a href="qarnoldi.c">Actual source code: qarnoldi.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/impls/krylov/qarnoldi/qarnoldi.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:05+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/impls/krylov/qarnoldi/qarnoldi.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc quadratic eigensolver: "qarnoldi"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Q-Arnoldi</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       Quadratic Arnoldi with Krylov-Schur type restart.</font>
+
+<a name="line19"> 19: </a><font color="#B22222">   References:</font>
+
+<a name="line21"> 21: </a><font color="#B22222">       [1] K. Meerbergen, "The Quadratic Arnoldi method for the solution</font>
+<a name="line22"> 22: </a><font color="#B22222">           of the quadratic eigenvalue problem", SIAM J. Matrix Anal.</font>
+<a name="line23"> 23: </a><font color="#B22222">           Appl. 30(4):1462-1482, 2008.</font>
+<a name="line24"> 24: </a><font color="#B22222">*/</font>
+
+<a name="line26"> 26: </a> #include <A href="../../../../../include/slepc/private/pepimpl.h.html">&lt;slepc/private/pepimpl.h&gt;</A>
+<a name="line27"> 27: </a><font color="#A020F0">#include &lt;petscblaslapack.h&gt;</font>
+
+<a name="line29"> 29: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line30"> 30: </a>  PetscReal keep;         <font color="#B22222">/* restart parameter */</font>
+<a name="line31"> 31: </a>  PetscBool lock;         <font color="#B22222">/* locking/non-locking variant */</font>
+<a name="line32"> 32: </a>} PEP_QARNOLDI;
+
+<a name="line34"> 34: </a><strong><font color="#4169E1"><a name="PEPSetUp_QArnoldi"></a>PetscErrorCode PEPSetUp_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line35"> 35: </a>{
+<a name="line37"> 37: </a>  PEP_QARNOLDI   *ctx = (PEP_QARNOLDI*)pep-&gt;data;
+<a name="line38"> 38: </a>  PetscBool      shift,sinv,flg;
+
+<a name="line41"> 41: </a>  pep-&gt;lineariz = PETSC_TRUE;
+<a name="line42"> 42: </a>  PEPSetDimensions_Default(pep,pep-&gt;nev,&amp;pep-&gt;ncv,&amp;pep-&gt;mpd);
+<a name="line43"> 43: </a>  <font color="#4169E1">if</font> (!ctx-&gt;lock &amp;&amp; pep-&gt;mpd&lt;pep-&gt;ncv) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Should not use mpd parameter in non-locking variant"</font>);
+<a name="line44"> 44: </a>  <font color="#4169E1">if</font> (pep-&gt;max_it==PETSC_DEFAULT) pep-&gt;max_it = PetscMax(100,4*pep-&gt;n/pep-&gt;ncv);
+
+<a name="line46"> 46: </a>  PetscObjectTypeCompare((PetscObject)pep-&gt;st,STSHIFT,&amp;shift);
+<a name="line47"> 47: </a>  PetscObjectTypeCompare((PetscObject)pep-&gt;st,STSINVERT,&amp;sinv);
+<a name="line48"> 48: </a>  <font color="#4169E1">if</font> (!shift &amp;&amp; !sinv) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Only STSHIFT and STSINVERT spectral transformations can be used"</font>);
+<a name="line49"> 49: </a>  <font color="#4169E1">if</font> (!pep-&gt;which) {
+<a name="line50"> 50: </a>    <font color="#4169E1">if</font> (sinv) pep-&gt;which = <a href="../../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_MAGNITUDE</a>;
+<a name="line51"> 51: </a>    <font color="#4169E1">else</font> pep-&gt;which = <a href="../../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_MAGNITUDE</a>;
+<a name="line52"> 52: </a>  }
+<a name="line53"> 53: </a>  <font color="#4169E1">if</font> (pep-&gt;which==<a href="../../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_ALL</a>) SETERRQ(PetscObjectComm((PetscObject)pep),1,<font color="#666666">"Wrong value of pep-&gt;which"</font>);
+
+<a name="line55"> 55: </a>  <font color="#4169E1">if</font> (pep-&gt;nmat!=3) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Solver only available for quadratic problems"</font>);
+<a name="line56"> 56: </a>  <font color="#4169E1">if</font> (pep-&gt;basis!=<a href="../../../../../docs/manualpages/PEP/PEPBasis.html#PEPBasis">PEP_BASIS_MONOMIAL</a>) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Solver not implemented for non-monomial bases"</font>);
+<a name="line57"> 57: </a>  <a href="../../../../../docs/manualpages/ST/STGetTransform.html#STGetTransform">STGetTransform</a>(pep-&gt;st,&amp;flg);
+<a name="line58"> 58: </a>  <font color="#4169E1">if</font> (!flg) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Solver requires the <a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> transformation flag set, see <a href="../../../../../docs/manualpages/ST/STSetTransform.html#STSetTransform">STSetTransform</a>()"</font>);
+
+<a name="line60"> 60: </a>  <font color="#B22222">/* set default extraction */</font>
+<a name="line61"> 61: </a>  <font color="#4169E1">if</font> (!pep-&gt;extract) {
+<a name="line62"> 62: </a>    pep-&gt;extract = <a href="../../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_NONE</a>;
+<a name="line63"> 63: </a>  }
+<a name="line64"> 64: </a>  <font color="#4169E1">if</font> (pep-&gt;extract!=<a href="../../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_NONE</a>) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Solver does not support requested extraction"</font>);
+
+<a name="line66"> 66: </a>  <font color="#4169E1">if</font> (!ctx-&gt;keep) ctx-&gt;keep = 0.5;
+
+<a name="line68"> 68: </a>  <a href="../../../../../docs/manualpages/PEP/PEPAllocateSolution.html#PEPAllocateSolution">PEPAllocateSolution</a>(pep,0);
+<a name="line69"> 69: </a>  <a href="../../../../../docs/manualpages/PEP/PEPSetWorkVecs.html#PEPSetWorkVecs">PEPSetWorkVecs</a>(pep,4);
+
+<a name="line71"> 71: </a>  <a href="../../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(pep-&gt;ds,DSNHEP);
+<a name="line72"> 72: </a>  <a href="../../../../../docs/manualpages/DS/DSSetExtraRow.html#DSSetExtraRow">DSSetExtraRow</a>(pep-&gt;ds,PETSC_TRUE);
+<a name="line73"> 73: </a>  <a href="../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(pep-&gt;ds,pep-&gt;ncv+1);
+
+<a name="line75"> 75: </a>  <font color="#4169E1">return</font>(0);
+<a name="line76"> 76: </a>}
+
+<a name="line78"> 78: </a><strong><font color="#4169E1"><a name="PEPExtractVectors_QArnoldi"></a>PetscErrorCode PEPExtractVectors_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line79"> 79: </a>{
+<a name="line81"> 81: </a>  PetscInt       i,k=pep-&gt;nconv,ldds;
+<a name="line82"> 82: </a>  PetscScalar    *X,*pX0;
+<a name="line83"> 83: </a>  Mat            X0;
+
+<a name="line86"> 86: </a>  <font color="#4169E1">if</font> (pep-&gt;nconv==0) <font color="#4169E1">return</font>(0);
+<a name="line87"> 87: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(pep-&gt;ds,&amp;ldds);
+<a name="line88"> 88: </a>  <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line89"> 89: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;X);
+
+<a name="line91"> 91: </a>  <font color="#B22222">/* update vectors V = V*X */</font>
+<a name="line92"> 92: </a>  MatCreateSeqDense(PETSC_COMM_SELF,k,k,NULL,&amp;X0);
+<a name="line93"> 93: </a>  MatDenseGetArray(X0,&amp;pX0);
+<a name="line94"> 94: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line95"> 95: </a>    PetscArraycpy(pX0+i*k,X+i*ldds,k);
+<a name="line96"> 96: </a>  }
+<a name="line97"> 97: </a>  MatDenseRestoreArray(X0,&amp;pX0);
+<a name="line98"> 98: </a>  <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(pep-&gt;V,X0,0,k);
+<a name="line99"> 99: </a>  MatDestroy(&amp;X0);
+<a name="line100">100: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;X);
+<a name="line101">101: </a>  <font color="#4169E1">return</font>(0);
+<a name="line102">102: </a>}
+
+<a name="line104">104: </a><font color="#B22222">/*</font>
+<a name="line105">105: </a><font color="#B22222">  Compute a step of Classical Gram-Schmidt orthogonalization</font>
+<a name="line106">106: </a><font color="#B22222">*/</font>
+<a name="line107">107: </a><strong><font color="#4169E1"><a name="PEPQArnoldiCGS"></a>static PetscErrorCode PEPQArnoldiCGS(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscScalar *H,PetscBLASInt ldh,PetscScalar *h,PetscBLASInt j,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Vec t,Vec v,Vec w,PetscReal *onorm,PetscReal *norm,PetscScalar *work)</font></strong>
+<a name="line108">108: </a>{
+<a name="line110">110: </a>  PetscBLASInt   ione = 1,j_1 = j+1;
+<a name="line111">111: </a>  PetscReal      x,y;
+<a name="line112">112: </a>  PetscScalar    dot,one = 1.0,zero = 0.0;
+
+<a name="line115">115: </a>  <font color="#B22222">/* compute norm of v and w */</font>
+<a name="line116">116: </a>  <font color="#4169E1">if</font> (onorm) {
+<a name="line117">117: </a>    VecNorm(v,NORM_2,&amp;x);
+<a name="line118">118: </a>    VecNorm(w,NORM_2,&amp;y);
+<a name="line119">119: </a>    *onorm = PetscSqrtReal(x*x+y*y);
+<a name="line120">120: </a>  }
+
+<a name="line122">122: </a>  <font color="#B22222">/* orthogonalize: compute h */</font>
+<a name="line123">123: </a>  <a href="../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(V,v,h);
+<a name="line124">124: </a>  <a href="../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(V,w,work);
+<a name="line125">125: </a>  <font color="#4169E1">if</font> (j&gt;0)
+<a name="line126">126: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"C"</font>,&amp;j_1,&amp;j,&amp;one,H,&amp;ldh,work,&amp;ione,&amp;one,h,&amp;ione));
+<a name="line127">127: </a>  VecDot(w,t,&amp;dot);
+<a name="line128">128: </a>  h[j] += dot;
+
+<a name="line130">130: </a>  <font color="#B22222">/* orthogonalize: update v and w */</font>
+<a name="line131">131: </a>  <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(V,-1.0,1.0,v,h);
+<a name="line132">132: </a>  <font color="#4169E1">if</font> (j&gt;0) {
+<a name="line133">133: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;j_1,&amp;j,&amp;one,H,&amp;ldh,h,&amp;ione,&amp;zero,work,&amp;ione));
+<a name="line134">134: </a>    <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(V,-1.0,1.0,w,work);
+<a name="line135">135: </a>  }
+<a name="line136">136: </a>  VecAXPY(w,-h[j],t);
+
+<a name="line138">138: </a>  <font color="#B22222">/* compute norm of v and w */</font>
+<a name="line139">139: </a>  <font color="#4169E1">if</font> (norm) {
+<a name="line140">140: </a>    VecNorm(v,NORM_2,&amp;x);
+<a name="line141">141: </a>    VecNorm(w,NORM_2,&amp;y);
+<a name="line142">142: </a>    *norm = PetscSqrtReal(x*x+y*y);
+<a name="line143">143: </a>  }
+<a name="line144">144: </a>  <font color="#4169E1">return</font>(0);
+<a name="line145">145: </a>}
+
+<a name="line147">147: </a><font color="#B22222">/*</font>
+<a name="line148">148: </a><font color="#B22222">  Compute a run of Q-Arnoldi iterations</font>
+<a name="line149">149: </a><font color="#B22222">*/</font>
+<a name="line150">150: </a><strong><font color="#4169E1"><a name="PEPQArnoldi"></a>static PetscErrorCode PEPQArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscScalar *H,PetscInt ldh,PetscInt k,PetscInt *M,Vec v,Vec w,PetscReal *beta,PetscBool *breakdown,PetscScalar *work)</font></strong>
+<a name="line151">151: </a>{
+<a name="line152">152: </a>  PetscErrorCode     ierr;
+<a name="line153">153: </a>  PetscInt           i,j,l,m = *M;
+<a name="line154">154: </a>  Vec                t = pep-&gt;work[2],u = pep-&gt;work[3];
+<a name="line155">155: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BVOrthogRefineType</a> refinement;
+<a name="line156">156: </a>  PetscReal          norm=0.0,onorm,eta;
+<a name="line157">157: </a>  PetscScalar        *c = work + m;
+
+<a name="line160">160: </a>  <a href="../../../../../docs/manualpages/BV/BVGetOrthogonalization.html#BVGetOrthogonalization">BVGetOrthogonalization</a>(pep-&gt;V,NULL,&amp;refinement,&amp;eta,NULL);
+<a name="line161">161: </a>  <a href="../../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,k,v);
+<a name="line162">162: </a>  <font color="#4169E1">for</font> (j=k;j&lt;m;j++) {
+<a name="line163">163: </a>    <font color="#B22222">/* apply operator */</font>
+<a name="line164">164: </a>    VecCopy(w,t);
+<a name="line165">165: </a>    <font color="#4169E1">if</font> (pep-&gt;Dr) {
+<a name="line166">166: </a>      VecPointwiseMult(v,v,pep-&gt;Dr);
+<a name="line167">167: </a>    }
+<a name="line168">168: </a>    <a href="../../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>(pep-&gt;st,0,v,u);
+<a name="line169">169: </a>    VecCopy(t,v);
+<a name="line170">170: </a>    <font color="#4169E1">if</font> (pep-&gt;Dr) {
+<a name="line171">171: </a>      VecPointwiseMult(t,t,pep-&gt;Dr);
+<a name="line172">172: </a>    }
+<a name="line173">173: </a>    <a href="../../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>(pep-&gt;st,1,t,w);
+<a name="line174">174: </a>    VecAXPY(u,pep-&gt;sfactor,w);
+<a name="line175">175: </a>    <a href="../../../../../docs/manualpages/ST/STMatSolve.html#STMatSolve">STMatSolve</a>(pep-&gt;st,u,w);
+<a name="line176">176: </a>    VecScale(w,-1.0/(pep-&gt;sfactor*pep-&gt;sfactor));
+<a name="line177">177: </a>    <font color="#4169E1">if</font> (pep-&gt;Dr) {
+<a name="line178">178: </a>      VecPointwiseDivide(w,w,pep-&gt;Dr);
+<a name="line179">179: </a>    }
+<a name="line180">180: </a>    VecCopy(v,t);
+<a name="line181">181: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pep-&gt;V,0,j+1);
+
+<a name="line183">183: </a>    <font color="#B22222">/* orthogonalize */</font>
+<a name="line184">184: </a>    <font color="#4169E1">switch</font> (refinement) {
+<a name="line185">185: </a>      <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_NEVER</a>:
+<a name="line186">186: </a>        PEPQArnoldiCGS(pep,H,ldh,H+ldh*j,j,pep-&gt;V,t,v,w,NULL,&amp;norm,work);
+<a name="line187">187: </a>        *breakdown = PETSC_FALSE;
+<a name="line188">188: </a>        <font color="#4169E1">break</font>;
+<a name="line189">189: </a>      <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_ALWAYS</a>:
+<a name="line190">190: </a>        PEPQArnoldiCGS(pep,H,ldh,H+ldh*j,j,pep-&gt;V,t,v,w,NULL,NULL,work);
+<a name="line191">191: </a>        PEPQArnoldiCGS(pep,H,ldh,c,j,pep-&gt;V,t,v,w,&amp;onorm,&amp;norm,work);
+<a name="line192">192: </a>        <font color="#4169E1">for</font> (i=0;i&lt;=j;i++) H[ldh*j+i] += c[i];
+<a name="line193">193: </a>        <font color="#4169E1">if</font> (norm &lt; eta * onorm) *breakdown = PETSC_TRUE;
+<a name="line194">194: </a>        <font color="#4169E1">else</font> *breakdown = PETSC_FALSE;
+<a name="line195">195: </a>        <font color="#4169E1">break</font>;
+<a name="line196">196: </a>      <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_IFNEEDED</a>:
+<a name="line197">197: </a>        PEPQArnoldiCGS(pep,H,ldh,H+ldh*j,j,pep-&gt;V,t,v,w,&amp;onorm,&amp;norm,work);
+<a name="line198">198: </a>        <font color="#B22222">/* ||q|| &lt; eta ||h|| */</font>
+<a name="line199">199: </a>        l = 1;
+<a name="line200">200: </a>        <font color="#4169E1">while</font> (l&lt;3 &amp;&amp; norm &lt; eta * onorm) {
+<a name="line201">201: </a>          l++;
+<a name="line202">202: </a>          onorm = norm;
+<a name="line203">203: </a>          PEPQArnoldiCGS(pep,H,ldh,c,j,pep-&gt;V,t,v,w,NULL,&amp;norm,work);
+<a name="line204">204: </a>          <font color="#4169E1">for</font> (i=0;i&lt;=j;i++) H[ldh*j+i] += c[i];
+<a name="line205">205: </a>        }
+<a name="line206">206: </a>        <font color="#4169E1">if</font> (norm &lt; eta * onorm) *breakdown = PETSC_TRUE;
+<a name="line207">207: </a>        <font color="#4169E1">else</font> *breakdown = PETSC_FALSE;
+<a name="line208">208: </a>        <font color="#4169E1">break</font>;
+<a name="line209">209: </a>    }
+<a name="line210">210: </a>    VecScale(v,1.0/norm);
+<a name="line211">211: </a>    VecScale(w,1.0/norm);
+
+<a name="line213">213: </a>    H[j+1+ldh*j] = norm;
+<a name="line214">214: </a>    <font color="#4169E1">if</font> (j&lt;m-1) {
+<a name="line215">215: </a>      <a href="../../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,j+1,v);
+<a name="line216">216: </a>    }
+<a name="line217">217: </a>  }
+<a name="line218">218: </a>  *beta = norm;
+<a name="line219">219: </a>  <font color="#4169E1">return</font>(0);
+<a name="line220">220: </a>}
+
+<a name="line222">222: </a><strong><font color="#4169E1"><a name="PEPSolve_QArnoldi"></a>PetscErrorCode PEPSolve_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line223">223: </a>{
+<a name="line225">225: </a>  PEP_QARNOLDI   *ctx = (PEP_QARNOLDI*)pep-&gt;data;
+<a name="line226">226: </a>  PetscInt       j,k,l,lwork,nv,ld,newn,nconv;
+<a name="line227">227: </a>  Vec            v=pep-&gt;work[0],w=pep-&gt;work[1];
+<a name="line228">228: </a>  Mat            Q;
+<a name="line229">229: </a>  PetscScalar    *S,*work;
+<a name="line230">230: </a>  PetscReal      beta=0.0,norm,x,y;
+<a name="line231">231: </a>  PetscBool      breakdown=PETSC_FALSE,sinv;
+
+<a name="line234">234: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(pep-&gt;ds,&amp;ld);
+<a name="line235">235: </a>  lwork = 7*pep-&gt;ncv;
+<a name="line236">236: </a>  PetscMalloc1(lwork,&amp;work);
+<a name="line237">237: </a>  PetscObjectTypeCompare((PetscObject)pep-&gt;st,STSINVERT,&amp;sinv);
+<a name="line238">238: </a>  <a href="../../../../../docs/manualpages/RG/RGPushScale.html#RGPushScale">RGPushScale</a>(pep-&gt;rg,sinv?pep-&gt;sfactor:1.0/pep-&gt;sfactor);
+<a name="line239">239: </a>  <a href="../../../../../docs/manualpages/ST/STScaleShift.html#STScaleShift">STScaleShift</a>(pep-&gt;st,sinv?pep-&gt;sfactor:1.0/pep-&gt;sfactor);
+
+<a name="line241">241: </a>  <font color="#B22222">/* Get the starting Arnoldi vector */</font>
+<a name="line242">242: </a>  <font color="#4169E1">for</font> (j=0;j&lt;2;j++) {
+<a name="line243">243: </a>    <font color="#4169E1">if</font> (j&gt;=pep-&gt;nini) {
+<a name="line244">244: </a>      <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(pep-&gt;V,j);
+<a name="line245">245: </a>    }
+<a name="line246">246: </a>  }
+<a name="line247">247: </a>  <a href="../../../../../docs/manualpages/BV/BVCopyVec.html#BVCopyVec">BVCopyVec</a>(pep-&gt;V,0,v);
+<a name="line248">248: </a>  <a href="../../../../../docs/manualpages/BV/BVCopyVec.html#BVCopyVec">BVCopyVec</a>(pep-&gt;V,1,w);
+<a name="line249">249: </a>  VecNorm(v,NORM_2,&amp;x);
+<a name="line250">250: </a>  VecNorm(w,NORM_2,&amp;y);
+<a name="line251">251: </a>  norm = PetscSqrtReal(x*x+y*y);
+<a name="line252">252: </a>  VecScale(v,1.0/norm);
+<a name="line253">253: </a>  VecScale(w,1.0/norm);
+
+<a name="line255">255: </a>  <font color="#B22222">/* clean projected matrix (including the extra-arrow) */</font>
+<a name="line256">256: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line257">257: </a>  PetscArrayzero(S,ld*ld);
+<a name="line258">258: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+
+<a name="line260">260: </a>   <font color="#B22222">/* Restart loop */</font>
+<a name="line261">261: </a>  l = 0;
+<a name="line262">262: </a>  <font color="#4169E1">while</font> (pep-&gt;reason == <a href="../../../../../docs/manualpages/PEP/PEPConvergedReason.html#PEPConvergedReason">PEP_CONVERGED_ITERATING</a>) {
+<a name="line263">263: </a>    pep-&gt;its++;
+
+<a name="line265">265: </a>    <font color="#B22222">/* Compute an nv-step Arnoldi factorization */</font>
+<a name="line266">266: </a>    nv = PetscMin(pep-&gt;nconv+pep-&gt;mpd,pep-&gt;ncv);
+<a name="line267">267: </a>    <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line268">268: </a>    PEPQArnoldi(pep,S,ld,pep-&gt;nconv+l,&amp;nv,v,w,&amp;beta,&amp;breakdown,work);
+<a name="line269">269: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line270">270: </a>    <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(pep-&gt;ds,nv,0,pep-&gt;nconv,pep-&gt;nconv+l);
+<a name="line271">271: </a>    <font color="#4169E1">if</font> (l==0) {
+<a name="line272">272: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>);
+<a name="line273">273: </a>    } <font color="#4169E1">else</font> {
+<a name="line274">274: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line275">275: </a>    }
+<a name="line276">276: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pep-&gt;V,pep-&gt;nconv,nv);
+
+<a name="line278">278: </a>    <font color="#B22222">/* Solve projected problem */</font>
+<a name="line279">279: </a>    <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(pep-&gt;ds,pep-&gt;eigr,pep-&gt;eigi);
+<a name="line280">280: </a>    <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(pep-&gt;ds,pep-&gt;eigr,pep-&gt;eigi,NULL,NULL,NULL);
+<a name="line281">281: </a>    <a href="../../../../../docs/manualpages/DS/DSUpdateExtraRow.html#DSUpdateExtraRow">DSUpdateExtraRow</a>(pep-&gt;ds);
+<a name="line282">282: </a>    <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(pep-&gt;ds,pep-&gt;eigr,pep-&gt;eigi);
+
+<a name="line284">284: </a>    <font color="#B22222">/* Check convergence */</font>
+<a name="line285">285: </a>    PEPKrylovConvergence(pep,PETSC_FALSE,pep-&gt;nconv,nv-pep-&gt;nconv,beta,&amp;k);
+<a name="line286">286: </a>    (*pep-&gt;stopping)(pep,pep-&gt;its,pep-&gt;max_it,k,pep-&gt;nev,&amp;pep-&gt;reason,pep-&gt;stoppingctx);
+<a name="line287">287: </a>    nconv = k;
+
+<a name="line289">289: </a>    <font color="#B22222">/* Update l */</font>
+<a name="line290">290: </a>    <font color="#4169E1">if</font> (pep-&gt;reason != <a href="../../../../../docs/manualpages/PEP/PEPConvergedReason.html#PEPConvergedReason">PEP_CONVERGED_ITERATING</a> || breakdown) l = 0;
+<a name="line291">291: </a>    <font color="#4169E1">else</font> l = PetscMax(1,(PetscInt)((nv-k)*ctx-&gt;keep));
+<a name="line292">292: </a>    <font color="#4169E1">if</font> (!ctx-&gt;lock &amp;&amp; l&gt;0) { l += k; k = 0; } <font color="#B22222">/* non-locking variant: reset no. of converged pairs */</font>
+
+<a name="line294">294: </a>    <font color="#4169E1">if</font> (pep-&gt;reason == <a href="../../../../../docs/manualpages/PEP/PEPConvergedReason.html#PEPConvergedReason">PEP_CONVERGED_ITERATING</a>) {
+<a name="line295">295: </a>      <font color="#4169E1">if</font> (breakdown) {
+<a name="line296">296: </a>        <font color="#B22222">/* Stop if breakdown */</font>
+<a name="line297">297: </a>        PetscInfo2(pep,<font color="#666666">"Breakdown Quadratic Arnoldi method (it=%D norm=%g)\n"</font>,pep-&gt;its,(double)beta);
+<a name="line298">298: </a>        pep-&gt;reason = <a href="../../../../../docs/manualpages/PEP/PEPConvergedReason.html#PEPConvergedReason">PEP_DIVERGED_BREAKDOWN</a>;
+<a name="line299">299: </a>      } <font color="#4169E1">else</font> {
+<a name="line300">300: </a>        <font color="#B22222">/* Prepare the Rayleigh quotient for restart */</font>
+<a name="line301">301: </a>        <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a>(pep-&gt;ds,k+l);
+<a name="line302">302: </a>        <a href="../../../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(pep-&gt;ds,&amp;newn,NULL,NULL,NULL,NULL);
+<a name="line303">303: </a>        l = newn-k;
+<a name="line304">304: </a>      }
+<a name="line305">305: </a>    }
+<a name="line306">306: </a>    <font color="#B22222">/* Update the corresponding vectors V(:,idx) = V*Q(:,idx) */</font>
+<a name="line307">307: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line308">308: </a>    <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(pep-&gt;V,Q,pep-&gt;nconv,k+l);
+<a name="line309">309: </a>    MatDestroy(&amp;Q);
+
+<a name="line311">311: </a>    pep-&gt;nconv = k;
+<a name="line312">312: </a>    PEPMonitor(pep,pep-&gt;its,nconv,pep-&gt;eigr,pep-&gt;eigi,pep-&gt;errest,nv);
+<a name="line313">313: </a>  }
+<a name="line314">314: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pep-&gt;V,0,pep-&gt;nconv);
+<a name="line315">315: </a>  <font color="#4169E1">for</font> (j=0;j&lt;pep-&gt;nconv;j++) {
+<a name="line316">316: </a>    pep-&gt;eigr[j] *= pep-&gt;sfactor;
+<a name="line317">317: </a>    pep-&gt;eigi[j] *= pep-&gt;sfactor;
+<a name="line318">318: </a>  }
+
+<a name="line320">320: </a>  <a href="../../../../../docs/manualpages/ST/STScaleShift.html#STScaleShift">STScaleShift</a>(pep-&gt;st,sinv?1.0/pep-&gt;sfactor:pep-&gt;sfactor);
+<a name="line321">321: </a>  <a href="../../../../../docs/manualpages/RG/RGPopScale.html#RGPopScale">RGPopScale</a>(pep-&gt;rg);
+
+<a name="line323">323: </a>  <font color="#B22222">/* truncate Schur decomposition and change the state to raw so that</font>
+<a name="line324">324: </a><font color="#B22222">     <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>() computes eigenvectors from scratch */</font>
+<a name="line325">325: </a>  <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(pep-&gt;ds,pep-&gt;nconv,0,0,0);
+<a name="line326">326: </a>  <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(pep-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line327">327: </a>  PetscFree(work);
+<a name="line328">328: </a>  <font color="#4169E1">return</font>(0);
+<a name="line329">329: </a>}
+
+<a name="line331">331: </a><strong><font color="#4169E1"><a name="PEPQArnoldiSetRestart_QArnoldi"></a>static PetscErrorCode PEPQArnoldiSetRestart_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal keep)</font></strong>
+<a name="line332">332: </a>{
+<a name="line333">333: </a>  PEP_QARNOLDI *ctx = (PEP_QARNOLDI*)pep-&gt;data;
+
+<a name="line336">336: </a>  <font color="#4169E1">if</font> (keep==PETSC_DEFAULT) ctx-&gt;keep = 0.5;
+<a name="line337">337: </a>  <font color="#4169E1">else</font> {
+<a name="line338">338: </a>    <font color="#4169E1">if</font> (keep&lt;0.1 || keep&gt;0.9) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The keep argument must be in the range [0.1,0.9]"</font>);
+<a name="line339">339: </a>    ctx-&gt;keep = keep;
+<a name="line340">340: </a>  }
+<a name="line341">341: </a>  <font color="#4169E1">return</font>(0);
+<a name="line342">342: </a>}
+
+<a name="line344">344: </a><font color="#B22222">/*@</font>
+<a name="line345">345: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetRestart.html#PEPQArnoldiSetRestart">PEPQArnoldiSetRestart</a> - Sets the restart parameter for the Q-Arnoldi</font>
+<a name="line346">346: </a><font color="#B22222">   method, in particular the proportion of basis vectors that must be kept</font>
+<a name="line347">347: </a><font color="#B22222">   after restart.</font>
+
+<a name="line349">349: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line351">351: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line352">352: </a><font color="#B22222">+  pep  - the eigenproblem solver context</font>
+<a name="line353">353: </a><font color="#B22222">-  keep - the number of vectors to be kept at restart</font>
+
+<a name="line355">355: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line356">356: </a><font color="#B22222">.  -pep_qarnoldi_restart - Sets the restart parameter</font>
+
+<a name="line358">358: </a><font color="#B22222">   Notes:</font>
+<a name="line359">359: </a><font color="#B22222">   Allowed values are in the range [0.1,0.9]. The default is 0.5.</font>
+
+<a name="line361">361: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line363">363: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiGetRestart.html#PEPQArnoldiGetRestart">PEPQArnoldiGetRestart</a>()</font>
+<a name="line364">364: </a><font color="#B22222">@*/</font>
+<a name="line365">365: </a><strong><font color="#4169E1"><a name="PEPQArnoldiSetRestart"></a>PetscErrorCode <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetRestart.html#PEPQArnoldiSetRestart">PEPQArnoldiSetRestart</a>(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal keep)</font></strong>
+<a name="line366">366: </a>{
+
+<a name="line372">372: </a>  PetscTryMethod(pep,<font color="#666666">"PEPQArnoldiSetRestart_C"</font>,(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal),(pep,keep));
+<a name="line373">373: </a>  <font color="#4169E1">return</font>(0);
+<a name="line374">374: </a>}
+
+<a name="line376">376: </a><strong><font color="#4169E1"><a name="PEPQArnoldiGetRestart_QArnoldi"></a>static PetscErrorCode PEPQArnoldiGetRestart_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *keep)</font></strong>
+<a name="line377">377: </a>{
+<a name="line378">378: </a>  PEP_QARNOLDI *ctx = (PEP_QARNOLDI*)pep-&gt;data;
+
+<a name="line381">381: </a>  *keep = ctx-&gt;keep;
+<a name="line382">382: </a>  <font color="#4169E1">return</font>(0);
+<a name="line383">383: </a>}
+
+<a name="line385">385: </a><font color="#B22222">/*@</font>
+<a name="line386">386: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiGetRestart.html#PEPQArnoldiGetRestart">PEPQArnoldiGetRestart</a> - Gets the restart parameter used in the Q-Arnoldi method.</font>
+
+<a name="line388">388: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line390">390: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line391">391: </a><font color="#B22222">.  pep - the eigenproblem solver context</font>
+
+<a name="line393">393: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line394">394: </a><font color="#B22222">.  keep - the restart parameter</font>
+
+<a name="line396">396: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line398">398: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetRestart.html#PEPQArnoldiSetRestart">PEPQArnoldiSetRestart</a>()</font>
+<a name="line399">399: </a><font color="#B22222">@*/</font>
+<a name="line400">400: </a><strong><font color="#4169E1"><a name="PEPQArnoldiGetRestart"></a>PetscErrorCode <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiGetRestart.html#PEPQArnoldiGetRestart">PEPQArnoldiGetRestart</a>(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *keep)</font></strong>
+<a name="line401">401: </a>{
+
+<a name="line407">407: </a>  PetscUseMethod(pep,<font color="#666666">"PEPQArnoldiGetRestart_C"</font>,(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal*),(pep,keep));
+<a name="line408">408: </a>  <font color="#4169E1">return</font>(0);
+<a name="line409">409: </a>}
+
+<a name="line411">411: </a><strong><font color="#4169E1"><a name="PEPQArnoldiSetLocking_QArnoldi"></a>static PetscErrorCode PEPQArnoldiSetLocking_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool lock)</font></strong>
+<a name="line412">412: </a>{
+<a name="line413">413: </a>  PEP_QARNOLDI *ctx = (PEP_QARNOLDI*)pep-&gt;data;
+
+<a name="line416">416: </a>  ctx-&gt;lock = lock;
+<a name="line417">417: </a>  <font color="#4169E1">return</font>(0);
+<a name="line418">418: </a>}
+
+<a name="line420">420: </a><font color="#B22222">/*@</font>
+<a name="line421">421: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetLocking.html#PEPQArnoldiSetLocking">PEPQArnoldiSetLocking</a> - Choose between locking and non-locking variants of</font>
+<a name="line422">422: </a><font color="#B22222">   the Q-Arnoldi method.</font>
+
+<a name="line424">424: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line426">426: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line427">427: </a><font color="#B22222">+  pep  - the eigenproblem solver context</font>
+<a name="line428">428: </a><font color="#B22222">-  lock - true if the locking variant must be selected</font>
+
+<a name="line430">430: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line431">431: </a><font color="#B22222">.  -pep_qarnoldi_locking - Sets the locking flag</font>
+
+<a name="line433">433: </a><font color="#B22222">   Notes:</font>
+<a name="line434">434: </a><font color="#B22222">   The default is to keep all directions in the working subspace even if</font>
+<a name="line435">435: </a><font color="#B22222">   already converged to working accuracy (the non-locking variant).</font>
+<a name="line436">436: </a><font color="#B22222">   This behaviour can be changed so that converged eigenpairs are locked</font>
+<a name="line437">437: </a><font color="#B22222">   when the method restarts.</font>
+
+<a name="line439">439: </a><font color="#B22222">   Note that the default behaviour is the opposite to Krylov solvers in <a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>.</font>
+
+<a name="line441">441: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line443">443: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiGetLocking.html#PEPQArnoldiGetLocking">PEPQArnoldiGetLocking</a>()</font>
+<a name="line444">444: </a><font color="#B22222">@*/</font>
+<a name="line445">445: </a><strong><font color="#4169E1"><a name="PEPQArnoldiSetLocking"></a>PetscErrorCode <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetLocking.html#PEPQArnoldiSetLocking">PEPQArnoldiSetLocking</a>(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool lock)</font></strong>
+<a name="line446">446: </a>{
+
+<a name="line452">452: </a>  PetscTryMethod(pep,<font color="#666666">"PEPQArnoldiSetLocking_C"</font>,(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscBool),(pep,lock));
+<a name="line453">453: </a>  <font color="#4169E1">return</font>(0);
+<a name="line454">454: </a>}
+
+<a name="line456">456: </a><strong><font color="#4169E1"><a name="PEPQArnoldiGetLocking_QArnoldi"></a>static PetscErrorCode PEPQArnoldiGetLocking_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool *lock)</font></strong>
+<a name="line457">457: </a>{
+<a name="line458">458: </a>  PEP_QARNOLDI *ctx = (PEP_QARNOLDI*)pep-&gt;data;
+
+<a name="line461">461: </a>  *lock = ctx-&gt;lock;
+<a name="line462">462: </a>  <font color="#4169E1">return</font>(0);
+<a name="line463">463: </a>}
+
+<a name="line465">465: </a><font color="#B22222">/*@</font>
+<a name="line466">466: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiGetLocking.html#PEPQArnoldiGetLocking">PEPQArnoldiGetLocking</a> - Gets the locking flag used in the Q-Arnoldi method.</font>
+
+<a name="line468">468: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line470">470: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line471">471: </a><font color="#B22222">.  pep - the eigenproblem solver context</font>
+
+<a name="line473">473: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line474">474: </a><font color="#B22222">.  lock - the locking flag</font>
+
+<a name="line476">476: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line478">478: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetLocking.html#PEPQArnoldiSetLocking">PEPQArnoldiSetLocking</a>()</font>
+<a name="line479">479: </a><font color="#B22222">@*/</font>
+<a name="line480">480: </a><strong><font color="#4169E1"><a name="PEPQArnoldiGetLocking"></a>PetscErrorCode <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiGetLocking.html#PEPQArnoldiGetLocking">PEPQArnoldiGetLocking</a>(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool *lock)</font></strong>
+<a name="line481">481: </a>{
+
+<a name="line487">487: </a>  PetscUseMethod(pep,<font color="#666666">"PEPQArnoldiGetLocking_C"</font>,(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscBool*),(pep,lock));
+<a name="line488">488: </a>  <font color="#4169E1">return</font>(0);
+<a name="line489">489: </a>}
+
+<a name="line491">491: </a><strong><font color="#4169E1"><a name="PEPSetFromOptions_QArnoldi"></a>PetscErrorCode PEPSetFromOptions_QArnoldi(PetscOptionItems *PetscOptionsObject,<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line492">492: </a>{
+<a name="line494">494: </a>  PetscBool      flg,lock;
+<a name="line495">495: </a>  PetscReal      keep;
+
+<a name="line498">498: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> Q-Arnoldi Options"</font>);
+
+<a name="line500">500: </a>    PetscOptionsReal(<font color="#666666">"-pep_qarnoldi_restart"</font>,<font color="#666666">"Proportion of vectors kept after restart"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetRestart.html#PEPQArnoldiSetRestart">PEPQArnoldiSetRestart</a>"</font>,0.5,&amp;keep,&amp;flg);
+<a name="line501">501: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetRestart.html#PEPQArnoldiSetRestart">PEPQArnoldiSetRestart</a>(pep,keep); }
+
+<a name="line503">503: </a>    PetscOptionsBool(<font color="#666666">"-pep_qarnoldi_locking"</font>,<font color="#666666">"Choose between locking and non-locking variants"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetLocking.html#PEPQArnoldiSetLocking">PEPQArnoldiSetLocking</a>"</font>,PETSC_FALSE,&amp;lock,&amp;flg);
+<a name="line504">504: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/PEP/PEPQArnoldiSetLocking.html#PEPQArnoldiSetLocking">PEPQArnoldiSetLocking</a>(pep,lock); }
+
+<a name="line506">506: </a>  PetscOptionsTail();
+<a name="line507">507: </a>  <font color="#4169E1">return</font>(0);
+<a name="line508">508: </a>}
+
+<a name="line510">510: </a><strong><font color="#4169E1"><a name="PEPView_QArnoldi"></a>PetscErrorCode PEPView_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line511">511: </a>{
+<a name="line513">513: </a>  PEP_QARNOLDI   *ctx = (PEP_QARNOLDI*)pep-&gt;data;
+<a name="line514">514: </a>  PetscBool      isascii;
+
+<a name="line517">517: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line518">518: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line519">519: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  %d%% of basis vectors kept after restart\n"</font>,(int)(100*ctx-&gt;keep));
+<a name="line520">520: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  using the %slocking variant\n"</font>,ctx-&gt;lock?<font color="#666666">""</font>:<font color="#666666">"non-"</font>);
+<a name="line521">521: </a>  }
+<a name="line522">522: </a>  <font color="#4169E1">return</font>(0);
+<a name="line523">523: </a>}
+
+<a name="line525">525: </a><strong><font color="#4169E1"><a name="PEPDestroy_QArnoldi"></a>PetscErrorCode PEPDestroy_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line526">526: </a>{
+
+<a name="line530">530: </a>  PetscFree(pep-&gt;data);
+<a name="line531">531: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiSetRestart_C"</font>,NULL);
+<a name="line532">532: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiGetRestart_C"</font>,NULL);
+<a name="line533">533: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiSetLocking_C"</font>,NULL);
+<a name="line534">534: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiGetLocking_C"</font>,NULL);
+<a name="line535">535: </a>  <font color="#4169E1">return</font>(0);
+<a name="line536">536: </a>}
+
+<a name="line538">538: </a><strong><font color="#4169E1"><a name="PEPCreate_QArnoldi"></a>SLEPC_EXTERN PetscErrorCode PEPCreate_QArnoldi(<a href="../../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line539">539: </a>{
+<a name="line540">540: </a>  PEP_QARNOLDI   *ctx;
+
+<a name="line544">544: </a>  PetscNewLog(pep,&amp;ctx);
+<a name="line545">545: </a>  pep-&gt;data = (void*)ctx;
+<a name="line546">546: </a>  ctx-&gt;lock = PETSC_TRUE;
+
+<a name="line548">548: </a>  pep-&gt;ops-&gt;solve          = PEPSolve_QArnoldi;
+<a name="line549">549: </a>  pep-&gt;ops-&gt;setup          = PEPSetUp_QArnoldi;
+<a name="line550">550: </a>  pep-&gt;ops-&gt;setfromoptions = PEPSetFromOptions_QArnoldi;
+<a name="line551">551: </a>  pep-&gt;ops-&gt;destroy        = PEPDestroy_QArnoldi;
+<a name="line552">552: </a>  pep-&gt;ops-&gt;view           = PEPView_QArnoldi;
+<a name="line553">553: </a>  pep-&gt;ops-&gt;backtransform  = PEPBackTransform_Default;
+<a name="line554">554: </a>  pep-&gt;ops-&gt;computevectors = PEPComputeVectors_Default;
+<a name="line555">555: </a>  pep-&gt;ops-&gt;extractvectors = PEPExtractVectors_QArnoldi;
+<a name="line556">556: </a>  pep-&gt;ops-&gt;setdefaultst   = PEPSetDefaultST_Transform;
+
+<a name="line558">558: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiSetRestart_C"</font>,PEPQArnoldiSetRestart_QArnoldi);
+<a name="line559">559: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiGetRestart_C"</font>,PEPQArnoldiGetRestart_QArnoldi);
+<a name="line560">560: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiSetLocking_C"</font>,PEPQArnoldiSetLocking_QArnoldi);
+<a name="line561">561: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPQArnoldiGetLocking_C"</font>,PEPQArnoldiGetLocking_QArnoldi);
+<a name="line562">562: </a>  <font color="#4169E1">return</font>(0);
+<a name="line563">563: </a>}
+
+</pre>
+</body>
+
+</html>

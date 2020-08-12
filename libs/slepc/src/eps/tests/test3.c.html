@@ -1,0 +1,181 @@
+<center><a href="test3.c">Actual source code: test3.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tests/test3.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:55+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tests/test3.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Tests multiple calls to <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a> with different matrix.\n\n"</font>;
+
+<a name="line13"> 13: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line15"> 15: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line16"> 16: </a>{
+<a name="line17"> 17: </a>  Mat            A1,A2;       <font color="#B22222">/* problem matrices */</font>
+<a name="line18"> 18: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;         <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line19"> 19: </a>  PetscReal      tol=1000*PETSC_MACHINE_EPSILON,v;
+<a name="line20"> 20: </a>  Vec            d;
+<a name="line21"> 21: </a>  PetscInt       n=30,i,Istart,Iend;
+<a name="line22"> 22: </a>  PetscRandom    myrand;
+
+<a name="line25"> 25: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line27"> 27: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line28"> 28: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nTridiagonal with random diagonal, n=%D\n\n"</font>,n);
+
+<a name="line30"> 30: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line31"> 31: </a><font color="#B22222">           Create matrix tridiag([-1 0 -1])</font>
+<a name="line32"> 32: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line33"> 33: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A1);
+<a name="line34"> 34: </a>  MatSetSizes(A1,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line35"> 35: </a>  MatSetFromOptions(A1);
+<a name="line36"> 36: </a>  MatSetUp(A1);
+
+<a name="line38"> 38: </a>  MatGetOwnershipRange(A1,&amp;Istart,&amp;Iend);
+<a name="line39"> 39: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line40"> 40: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A1,i,i-1,-1.0,INSERT_VALUES); }
+<a name="line41"> 41: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(A1,i,i+1,-1.0,INSERT_VALUES); }
+<a name="line42"> 42: </a>  }
+<a name="line43"> 43: </a>  MatAssemblyBegin(A1,MAT_FINAL_ASSEMBLY);
+<a name="line44"> 44: </a>  MatAssemblyEnd(A1,MAT_FINAL_ASSEMBLY);
+
+<a name="line46"> 46: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line47"> 47: </a><font color="#B22222">       Create two matrices by filling the diagonal with rand values</font>
+<a name="line48"> 48: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line49"> 49: </a>  MatDuplicate(A1,MAT_COPY_VALUES,&amp;A2);
+<a name="line50"> 50: </a>  MatCreateVecs(A1,NULL,&amp;d);
+<a name="line51"> 51: </a>  PetscRandomCreate(PETSC_COMM_WORLD,&amp;myrand);
+<a name="line52"> 52: </a>  PetscRandomSetFromOptions(myrand);
+<a name="line53"> 53: </a>  PetscRandomSetInterval(myrand,0.0,1.0);
+<a name="line54"> 54: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line55"> 55: </a>    PetscRandomGetValueReal(myrand,&amp;v);
+<a name="line56"> 56: </a>    VecSetValue(d,i,v,INSERT_VALUES);
+<a name="line57"> 57: </a>  }
+<a name="line58"> 58: </a>  VecAssemblyBegin(d);
+<a name="line59"> 59: </a>  VecAssemblyEnd(d);
+<a name="line60"> 60: </a>  MatDiagonalSet(A1,d,INSERT_VALUES);
+<a name="line61"> 61: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line62"> 62: </a>    PetscRandomGetValueReal(myrand,&amp;v);
+<a name="line63"> 63: </a>    VecSetValue(d,i,v,INSERT_VALUES);
+<a name="line64"> 64: </a>  }
+<a name="line65"> 65: </a>  VecAssemblyBegin(d);
+<a name="line66"> 66: </a>  VecAssemblyEnd(d);
+<a name="line67"> 67: </a>  MatDiagonalSet(A2,d,INSERT_VALUES);
+<a name="line68"> 68: </a>  VecDestroy(&amp;d);
+<a name="line69"> 69: </a>  PetscRandomDestroy(&amp;myrand);
+
+<a name="line71"> 71: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line72"> 72: </a><font color="#B22222">                        Create the eigensolver</font>
+<a name="line73"> 73: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line74"> 74: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line75"> 75: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>);
+<a name="line76"> 76: </a>  <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(eps,tol,PETSC_DEFAULT);
+<a name="line77"> 77: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A1,NULL);
+<a name="line78"> 78: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line80"> 80: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line81"> 81: </a><font color="#B22222">                        Solve first eigenproblem</font>
+<a name="line82"> 82: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line83"> 83: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line84"> 84: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" - - - First matrix - - -\n"</font>);
+<a name="line85"> 85: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+
+<a name="line87"> 87: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line88"> 88: </a><font color="#B22222">                        Solve second eigenproblem</font>
+<a name="line89"> 89: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line90"> 90: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A2,NULL);
+<a name="line91"> 91: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line92"> 92: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" - - - Second matrix - - -\n"</font>);
+<a name="line93"> 93: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+
+<a name="line95"> 95: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line96"> 96: </a>  MatDestroy(&amp;A1);
+<a name="line97"> 97: </a>  MatDestroy(&amp;A2);
+<a name="line98"> 98: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line99"> 99: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line100">100: </a>}
+
+<a name="line102">102: </a><font color="#B22222">/*TEST</font>
+
+<a name="line104">104: </a><font color="#B22222">   testset:</font>
+<a name="line105">105: </a><font color="#B22222">      args: -eps_nev 4</font>
+<a name="line106">106: </a><font color="#B22222">      requires: !single</font>
+<a name="line107">107: </a><font color="#B22222">      output_file: output/test3_1.out</font>
+<a name="line108">108: </a><font color="#B22222">      test:</font>
+<a name="line109">109: </a><font color="#B22222">         suffix: 1</font>
+<a name="line110">110: </a><font color="#B22222">         args: -eps_type {{krylovschur subspace arnoldi lanczos lapack}}</font>
+<a name="line111">111: </a><font color="#B22222">      test:</font>
+<a name="line112">112: </a><font color="#B22222">         suffix: 1_power</font>
+<a name="line113">113: </a><font color="#B22222">         args: -eps_type power -eps_max_it 20000</font>
+<a name="line114">114: </a><font color="#B22222">      test:</font>
+<a name="line115">115: </a><font color="#B22222">         suffix: 1_jd</font>
+<a name="line116">116: </a><font color="#B22222">         args: -eps_type jd -eps_jd_initial_size 7</font>
+<a name="line117">117: </a><font color="#B22222">      test:</font>
+<a name="line118">118: </a><font color="#B22222">         suffix: 1_gd</font>
+<a name="line119">119: </a><font color="#B22222">         args: -eps_type gd -eps_gd_initial_size 7</font>
+<a name="line120">120: </a><font color="#B22222">      test:</font>
+<a name="line121">121: </a><font color="#B22222">         suffix: 1_gd2</font>
+<a name="line122">122: </a><font color="#B22222">         args: -eps_type gd -eps_gd_double_expansion</font>
+<a name="line123">123: </a><font color="#B22222">      test:</font>
+<a name="line124">124: </a><font color="#B22222">         suffix: 1_arpack</font>
+<a name="line125">125: </a><font color="#B22222">         args: -eps_type arpack</font>
+<a name="line126">126: </a><font color="#B22222">         requires: arpack</font>
+<a name="line127">127: </a><font color="#B22222">      test:</font>
+<a name="line128">128: </a><font color="#B22222">         suffix: 1_primme</font>
+<a name="line129">129: </a><font color="#B22222">         args: -eps_type primme -eps_conv_abs -eps_primme_blocksize 4</font>
+<a name="line130">130: </a><font color="#B22222">         requires: primme</font>
+<a name="line131">131: </a><font color="#B22222">      test:</font>
+<a name="line132">132: </a><font color="#B22222">         suffix: 1_trlan</font>
+<a name="line133">133: </a><font color="#B22222">         args: -eps_type trlan</font>
+<a name="line134">134: </a><font color="#B22222">         requires: trlan</font>
+<a name="line135">135: </a><font color="#B22222">      test:</font>
+<a name="line136">136: </a><font color="#B22222">         suffix: 1_blzpack</font>
+<a name="line137">137: </a><font color="#B22222">         args: -eps_type blzpack -st_type sinvert -eps_target 2.7</font>
+<a name="line138">138: </a><font color="#B22222">         requires: blzpack</font>
+
+<a name="line140">140: </a><font color="#B22222">   testset:</font>
+<a name="line141">141: </a><font color="#B22222">      args: -eps_nev 4 -eps_smallest_real -eps_max_it 500</font>
+<a name="line142">142: </a><font color="#B22222">      requires: !single</font>
+<a name="line143">143: </a><font color="#B22222">      output_file: output/test3_2.out</font>
+<a name="line144">144: </a><font color="#B22222">      test:</font>
+<a name="line145">145: </a><font color="#B22222">         suffix: 2_rqcg</font>
+<a name="line146">146: </a><font color="#B22222">         args: -eps_type rqcg -eps_rqcg_reset 5 -eps_ncv 32</font>
+<a name="line147">147: </a><font color="#B22222">      test:</font>
+<a name="line148">148: </a><font color="#B22222">         suffix: 2_lobpcg</font>
+<a name="line149">149: </a><font color="#B22222">         args: -eps_type lobpcg -eps_lobpcg_blocksize 6 -st_pc_type none</font>
+<a name="line150">150: </a><font color="#B22222">      test:</font>
+<a name="line151">151: </a><font color="#B22222">         suffix: 2_lanczos</font>
+<a name="line152">152: </a><font color="#B22222">         args: -eps_type lanczos</font>
+<a name="line153">153: </a><font color="#B22222">      test:</font>
+<a name="line154">154: </a><font color="#B22222">         suffix: 2_lanczos_delayed</font>
+<a name="line155">155: </a><font color="#B22222">         args: -eps_type lanczos -eps_lanczos_reorthog delayed -eps_tol 1e-8</font>
+<a name="line156">156: </a><font color="#B22222">      test:</font>
+<a name="line157">157: </a><font color="#B22222">         suffix: 2_trlan</font>
+<a name="line158">158: </a><font color="#B22222">         args: -eps_type trlan</font>
+<a name="line159">159: </a><font color="#B22222">         requires: trlan</font>
+<a name="line160">160: </a><font color="#B22222">      test:</font>
+<a name="line161">161: </a><font color="#B22222">         suffix: 2_blopex</font>
+<a name="line162">162: </a><font color="#B22222">         args: -eps_type blopex -eps_conv_abs -st_shift -2</font>
+<a name="line163">163: </a><font color="#B22222">         requires: blopex</font>
+
+<a name="line165">165: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

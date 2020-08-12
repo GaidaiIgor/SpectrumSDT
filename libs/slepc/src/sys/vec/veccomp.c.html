@@ -1,0 +1,739 @@
+<center><a href="veccomp.c">Actual source code: veccomp.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/vec/veccomp.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:35+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/vec/veccomp.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a> #include <A href="../../../include/slepc/private/vecimplslepc.h.html">&lt;slepc/private/vecimplslepc.h&gt;</A>
+
+<a name="line13"> 13: </a><font color="#B22222">/* Private MPI datatypes and operators */</font>
+<a name="line14"> 14: </a>static MPI_Datatype MPIU_NORM2=0, MPIU_NORM1_AND_2=0;
+<a name="line15"> 15: </a>static PetscBool VecCompInitialized = PETSC_FALSE;
+<a name="line16"> 16: </a>MPI_Op MPIU_NORM2_SUM=0;
+
+<a name="line18"> 18: </a><font color="#B22222">/* Private functions */</font>
+<a name="line19"> 19: </a><strong><font color="#4169E1">PETSC_STATIC_INLINE void SumNorm2(PetscReal*,PetscReal*,PetscReal*,PetscReal*)</font></strong>;
+<a name="line20"> 20: </a><strong><font color="#4169E1">PETSC_STATIC_INLINE PetscReal GetNorm2(PetscReal,PetscReal)</font></strong>;
+<a name="line21"> 21: </a><strong><font color="#4169E1">PETSC_STATIC_INLINE void AddNorm2(PetscReal*,PetscReal*,PetscReal)</font></strong>;
+<a name="line22"> 22: </a><strong><font color="#4169E1">static PetscErrorCode VecCompSetSubVecs_Comp(Vec,PetscInt,Vec*)</font></strong>;
+<a name="line23"> 23: </a><strong><font color="#4169E1">static PetscErrorCode VecCompGetSubVecs_Comp(Vec,PetscInt*,const Vec**)</font></strong>;
+
+<a name="line25"> 25: </a><font color="#A020F0">#include </font><font color="#666666">"veccomp0.h"</font><font color="#A020F0"></font>
+
+<a name="line28"> 28: </a><font color="#A020F0">#include </font><font color="#666666">"veccomp0.h"</font><font color="#A020F0"></font>
+
+<a name="line30"> 30: </a><strong><font color="#4169E1"><a name="SumNorm2"></a>PETSC_STATIC_INLINE void SumNorm2(PetscReal *ssq0,PetscReal *scale0,PetscReal *ssq1,PetscReal *scale1)</font></strong>
+<a name="line31"> 31: </a>{
+<a name="line32"> 32: </a>  PetscReal q;
+<a name="line33"> 33: </a>  <font color="#4169E1">if</font> (*scale0 &gt; *scale1) {
+<a name="line34"> 34: </a>    q = *scale1/(*scale0);
+<a name="line35"> 35: </a>    *ssq1 = *ssq0 + q*q*(*ssq1);
+<a name="line36"> 36: </a>    *scale1 = *scale0;
+<a name="line37"> 37: </a>  } <font color="#4169E1">else</font> {
+<a name="line38"> 38: </a>    q = *scale0/(*scale1);
+<a name="line39"> 39: </a>    *ssq1 += q*q*(*ssq0);
+<a name="line40"> 40: </a>  }
+<a name="line41"> 41: </a>}
+
+<a name="line43"> 43: </a><strong><font color="#4169E1"><a name="GetNorm2"></a>PETSC_STATIC_INLINE PetscReal GetNorm2(PetscReal ssq,PetscReal scale)</font></strong>
+<a name="line44"> 44: </a>{
+<a name="line45"> 45: </a>  <font color="#4169E1">return</font> scale*PetscSqrtReal(ssq);
+<a name="line46"> 46: </a>}
+
+<a name="line48"> 48: </a><strong><font color="#4169E1"><a name="AddNorm2"></a>PETSC_STATIC_INLINE void AddNorm2(PetscReal *ssq,PetscReal *scale,PetscReal x)</font></strong>
+<a name="line49"> 49: </a>{
+<a name="line50"> 50: </a>  PetscReal absx,q;
+<a name="line51"> 51: </a>  <font color="#4169E1">if</font> (x != 0.0) {
+<a name="line52"> 52: </a>    absx = PetscAbs(x);
+<a name="line53"> 53: </a>    <font color="#4169E1">if</font> (*scale &lt; absx) {
+<a name="line54"> 54: </a>      q = *scale/absx;
+<a name="line55"> 55: </a>      *ssq = 1.0 + *ssq*q*q;
+<a name="line56"> 56: </a>      *scale = absx;
+<a name="line57"> 57: </a>    } <font color="#4169E1">else</font> {
+<a name="line58"> 58: </a>      q = absx/(*scale);
+<a name="line59"> 59: </a>      *ssq += q*q;
+<a name="line60"> 60: </a>    }
+<a name="line61"> 61: </a>  }
+<a name="line62"> 62: </a>}
+
+<a name="line64"> 64: </a><strong><font color="#4169E1"><a name="SlepcSumNorm2_Local"></a>SLEPC_EXTERN void MPIAPI SlepcSumNorm2_Local(void *in,void *out,PetscMPIInt *cnt,MPI_Datatype *datatype)</font></strong>
+<a name="line65"> 65: </a>{
+<a name="line66"> 66: </a>  PetscInt  i,count = *cnt;
+<a name="line67"> 67: </a>  PetscReal *xin = (PetscReal*)in,*xout = (PetscReal*)out;
+
+<a name="line70"> 70: </a>  <font color="#4169E1">if</font> (*datatype == MPIU_NORM2) {
+<a name="line71"> 71: </a>    <font color="#4169E1">for</font> (i=0;i&lt;count;i++) {
+<a name="line72"> 72: </a>      SumNorm2(&amp;xin[i*2],&amp;xin[i*2+1],&amp;xout[i*2],&amp;xout[i*2+1]);
+<a name="line73"> 73: </a>    }
+<a name="line74"> 74: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*datatype == MPIU_NORM1_AND_2) {
+<a name="line75"> 75: </a>    <font color="#4169E1">for</font> (i=0;i&lt;count;i++) {
+<a name="line76"> 76: </a>      xout[i*3] += xin[i*3];
+<a name="line77"> 77: </a>      SumNorm2(&amp;xin[i*3+1],&amp;xin[i*3+2],&amp;xout[i*3+1],&amp;xout[i*3+2]);
+<a name="line78"> 78: </a>    }
+<a name="line79"> 79: </a>  } <font color="#4169E1">else</font> {
+<a name="line80"> 80: </a>    (*PetscErrorPrintf)(<font color="#666666">"Can only handle MPIU_NORM* data types"</font>);
+<a name="line81"> 81: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Abort.html#MPI_Abort">MPI_Abort</a>(MPI_COMM_WORLD,1);
+<a name="line82"> 82: </a>  }
+<a name="line83"> 83: </a>  PetscFunctionReturnVoid();
+<a name="line84"> 84: </a>}
+
+<a name="line86"> 86: </a><strong><font color="#4169E1"><a name="VecCompNormEnd"></a>static PetscErrorCode VecCompNormEnd(void)</font></strong>
+<a name="line87"> 87: </a>{
+
+<a name="line91"> 91: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Type_free.html#MPI_Type_free">MPI_Type_free</a>(&amp;MPIU_NORM2);
+<a name="line92"> 92: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Type_free.html#MPI_Type_free">MPI_Type_free</a>(&amp;MPIU_NORM1_AND_2);
+<a name="line93"> 93: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Op_free.html#MPI_Op_free">MPI_Op_free</a>(&amp;MPIU_NORM2_SUM);
+<a name="line94"> 94: </a>  VecCompInitialized = PETSC_FALSE;
+<a name="line95"> 95: </a>  <font color="#4169E1">return</font>(0);
+<a name="line96"> 96: </a>}
+
+<a name="line98"> 98: </a><strong><font color="#4169E1"><a name="VecCompNormInit"></a>static PetscErrorCode VecCompNormInit(void)</font></strong>
+<a name="line99"> 99: </a>{
+
+<a name="line103">103: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Type_contiguous.html#MPI_Type_contiguous">MPI_Type_contiguous</a>(2,MPIU_REAL,&amp;MPIU_NORM2);
+<a name="line104">104: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Type_commit.html#MPI_Type_commit">MPI_Type_commit</a>(&amp;MPIU_NORM2);
+<a name="line105">105: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Type_contiguous.html#MPI_Type_contiguous">MPI_Type_contiguous</a>(3,MPIU_REAL,&amp;MPIU_NORM1_AND_2);
+<a name="line106">106: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Type_commit.html#MPI_Type_commit">MPI_Type_commit</a>(&amp;MPIU_NORM1_AND_2);
+<a name="line107">107: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Op_create.html#MPI_Op_create">MPI_Op_create</a>(SlepcSumNorm2_Local,PETSC_TRUE,&amp;MPIU_NORM2_SUM);
+<a name="line108">108: </a>  PetscRegisterFinalize(VecCompNormEnd);
+<a name="line109">109: </a>  <font color="#4169E1">return</font>(0);
+<a name="line110">110: </a>}
+
+<a name="line112">112: </a><strong><font color="#4169E1"><a name="VecDestroy_Comp"></a>PetscErrorCode VecDestroy_Comp(Vec v)</font></strong>
+<a name="line113">113: </a>{
+<a name="line114">114: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data;
+<a name="line115">115: </a>  PetscInt       i;
+
+<a name="line119">119: </a><font color="#A020F0">#if defined(PETSC_USE_LOG)</font>
+<a name="line120">120: </a>  PetscLogObjectState((PetscObject)v,<font color="#666666">"Length=%D"</font>,v-&gt;map-&gt;n);
+<a name="line121">121: </a><font color="#A020F0">#endif</font>
+<a name="line122">122: </a>  <font color="#4169E1">for</font> (i=0;i&lt;vs-&gt;nx;i++) {
+<a name="line123">123: </a>    VecDestroy(&amp;vs-&gt;x[i]);
+<a name="line124">124: </a>  }
+<a name="line125">125: </a>  <font color="#4169E1">if</font> (--vs-&gt;n-&gt;friends &lt;= 0) {
+<a name="line126">126: </a>    PetscFree(vs-&gt;n);
+<a name="line127">127: </a>  }
+<a name="line128">128: </a>  PetscFree(vs-&gt;x);
+<a name="line129">129: </a>  PetscFree(vs);
+<a name="line130">130: </a>  PetscObjectComposeFunction((PetscObject)v,<font color="#666666">"VecCompSetSubVecs_C"</font>,NULL);
+<a name="line131">131: </a>  PetscObjectComposeFunction((PetscObject)v,<font color="#666666">"VecCompGetSubVecs_C"</font>,NULL);
+<a name="line132">132: </a>  <font color="#4169E1">return</font>(0);
+<a name="line133">133: </a>}
+
+<a name="line135">135: </a>static <font color="#4169E1">struct _VecOps</font> DvOps = {VecDuplicate_Comp, <font color="#B22222">/* 1 */</font>
+<a name="line136">136: </a>            VecDuplicateVecs_Comp,
+<a name="line137">137: </a>            VecDestroyVecs_Comp,
+<a name="line138">138: </a>            VecDot_Comp_MPI,
+<a name="line139">139: </a>            VecMDot_Comp_MPI,
+<a name="line140">140: </a>            VecNorm_Comp_MPI,
+<a name="line141">141: </a>            VecTDot_Comp_MPI,
+<a name="line142">142: </a>            VecMTDot_Comp_MPI,
+<a name="line143">143: </a>            VecScale_Comp,
+<a name="line144">144: </a>            VecCopy_Comp, <font color="#B22222">/* 10 */</font>
+<a name="line145">145: </a>            VecSet_Comp,
+<a name="line146">146: </a>            VecSwap_Comp,
+<a name="line147">147: </a>            VecAXPY_Comp,
+<a name="line148">148: </a>            VecAXPBY_Comp,
+<a name="line149">149: </a>            VecMAXPY_Comp,
+<a name="line150">150: </a>            VecAYPX_Comp,
+<a name="line151">151: </a>            VecWAXPY_Comp,
+<a name="line152">152: </a>            VecAXPBYPCZ_Comp,
+<a name="line153">153: </a>            VecPointwiseMult_Comp,
+<a name="line154">154: </a>            VecPointwiseDivide_Comp,
+<a name="line155">155: </a>            0, <font color="#B22222">/* 20 */</font>
+<a name="line156">156: </a>            0,0,
+<a name="line157">157: </a>            0 <font color="#B22222">/*VecGetArray_Seq*/</font>,
+<a name="line158">158: </a>            VecGetSize_Comp,
+<a name="line159">159: </a>            VecGetLocalSize_Comp,
+<a name="line160">160: </a>            0<font color="#B22222">/*VecRestoreArray_Seq*/</font>,
+<a name="line161">161: </a>            VecMax_Comp,
+<a name="line162">162: </a>            VecMin_Comp,
+<a name="line163">163: </a>            VecSetRandom_Comp,
+<a name="line164">164: </a>            0, <font color="#B22222">/* 30 */</font>
+<a name="line165">165: </a>            0,
+<a name="line166">166: </a>            VecDestroy_Comp,
+<a name="line167">167: </a>            VecView_Comp,
+<a name="line168">168: </a>            0<font color="#B22222">/*VecPlaceArray_Seq*/</font>,
+<a name="line169">169: </a>            0<font color="#B22222">/*VecReplaceArray_Seq*/</font>,
+<a name="line170">170: </a>            VecDot_Comp_Seq,
+<a name="line171">171: </a>            VecTDot_Comp_Seq,
+<a name="line172">172: </a>            VecNorm_Comp_Seq,
+<a name="line173">173: </a>            VecMDot_Comp_Seq,
+<a name="line174">174: </a>            VecMTDot_Comp_Seq, <font color="#B22222">/* 40 */</font>
+<a name="line175">175: </a>            0,
+<a name="line176">176: </a>            VecReciprocal_Comp,
+<a name="line177">177: </a>            VecConjugate_Comp,
+<a name="line178">178: </a>            0,0,
+<a name="line179">179: </a>            0<font color="#B22222">/*VecResetArray_Seq*/</font>,
+<a name="line180">180: </a>            0,
+<a name="line181">181: </a>            VecMaxPointwiseDivide_Comp,
+<a name="line182">182: </a>            VecPointwiseMax_Comp,
+<a name="line183">183: </a>            VecPointwiseMaxAbs_Comp,
+<a name="line184">184: </a>            VecPointwiseMin_Comp,
+<a name="line185">185: </a>            0,
+<a name="line186">186: </a>            VecSqrtAbs_Comp,
+<a name="line187">187: </a>            VecAbs_Comp,
+<a name="line188">188: </a>            VecExp_Comp,
+<a name="line189">189: </a>            VecLog_Comp,
+<a name="line190">190: </a>            VecShift_Comp,
+<a name="line191">191: </a>            0,
+<a name="line192">192: </a>            0,
+<a name="line193">193: </a>            0,
+<a name="line194">194: </a>            VecDotNorm2_Comp_MPI
+<a name="line195">195: </a>          };
+
+<a name="line197">197: </a><strong><font color="#4169E1"><a name="VecDuplicateVecs_Comp"></a>PetscErrorCode VecDuplicateVecs_Comp(Vec w,PetscInt m,Vec *V[])</font></strong>
+<a name="line198">198: </a>{
+<a name="line200">200: </a>  PetscInt       i;
+
+<a name="line205">205: </a>  <font color="#4169E1">if</font> (m&lt;=0) SETERRQ1(PetscObjectComm((PetscObject)w),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"m must be &gt; 0: m = %D"</font>,m);
+<a name="line206">206: </a>  PetscMalloc1(m,V);
+<a name="line207">207: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m;i++) { VecDuplicate(w,*V+i); }
+<a name="line208">208: </a>  <font color="#4169E1">return</font>(0);
+<a name="line209">209: </a>}
+
+<a name="line211">211: </a><strong><font color="#4169E1"><a name="VecDestroyVecs_Comp"></a>PetscErrorCode VecDestroyVecs_Comp(PetscInt m,Vec v[])</font></strong>
+<a name="line212">212: </a>{
+<a name="line214">214: </a>  PetscInt       i;
+
+<a name="line218">218: </a>  <font color="#4169E1">if</font> (m&lt;=0) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"m must be &gt; 0: m = %D"</font>,m);
+<a name="line219">219: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m;i++) { VecDestroy(&amp;v[i]); }
+<a name="line220">220: </a>  PetscFree(v);
+<a name="line221">221: </a>  <font color="#4169E1">return</font>(0);
+<a name="line222">222: </a>}
+
+<a name="line224">224: </a><strong><font color="#4169E1"><a name="VecCreate_Comp_Private"></a>static PetscErrorCode VecCreate_Comp_Private(Vec v,Vec *x,PetscInt nx,PetscBool x_to_me,Vec_Comp_N *n)</font></strong>
+<a name="line225">225: </a>{
+<a name="line226">226: </a>  Vec_Comp       *s;
+<a name="line228">228: </a>  PetscInt       N=0,lN=0,i,k;
+
+<a name="line231">231: </a>  <font color="#4169E1">if</font> (!VecCompInitialized) {
+<a name="line232">232: </a>    VecCompInitialized = PETSC_TRUE;
+<a name="line233">233: </a>    VecRegister(VECCOMP,VecCreate_Comp);
+<a name="line234">234: </a>    VecCompNormInit();
+<a name="line235">235: </a>  }
+
+<a name="line237">237: </a>  <font color="#B22222">/* Allocate a new Vec_Comp */</font>
+<a name="line238">238: </a>  <font color="#4169E1">if</font> (v-&gt;data) { PetscFree(v-&gt;data); }
+<a name="line239">239: </a>  PetscNewLog(v,&amp;s);
+<a name="line240">240: </a>  PetscMemcpy(v-&gt;ops,&amp;DvOps,<font color="#4169E1">sizeof</font>(DvOps));
+<a name="line241">241: </a>  v-&gt;data        = (void*)s;
+<a name="line242">242: </a>  v-&gt;petscnative = PETSC_FALSE;
+
+<a name="line244">244: </a>  <font color="#B22222">/* Allocate the array of Vec, if it is needed to be done */</font>
+<a name="line245">245: </a>  <font color="#4169E1">if</font> (!x_to_me) {
+<a name="line246">246: </a>    <font color="#4169E1">if</font> (nx) { PetscMalloc1(nx,&amp;s-&gt;x); }
+<a name="line247">247: </a>    <font color="#4169E1">if</font> (x) { PetscArraycpy(s-&gt;x,x,nx); }
+<a name="line248">248: </a>  } <font color="#4169E1">else</font> s-&gt;x = x;
+
+<a name="line250">250: </a>  s-&gt;nx = nx;
+
+<a name="line252">252: </a>  <font color="#4169E1">if</font> (nx &amp;&amp; x) {
+<a name="line253">253: </a>    <font color="#B22222">/* Allocate the shared structure, if it is not given */</font>
+<a name="line254">254: </a>    <font color="#4169E1">if</font> (!n) {
+<a name="line255">255: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nx;i++) {
+<a name="line256">256: </a>        VecGetSize(x[i],&amp;k);
+<a name="line257">257: </a>        N+= k;
+<a name="line258">258: </a>        VecGetLocalSize(x[i],&amp;k);
+<a name="line259">259: </a>        lN+= k;
+<a name="line260">260: </a>      }
+<a name="line261">261: </a>      PetscNewLog(v,&amp;n);
+<a name="line262">262: </a>      s-&gt;n = n;
+<a name="line263">263: </a>      n-&gt;n = nx;
+<a name="line264">264: </a>      n-&gt;N = N;
+<a name="line265">265: </a>      n-&gt;lN = lN;
+<a name="line266">266: </a>      n-&gt;friends = 1;
+<a name="line267">267: </a>    } <font color="#4169E1">else</font> { <font color="#B22222">/* If not, check in the vector in the shared structure */</font>
+<a name="line268">268: </a>      s-&gt;n = n;
+<a name="line269">269: </a>      s-&gt;n-&gt;friends++;
+<a name="line270">270: </a>    }
+
+<a name="line272">272: </a>    <font color="#B22222">/* Set the virtual sizes as the real sizes of the vector */</font>
+<a name="line273">273: </a>    VecSetSizes(v,s-&gt;n-&gt;lN,s-&gt;n-&gt;N);
+<a name="line274">274: </a>  }
+
+<a name="line276">276: </a>  PetscObjectChangeTypeName((PetscObject)v,VECCOMP);
+<a name="line277">277: </a>  PetscObjectComposeFunction((PetscObject)v,<font color="#666666">"VecCompSetSubVecs_C"</font>,VecCompSetSubVecs_Comp);
+<a name="line278">278: </a>  PetscObjectComposeFunction((PetscObject)v,<font color="#666666">"VecCompGetSubVecs_C"</font>,VecCompGetSubVecs_Comp);
+<a name="line279">279: </a>  <font color="#4169E1">return</font>(0);
+<a name="line280">280: </a>}
+
+<a name="line282">282: </a><strong><font color="#4169E1"><a name="VecCreate_Comp"></a>SLEPC_EXTERN PetscErrorCode VecCreate_Comp(Vec V)</font></strong>
+<a name="line283">283: </a>{
+
+<a name="line287">287: </a>  VecCreate_Comp_Private(V,NULL,0,PETSC_FALSE,NULL);
+<a name="line288">288: </a>  <font color="#4169E1">return</font>(0);
+<a name="line289">289: </a>}
+
+<a name="line291">291: </a><font color="#B22222">/*@C</font>
+<a name="line292">292: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/VecCreateComp.html#VecCreateComp">VecCreateComp</a> - Creates a new vector containing several subvectors,</font>
+<a name="line293">293: </a><font color="#B22222">   each stored separately.</font>
+
+<a name="line295">295: </a><font color="#B22222">   Collective</font>
+
+<a name="line297">297: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line298">298: </a><font color="#B22222">+  comm - communicator for the new Vec</font>
+<a name="line299">299: </a><font color="#B22222">.  Nx   - array of (initial) global sizes of child vectors</font>
+<a name="line300">300: </a><font color="#B22222">.  n    - number of child vectors</font>
+<a name="line301">301: </a><font color="#B22222">.  t    - type of the child vectors</font>
+<a name="line302">302: </a><font color="#B22222">-  Vparent - (optional) template vector</font>
+
+<a name="line304">304: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line305">305: </a><font color="#B22222">.  V - new vector</font>
+
+<a name="line307">307: </a><font color="#B22222">   Notes:</font>
+<a name="line308">308: </a><font color="#B22222">   This is similar to PETSc's VecNest but customized for SLEPc's needs. In particular,</font>
+<a name="line309">309: </a><font color="#B22222">   the number of child vectors can be modified dynamically, with <a href="../../../docs/manualpages/sys/VecCompSetSubVecs.html#VecCompSetSubVecs">VecCompSetSubVecs</a>().</font>
+
+<a name="line311">311: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line313">313: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a>(), <a href="../../../docs/manualpages/sys/VecCompSetSubVecs.html#VecCompSetSubVecs">VecCompSetSubVecs</a>()</font>
+<a name="line314">314: </a><font color="#B22222">@*/</font>
+<a name="line315">315: </a><strong><font color="#4169E1"><a name="VecCreateComp"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/VecCreateComp.html#VecCreateComp">VecCreateComp</a>(MPI_Comm comm,PetscInt *Nx,PetscInt n,VecType t,Vec Vparent,Vec *V)</font></strong>
+<a name="line316">316: </a>{
+<a name="line318">318: </a>  Vec            *x;
+<a name="line319">319: </a>  PetscInt       i;
+
+<a name="line322">322: </a>  VecCreate(comm,V);
+<a name="line323">323: </a>  PetscMalloc1(n,&amp;x);
+<a name="line324">324: </a>  PetscLogObjectMemory((PetscObject)*V,n*<font color="#4169E1">sizeof</font>(Vec));
+<a name="line325">325: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line326">326: </a>    VecCreate(comm,&amp;x[i]);
+<a name="line327">327: </a>    VecSetSizes(x[i],PETSC_DECIDE,Nx[i]);
+<a name="line328">328: </a>    VecSetType(x[i],t);
+<a name="line329">329: </a>  }
+<a name="line330">330: </a>  VecCreate_Comp_Private(*V,x,n,PETSC_TRUE,Vparent?((Vec_Comp*)Vparent-&gt;data)-&gt;n:NULL);
+<a name="line331">331: </a>  <font color="#4169E1">return</font>(0);
+<a name="line332">332: </a>}
+
+<a name="line334">334: </a><font color="#B22222">/*@C</font>
+<a name="line335">335: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a> - Creates a new vector containing several subvectors,</font>
+<a name="line336">336: </a><font color="#B22222">   each stored separately, from an array of Vecs.</font>
+
+<a name="line338">338: </a><font color="#B22222">   Collective on x</font>
+
+<a name="line340">340: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line341">341: </a><font color="#B22222">+  x - array of Vecs</font>
+<a name="line342">342: </a><font color="#B22222">.  n - number of child vectors</font>
+<a name="line343">343: </a><font color="#B22222">-  Vparent - (optional) template vector</font>
+
+<a name="line345">345: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line346">346: </a><font color="#B22222">.  V - new vector</font>
+
+<a name="line348">348: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line350">350: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/VecCreateComp.html#VecCreateComp">VecCreateComp</a>()</font>
+<a name="line351">351: </a><font color="#B22222">@*/</font>
+<a name="line352">352: </a><strong><font color="#4169E1"><a name="VecCreateCompWithVecs"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a>(Vec *x,PetscInt n,Vec Vparent,Vec *V)</font></strong>
+<a name="line353">353: </a>{
+<a name="line355">355: </a>  PetscInt       i;
+
+<a name="line361">361: </a>  VecCreate(PetscObjectComm((PetscObject)x[0]),V);
+<a name="line362">362: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line363">363: </a>    PetscObjectReference((PetscObject)x[i]);
+<a name="line364">364: </a>  }
+<a name="line365">365: </a>  VecCreate_Comp_Private(*V,x,n,PETSC_FALSE,Vparent?((Vec_Comp*)Vparent-&gt;data)-&gt;n:NULL);
+<a name="line366">366: </a>  <font color="#4169E1">return</font>(0);
+<a name="line367">367: </a>}
+
+<a name="line369">369: </a><strong><font color="#4169E1"><a name="VecDuplicate_Comp"></a>PetscErrorCode VecDuplicate_Comp(Vec win,Vec *V)</font></strong>
+<a name="line370">370: </a>{
+<a name="line372">372: </a>  Vec            *x;
+<a name="line373">373: </a>  PetscInt       i;
+<a name="line374">374: </a>  Vec_Comp       *s = (Vec_Comp*)win-&gt;data;
+
+<a name="line377">377: </a>  SlepcValidVecComp(win,1);
+<a name="line378">378: </a>  VecCreate(PetscObjectComm((PetscObject)win),V);
+<a name="line379">379: </a>  PetscMalloc1(s-&gt;nx,&amp;x);
+<a name="line380">380: </a>  PetscLogObjectMemory((PetscObject)*V,s-&gt;nx*<font color="#4169E1">sizeof</font>(Vec));
+<a name="line381">381: </a>  <font color="#4169E1">for</font> (i=0;i&lt;s-&gt;nx;i++) {
+<a name="line382">382: </a>    <font color="#4169E1">if</font> (s-&gt;x[i]) {
+<a name="line383">383: </a>      VecDuplicate(s-&gt;x[i],&amp;x[i]);
+<a name="line384">384: </a>    } <font color="#4169E1">else</font> x[i] = NULL;
+<a name="line385">385: </a>  }
+<a name="line386">386: </a>  VecCreate_Comp_Private(*V,x,s-&gt;nx,PETSC_TRUE,s-&gt;n);
+<a name="line387">387: </a>  <font color="#4169E1">return</font>(0);
+<a name="line388">388: </a>}
+
+<a name="line390">390: </a><strong><font color="#4169E1"><a name="VecCompGetSubVecs_Comp"></a>static PetscErrorCode VecCompGetSubVecs_Comp(Vec win,PetscInt *n,const Vec **x)</font></strong>
+<a name="line391">391: </a>{
+<a name="line392">392: </a>  Vec_Comp *s = (Vec_Comp*)win-&gt;data;
+
+<a name="line395">395: </a>  <font color="#4169E1">if</font> (x) *x = s-&gt;x;
+<a name="line396">396: </a>  <font color="#4169E1">if</font> (n) *n = s-&gt;n-&gt;n;
+<a name="line397">397: </a>  <font color="#4169E1">return</font>(0);
+<a name="line398">398: </a>}
+
+<a name="line400">400: </a><font color="#B22222">/*@C</font>
+<a name="line401">401: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/VecCompGetSubVecs.html#VecCompGetSubVecs">VecCompGetSubVecs</a> - Returns the entire array of vectors defining a</font>
+<a name="line402">402: </a><font color="#B22222">   compound vector.</font>
+
+<a name="line404">404: </a><font color="#B22222">   Collective on win</font>
+
+<a name="line406">406: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line407">407: </a><font color="#B22222">.  win - compound vector</font>
+
+<a name="line409">409: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line410">410: </a><font color="#B22222">+  n - number of child vectors</font>
+<a name="line411">411: </a><font color="#B22222">-  x - array of child vectors</font>
+
+<a name="line413">413: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line415">415: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/VecCreateComp.html#VecCreateComp">VecCreateComp</a>()</font>
+<a name="line416">416: </a><font color="#B22222">@*/</font>
+<a name="line417">417: </a><strong><font color="#4169E1"><a name="VecCompGetSubVecs"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/VecCompGetSubVecs.html#VecCompGetSubVecs">VecCompGetSubVecs</a>(Vec win,PetscInt *n,const Vec **x)</font></strong>
+<a name="line418">418: </a>{
+
+<a name="line423">423: </a>  PetscUseMethod(win,<font color="#666666">"VecCompGetSubVecs_C"</font>,(Vec,PetscInt*,const Vec**),(win,n,x));
+<a name="line424">424: </a>  <font color="#4169E1">return</font>(0);
+<a name="line425">425: </a>}
+
+<a name="line427">427: </a><strong><font color="#4169E1"><a name="VecCompSetSubVecs_Comp"></a>static PetscErrorCode VecCompSetSubVecs_Comp(Vec win,PetscInt n,Vec *x)</font></strong>
+<a name="line428">428: </a>{
+<a name="line429">429: </a>  Vec_Comp       *s = (Vec_Comp*)win-&gt;data;
+<a name="line430">430: </a>  PetscInt       i,N,nlocal;
+<a name="line431">431: </a>  Vec_Comp_N     *nn;
+
+<a name="line435">435: </a>  <font color="#4169E1">if</font> (!s) SETERRQ(PetscObjectComm((PetscObject)win),PETSC_ERR_ORDER,<font color="#666666">"Must call VecSetSizes first"</font>);
+<a name="line436">436: </a>  <font color="#4169E1">if</font> (!s-&gt;nx) {
+<a name="line437">437: </a>    <font color="#B22222">/* vector has been created via VecCreate+VecSetType+VecSetSizes, so allocate data structures */</font>
+<a name="line438">438: </a>    PetscMalloc1(n,&amp;s-&gt;x);
+<a name="line439">439: </a>    PetscLogObjectMemory((PetscObject)win,n*<font color="#4169E1">sizeof</font>(Vec));
+<a name="line440">440: </a>    VecGetSize(win,&amp;N);
+<a name="line441">441: </a>    <font color="#4169E1">if</font> (N%n) SETERRQ2(PetscObjectComm((PetscObject)win),1,<font color="#666666">"Global dimension %D is not divisible by %D"</font>,N,n);
+<a name="line442">442: </a>    VecGetLocalSize(win,&amp;nlocal);
+<a name="line443">443: </a>    <font color="#4169E1">if</font> (nlocal%n) SETERRQ2(PetscObjectComm((PetscObject)win),1,<font color="#666666">"Local dimension %D is not divisible by %D"</font>,nlocal,n);
+<a name="line444">444: </a>    s-&gt;nx = n;
+<a name="line445">445: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line446">446: </a>      VecCreate(PetscObjectComm((PetscObject)win),&amp;s-&gt;x[i]);
+<a name="line447">447: </a>      VecSetSizes(s-&gt;x[i],nlocal/n,N/n);
+<a name="line448">448: </a>      VecSetFromOptions(s-&gt;x[i]);
+<a name="line449">449: </a>    }
+<a name="line450">450: </a>    <font color="#4169E1">if</font> (!s-&gt;n) {
+<a name="line451">451: </a>      PetscNewLog(win,&amp;nn);
+<a name="line452">452: </a>      s-&gt;n = nn;
+<a name="line453">453: </a>      nn-&gt;N = N;
+<a name="line454">454: </a>      nn-&gt;lN = nlocal;
+<a name="line455">455: </a>      nn-&gt;friends = 1;
+<a name="line456">456: </a>    }
+<a name="line457">457: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (n &gt; s-&gt;nx) SETERRQ1(PetscObjectComm((PetscObject)win),PETSC_ERR_SUP,<font color="#666666">"Number of child vectors cannot be larger than %D"</font>,s-&gt;nx);
+<a name="line458">458: </a>  <font color="#4169E1">if</font> (x) {
+<a name="line459">459: </a>    PetscArraycpy(s-&gt;x,x,n);
+<a name="line460">460: </a>  }
+<a name="line461">461: </a>  s-&gt;n-&gt;n = n;
+<a name="line462">462: </a>  <font color="#4169E1">return</font>(0);
+<a name="line463">463: </a>}
+
+<a name="line465">465: </a><font color="#B22222">/*@C</font>
+<a name="line466">466: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/VecCompSetSubVecs.html#VecCompSetSubVecs">VecCompSetSubVecs</a> - Resets the number of subvectors defining a compound vector,</font>
+<a name="line467">467: </a><font color="#B22222">   or replaces the subvectors.</font>
+
+<a name="line469">469: </a><font color="#B22222">   Collective on win</font>
+
+<a name="line471">471: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line472">472: </a><font color="#B22222">+  win - compound vector</font>
+<a name="line473">473: </a><font color="#B22222">.  n - number of child vectors</font>
+<a name="line474">474: </a><font color="#B22222">-  x - array of child vectors</font>
+
+<a name="line476">476: </a><font color="#B22222">   Note:</font>
+<a name="line477">477: </a><font color="#B22222">   It is not possible to increase the number of subvectors with respect to the</font>
+<a name="line478">478: </a><font color="#B22222">   number set at its creation.</font>
+
+<a name="line480">480: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line482">482: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/VecCreateComp.html#VecCreateComp">VecCreateComp</a>(), <a href="../../../docs/manualpages/sys/VecCompGetSubVecs.html#VecCompGetSubVecs">VecCompGetSubVecs</a>()</font>
+<a name="line483">483: </a><font color="#B22222">@*/</font>
+<a name="line484">484: </a><strong><font color="#4169E1"><a name="VecCompSetSubVecs"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/VecCompSetSubVecs.html#VecCompSetSubVecs">VecCompSetSubVecs</a>(Vec win,PetscInt n,Vec *x)</font></strong>
+<a name="line485">485: </a>{
+
+<a name="line491">491: </a>  PetscTryMethod(win,<font color="#666666">"VecCompSetSubVecs_C"</font>,(Vec,PetscInt,Vec*),(win,n,x));
+<a name="line492">492: </a>  <font color="#4169E1">return</font>(0);
+<a name="line493">493: </a>}
+
+<a name="line495">495: </a><strong><font color="#4169E1"><a name="VecAXPY_Comp"></a>PetscErrorCode VecAXPY_Comp(Vec v,PetscScalar alpha,Vec w)</font></strong>
+<a name="line496">496: </a>{
+<a name="line498">498: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data,*ws = (Vec_Comp*)w-&gt;data;
+<a name="line499">499: </a>  PetscInt       i;
+
+<a name="line502">502: </a>  SlepcValidVecComp(v,1);
+<a name="line503">503: </a>  SlepcValidVecComp(w,3);
+<a name="line504">504: </a>  <font color="#4169E1">for</font> (i=0;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line505">505: </a>    VecAXPY(vs-&gt;x[i],alpha,ws-&gt;x[i]);
+<a name="line506">506: </a>  }
+<a name="line507">507: </a>  <font color="#4169E1">return</font>(0);
+<a name="line508">508: </a>}
+
+<a name="line510">510: </a><strong><font color="#4169E1"><a name="VecAYPX_Comp"></a>PetscErrorCode VecAYPX_Comp(Vec v,PetscScalar alpha,Vec w)</font></strong>
+<a name="line511">511: </a>{
+<a name="line513">513: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data,*ws = (Vec_Comp*)w-&gt;data;
+<a name="line514">514: </a>  PetscInt       i;
+
+<a name="line517">517: </a>  SlepcValidVecComp(v,1);
+<a name="line518">518: </a>  SlepcValidVecComp(w,3);
+<a name="line519">519: </a>  <font color="#4169E1">for</font> (i=0;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line520">520: </a>    VecAYPX(vs-&gt;x[i],alpha,ws-&gt;x[i]);
+<a name="line521">521: </a>  }
+<a name="line522">522: </a>  <font color="#4169E1">return</font>(0);
+<a name="line523">523: </a>}
+
+<a name="line525">525: </a><strong><font color="#4169E1"><a name="VecAXPBY_Comp"></a>PetscErrorCode VecAXPBY_Comp(Vec v,PetscScalar alpha,PetscScalar beta,Vec w)</font></strong>
+<a name="line526">526: </a>{
+<a name="line528">528: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data,*ws = (Vec_Comp*)w-&gt;data;
+<a name="line529">529: </a>  PetscInt       i;
+
+<a name="line532">532: </a>  SlepcValidVecComp(v,1);
+<a name="line533">533: </a>  SlepcValidVecComp(w,4);
+<a name="line534">534: </a>  <font color="#4169E1">for</font> (i=0;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line535">535: </a>    VecAXPBY(vs-&gt;x[i],alpha,beta,ws-&gt;x[i]);
+<a name="line536">536: </a>  }
+<a name="line537">537: </a>  <font color="#4169E1">return</font>(0);
+<a name="line538">538: </a>}
+
+<a name="line540">540: </a><strong><font color="#4169E1"><a name="VecMAXPY_Comp"></a>PetscErrorCode VecMAXPY_Comp(Vec v,PetscInt n,const PetscScalar *alpha,Vec *w)</font></strong>
+<a name="line541">541: </a>{
+<a name="line543">543: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data;
+<a name="line544">544: </a>  Vec            *wx;
+<a name="line545">545: </a>  PetscInt       i,j;
+
+<a name="line548">548: </a>  SlepcValidVecComp(v,1);
+<a name="line549">549: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) SlepcValidVecComp(w[i],4);
+
+<a name="line551">551: </a>  PetscMalloc1(n,&amp;wx);
+
+<a name="line553">553: </a>  <font color="#4169E1">for</font> (j=0;j&lt;vs-&gt;n-&gt;n;j++) {
+<a name="line554">554: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) wx[i] = ((Vec_Comp*)w[i]-&gt;data)-&gt;x[j];
+<a name="line555">555: </a>    VecMAXPY(vs-&gt;x[j],n,alpha,wx);
+<a name="line556">556: </a>  }
+
+<a name="line558">558: </a>  PetscFree(wx);
+<a name="line559">559: </a>  <font color="#4169E1">return</font>(0);
+<a name="line560">560: </a>}
+
+<a name="line562">562: </a><strong><font color="#4169E1"><a name="VecWAXPY_Comp"></a>PetscErrorCode VecWAXPY_Comp(Vec v,PetscScalar alpha,Vec w,Vec z)</font></strong>
+<a name="line563">563: </a>{
+<a name="line565">565: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data,*ws = (Vec_Comp*)w-&gt;data,*zs = (Vec_Comp*)z-&gt;data;
+<a name="line566">566: </a>  PetscInt       i;
+
+<a name="line569">569: </a>  SlepcValidVecComp(v,1);
+<a name="line570">570: </a>  SlepcValidVecComp(w,3);
+<a name="line571">571: </a>  SlepcValidVecComp(z,4);
+<a name="line572">572: </a>  <font color="#4169E1">for</font> (i=0;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line573">573: </a>    VecWAXPY(vs-&gt;x[i],alpha,ws-&gt;x[i],zs-&gt;x[i]);
+<a name="line574">574: </a>  }
+<a name="line575">575: </a>  <font color="#4169E1">return</font>(0);
+<a name="line576">576: </a>}
+
+<a name="line578">578: </a><strong><font color="#4169E1"><a name="VecAXPBYPCZ_Comp"></a>PetscErrorCode VecAXPBYPCZ_Comp(Vec v,PetscScalar alpha,PetscScalar beta,PetscScalar gamma,Vec w,Vec z)</font></strong>
+<a name="line579">579: </a>{
+<a name="line580">580: </a>  PetscErrorCode  ierr;
+<a name="line581">581: </a>  Vec_Comp        *vs = (Vec_Comp*)v-&gt;data,*ws = (Vec_Comp*)w-&gt;data,*zs = (Vec_Comp*)z-&gt;data;
+<a name="line582">582: </a>  PetscInt        i;
+
+<a name="line585">585: </a>  SlepcValidVecComp(v,1);
+<a name="line586">586: </a>  SlepcValidVecComp(w,5);
+<a name="line587">587: </a>  SlepcValidVecComp(z,6);
+<a name="line588">588: </a>  <font color="#4169E1">for</font> (i=0;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line589">589: </a>    VecAXPBYPCZ(vs-&gt;x[i],alpha,beta,gamma,ws-&gt;x[i],zs-&gt;x[i]);
+<a name="line590">590: </a>  }
+<a name="line591">591: </a>  <font color="#4169E1">return</font>(0);
+<a name="line592">592: </a>}
+
+<a name="line594">594: </a><strong><font color="#4169E1"><a name="VecGetSize_Comp"></a>PetscErrorCode VecGetSize_Comp(Vec v,PetscInt *size)</font></strong>
+<a name="line595">595: </a>{
+<a name="line596">596: </a>  Vec_Comp *vs = (Vec_Comp*)v-&gt;data;
+
+<a name="line600">600: </a>  <font color="#4169E1">if</font> (vs-&gt;n) {
+<a name="line601">601: </a>    SlepcValidVecComp(v,1);
+<a name="line602">602: </a>    *size = vs-&gt;n-&gt;N;
+<a name="line603">603: </a>  } <font color="#4169E1">else</font> *size = v-&gt;map-&gt;N;
+<a name="line604">604: </a>  <font color="#4169E1">return</font>(0);
+<a name="line605">605: </a>}
+
+<a name="line607">607: </a><strong><font color="#4169E1"><a name="VecGetLocalSize_Comp"></a>PetscErrorCode VecGetLocalSize_Comp(Vec v,PetscInt *size)</font></strong>
+<a name="line608">608: </a>{
+<a name="line609">609: </a>  Vec_Comp *vs = (Vec_Comp*)v-&gt;data;
+
+<a name="line613">613: </a>  <font color="#4169E1">if</font> (vs-&gt;n) {
+<a name="line614">614: </a>    SlepcValidVecComp(v,1);
+<a name="line615">615: </a>    *size = vs-&gt;n-&gt;lN;
+<a name="line616">616: </a>  } <font color="#4169E1">else</font> *size = v-&gt;map-&gt;n;
+<a name="line617">617: </a>  <font color="#4169E1">return</font>(0);
+<a name="line618">618: </a>}
+
+<a name="line620">620: </a><strong><font color="#4169E1"><a name="VecMax_Comp"></a>PetscErrorCode VecMax_Comp(Vec v,PetscInt *idx,PetscReal *z)</font></strong>
+<a name="line621">621: </a>{
+<a name="line623">623: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data;
+<a name="line624">624: </a>  PetscInt       idxp,s=0,s0;
+<a name="line625">625: </a>  PetscReal      zp,z0;
+<a name="line626">626: </a>  PetscInt       i;
+
+<a name="line629">629: </a>  SlepcValidVecComp(v,1);
+<a name="line630">630: </a>  <font color="#4169E1">if</font> (!idx &amp;&amp; !z) <font color="#4169E1">return</font>(0);
+
+<a name="line632">632: </a>  <font color="#4169E1">if</font> (vs-&gt;n-&gt;n &gt; 0) {
+<a name="line633">633: </a>    VecMax(vs-&gt;x[0],idx?&amp;idxp:NULL,&amp;zp);
+<a name="line634">634: </a>  } <font color="#4169E1">else</font> {
+<a name="line635">635: </a>    zp = PETSC_MIN_REAL;
+<a name="line636">636: </a>    <font color="#4169E1">if</font> (idx) idxp = -1;
+<a name="line637">637: </a>  }
+<a name="line638">638: </a>  <font color="#4169E1">for</font> (i=1;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line639">639: </a>    VecGetSize(vs-&gt;x[i-1],&amp;s0);
+<a name="line640">640: </a>    s += s0;
+<a name="line641">641: </a>    VecMax(vs-&gt;x[i],idx?&amp;idxp:NULL,&amp;z0);
+<a name="line642">642: </a>    <font color="#4169E1">if</font> (zp &lt; z0) {
+<a name="line643">643: </a>      <font color="#4169E1">if</font> (idx) *idx = s+idxp;
+<a name="line644">644: </a>      zp = z0;
+<a name="line645">645: </a>    }
+<a name="line646">646: </a>  }
+<a name="line647">647: </a>  <font color="#4169E1">if</font> (z) *z = zp;
+<a name="line648">648: </a>  <font color="#4169E1">return</font>(0);
+<a name="line649">649: </a>}
+
+<a name="line651">651: </a><strong><font color="#4169E1"><a name="VecMin_Comp"></a>PetscErrorCode VecMin_Comp(Vec v,PetscInt *idx,PetscReal *z)</font></strong>
+<a name="line652">652: </a>{
+<a name="line654">654: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data;
+<a name="line655">655: </a>  PetscInt       idxp,s=0,s0;
+<a name="line656">656: </a>  PetscReal      zp,z0;
+<a name="line657">657: </a>  PetscInt       i;
+
+<a name="line660">660: </a>  SlepcValidVecComp(v,1);
+<a name="line661">661: </a>  <font color="#4169E1">if</font> (!idx &amp;&amp; !z) <font color="#4169E1">return</font>(0);
+
+<a name="line663">663: </a>  <font color="#4169E1">if</font> (vs-&gt;n-&gt;n &gt; 0) {
+<a name="line664">664: </a>    VecMin(vs-&gt;x[0],idx?&amp;idxp:NULL,&amp;zp);
+<a name="line665">665: </a>  } <font color="#4169E1">else</font> {
+<a name="line666">666: </a>    zp = PETSC_MAX_REAL;
+<a name="line667">667: </a>    <font color="#4169E1">if</font> (idx) idxp = -1;
+<a name="line668">668: </a>  }
+<a name="line669">669: </a>  <font color="#4169E1">for</font> (i=1;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line670">670: </a>    VecGetSize(vs-&gt;x[i-1],&amp;s0);
+<a name="line671">671: </a>    s += s0;
+<a name="line672">672: </a>    VecMin(vs-&gt;x[i],idx?&amp;idxp:NULL,&amp;z0);
+<a name="line673">673: </a>    <font color="#4169E1">if</font> (zp &gt; z0) {
+<a name="line674">674: </a>      <font color="#4169E1">if</font> (idx) *idx = s+idxp;
+<a name="line675">675: </a>      zp = z0;
+<a name="line676">676: </a>    }
+<a name="line677">677: </a>  }
+<a name="line678">678: </a>  <font color="#4169E1">if</font> (z) *z = zp;
+<a name="line679">679: </a>  <font color="#4169E1">return</font>(0);
+<a name="line680">680: </a>}
+
+<a name="line682">682: </a><strong><font color="#4169E1"><a name="VecMaxPointwiseDivide_Comp"></a>PetscErrorCode VecMaxPointwiseDivide_Comp(Vec v,Vec w,PetscReal *m)</font></strong>
+<a name="line683">683: </a>{
+<a name="line685">685: </a>  Vec_Comp       *vs = (Vec_Comp*)v-&gt;data,*ws = (Vec_Comp*)w-&gt;data;
+<a name="line686">686: </a>  PetscReal      work;
+<a name="line687">687: </a>  PetscInt       i;
+
+<a name="line690">690: </a>  SlepcValidVecComp(v,1);
+<a name="line691">691: </a>  SlepcValidVecComp(w,2);
+<a name="line692">692: </a>  <font color="#4169E1">if</font> (!m || vs-&gt;n-&gt;n == 0) <font color="#4169E1">return</font>(0);
+<a name="line693">693: </a>  VecMaxPointwiseDivide(vs-&gt;x[0],ws-&gt;x[0],m);
+<a name="line694">694: </a>  <font color="#4169E1">for</font> (i=1;i&lt;vs-&gt;n-&gt;n;i++) {
+<a name="line695">695: </a>    VecMaxPointwiseDivide(vs-&gt;x[i],ws-&gt;x[i],&amp;work);
+<a name="line696">696: </a>    *m = PetscMax(*m,work);
+<a name="line697">697: </a>  }
+<a name="line698">698: </a>  <font color="#4169E1">return</font>(0);
+<a name="line699">699: </a>}
+
+
+
+<a name="line707">707: </a><strong><font color="#228B22">PetscErrorCode __COMPOSE3__(Vec,NAME,_Comp)(Vec v) \</font></strong>
+<a name="line708">708: </a><strong><font color="#228B22">{ \</font></strong>
+<a name="line709">709: </a><strong><font color="#228B22">  PetscErrorCode  ierr; \</font></strong>
+<a name="line710">710: </a><strong><font color="#228B22">  Vec_Comp        *vs = (Vec_Comp*)v-&gt;data; \</font></strong>
+<a name="line711">711: </a><strong><font color="#228B22">  PetscInt        i; \</font></strong>
+<a name="line712">712: </a><strong><font color="#228B22">\</font></strong>
+<a name="line714">714: </a><strong><font color="#228B22">  SlepcValidVecComp(v,1); \</font></strong>
+<a name="line715">715: </a><strong><font color="#228B22">  for (i=0;i&lt;vs-&gt;n-&gt;n;i++) { \</font></strong>
+<a name="line716">716: </a><strong><font color="#228B22">    __COMPOSE2__(Vec,NAME)(vs-&gt;x[i]); \</font></strong>
+<a name="line717">717: </a><strong><font color="#228B22">  } \</font></strong>
+<a name="line718">718: </a><strong><font color="#228B22">  return(0);\</font></strong>
+<a name="line719">719: </a><strong><font color="#228B22">}</font></strong>
+
+<a name="line721">721: </a><strong><font color="#4169E1"><a name="_FUNC_TEMPLATE1__"></a>__FUNC_TEMPLATE1__(Conjugate)</font></strong>
+<a name="line722">722: </a><strong><font color="#4169E1">__FUNC_TEMPLATE1__(Reciprocal)</font></strong>
+<a name="line723">723: </a><strong><font color="#4169E1">__FUNC_TEMPLATE1__(SqrtAbs)</font></strong>
+<a name="line724">724: </a><strong><font color="#4169E1">__FUNC_TEMPLATE1__(Abs)</font></strong>
+<a name="line725">725: </a><strong><font color="#4169E1">__FUNC_TEMPLATE1__(Exp)</font></strong>
+<a name="line726">726: </a><strong><font color="#4169E1">__FUNC_TEMPLATE1__(Log)</font></strong>
+
+<a name="line729">729: </a><strong><font color="#228B22">PetscErrorCode __COMPOSE3__(Vec,NAME,_Comp)(Vec v,T0 __a) \</font></strong>
+<a name="line730">730: </a><strong><font color="#228B22">{ \</font></strong>
+<a name="line731">731: </a><strong><font color="#228B22">  PetscErrorCode  ierr; \</font></strong>
+<a name="line732">732: </a><strong><font color="#228B22">  Vec_Comp        *vs = (Vec_Comp*)v-&gt;data; \</font></strong>
+<a name="line733">733: </a><strong><font color="#228B22">  PetscInt        i; \</font></strong>
+<a name="line734">734: </a><strong><font color="#228B22">\</font></strong>
+<a name="line736">736: </a><strong><font color="#228B22">  SlepcValidVecComp(v,1); \</font></strong>
+<a name="line737">737: </a><strong><font color="#228B22">  for (i=0;i&lt;vs-&gt;n-&gt;n;i++) { \</font></strong>
+<a name="line738">738: </a><strong><font color="#228B22">    __COMPOSE2__(Vec,NAME)(vs-&gt;x[i],__a); \</font></strong>
+<a name="line739">739: </a><strong><font color="#228B22">  } \</font></strong>
+<a name="line740">740: </a><strong><font color="#228B22">  return(0);\</font></strong>
+<a name="line741">741: </a><strong><font color="#228B22">}</font></strong>
+
+<a name="line743">743: </a><strong><font color="#4169E1"><a name="_FUNC_TEMPLATE2__"></a>__FUNC_TEMPLATE2__(Set,PetscScalar)</font></strong>
+<a name="line744">744: </a><strong><font color="#4169E1">__FUNC_TEMPLATE2__(View,PetscViewer)</font></strong>
+<a name="line745">745: </a><strong><font color="#4169E1">__FUNC_TEMPLATE2__(Scale,PetscScalar)</font></strong>
+<a name="line746">746: </a><strong><font color="#4169E1">__FUNC_TEMPLATE2__(SetRandom,PetscRandom)</font></strong>
+<a name="line747">747: </a><strong><font color="#4169E1">__FUNC_TEMPLATE2__(Shift,PetscScalar)</font></strong>
+
+<a name="line750">750: </a><strong><font color="#228B22">PetscErrorCode __COMPOSE3__(Vec,NAME,_Comp)(Vec v,Vec w) \</font></strong>
+<a name="line751">751: </a><strong><font color="#228B22">{ \</font></strong>
+<a name="line752">752: </a><strong><font color="#228B22">  PetscErrorCode  ierr; \</font></strong>
+<a name="line753">753: </a><strong><font color="#228B22">  Vec_Comp        *vs = (Vec_Comp*)v-&gt;data,\</font></strong>
+<a name="line754">754: </a><strong><font color="#228B22">                  *ws = (Vec_Comp*)w-&gt;data; \</font></strong>
+<a name="line755">755: </a><strong><font color="#228B22">  PetscInt        i; \</font></strong>
+<a name="line756">756: </a><strong><font color="#228B22">\</font></strong>
+<a name="line758">758: </a><strong><font color="#228B22">  SlepcValidVecComp(v,1); \</font></strong>
+<a name="line759">759: </a><strong><font color="#228B22">  SlepcValidVecComp(w,2); \</font></strong>
+<a name="line760">760: </a><strong><font color="#228B22">  for (i=0;i&lt;vs-&gt;n-&gt;n;i++) { \</font></strong>
+<a name="line761">761: </a><strong><font color="#228B22">    __COMPOSE2__(Vec,NAME)(vs-&gt;x[i],ws-&gt;x[i]); \</font></strong>
+<a name="line762">762: </a><strong><font color="#228B22">  } \</font></strong>
+<a name="line763">763: </a><strong><font color="#228B22">  return(0);\</font></strong>
+<a name="line764">764: </a><strong><font color="#228B22">}</font></strong>
+
+<a name="line766">766: </a><strong><font color="#4169E1"><a name="_FUNC_TEMPLATE3__"></a>__FUNC_TEMPLATE3__(Copy)</font></strong>
+<a name="line767">767: </a><strong><font color="#4169E1">__FUNC_TEMPLATE3__(Swap)</font></strong>
+
+<a name="line770">770: </a><strong><font color="#228B22">PetscErrorCode __COMPOSE3__(Vec,NAME,_Comp)(Vec v,Vec w,Vec z) \</font></strong>
+<a name="line771">771: </a><strong><font color="#228B22">{ \</font></strong>
+<a name="line772">772: </a><strong><font color="#228B22">  PetscErrorCode  ierr; \</font></strong>
+<a name="line773">773: </a><strong><font color="#228B22">  Vec_Comp        *vs = (Vec_Comp*)v-&gt;data, \</font></strong>
+<a name="line774">774: </a><strong><font color="#228B22">                  *ws = (Vec_Comp*)w-&gt;data, \</font></strong>
+<a name="line775">775: </a><strong><font color="#228B22">                  *zs = (Vec_Comp*)z-&gt;data; \</font></strong>
+<a name="line776">776: </a><strong><font color="#228B22">  PetscInt        i; \</font></strong>
+<a name="line777">777: </a><strong><font color="#228B22">\</font></strong>
+<a name="line779">779: </a><strong><font color="#228B22">  SlepcValidVecComp(v,1); \</font></strong>
+<a name="line780">780: </a><strong><font color="#228B22">  SlepcValidVecComp(w,2); \</font></strong>
+<a name="line781">781: </a><strong><font color="#228B22">  SlepcValidVecComp(z,3); \</font></strong>
+<a name="line782">782: </a><strong><font color="#228B22">  for (i=0;i&lt;vs-&gt;n-&gt;n;i++) { \</font></strong>
+<a name="line783">783: </a><strong><font color="#228B22">    __COMPOSE2__(Vec,NAME)(vs-&gt;x[i],ws-&gt;x[i],zs-&gt;x[i]); \</font></strong>
+<a name="line784">784: </a><strong><font color="#228B22">  } \</font></strong>
+<a name="line785">785: </a><strong><font color="#228B22">  return(0);\</font></strong>
+<a name="line786">786: </a><strong><font color="#228B22">}</font></strong>
+
+<a name="line788">788: </a><strong><font color="#4169E1"><a name="_FUNC_TEMPLATE4__"></a>__FUNC_TEMPLATE4__(PointwiseMax)</font></strong>
+<a name="line789">789: </a><strong><font color="#4169E1">__FUNC_TEMPLATE4__(PointwiseMaxAbs)</font></strong>
+<a name="line790">790: </a><strong><font color="#4169E1">__FUNC_TEMPLATE4__(PointwiseMin)</font></strong>
+<a name="line791">791: </a><strong><font color="#4169E1">__FUNC_TEMPLATE4__(PointwiseMult)</font></strong>
+<a name="line792">792: </a><strong><font color="#4169E1">__FUNC_TEMPLATE4__(PointwiseDivide)</font></strong>
+</pre>
+</body>
+
+</html>

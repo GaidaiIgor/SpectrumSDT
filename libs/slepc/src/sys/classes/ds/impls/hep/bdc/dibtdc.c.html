@@ -1,0 +1,793 @@
+<center><a href="dibtdc.c">Actual source code: dibtdc.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/ds/impls/hep/bdc/dibtdc.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:39+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/ds/impls/hep/bdc/dibtdc.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   BDC - Block-divide and conquer (see description in README file)</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../../include/slepc/private/dsimpl.h.html">&lt;slepc/private/dsimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="cutlr_"></a>static PetscErrorCode cutlr_(PetscBLASInt start,PetscBLASInt n,PetscBLASInt blkct,</font></strong>
+<a name="line18"> 18: </a><strong><font color="#4169E1">        PetscBLASInt *bsizes,PetscBLASInt *ranks,PetscBLASInt *cut,</font></strong>
+<a name="line19"> 19: </a><strong><font color="#4169E1">        PetscBLASInt *lsum,PetscBLASInt *lblks,PetscBLASInt *info)</font></strong>
+<a name="line20"> 20: </a>{
+<a name="line21"> 21: </a><font color="#B22222">/*  -- Routine written in LAPACK Version 3.0 style -- */</font>
+<a name="line22"> 22: </a><font color="#B22222">/* *************************************************** */</font>
+<a name="line23"> 23: </a><font color="#B22222">/*     Written by */</font>
+<a name="line24"> 24: </a><font color="#B22222">/*     Michael Moldaschl and Wilfried Gansterer */</font>
+<a name="line25"> 25: </a><font color="#B22222">/*     University of Vienna */</font>
+<a name="line26"> 26: </a><font color="#B22222">/*     last modification: March 16, 2014 */</font>
+
+<a name="line28"> 28: </a><font color="#B22222">/*     Small adaptations of original code written by */</font>
+<a name="line29"> 29: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line30"> 30: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+<a name="line31"> 31: </a><font color="#B22222">/*     see https://doi.org/10.1137/S1064827501399432 */</font>
+<a name="line32"> 32: </a><font color="#B22222">/* *************************************************** */</font>
+
+<a name="line34"> 34: </a><font color="#B22222">/*  Purpose */</font>
+<a name="line35"> 35: </a><font color="#B22222">/*  ======= */</font>
+
+<a name="line37"> 37: </a><font color="#B22222">/*  CUTLR computes the optimal cut in a sequence of BLKCT neighboring */</font>
+<a name="line38"> 38: </a><font color="#B22222">/*  blocks whose sizes are given by the array BSIZES. */</font>
+<a name="line39"> 39: </a><font color="#B22222">/*  The sum of all block sizes in the sequence considered is given by N. */</font>
+<a name="line40"> 40: </a><font color="#B22222">/*  The cut is optimal in the sense that the difference of the sizes of */</font>
+<a name="line41"> 41: </a><font color="#B22222">/*  the resulting two halves is minimum over all cuts with minimum ranks */</font>
+<a name="line42"> 42: </a><font color="#B22222">/*  between blocks of the sequence considered. */</font>
+
+<a name="line44"> 44: </a><font color="#B22222">/*  Arguments */</font>
+<a name="line45"> 45: </a><font color="#B22222">/*  ========= */</font>
+
+<a name="line47"> 47: </a><font color="#B22222">/*  START  (input) INTEGER */</font>
+<a name="line48"> 48: </a><font color="#B22222">/*         In the original array KSIZES of the calling routine DIBTDC, */</font>
+<a name="line49"> 49: </a><font color="#B22222">/*         the position where the sequence considered in this routine starts. */</font>
+<a name="line50"> 50: </a><font color="#B22222">/*         START &gt;= 1. */</font>
+
+<a name="line52"> 52: </a><font color="#B22222">/*  N      (input) INTEGER */</font>
+<a name="line53"> 53: </a><font color="#B22222">/*         The sum of all the block sizes of the sequence to be cut = */</font>
+<a name="line54"> 54: </a><font color="#B22222">/*         = sum_{i=1}^{BLKCT} BSIZES(I). */</font>
+<a name="line55"> 55: </a><font color="#B22222">/*         N &gt;= 3. */</font>
+
+<a name="line57"> 57: </a><font color="#B22222">/*  BLKCT  (input) INTEGER */</font>
+<a name="line58"> 58: </a><font color="#B22222">/*         The number of blocks in the sequence to be cut. */</font>
+<a name="line59"> 59: </a><font color="#B22222">/*         BLKCT &gt;= 3. */</font>
+
+<a name="line61"> 61: </a><font color="#B22222">/*  BSIZES (input) INTEGER array, dimension (BLKCT) */</font>
+<a name="line62"> 62: </a><font color="#B22222">/*         The dimensions of the (quadratic) blocks of the sequence to be */</font>
+<a name="line63"> 63: </a><font color="#B22222">/*         cut. sum_{i=1}^{BLKCT} BSIZES(I) = N. */</font>
+
+<a name="line65"> 65: </a><font color="#B22222">/*  RANKS  (input) INTEGER array, dimension (BLKCT-1) */</font>
+<a name="line66"> 66: </a><font color="#B22222">/*         The ranks determining the approximations of the off-diagonal */</font>
+<a name="line67"> 67: </a><font color="#B22222">/*         blocks in the sequence considered. */</font>
+
+<a name="line69"> 69: </a><font color="#B22222">/*  CUT    (output) INTEGER */</font>
+<a name="line70"> 70: </a><font color="#B22222">/*         After the optimum cut has been determined, the position (in the */</font>
+<a name="line71"> 71: </a><font color="#B22222">/*         overall problem as worked on in DIBTDC !) of the last block in */</font>
+<a name="line72"> 72: </a><font color="#B22222">/*         the first half of the sequence to be cut. */</font>
+<a name="line73"> 73: </a><font color="#B22222">/*         START &lt;= CUT &lt;= START+BLKCT-2. */</font>
+
+<a name="line75"> 75: </a><font color="#B22222">/*  LSUM   (output) INTEGER */</font>
+<a name="line76"> 76: </a><font color="#B22222">/*         After the optimum cut has been determined, the sum of the */</font>
+<a name="line77"> 77: </a><font color="#B22222">/*         block sizes in the first half of the sequence to be cut. */</font>
+<a name="line78"> 78: </a><font color="#B22222">/*         LSUM &lt; N. */</font>
+
+<a name="line80"> 80: </a><font color="#B22222">/*  LBLKS  (output) INTEGER */</font>
+<a name="line81"> 81: </a><font color="#B22222">/*         After the optimum cut has been determined, the number of the */</font>
+<a name="line82"> 82: </a><font color="#B22222">/*         blocks in the first half of the sequence to be cut. */</font>
+<a name="line83"> 83: </a><font color="#B22222">/*         1 &lt;= LBLKS &lt; BLKCT. */</font>
+
+<a name="line85"> 85: </a><font color="#B22222">/*  INFO   (output) INTEGER */</font>
+<a name="line86"> 86: </a><font color="#B22222">/*          = 0:  successful exit. */</font>
+<a name="line87"> 87: </a><font color="#B22222">/*          &lt; 0:  illegal arguments. */</font>
+<a name="line88"> 88: </a><font color="#B22222">/*                if INFO = -i, the i-th (input) argument had an illegal */</font>
+<a name="line89"> 89: </a><font color="#B22222">/*                value. */</font>
+<a name="line90"> 90: </a><font color="#B22222">/*          &gt; 0:  illegal results. */</font>
+<a name="line91"> 91: </a><font color="#B22222">/*                if INFO = i, the i-th (output) argument had an illegal */</font>
+<a name="line92"> 92: </a><font color="#B22222">/*                value. */</font>
+
+<a name="line94"> 94: </a><font color="#B22222">/*  Further Details */</font>
+<a name="line95"> 95: </a><font color="#B22222">/*  =============== */</font>
+
+<a name="line97"> 97: </a><font color="#B22222">/*  Based on code written by */</font>
+<a name="line98"> 98: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line99"> 99: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+
+<a name="line101">101: </a><font color="#B22222">/*  ===================================================================== */</font>
+
+<a name="line103">103: </a>  PetscBLASInt i, ksk, kchk, ksum, nhalf, deviat, mindev, minrnk, tmpsum;
+
+<a name="line106">106: </a>  *info = 0;
+<a name="line107">107: </a>  *lblks = 1;
+<a name="line108">108: </a>  *lsum = 1;
+<a name="line109">109: </a>  *cut = start;
+
+<a name="line111">111: </a>  <font color="#4169E1">if</font> (start &lt; 1) *info = -1;
+<a name="line112">112: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (n &lt; 3) *info = -2;
+<a name="line113">113: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (blkct &lt; 3) *info = -3;
+<a name="line114">114: </a>  <font color="#4169E1">if</font> (*info == 0) {
+<a name="line115">115: </a>    ksum = 0;
+<a name="line116">116: </a>    kchk = 0;
+<a name="line117">117: </a>    <font color="#4169E1">for</font> (i = 0; i &lt; blkct; ++i) {
+<a name="line118">118: </a>      ksk = bsizes[i];
+<a name="line119">119: </a>      ksum += ksk;
+<a name="line120">120: </a>      <font color="#4169E1">if</font> (ksk &lt; 1) kchk = 1;
+<a name="line121">121: </a>    }
+<a name="line122">122: </a>    <font color="#4169E1">if</font> (ksum != n || kchk == 1) *info = -4;
+<a name="line123">123: </a>  }
+<a name="line124">124: </a>  <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Wrong argument %d in CUTLR"</font>,-(*info));
+
+<a name="line126">126: </a>  <font color="#B22222">/* determine smallest rank in the range considered */</font>
+
+<a name="line128">128: </a>  minrnk = n;
+<a name="line129">129: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; blkct-1; ++i) {
+<a name="line130">130: </a>    <font color="#4169E1">if</font> (ranks[i] &lt; minrnk) minrnk = ranks[i];
+<a name="line131">131: </a>  }
+
+<a name="line133">133: </a>  <font color="#B22222">/* determine best cut among those with smallest rank */</font>
+
+<a name="line135">135: </a>  nhalf = n / 2;
+<a name="line136">136: </a>  tmpsum = 0;
+<a name="line137">137: </a>  mindev = n;
+<a name="line138">138: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; blkct; ++i) {
+<a name="line139">139: </a>    tmpsum += bsizes[i];
+<a name="line140">140: </a>    <font color="#4169E1">if</font> (ranks[i] == minrnk) {
+
+<a name="line142">142: </a>      <font color="#B22222">/* determine deviation from "optimal" cut NHALF */</font>
+
+<a name="line144">144: </a>      deviat = tmpsum - nhalf;
+<a name="line145">145: </a>      <font color="#4169E1">if</font> (deviat&lt;0) deviat = -deviat;
+
+<a name="line147">147: </a>      <font color="#B22222">/* compare to best deviation so far */</font>
+
+<a name="line149">149: </a>      <font color="#4169E1">if</font> (deviat &lt; mindev) {
+<a name="line150">150: </a>        mindev = deviat;
+<a name="line151">151: </a>        *cut = start + i;
+<a name="line152">152: </a>        *lblks = i + 1;
+<a name="line153">153: </a>        *lsum = tmpsum;
+<a name="line154">154: </a>      }
+<a name="line155">155: </a>    }
+<a name="line156">156: </a>  }
+
+<a name="line158">158: </a>  <font color="#4169E1">if</font> (*cut &lt; start || *cut &gt;= start + blkct - 1) *info = 6;
+<a name="line159">159: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*lsum &lt; 1 || *lsum &gt;= n) *info = 7;
+<a name="line160">160: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*lblks &lt; 1 || *lblks &gt;= blkct) *info = 8;
+<a name="line161">161: </a>  <font color="#4169E1">return</font>(0);
+<a name="line162">162: </a>}
+
+<a name="line164">164: </a><strong><font color="#4169E1"><a name="BDC_dibtdc_"></a>PetscErrorCode BDC_dibtdc_(const char *jobz,PetscBLASInt n,PetscBLASInt nblks,</font></strong>
+<a name="line165">165: </a><strong><font color="#4169E1">        PetscBLASInt *ksizes,PetscReal *d,PetscBLASInt l1d,PetscBLASInt l2d,</font></strong>
+<a name="line166">166: </a><strong><font color="#4169E1">        PetscReal *e,PetscBLASInt *rank,PetscBLASInt l1e,PetscBLASInt l2e,</font></strong>
+<a name="line167">167: </a><strong><font color="#4169E1">        PetscReal tol,PetscReal *ev,PetscReal *z,PetscBLASInt ldz,PetscReal *work,</font></strong>
+<a name="line168">168: </a><strong><font color="#4169E1">        PetscBLASInt lwork,PetscBLASInt *iwork,PetscBLASInt liwork,</font></strong>
+<a name="line169">169: </a><strong><font color="#4169E1">        PetscBLASInt *info,PetscBLASInt jobz_len)</font></strong>
+<a name="line170">170: </a>{
+<a name="line171">171: </a><font color="#B22222">/*  -- Routine written in LAPACK Version 3.0 style -- */</font>
+<a name="line172">172: </a><font color="#B22222">/* *************************************************** */</font>
+<a name="line173">173: </a><font color="#B22222">/*     Written by */</font>
+<a name="line174">174: </a><font color="#B22222">/*     Michael Moldaschl and Wilfried Gansterer */</font>
+<a name="line175">175: </a><font color="#B22222">/*     University of Vienna */</font>
+<a name="line176">176: </a><font color="#B22222">/*     last modification: March 16, 2014 */</font>
+
+<a name="line178">178: </a><font color="#B22222">/*     Small adaptations of original code written by */</font>
+<a name="line179">179: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line180">180: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+<a name="line181">181: </a><font color="#B22222">/*     see https://doi.org/10.1137/S1064827501399432 */</font>
+<a name="line182">182: </a><font color="#B22222">/* *************************************************** */</font>
+
+<a name="line184">184: </a><font color="#B22222">/*  Purpose */</font>
+<a name="line185">185: </a><font color="#B22222">/*  ======= */</font>
+
+<a name="line187">187: </a><font color="#B22222">/*  DIBTDC computes all eigenvalues and corresponding eigenvectors of a */</font>
+<a name="line188">188: </a><font color="#B22222">/*  symmetric irreducible block tridiagonal matrix with rank RANK matrices */</font>
+<a name="line189">189: </a><font color="#B22222">/*  as the subdiagonal blocks using a block divide and conquer method. */</font>
+
+<a name="line191">191: </a><font color="#B22222">/*  Arguments */</font>
+<a name="line192">192: </a><font color="#B22222">/*  ========= */</font>
+
+<a name="line194">194: </a><font color="#B22222">/*  JOBZ    (input) CHARACTER*1 */</font>
+<a name="line195">195: </a><font color="#B22222">/*          = 'N':  Compute eigenvalues only (not implemented); */</font>
+<a name="line196">196: </a><font color="#B22222">/*          = 'D':  Compute eigenvalues and eigenvectors. */</font>
+<a name="line197">197: </a><font color="#B22222">/*                  Eigenvectors are accumulated in the */</font>
+<a name="line198">198: </a><font color="#B22222">/*                  divide-and-conquer process. */</font>
+
+<a name="line200">200: </a><font color="#B22222">/*  N      (input) INTEGER */</font>
+<a name="line201">201: </a><font color="#B22222">/*         The dimension of the symmetric irreducible block tridiagonal */</font>
+<a name="line202">202: </a><font color="#B22222">/*         matrix.  N &gt;= 2. */</font>
+
+<a name="line204">204: </a><font color="#B22222">/*  NBLKS  (input) INTEGER, 2 &lt;= NBLKS &lt;= N */</font>
+<a name="line205">205: </a><font color="#B22222">/*         The number of diagonal blocks in the matrix. */</font>
+
+<a name="line207">207: </a><font color="#B22222">/*  KSIZES (input) INTEGER array, dimension (NBLKS) */</font>
+<a name="line208">208: </a><font color="#B22222">/*         The dimension of the square diagonal blocks from top left */</font>
+<a name="line209">209: </a><font color="#B22222">/*         to bottom right.  KSIZES(I) &gt;= 1 for all I, and the sum of */</font>
+<a name="line210">210: </a><font color="#B22222">/*         KSIZES(I) for I = 1 to NBLKS has to be equal to N. */</font>
+
+<a name="line212">212: </a><font color="#B22222">/*  D      (input) DOUBLE PRECISION array, dimension (L1D,L2D,NBLKS) */</font>
+<a name="line213">213: </a><font color="#B22222">/*         The lower triangular elements of the symmetric diagonal */</font>
+<a name="line214">214: </a><font color="#B22222">/*         blocks of the block tridiagonal matrix.  Elements of the top */</font>
+<a name="line215">215: </a><font color="#B22222">/*         left diagonal block, which is of dimension KSIZES(1), are */</font>
+<a name="line216">216: </a><font color="#B22222">/*         contained in D(*,*,1); the elements of the next diagonal */</font>
+<a name="line217">217: </a><font color="#B22222">/*         block, which is of dimension KSIZES(2), are contained in */</font>
+<a name="line218">218: </a><font color="#B22222">/*         D(*,*,2); etc. */</font>
+
+<a name="line220">220: </a><font color="#B22222">/*  L1D    (input) INTEGER */</font>
+<a name="line221">221: </a><font color="#B22222">/*         The leading dimension of the array D.  L1D &gt;= max(3,KMAX), */</font>
+<a name="line222">222: </a><font color="#B22222">/*         where KMAX is the dimension of the largest diagonal block. */</font>
+
+<a name="line224">224: </a><font color="#B22222">/*  L2D    (input) INTEGER */</font>
+<a name="line225">225: </a><font color="#B22222">/*         The second dimension of the array D.  L2D &gt;= max(3,KMAX), */</font>
+<a name="line226">226: </a><font color="#B22222">/*         where KMAX is as stated in L1D above. */</font>
+
+<a name="line228">228: </a><font color="#B22222">/*  E      (input) DOUBLE PRECISION array, dimension (L1E,L2E,NBLKS-1) */</font>
+<a name="line229">229: </a><font color="#B22222">/*         Contains the elements of the scalars (singular values) and */</font>
+<a name="line230">230: </a><font color="#B22222">/*         vectors (singular vectors) defining the rank RANK subdiagonal */</font>
+<a name="line231">231: </a><font color="#B22222">/*         blocks of the matrix. */</font>
+<a name="line232">232: </a><font color="#B22222">/*         E(1:RANK(K),RANK(K)+1,K) holds the RANK(K) scalars, */</font>
+<a name="line233">233: </a><font color="#B22222">/*         E(:,1:RANK(K),K) holds the RANK(K) column vectors, and */</font>
+<a name="line234">234: </a><font color="#B22222">/*         E(:,RANK(K)+2:2*RANK(K)+1,K) holds the row vectors for the K-th */</font>
+<a name="line235">235: </a><font color="#B22222">/*         subdiagonal block. */</font>
+
+<a name="line237">237: </a><font color="#B22222">/*  RANK   (input) INTEGER array, dimension (NBLKS-1). */</font>
+<a name="line238">238: </a><font color="#B22222">/*         The ranks of all the subdiagonal blocks contained in the array E. */</font>
+<a name="line239">239: </a><font color="#B22222">/*         RANK(K) &lt;= MIN(KSIZES(K), KSIZES(K+1)) */</font>
+
+<a name="line241">241: </a><font color="#B22222">/*  L1E    (input) INTEGER */</font>
+<a name="line242">242: </a><font color="#B22222">/*         The leading dimension of the array E.  L1E &gt;= max(3,2*KMAX+1), */</font>
+<a name="line243">243: </a><font color="#B22222">/*         where KMAX is as stated in L1D above. */</font>
+
+<a name="line245">245: </a><font color="#B22222">/*  L2E    (input) INTEGER */</font>
+<a name="line246">246: </a><font color="#B22222">/*         The second dimension of the array E.  L2E &gt;= max(3,2*KMAX+1), */</font>
+<a name="line247">247: </a><font color="#B22222">/*         where KMAX is as stated in L1D above. */</font>
+
+<a name="line249">249: </a><font color="#B22222">/*  TOL    (input) DOUBLE PRECISION, TOL &lt;= 1.0D-1 */</font>
+<a name="line250">250: </a><font color="#B22222">/*         User specified deflation tolerance for the routine DMERG2. */</font>
+<a name="line251">251: </a><font color="#B22222">/*         If (1.0D-1 &gt;= TOL &gt;= 20*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) then TOL is used as */</font>
+<a name="line252">252: </a><font color="#B22222">/*         the deflation tolerance in DSRTDF. */</font>
+<a name="line253">253: </a><font color="#B22222">/*         If (TOL &lt; 20*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) then the standard deflation tolerance from */</font>
+<a name="line254">254: </a><font color="#B22222">/*         LAPACK is used as the deflation tolerance in DSRTDF. */</font>
+
+<a name="line256">256: </a><font color="#B22222">/*  EV     (output) DOUBLE PRECISION array, dimension (N) */</font>
+<a name="line257">257: </a><font color="#B22222">/*         If INFO = 0, then EV contains the eigenvalues of the */</font>
+<a name="line258">258: </a><font color="#B22222">/*         symmetric block tridiagonal matrix in ascending order. */</font>
+
+<a name="line260">260: </a><font color="#B22222">/*  Z      (input/output) DOUBLE PRECISION array, dimension (LDZ, N) */</font>
+<a name="line261">261: </a><font color="#B22222">/*         On entry, Z will be the identity matrix. */</font>
+<a name="line262">262: </a><font color="#B22222">/*         On exit, Z contains the eigenvectors of the block tridiagonal */</font>
+<a name="line263">263: </a><font color="#B22222">/*         matrix. */</font>
+
+<a name="line265">265: </a><font color="#B22222">/*  LDZ    (input) INTEGER */</font>
+<a name="line266">266: </a><font color="#B22222">/*         The leading dimension of the array Z.  LDZ &gt;= max(1,N). */</font>
+
+<a name="line268">268: </a><font color="#B22222">/*  WORK   (workspace) DOUBLE PRECISION array, dimension (LWORK) */</font>
+
+<a name="line270">270: </a><font color="#B22222">/*  LWORK   (input) INTEGER */</font>
+<a name="line271">271: </a><font color="#B22222">/*          The dimension of the array WORK. */</font>
+<a name="line272">272: </a><font color="#B22222">/*          In order to guarantee correct results in all cases, */</font>
+<a name="line273">273: </a><font color="#B22222">/*          LWORK must be at least (2*N**2 + 3*N). In many cases, */</font>
+<a name="line274">274: </a><font color="#B22222">/*          less workspace is required. The absolute minimum required is */</font>
+<a name="line275">275: </a><font color="#B22222">/*          (N**2 + 3*N). */</font>
+<a name="line276">276: </a><font color="#B22222">/*          If the workspace provided is not sufficient, the routine will */</font>
+<a name="line277">277: </a><font color="#B22222">/*          return a corresponding error code and report how much workspace */</font>
+<a name="line278">278: </a><font color="#B22222">/*          was missing (see INFO). */</font>
+
+<a name="line280">280: </a><font color="#B22222">/*  IWORK  (workspace) INTEGER array, dimension (LIWORK) */</font>
+
+<a name="line282">282: </a><font color="#B22222">/*  LIWORK  (input) INTEGER */</font>
+<a name="line283">283: </a><font color="#B22222">/*          The dimension of the array IWORK. */</font>
+<a name="line284">284: </a><font color="#B22222">/*          LIWORK must be at least (5*N + 3 + 4*NBLKS - 4): */</font>
+<a name="line285">285: </a><font color="#B22222">/*                 5*KMAX+3 for DSYEVD, 5*N for ????, */</font>
+<a name="line286">286: </a><font color="#B22222">/*                 4*NBLKS-4 for the preprocessing (merging order) */</font>
+<a name="line287">287: </a><font color="#B22222">/*          Summarizing, the minimum integer workspace needed is */</font>
+<a name="line288">288: </a><font color="#B22222">/*          MAX(5*N, 5*KMAX + 3) + 4*NBLKS - 4 */</font>
+
+<a name="line290">290: </a><font color="#B22222">/*  INFO   (output) INTEGER */</font>
+<a name="line291">291: </a><font color="#B22222">/*          = 0:  successful exit. */</font>
+<a name="line292">292: </a><font color="#B22222">/*          &lt; 0, &gt; -99: illegal arguments. */</font>
+<a name="line293">293: </a><font color="#B22222">/*                if INFO = -i, the i-th argument had an illegal value. */</font>
+<a name="line294">294: </a><font color="#B22222">/*          = -99: error in the preprocessing (call of CUTLR). */</font>
+<a name="line295">295: </a><font color="#B22222">/*          &lt; -200: not enough workspace. Space for ABS(INFO + 200) */</font>
+<a name="line296">296: </a><font color="#B22222">/*                numbers is required in addition to the workspace provided, */</font>
+<a name="line297">297: </a><font color="#B22222">/*                otherwise some eigenvectors will be incorrect. */</font>
+<a name="line298">298: </a><font color="#B22222">/*          &gt; 0:  The algorithm failed to compute an eigenvalue while */</font>
+<a name="line299">299: </a><font color="#B22222">/*                working on the submatrix lying in rows and columns */</font>
+<a name="line300">300: </a><font color="#B22222">/*                INFO/(N+1) through mod(INFO,N+1). */</font>
+
+<a name="line302">302: </a><font color="#B22222">/*  Further Details */</font>
+<a name="line303">303: </a><font color="#B22222">/*  =============== */</font>
+
+<a name="line305">305: </a><font color="#B22222">/*  Based on code written by */</font>
+<a name="line306">306: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line307">307: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+
+<a name="line309">309: </a><font color="#B22222">/*  This routine is comparable to Dlaed0.f from LAPACK. */</font>
+
+<a name="line311">311: </a><font color="#B22222">/*  ===================================================================== */</font>
+
+<a name="line313">313: </a>  PetscBLASInt   i, j, k, np, rp1, ksk, one=1;
+<a name="line314">314: </a>  PetscBLASInt   cut, mat1, kchk, kbrk, blks, kmax, icut, size, ksum, lsum;
+<a name="line315">315: </a>  PetscBLASInt   lblks, rblks, isize, lwmin, ilsum;
+<a name="line316">316: </a>  PetscBLASInt   start, vstrt, istck1, istck2, istck3, merged;
+<a name="line317">317: </a>  PetscBLASInt   liwmin, matsiz, startp, istrtp;
+<a name="line318">318: </a>  PetscReal      rho, done=1.0, dmone=-1.0;
+
+<a name="line322">322: </a>  *info = 0;
+
+<a name="line324">324: </a>  <font color="#4169E1">if</font> (*(unsigned char *)jobz != 'N' &amp;&amp; *(unsigned char *)jobz != 'D') *info = -1;
+<a name="line325">325: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (n &lt; 2) *info = -2;
+<a name="line326">326: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (nblks &lt; 2 || nblks &gt; n) *info = -3;
+<a name="line327">327: </a>  <font color="#4169E1">if</font> (*info == 0) {
+<a name="line328">328: </a>    ksum = 0;
+<a name="line329">329: </a>    kmax = 0;
+<a name="line330">330: </a>    kchk = 0;
+<a name="line331">331: </a>    <font color="#4169E1">for</font> (k = 0; k &lt; nblks; ++k) {
+<a name="line332">332: </a>      ksk = ksizes[k];
+<a name="line333">333: </a>      ksum += ksk;
+<a name="line334">334: </a>      <font color="#4169E1">if</font> (ksk &gt; kmax) kmax = ksk;
+<a name="line335">335: </a>      <font color="#4169E1">if</font> (ksk &lt; 1) kchk = 1;
+<a name="line336">336: </a>    }
+<a name="line337">337: </a>    lwmin = n*n + n * 3;
+<a name="line338">338: </a>    liwmin = PetscMax(n * 5,kmax * 5 + 3) + 4*nblks - 4;
+<a name="line339">339: </a>    <font color="#4169E1">if</font> (ksum != n || kchk == 1) *info = -4;
+<a name="line340">340: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l1d &lt; PetscMax(3,kmax)) *info = -6;
+<a name="line341">341: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l2d &lt; PetscMax(3,kmax)) *info = -7;
+<a name="line342">342: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l1e &lt; PetscMax(3,2*kmax + 1)) *info = -10;
+<a name="line343">343: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l2e &lt; PetscMax(3,2*kmax + 1)) *info = -11;
+<a name="line344">344: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (tol &gt; .1) *info = -12;
+<a name="line345">345: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ldz &lt; PetscMax(1,n)) *info = -15;
+<a name="line346">346: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (lwork &lt; lwmin) *info = -17;
+<a name="line347">347: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (liwork &lt; liwmin) *info = -19;
+<a name="line348">348: </a>  }
+<a name="line349">349: </a>  <font color="#4169E1">if</font> (*info == 0) {
+<a name="line350">350: </a>    <font color="#4169E1">for</font> (k = 0; k &lt; nblks-1; ++k) {
+<a name="line351">351: </a>      <font color="#4169E1">if</font> (rank[k] &gt; PetscMin(ksizes[k],ksizes[k+1]) || rank[k] &lt; 1) *info = -9;
+<a name="line352">352: </a>    }
+<a name="line353">353: </a>  }
+
+<a name="line355">355: </a>  <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Wrong argument %d in DIBTDC"</font>,-(*info));
+
+<a name="line357">357: </a><font color="#B22222">/* **************************************************************************** */</font>
+
+<a name="line359">359: </a>  <font color="#B22222">/* ...Preprocessing..................................................... */</font>
+<a name="line360">360: </a>  <font color="#B22222">/*    Determine the optimal order for merging the subblocks and how much */</font>
+<a name="line361">361: </a>  <font color="#B22222">/*    workspace will be needed for the merging (determined by the last */</font>
+<a name="line362">362: </a>  <font color="#B22222">/*    merge). Cutpoints for the merging operations are determined and stored */</font>
+<a name="line363">363: </a>  <font color="#B22222">/*    in reverse chronological order (starting with the final merging */</font>
+<a name="line364">364: </a>  <font color="#B22222">/*    operation). */</font>
+
+<a name="line366">366: </a>  <font color="#B22222">/*    integer workspace requirements for the preprocessing: */</font>
+<a name="line367">367: </a>  <font color="#B22222">/*         4*(NBLKS-1) for merging history */</font>
+<a name="line368">368: </a>  <font color="#B22222">/*         at most 3*(NBLKS-1) for stack */</font>
+
+<a name="line370">370: </a>  start = 1;
+<a name="line371">371: </a>  size = n;
+<a name="line372">372: </a>  blks = nblks;
+<a name="line373">373: </a>  merged = 0;
+<a name="line374">374: </a>  k = 0;
+
+<a name="line376">376: </a>  <font color="#B22222">/* integer workspace used for the stack is not needed any more after the */</font>
+<a name="line377">377: </a>  <font color="#B22222">/* preprocessing and therefore can use part of the 5*N */</font>
+<a name="line378">378: </a>  <font color="#B22222">/* integer workspace needed later on in the code */</font>
+
+<a name="line380">380: </a>  istck1 = 0;
+<a name="line381">381: </a>  istck2 = istck1 + nblks;
+<a name="line382">382: </a>  istck3 = istck2 + nblks;
+
+<a name="line384">384: </a>  <font color="#B22222">/* integer workspace used for storing the order of merges starts AFTER */</font>
+<a name="line385">385: </a>  <font color="#B22222">/* the integer workspace 5*N+3 which is needed later on in the code */</font>
+<a name="line386">386: </a>  <font color="#B22222">/* (5*KMAX+3 for DSYEVD, 4*N in DMERG2) */</font>
+
+<a name="line388">388: </a>  istrtp = n * 5 + 4;
+<a name="line389">389: </a>  icut = istrtp + nblks - 1;
+<a name="line390">390: </a>  isize = icut + nblks - 1;
+<a name="line391">391: </a>  ilsum = isize + nblks - 1;
+
+<a name="line393">393: </a><strong><font color="#FF0000">L200:</font></strong>
+
+<a name="line395">395: </a>  <font color="#4169E1">if</font> (nblks &gt;= 3) {
+
+<a name="line397">397: </a>    <font color="#B22222">/* Determine the cut point. Note that in the routine CUTLR it is */</font>
+<a name="line398">398: </a>    <font color="#B22222">/* chosen such that it yields the best balanced merging operation */</font>
+<a name="line399">399: </a>    <font color="#B22222">/* among all the rank modifications with minimum rank. */</font>
+
+<a name="line401">401: </a>    cutlr_(start, size, blks, &amp;ksizes[start-1], &amp;rank[start-1], &amp;cut,
+<a name="line402">402: </a>                  &amp;lsum, &amp;lblks, info);
+<a name="line403">403: </a>    <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dibtdc: Error in cutlr, info = %d"</font>,*info);
+
+<a name="line405">405: </a>  } <font color="#4169E1">else</font> {
+<a name="line406">406: </a>    cut = 1;
+<a name="line407">407: </a>    lsum = ksizes[0];
+<a name="line408">408: </a>    lblks = 1;
+<a name="line409">409: </a>  }
+
+<a name="line411">411: </a>  ++merged;
+<a name="line412">412: </a>  startp = 0;
+<a name="line413">413: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; start-1; ++i) startp += ksizes[i];
+<a name="line414">414: </a>  iwork[istrtp + (nblks - 1) - merged-1] = startp + 1;
+<a name="line415">415: </a>  iwork[icut + (nblks - 1) - merged-1] = cut;
+<a name="line416">416: </a>  iwork[isize + (nblks - 1) - merged-1] = size;
+<a name="line417">417: </a>  iwork[ilsum + (nblks - 1) - merged-1] = lsum;
+
+<a name="line419">419: </a>  <font color="#4169E1">if</font> (lblks == 2) {
+
+<a name="line421">421: </a>    <font color="#B22222">/* one merge in left branch, left branch done */</font>
+<a name="line422">422: </a>    ++merged;
+<a name="line423">423: </a>    iwork[istrtp + (nblks - 1) - merged-1] = startp + 1;
+<a name="line424">424: </a>    iwork[icut + (nblks - 1) - merged-1] = start;
+<a name="line425">425: </a>    iwork[isize + (nblks - 1) - merged-1] = lsum;
+<a name="line426">426: </a>    iwork[ilsum + (nblks - 1) - merged-1] = ksizes[start-1];
+<a name="line427">427: </a>  }
+
+<a name="line429">429: </a>  <font color="#4169E1">if</font> (lblks == 1 || lblks == 2) {
+
+<a name="line431">431: </a>    <font color="#B22222">/* left branch done, continue on the right side */</font>
+<a name="line432">432: </a>    start += lblks;
+<a name="line433">433: </a>    size -= lsum;
+<a name="line434">434: </a>    blks -= lblks;
+
+<a name="line436">436: </a>    <font color="#4169E1">if</font> (blks &lt;= 0) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dibtdc: Error in preprocessing, blks = %d"</font>,blks);
+
+<a name="line438">438: </a>    <font color="#4169E1">if</font> (blks == 2) {
+
+<a name="line440">440: </a>      <font color="#B22222">/* one merge in right branch, right branch done */</font>
+<a name="line441">441: </a>      ++merged;
+<a name="line442">442: </a>      startp += lsum;
+<a name="line443">443: </a>      iwork[istrtp + (nblks - 1) - merged-1] = startp + 1;
+<a name="line444">444: </a>      iwork[icut + (nblks - 1) - merged-1] = start;
+<a name="line445">445: </a>      iwork[isize + (nblks - 1) - merged-1] = size;
+<a name="line446">446: </a>      iwork[ilsum + (nblks - 1) - merged-1] = ksizes[start-1];
+<a name="line447">447: </a>    }
+
+<a name="line449">449: </a>    <font color="#4169E1">if</font> (blks == 1 || blks == 2) {
+
+<a name="line451">451: </a>      <font color="#B22222">/* get the next subproblem from the stack or finished */</font>
+
+<a name="line453">453: </a>      <font color="#4169E1">if</font> (k &gt;= 1) {
+
+<a name="line455">455: </a>        <font color="#B22222">/* something left on the stack */</font>
+<a name="line456">456: </a>        start = iwork[istck1 + k-1];
+<a name="line457">457: </a>        size = iwork[istck2 + k-1];
+<a name="line458">458: </a>        blks = iwork[istck3 + k-1];
+<a name="line459">459: </a>        --k;
+<a name="line460">460: </a>        <font color="#4169E1">goto</font> L200;
+<a name="line461">461: </a>      } <font color="#4169E1">else</font> {
+
+<a name="line463">463: </a>        <font color="#B22222">/* nothing left on the stack */</font>
+<a name="line464">464: </a>        <font color="#4169E1">if</font> (merged != nblks-1) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"ERROR in preprocessing - not enough merges performed"</font>);
+
+<a name="line466">466: </a>        <font color="#B22222">/* exit preprocessing */</font>
+
+<a name="line468">468: </a>      }
+<a name="line469">469: </a>    } <font color="#4169E1">else</font> {
+
+<a name="line471">471: </a>      <font color="#B22222">/* BLKS.GE.3, and therefore analyze the right side */</font>
+
+<a name="line473">473: </a>      <font color="#4169E1">goto</font> L200;
+<a name="line474">474: </a>    }
+<a name="line475">475: </a>  } <font color="#4169E1">else</font> {
+
+<a name="line477">477: </a>    <font color="#B22222">/* LBLKS.GE.3, and therefore check the right side and */</font>
+<a name="line478">478: </a>    <font color="#B22222">/* put it on the stack if required */</font>
+
+<a name="line480">480: </a>    rblks = blks - lblks;
+<a name="line481">481: </a>    <font color="#4169E1">if</font> (rblks &gt;= 3) {
+<a name="line482">482: </a>      ++k;
+<a name="line483">483: </a>      iwork[istck1 + k-1] = cut + 1;
+<a name="line484">484: </a>      iwork[istck2 + k-1] = size - lsum;
+<a name="line485">485: </a>      iwork[istck3 + k-1] = rblks;
+<a name="line486">486: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (rblks == 2) {
+
+<a name="line488">488: </a>      <font color="#B22222">/* one merge in right branch, right branch done */</font>
+<a name="line489">489: </a>      <font color="#B22222">/* (note that nothing needs to be done if RBLKS.EQ.1 !) */</font>
+
+<a name="line491">491: </a>      ++merged;
+<a name="line492">492: </a>      startp += lsum;
+<a name="line493">493: </a>      iwork[istrtp + (nblks - 1) - merged-1] = startp + 1;
+<a name="line494">494: </a>      iwork[icut + (nblks - 1) - merged-1] = start + lblks;
+<a name="line495">495: </a>      iwork[isize + (nblks - 1) - merged-1] = size - lsum;
+<a name="line496">496: </a>      iwork[ilsum + (nblks - 1) - merged-1] = ksizes[start + lblks-1];
+<a name="line497">497: </a>    }
+<a name="line498">498: </a>    <font color="#4169E1">if</font> (rblks &lt;= 0) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dibtdc: ERROR in preprocessing - rblks = %d"</font>,rblks);
+
+<a name="line500">500: </a>    <font color="#B22222">/* continue on the left side */</font>
+
+<a name="line502">502: </a>    size = lsum;
+<a name="line503">503: </a>    blks = lblks;
+<a name="line504">504: </a>    <font color="#4169E1">goto</font> L200;
+<a name="line505">505: </a>  }
+
+<a name="line507">507: </a>  <font color="#B22222">/*  SIZE = IWORK(ISIZE+NBLKS-2) */</font>
+<a name="line508">508: </a>  <font color="#B22222">/*  MAT1 = IWORK(ILSUM+NBLKS-2) */</font>
+
+<a name="line510">510: </a>  <font color="#B22222">/* Note: after the dimensions SIZE and MAT1 of the last merging */</font>
+<a name="line511">511: </a>  <font color="#B22222">/* operation have been determined, an upper bound for the workspace */</font>
+<a name="line512">512: </a>  <font color="#B22222">/* requirements which is independent of how much deflation occurs in */</font>
+<a name="line513">513: </a>  <font color="#B22222">/* the last merging operation could be determined as follows */</font>
+<a name="line514">514: </a>  <font color="#B22222">/* (based on (3.15) and (3.19) from UT-CS-00-447): */</font>
+
+<a name="line516">516: </a>  <font color="#B22222">/*  IF(MAT1.LE.N/2) THEN */</font>
+<a name="line517">517: </a>  <font color="#B22222">/*     WSPREQ = 3*N + 3/2*(SIZE-MAT1)**2 + N*N/2 + MAT1*MAT1 */</font>
+<a name="line518">518: </a>  <font color="#B22222">/*  ELSE */</font>
+<a name="line519">519: </a>  <font color="#B22222">/*     WSPREQ = 3*N + 3/2*MAT1*MAT1 + N*N/2 + (SIZE-MAT1)**2 */</font>
+<a name="line520">520: </a>  <font color="#B22222">/*  END IF */</font>
+
+<a name="line522">522: </a>  <font color="#B22222">/*  IF(LWORK-WSPREQ.LT.0)THEN */</font>
+<a name="line523">523: </a>  <font color="#B22222">/*          not enough work space provided */</font>
+<a name="line524">524: </a>  <font color="#B22222">/*     INFO = -200 - (WSPREQ-LWORK) */</font>
+<a name="line525">525: </a>  <font color="#B22222">/*     RETURN */</font>
+<a name="line526">526: </a>  <font color="#B22222">/*  END IF */</font>
+<a name="line527">527: </a>  <font color="#B22222">/*  However, this is not really useful, since the actual check whether */</font>
+<a name="line528">528: </a>  <font color="#B22222">/*  enough workspace is provided happens in DMERG2.f ! */</font>
+
+<a name="line530">530: </a><font color="#B22222">/* ************************************************************************* */</font>
+
+<a name="line532">532: </a>  <font color="#B22222">/* ...Solve subproblems................................... */</font>
+
+<a name="line534">534: </a>  <font color="#B22222">/* Divide the matrix into NBLKS submatrices using rank-r */</font>
+<a name="line535">535: </a>  <font color="#B22222">/* modifications (cuts) and solve for their eigenvalues and */</font>
+<a name="line536">536: </a>  <font color="#B22222">/* eigenvectors. Initialize index array to sort eigenvalues. */</font>
+
+<a name="line538">538: </a>  <font color="#B22222">/* first block: ...................................... */</font>
+
+<a name="line540">540: </a>  <font color="#B22222">/*    correction for block 1: D1 - V1 \Sigma1 V1^T */</font>
+
+<a name="line542">542: </a>  ksk = ksizes[0];
+<a name="line543">543: </a>  rp1 = rank[0];
+
+<a name="line545">545: </a>  <font color="#B22222">/* initialize the proper part of Z with the diagonal block D1 */</font>
+<a name="line546">546: </a>  <font color="#B22222">/* (the correction will be made in Z and then the call of DSYEVD will */</font>
+<a name="line547">547: </a>  <font color="#B22222">/*  overwrite it with the eigenvectors) */</font>
+
+<a name="line549">549: </a>  <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) z[i+j*ldz] = d[i+j*l1d];
+
+<a name="line551">551: </a>  <font color="#B22222">/* copy D1 into WORK (in order to be able to restore it afterwards) */</font>
+
+<a name="line553">553: </a>  <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) work[i+j*ksk] = d[i+j*l1d];
+
+<a name="line555">555: </a>  <font color="#B22222">/* copy V1 into the first RANK(1) columns of D1 and then */</font>
+<a name="line556">556: </a>  <font color="#B22222">/* multiply with \Sigma1 */</font>
+
+<a name="line558">558: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; rank[0]; ++i) {
+<a name="line559">559: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;ksk, &amp;e[(rp1 + i+1)*l1e], &amp;one, &amp;d[i*l1d], &amp;one));
+<a name="line560">560: </a>    PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;ksk, &amp;e[i + rp1*l1e], &amp;d[i*l1d], &amp;one));
+<a name="line561">561: </a>  }
+
+<a name="line563">563: </a>  <font color="#B22222">/* multiply the first RANK(1) columns of D1 with V1^T and */</font>
+<a name="line564">564: </a>  <font color="#B22222">/* subtract the result from the proper part of Z (previously */</font>
+<a name="line565">565: </a>  <font color="#B22222">/* initialized with D1) */</font>
+
+<a name="line567">567: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>, <font color="#666666">"T"</font>, &amp;ksk, &amp;ksk, rank, &amp;dmone,
+<a name="line568">568: </a>          d, &amp;l1d, &amp;e[(rank[0]+1)*l1e], &amp;l1e, &amp;done, z, &amp;ldz));
+
+<a name="line570">570: </a>  <font color="#B22222">/* restore the original D1 from WORK */</font>
+
+<a name="line572">572: </a>  <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) d[i+j*l1d] = work[i+j*ksk];
+
+<a name="line574">574: </a>  <font color="#B22222">/* eigenanalysis of block 1 (using DSYEVD) */</font>
+
+<a name="line576">576: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKsyev"</font>,LAPACKsyev_(<font color="#666666">"V"</font>, <font color="#666666">"L"</font>, &amp;ksk, z, &amp;ldz, ev, work, &amp;lwork, info));
+<a name="line577">577: </a>  <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dibtdc: Error in DSYEVD for block 1, info = %d"</font>,*info);
+
+<a name="line579">579: </a>  <font color="#B22222">/* EV(1:) contains the eigenvalues in ascending order */</font>
+<a name="line580">580: </a>  <font color="#B22222">/* (they are returned this way by DSYEVD) */</font>
+
+<a name="line582">582: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; ksk; ++i) iwork[i] = i+1;
+
+<a name="line584">584: </a>    <font color="#B22222">/* intermediate blocks: .............................. */</font>
+
+<a name="line586">586: </a>    np = ksk;
+
+<a name="line588">588: </a>    <font color="#B22222">/* remaining number of blocks */</font>
+
+<a name="line590">590: </a>    <font color="#4169E1">if</font> (nblks &gt; 2) {
+<a name="line591">591: </a>      <font color="#4169E1">for</font> (k = 1; k &lt; nblks-1; ++k) {
+
+<a name="line593">593: </a>      <font color="#B22222">/* correction for block K: */</font>
+<a name="line594">594: </a>      <font color="#B22222">/* Dk - U(k-1) \Sigma(k-1) U(k-1)^T - Vk \Sigmak Vk^T */</font>
+
+<a name="line596">596: </a>      ksk = ksizes[k];
+<a name="line597">597: </a>      rp1 = rank[k];
+
+<a name="line599">599: </a>      <font color="#B22222">/* initialize the proper part of Z with the diagonal block Dk */</font>
+<a name="line600">600: </a>      <font color="#B22222">/* (the correction will be made in Z and then the call of DSYEVD will */</font>
+<a name="line601">601: </a>      <font color="#B22222">/*  overwrite it with the eigenvectors) */</font>
+
+<a name="line603">603: </a>      <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) z[np+i+(np+j)*ldz] = d[i+(j+k*l2d)*l1d];
+
+<a name="line605">605: </a>      <font color="#B22222">/* copy Dk into WORK (in order to be able to restore it afterwards) */</font>
+
+<a name="line607">607: </a>      <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) work[i+j*ksk] = d[i+(j+k*l2d)*l1d];
+
+<a name="line609">609: </a>      <font color="#B22222">/* copy U(K-1) into the first RANK(K-1) columns of Dk and then */</font>
+<a name="line610">610: </a>      <font color="#B22222">/* multiply with \Sigma(K-1) */</font>
+
+<a name="line612">612: </a>      <font color="#4169E1">for</font> (i = 0; i &lt; rank[k-1]; ++i) {
+<a name="line613">613: </a>        PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;ksk, &amp;e[(i+(k-1)*l2e)*l1e], &amp;one, &amp;d[(i+k*l2d)*l1d], &amp;one));
+<a name="line614">614: </a>        PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;ksk, &amp;e[i+(rank[k-1]+(k-1)*l2e)*l1e], &amp;d[(i+k*l2d)*l1d], &amp;one));
+<a name="line615">615: </a>      }
+
+<a name="line617">617: </a>      <font color="#B22222">/* multiply the first RANK(K-1) columns of Dk with U(k-1)^T and */</font>
+<a name="line618">618: </a>      <font color="#B22222">/* subtract the result from the proper part of Z (previously */</font>
+<a name="line619">619: </a>      <font color="#B22222">/* initialized with Dk) */</font>
+
+<a name="line621">621: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>, <font color="#666666">"T"</font>, &amp;ksk, &amp;ksk, &amp;rank[k-1],
+<a name="line622">622: </a>                    &amp;dmone, &amp;d[k*l1d*l2d],
+<a name="line623">623: </a>                    &amp;l1d, &amp;e[(k-1)*l1e*l2e], &amp;l1e, &amp;done, &amp;z[np+np*ldz], &amp;ldz));
+
+<a name="line625">625: </a>      <font color="#B22222">/* copy Vk into the first RANK(K) columns of Dk and then */</font>
+<a name="line626">626: </a>      <font color="#B22222">/* multiply with \Sigmak */</font>
+
+<a name="line628">628: </a>      <font color="#4169E1">for</font> (i = 0; i &lt; rank[k]; ++i) {
+<a name="line629">629: </a>        PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;ksk, &amp;e[(rp1+i+1 + k*l2e)*l1e], &amp;one, &amp;d[(i + k*l2d)*l1d], &amp;one));
+<a name="line630">630: </a>        PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;ksk, &amp;e[i + (rp1 + k*l2e)*l1e], &amp;d[(i + k*l2d)*l1d], &amp;one));
+<a name="line631">631: </a>      }
+
+<a name="line633">633: </a>      <font color="#B22222">/* multiply the first RANK(K) columns of Dk with Vk^T and */</font>
+<a name="line634">634: </a>      <font color="#B22222">/* subtract the result from the proper part of Z (previously */</font>
+<a name="line635">635: </a>      <font color="#B22222">/* updated with [- U(k-1) \Sigma(k-1) U(k-1)^T]) */</font>
+
+<a name="line637">637: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>, <font color="#666666">"T"</font>, &amp;ksk, &amp;ksk, &amp;rank[k],
+<a name="line638">638: </a>                    &amp;dmone, &amp;d[k*l1d*l2d], &amp;l1d,
+<a name="line639">639: </a>                    &amp;e[(rank[k]+1 + k*l2e)*l1e], &amp;l1e, &amp;done, &amp;z[np+np*ldz], &amp;ldz));
+
+<a name="line641">641: </a>      <font color="#B22222">/* restore the original Dk from WORK */</font>
+
+<a name="line643">643: </a>      <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) d[i+(j+k*l2d)*l1d] = work[i+j*ksk];
+
+<a name="line645">645: </a>      <font color="#B22222">/* eigenanalysis of block K (using dsyevd) */</font>
+
+<a name="line647">647: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKsyev"</font>,LAPACKsyev_(<font color="#666666">"V"</font>, <font color="#666666">"L"</font>, &amp;ksk, &amp;z[np+np*ldz],
+<a name="line648">648: </a>                     &amp;ldz, &amp;ev[np], work, &amp;lwork, info));
+<a name="line649">649: </a>      <font color="#4169E1">if</font> (*info) SETERRQ2(PETSC_COMM_SELF,1,<font color="#666666">"dibtdc: Error in DSYEVD for block %d, info = %d"</font>,k,*info);
+
+<a name="line651">651: </a>      <font color="#B22222">/* EV(NPP1:) contains the eigenvalues in ascending order */</font>
+<a name="line652">652: </a>      <font color="#B22222">/* (they are returned this way by DSYEVD) */</font>
+
+<a name="line654">654: </a>      <font color="#4169E1">for</font> (i = 0; i &lt; ksk; ++i) iwork[np + i] = i+1;
+
+<a name="line656">656: </a>      <font color="#B22222">/* update NP */</font>
+<a name="line657">657: </a>      np += ksk;
+<a name="line658">658: </a>    }
+<a name="line659">659: </a>  }
+
+<a name="line661">661: </a>  <font color="#B22222">/* last block: ....................................... */</font>
+
+<a name="line663">663: </a>  <font color="#B22222">/*    correction for block NBLKS: */</font>
+<a name="line664">664: </a>  <font color="#B22222">/*    D(nblks) - U(nblks-1) \Sigma(nblks-1) U(nblks-1)^T */</font>
+
+<a name="line666">666: </a>  ksk = ksizes[nblks-1];
+
+<a name="line668">668: </a>  <font color="#B22222">/* initialize the proper part of Z with the diagonal block D(nblks) */</font>
+<a name="line669">669: </a>  <font color="#B22222">/* (the correction will be made in Z and then the call of DSYEVD will */</font>
+<a name="line670">670: </a>  <font color="#B22222">/* overwrite it with the eigenvectors) */</font>
+
+<a name="line672">672: </a>  <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) z[np+i+(np+j)*ldz] = d[i+(j+(nblks-1)*l2d)*l1d];
+
+<a name="line674">674: </a>  <font color="#B22222">/* copy D(nblks) into WORK (in order to be able to restore it afterwards) */</font>
+
+<a name="line676">676: </a>  <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) work[i+j*ksk] = d[i+(j+(nblks-1)*l2d)*l1d];
+
+<a name="line678">678: </a>  <font color="#B22222">/* copy U(nblks-1) into the first RANK(nblks-1) columns of D(nblks) and then */</font>
+<a name="line679">679: </a>  <font color="#B22222">/* multiply with \Sigma(nblks-1) */</font>
+
+<a name="line681">681: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; rank[nblks-2]; ++i) {
+<a name="line682">682: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;ksk, &amp;e[(i + (nblks-2)*l2e)*l1e],
+<a name="line683">683: </a>              &amp;one, &amp;d[(i + (nblks-1)*l2d)*l1d], &amp;one));
+<a name="line684">684: </a>    PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;ksk,
+<a name="line685">685: </a>              &amp;e[i + (rank[nblks-2] + (nblks-2)*l2e)*l1e],
+<a name="line686">686: </a>              &amp;d[(i + (nblks-1)*l2d)*l1d], &amp;one));
+<a name="line687">687: </a>  }
+
+<a name="line689">689: </a>  <font color="#B22222">/* multiply the first RANK(nblks-1) columns of D(nblks) with U(nblks-1)^T */</font>
+<a name="line690">690: </a>  <font color="#B22222">/* and subtract the result from the proper part of Z (previously */</font>
+<a name="line691">691: </a>  <font color="#B22222">/* initialized with D(nblks)) */</font>
+
+<a name="line693">693: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>, <font color="#666666">"T"</font>, &amp;ksk, &amp;ksk, &amp;rank[nblks - 2],
+<a name="line694">694: </a>          &amp;dmone, &amp;d[(nblks-1)*l1d*l2d], &amp;l1d,
+<a name="line695">695: </a>          &amp;e[(nblks-2)*l1e*l2e], &amp;l1e, &amp;done, &amp;z[np+np*ldz], &amp;ldz));
+
+<a name="line697">697: </a>  <font color="#B22222">/* restore the original D(nblks) from WORK */</font>
+
+<a name="line699">699: </a>  <font color="#4169E1">for</font> (j=0;j&lt;ksk;j++) <font color="#4169E1">for</font> (i=j;i&lt;ksk;i++) d[i+(j+(nblks-1)*l2d)*l1d] = work[i+j*ksk];
+
+<a name="line701">701: </a>  <font color="#B22222">/* eigenanalysis of block NBLKS (using dsyevd) */</font>
+
+<a name="line703">703: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKsyev"</font>,LAPACKsyev_(<font color="#666666">"V"</font>, <font color="#666666">"L"</font>, &amp;ksk, &amp;z[np+np*ldz], &amp;ldz, &amp;ev[np], work, &amp;lwork, info));
+<a name="line704">704: </a>  <font color="#4169E1">if</font> (*info) SETERRQ2(PETSC_COMM_SELF,1,<font color="#666666">"dibtdc: Error in DSYEVD for block %d, info = %d"</font>,nblks,*info);
+
+<a name="line706">706: </a>  <font color="#B22222">/* EV(NPP1:) contains the eigenvalues in ascending order */</font>
+<a name="line707">707: </a>  <font color="#B22222">/* (they are returned this way by DSYEVD) */</font>
+
+<a name="line709">709: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; ksk; ++i) iwork[np + i] = i+1;
+
+<a name="line711">711: </a>  <font color="#B22222">/* note that from here on the entire workspace is available again */</font>
+
+
+<a name="line714">714: </a>  <font color="#B22222">/* Perform all the merging operations. */</font>
+
+<a name="line716">716: </a>  vstrt = 0;
+<a name="line717">717: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; nblks-1; ++i) {
+
+<a name="line719">719: </a>    <font color="#B22222">/* MATSIZ = total size of the current rank RANK modification problem */</font>
+
+<a name="line721">721: </a>    matsiz = iwork[isize + i - 1];
+<a name="line722">722: </a>    np = iwork[istrtp + i - 1];
+<a name="line723">723: </a>    kbrk = iwork[icut + i - 1];
+<a name="line724">724: </a>    mat1 = iwork[ilsum + i - 1];
+<a name="line725">725: </a>    vstrt += np;
+
+<a name="line727">727: </a>    <font color="#4169E1">for</font> (j = 0; j &lt; rank[kbrk-1]; ++j) {
+
+<a name="line729">729: </a>      <font color="#B22222">/* NOTE: The parameter RHO in DMERG2 is modified in DSRTDF */</font>
+<a name="line730">730: </a>      <font color="#B22222">/*       (multiplied by 2) ! In order not to change the */</font>
+<a name="line731">731: </a>      <font color="#B22222">/*       singular value stored in E(:, RANK(KBRK)+1, KBRK), */</font>
+<a name="line732">732: </a>      <font color="#B22222">/*       we do not pass on this variable as an argument to DMERG2, */</font>
+<a name="line733">733: </a>      <font color="#B22222">/*       but we assign a separate variable RHO here which is passed */</font>
+<a name="line734">734: </a>      <font color="#B22222">/*       on to DMERG2. */</font>
+<a name="line735">735: </a>      <font color="#B22222">/*       Alternative solution in F90: */</font>
+<a name="line736">736: </a>      <font color="#B22222">/*       pass E(:,RANK(KBRK)+1,KBRK) to an INTENT(IN) parameter */</font>
+<a name="line737">737: </a>      <font color="#B22222">/*       in DMERG2. */</font>
+
+<a name="line739">739: </a>      rho = e[j + (rank[kbrk-1] + (kbrk-1)*l2e)*l1e];
+
+<a name="line741">741: </a>      <font color="#B22222">/* eigenvectors are accumulated (JOBZ.EQ.'D') */</font>
+
+<a name="line743">743: </a>      BDC_dmerg2_(jobz, j+1, matsiz, &amp;ev[np-1], &amp;z[np-1+(np-1)*ldz],
+<a name="line744">744: </a>                    ldz, &amp;iwork[np-1], &amp;rho, &amp;e[(j + (kbrk-1)*l2e)*l1e],
+<a name="line745">745: </a>                    ksizes[kbrk], &amp;e[(rank[kbrk-1]+j+1 + (kbrk-1)*l2e)*l1e],
+<a name="line746">746: </a>                    ksizes[kbrk-1], mat1, work, lwork, &amp;iwork[n], tol, info, 1);
+<a name="line747">747: </a>                    
+<a name="line748">748: </a>      <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dibtdc: Error in dmerg2, info = %d"</font>,*info);
+<a name="line749">749: </a>    }
+
+<a name="line751">751: </a>    <font color="#B22222">/* at this point all RANK(KBRK) rank-one modifications corresponding */</font>
+<a name="line752">752: </a>    <font color="#B22222">/* to the current off-diagonal block are finished. */</font>
+<a name="line753">753: </a>    <font color="#B22222">/* Move on to the next off-diagonal block. */</font>
+
+<a name="line755">755: </a>  }
+
+<a name="line757">757: </a>  <font color="#B22222">/* Re-merge the eigenvalues/vectors which were deflated at the final */</font>
+<a name="line758">758: </a>  <font color="#B22222">/* merging step by sorting all eigenvalues and eigenvectors according */</font>
+<a name="line759">759: </a>  <font color="#B22222">/* to the permutation stored in IWORK. */</font>
+
+<a name="line761">761: </a>  <font color="#B22222">/* copy eigenvalues and eigenvectors in ordered form into WORK */</font>
+<a name="line762">762: </a>  <font color="#B22222">/* (eigenvalues into WORK(1:N), eigenvectors into WORK(N+1:N+1+N^2)) */</font>
+
+<a name="line764">764: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; n; ++i) {
+<a name="line765">765: </a>    j = iwork[i];
+<a name="line766">766: </a>    work[i] = ev[j-1];
+<a name="line767">767: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n, &amp;z[(j-1)*ldz], &amp;one, &amp;work[n*(i+1)], &amp;one));
+<a name="line768">768: </a>  }
+
+<a name="line770">770: </a>  <font color="#B22222">/* copy ordered eigenvalues back from WORK(1:N) into EV */</font>
+
+<a name="line772">772: </a>  PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n, work, &amp;one, ev, &amp;one));
+
+<a name="line774">774: </a>  <font color="#B22222">/* copy ordered eigenvectors back from WORK(N+1:N+1+N^2) into Z */</font>
+
+<a name="line776">776: </a>  <font color="#4169E1">for</font> (j=0;j&lt;n;j++) <font color="#4169E1">for</font> (i=0;i&lt;n;i++) z[i+j*ldz] = work[i+(j+1)*n];
+<a name="line777">777: </a>  <font color="#4169E1">return</font>(0);
+<a name="line778">778: </a>}
+
+</pre>
+</body>
+
+</html>

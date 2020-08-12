@@ -1,0 +1,213 @@
+<center><a href="ex16f90.F90">Actual source code: ex16f90.F90</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/tutorials/ex16f90.F90.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:07+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/tutorials/ex16f90.F90.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a>!
+<a name="line2">  2: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line3">  3: </a>!  SLEPc - Scalable Library <font color="#4169E1">for</font> Eigenvalue Problem Computations
+<a name="line4">  4: </a>!  Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain
+<a name="line5">  5: </a>!
+<a name="line6">  6: </a>!  This file is part of SLEPc.
+<a name="line7">  7: </a>!  SLEPc is distributed under a 2-clause BSD license (see LICENSE).
+<a name="line8">  8: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line9">  9: </a>!
+<a name="line10"> 10: </a>!  Program usage: mpiexec -n &lt;np&gt; ./ex16f90 [-help] [-n &lt;n&gt;] [-m &lt;m&gt;] [SLEPc opts]
+<a name="line11"> 11: </a>!
+<a name="line12"> 12: </a>!  Description: Simple example that solves a quadratic eigensystem with the
+<a name="line13"> 13: </a>!  <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> object. This is the Fortran90 equivalent to ex16.c
+<a name="line14"> 14: </a>!
+<a name="line15"> 15: </a>!  The command line options are:
+<a name="line16"> 16: </a>!    -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x dimension
+<a name="line17"> 17: </a>!    -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in y dimension
+<a name="line18"> 18: </a>!
+<a name="line19"> 19: </a>! ----------------------------------------------------------------------
+<a name="line20"> 20: </a>!
+<a name="line21"> 21: </a>      program main
+<a name="line22"> 22: </a> #include <A href="../../../include/slepc/finclude/slepcpep.h.html">&lt;slepc/finclude/slepcpep.h&gt;</A>
+<a name="line23"> 23: </a>      use slepcpep
+<a name="line24"> 24: </a>      implicit none
+
+<a name="line26"> 26: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line27"> 27: </a>!     Declarations
+<a name="line28"> 28: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line29"> 29: </a>!
+<a name="line30"> 30: </a>!  Variables:
+<a name="line31"> 31: </a>!     M,C,K  problem matrices
+<a name="line32"> 32: </a>!     pep    polynomial eigenproblem solver context
+
+<a name="line34"> 34: </a>      Mat            M, C, K, A(3)
+<a name="line35"> 35: </a>      <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>            pep
+<a name="line36"> 36: </a>      <a href="../../../docs/manualpages/PEP/PEPType.html#PEPType">PEPType</a>        tname
+<a name="line37"> 37: </a>      PetscInt       N, nx, ny, i, j, Istart, Iend, II
+<a name="line38"> 38: </a>      PetscInt       nev, ithree
+<a name="line39"> 39: </a>      PetscMPIInt    rank
+<a name="line40"> 40: </a>      PetscErrorCode ierr
+<a name="line41"> 41: </a>      PetscBool      flg, terse
+<a name="line42"> 42: </a>      PetscScalar    mone, two, four, val
+
+<a name="line44"> 44: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line45"> 45: </a>!     Beginning of program
+<a name="line46"> 46: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line48"> 48: </a>      call <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(PETSC_NULL_CHARACTER,ierr)
+<a name="line49"> 49: </a>      <font color="#4169E1">if</font> (ierr .ne. 0) then
+<a name="line50"> 50: </a>        print*,'<a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a> failed'
+<a name="line51"> 51: </a>        stop
+<a name="line52"> 52: </a>      endif
+<a name="line53"> 53: </a>      call <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PETSC_COMM_WORLD,rank,ierr);CHKERRA(ierr)
+<a name="line54"> 54: </a>      nx = 10
+<a name="line55"> 55: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-n',nx,flg,ierr);CHKERRA(ierr)
+<a name="line56"> 56: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-m',ny,flg,ierr);CHKERRA(ierr)
+<a name="line57"> 57: </a>      <font color="#4169E1">if</font> (.not. flg) then
+<a name="line58"> 58: </a>        ny = nx
+<a name="line59"> 59: </a>      endif
+<a name="line60"> 60: </a>      N = nx*ny
+<a name="line61"> 61: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line62"> 62: </a>        write(*,100) N, nx, ny
+<a name="line63"> 63: </a>      endif
+<a name="line64"> 64: </a> 100  format (/'Quadratic Eigenproblem, N=',I6,' (',I4,'x',I4,' grid)')
+
+<a name="line66"> 66: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line67"> 67: </a>!     Compute the matrices that define the eigensystem, (k^2*M+k*C+K)x=0
+<a name="line68"> 68: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line70"> 70: </a>!     ** K is the 2-D Laplacian
+<a name="line71"> 71: </a>      call MatCreate(PETSC_COMM_WORLD,K,ierr);CHKERRA(ierr)
+<a name="line72"> 72: </a>      call MatSetSizes(K,PETSC_DECIDE,PETSC_DECIDE,N,N,ierr);CHKERRA(ierr)
+<a name="line73"> 73: </a>      call MatSetFromOptions(K,ierr);CHKERRA(ierr)
+<a name="line74"> 74: </a>      call MatSetUp(K,ierr);CHKERRA(ierr)
+<a name="line75"> 75: </a>      call MatGetOwnershipRange(K,Istart,Iend,ierr);CHKERRA(ierr)
+<a name="line76"> 76: </a>      mone = -1.0
+<a name="line77"> 77: </a>      four = 4.0
+<a name="line78"> 78: </a>      <font color="#4169E1">do</font> II=Istart,Iend-1
+<a name="line79"> 79: </a>        i = II/nx
+<a name="line80"> 80: </a>        j = II-i*nx
+<a name="line81"> 81: </a>        <font color="#4169E1">if</font> (i .gt. 0) then
+<a name="line82"> 82: </a>          call MatSetValue(K,II,II-nx,mone,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line83"> 83: </a>        endif
+<a name="line84"> 84: </a>        <font color="#4169E1">if</font> (i .lt. ny-1) then
+<a name="line85"> 85: </a>          call MatSetValue(K,II,II+nx,mone,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line86"> 86: </a>        endif
+<a name="line87"> 87: </a>        <font color="#4169E1">if</font> (j .gt. 0) then
+<a name="line88"> 88: </a>          call MatSetValue(K,II,II-1,mone,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line89"> 89: </a>        endif
+<a name="line90"> 90: </a>        <font color="#4169E1">if</font> (j .lt. nx-1) then
+<a name="line91"> 91: </a>          call MatSetValue(K,II,II+1,mone,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line92"> 92: </a>        endif
+<a name="line93"> 93: </a>        call MatSetValue(K,II,II,four,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line94"> 94: </a>      end <font color="#4169E1">do</font>
+<a name="line95"> 95: </a>      call MatAssemblyBegin(K,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line96"> 96: </a>      call MatAssemblyEnd(K,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+
+<a name="line98"> 98: </a>!     ** C is the 1-D Laplacian on horizontal lines
+<a name="line99"> 99: </a>      call MatCreate(PETSC_COMM_WORLD,C,ierr);CHKERRA(ierr)
+<a name="line100">100: </a>      call MatSetSizes(C,PETSC_DECIDE,PETSC_DECIDE,N,N,ierr);CHKERRA(ierr)
+<a name="line101">101: </a>      call MatSetFromOptions(C,ierr);CHKERRA(ierr)
+<a name="line102">102: </a>      call MatSetUp(C,ierr);CHKERRA(ierr)
+<a name="line103">103: </a>      call MatGetOwnershipRange(C,Istart,Iend,ierr);CHKERRA(ierr)
+<a name="line104">104: </a>      two = 2.0
+<a name="line105">105: </a>      <font color="#4169E1">do</font> II=Istart,Iend-1
+<a name="line106">106: </a>        i = II/nx
+<a name="line107">107: </a>        j = II-i*nx
+<a name="line108">108: </a>        <font color="#4169E1">if</font> (j .gt. 0) then
+<a name="line109">109: </a>          call MatSetValue(C,II,II-1,mone,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line110">110: </a>        endif
+<a name="line111">111: </a>        <font color="#4169E1">if</font> (j .lt. nx-1) then
+<a name="line112">112: </a>          call MatSetValue(C,II,II+1,mone,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line113">113: </a>        endif
+<a name="line114">114: </a>        call MatSetValue(C,II,II,two,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line115">115: </a>      end <font color="#4169E1">do</font>
+<a name="line116">116: </a>      call MatAssemblyBegin(C,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line117">117: </a>      call MatAssemblyEnd(C,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+
+<a name="line119">119: </a>!     ** M is a diagonal matrix
+<a name="line120">120: </a>      call MatCreate(PETSC_COMM_WORLD,M,ierr);CHKERRA(ierr)
+<a name="line121">121: </a>      call MatSetSizes(M,PETSC_DECIDE,PETSC_DECIDE,N,N,ierr);CHKERRA(ierr)
+<a name="line122">122: </a>      call MatSetFromOptions(M,ierr);CHKERRA(ierr)
+<a name="line123">123: </a>      call MatSetUp(M,ierr);CHKERRA(ierr)
+<a name="line124">124: </a>      call MatGetOwnershipRange(M,Istart,Iend,ierr);CHKERRA(ierr)
+<a name="line125">125: </a>      <font color="#4169E1">do</font> II=Istart,Iend-1
+<a name="line126">126: </a>        val = II+1
+<a name="line127">127: </a>        call MatSetValue(M,II,II,val,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line128">128: </a>      end <font color="#4169E1">do</font>
+<a name="line129">129: </a>      call MatAssemblyBegin(M,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line130">130: </a>      call MatAssemblyEnd(M,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+
+<a name="line132">132: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line133">133: </a>!     Create the eigensolver and set various options
+<a name="line134">134: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line136">136: </a>!     ** Create eigensolver context
+<a name="line137">137: </a>      call <a href="../../../docs/manualpages/PEP/PEPCreate.html#PEPCreate">PEPCreate</a>(PETSC_COMM_WORLD,pep,ierr);CHKERRA(ierr)
+
+<a name="line139">139: </a>!     ** Set matrices and problem type
+<a name="line140">140: </a>      A(1) = K
+<a name="line141">141: </a>      A(2) = C
+<a name="line142">142: </a>      A(3) = M
+<a name="line143">143: </a>      ithree = 3
+<a name="line144">144: </a>      call <a href="../../../docs/manualpages/PEP/PEPSetOperators.html#PEPSetOperators">PEPSetOperators</a>(pep,ithree,A,ierr);CHKERRA(ierr)
+<a name="line145">145: </a>      call <a href="../../../docs/manualpages/PEP/PEPSetProblemType.html#PEPSetProblemType">PEPSetProblemType</a>(pep,<a href="../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GENERAL</a>,ierr);CHKERRA(ierr)
+
+<a name="line147">147: </a>!     ** Set solver parameters at runtime
+<a name="line148">148: </a>      call <a href="../../../docs/manualpages/PEP/PEPSetFromOptions.html#PEPSetFromOptions">PEPSetFromOptions</a>(pep,ierr);CHKERRA(ierr)
+
+<a name="line150">150: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line151">151: </a>!     Solve the eigensystem
+<a name="line152">152: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line154">154: </a>      call <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(pep,ierr);CHKERRA(ierr)
+
+<a name="line156">156: </a>!     ** Optional: Get some information from the solver and display it
+<a name="line157">157: </a>      call <a href="../../../docs/manualpages/PEP/PEPGetType.html#PEPGetType">PEPGetType</a>(pep,tname,ierr);CHKERRA(ierr)
+<a name="line158">158: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line159">159: </a>        write(*,120) tname
+<a name="line160">160: </a>      endif
+<a name="line161">161: </a> 120  format (' Solution method: ',A)
+<a name="line162">162: </a>      call <a href="../../../docs/manualpages/PEP/PEPGetDimensions.html#PEPGetDimensions">PEPGetDimensions</a>(pep,nev,PETSC_NULL_INTEGER,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line163">163: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line164">164: </a>        write(*,130) nev
+<a name="line165">165: </a>      endif
+<a name="line166">166: </a> 130  format (' Number of requested eigenvalues:',I4)
+
+<a name="line168">168: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line169">169: </a>!     Display solution and clean up
+<a name="line170">170: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line172">172: </a>!     ** show detailed info unless -terse option is given by user
+<a name="line173">173: </a>      call PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-terse',terse,ierr);CHKERRA(ierr)
+<a name="line174">174: </a>      <font color="#4169E1">if</font> (terse) then
+<a name="line175">175: </a>        call <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,PETSC_NULL_VIEWER,ierr);CHKERRA(ierr)
+<a name="line176">176: </a>      <font color="#4169E1">else</font>
+<a name="line177">177: </a>        call PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INFO_DETAIL,ierr);CHKERRA(ierr)
+<a name="line178">178: </a>        call <a href="../../../docs/manualpages/PEP/PEPReasonView.html#PEPReasonView">PEPReasonView</a>(pep,PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRA(ierr)
+<a name="line179">179: </a>        call <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRA(ierr)
+<a name="line180">180: </a>        call PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRA(ierr)
+<a name="line181">181: </a>      endif
+<a name="line182">182: </a>      call <a href="../../../docs/manualpages/PEP/PEPDestroy.html#PEPDestroy">PEPDestroy</a>(pep,ierr);CHKERRA(ierr)
+<a name="line183">183: </a>      call MatDestroy(K,ierr);CHKERRA(ierr)
+<a name="line184">184: </a>      call MatDestroy(C,ierr);CHKERRA(ierr)
+<a name="line185">185: </a>      call MatDestroy(M,ierr);CHKERRA(ierr)
+<a name="line186">186: </a>      call <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>(ierr)
+<a name="line187">187: </a>      end
+
+<a name="line189">189: </a>!<font color="#B22222">/*TEST</font>
+<a name="line190">190: </a><font color="#B22222">!</font>
+<a name="line191">191: </a><font color="#B22222">!   test:</font>
+<a name="line192">192: </a><font color="#B22222">!      suffix: 1</font>
+<a name="line193">193: </a><font color="#B22222">!      args: -pep_nev 4 -pep_ncv 19 -terse</font>
+<a name="line194">194: </a><font color="#B22222">!      requires: !complex</font>
+<a name="line195">195: </a><font color="#B22222">!</font>
+<a name="line196">196: </a><font color="#B22222">!TEST*/</font>
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,194 @@
+<center><a href="sleeper.c">Actual source code: sleeper.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/tutorials/nlevp/sleeper.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:07+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/tutorials/nlevp/sleeper.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This example implements one of the problems found at</font>
+<a name="line12"> 12: </a><font color="#B22222">       NLEVP: A Collection of Nonlinear Eigenvalue Problems,</font>
+<a name="line13"> 13: </a><font color="#B22222">       The University of Manchester.</font>
+<a name="line14"> 14: </a><font color="#B22222">   The details of the collection can be found at:</font>
+<a name="line15"> 15: </a><font color="#B22222">       [1] T. Betcke et al., "NLEVP: A Collection of Nonlinear Eigenvalue</font>
+<a name="line16"> 16: </a><font color="#B22222">           Problems", ACM Trans. Math. Software 39(2), Article 7, 2013.</font>
+
+<a name="line18"> 18: </a><font color="#B22222">   The sleeper problem is a proportionally damped QEP describing the</font>
+<a name="line19"> 19: </a><font color="#B22222">   oscillations of a rail track resting on sleepers.</font>
+<a name="line20"> 20: </a><font color="#B22222">*/</font>
+
+<a name="line22"> 22: </a>static char help[] = <font color="#666666">"Oscillations of a rail track resting on sleepers.\n\n"</font>
+<a name="line23"> 23: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line24"> 24: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = dimension of the matrices.\n\n"</font>;
+
+<a name="line26"> 26: </a> #include <A href="../../../../include/slepcpep.h.html">&lt;slepcpep.h&gt;</A>
+
+<a name="line28"> 28: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line29"> 29: </a>{
+<a name="line30"> 30: </a>  Mat            M,C,K,A[3];      <font color="#B22222">/* problem matrices */</font>
+<a name="line31"> 31: </a>  <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>            pep;             <font color="#B22222">/* polynomial eigenproblem solver context */</font>
+<a name="line32"> 32: </a>  PetscInt       n=10,Istart,Iend,i;
+<a name="line33"> 33: </a>  PetscBool      terse;
+
+<a name="line36"> 36: </a>  <a href="../../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line38"> 38: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line39"> 39: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nRailtrack resting on sleepers, n=%D\n\n"</font>,n);
+
+<a name="line41"> 41: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line42"> 42: </a><font color="#B22222">     Compute the matrices that define the eigensystem, (k^2*M+k*C+K)x=0</font>
+<a name="line43"> 43: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line45"> 45: </a>  <font color="#B22222">/* K is a pentadiagonal */</font>
+<a name="line46"> 46: </a>  MatCreate(PETSC_COMM_WORLD,&amp;K);
+<a name="line47"> 47: </a>  MatSetSizes(K,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line48"> 48: </a>  MatSetFromOptions(K);
+<a name="line49"> 49: </a>  MatSetUp(K);
+
+<a name="line51"> 51: </a>  MatGetOwnershipRange(K,&amp;Istart,&amp;Iend);
+<a name="line52"> 52: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line53"> 53: </a>    <font color="#4169E1">if</font> (i==0) {
+<a name="line54"> 54: </a>      MatSetValue(K,i,n-1,-3.0,INSERT_VALUES);
+<a name="line55"> 55: </a>      MatSetValue(K,i,n-2,1.0,INSERT_VALUES);
+<a name="line56"> 56: </a>    }
+<a name="line57"> 57: </a>    <font color="#4169E1">if</font> (i==1) { MatSetValue(K,i,n-1,1.0,INSERT_VALUES); }
+<a name="line58"> 58: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(K,i,i-1,-3.0,INSERT_VALUES); }
+<a name="line59"> 59: </a>    <font color="#4169E1">if</font> (i&gt;1) { MatSetValue(K,i,i-2,1.0,INSERT_VALUES); }
+<a name="line60"> 60: </a>    MatSetValue(K,i,i,5.0,INSERT_VALUES);
+<a name="line61"> 61: </a>    <font color="#4169E1">if</font> (i==n-1) {
+<a name="line62"> 62: </a>      MatSetValue(K,i,0,-3.0,INSERT_VALUES);
+<a name="line63"> 63: </a>      MatSetValue(K,i,1,1.0,INSERT_VALUES);
+<a name="line64"> 64: </a>    }
+<a name="line65"> 65: </a>    <font color="#4169E1">if</font> (i==n-2) { MatSetValue(K,i,0,1.0,INSERT_VALUES); }
+<a name="line66"> 66: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(K,i,i+1,-3.0,INSERT_VALUES); }
+<a name="line67"> 67: </a>    <font color="#4169E1">if</font> (i&lt;n-2) { MatSetValue(K,i,i+2,1.0,INSERT_VALUES); }
+<a name="line68"> 68: </a>  }
+
+<a name="line70"> 70: </a>  MatAssemblyBegin(K,MAT_FINAL_ASSEMBLY);
+<a name="line71"> 71: </a>  MatAssemblyEnd(K,MAT_FINAL_ASSEMBLY);
+
+<a name="line73"> 73: </a>  <font color="#B22222">/* C is a circulant matrix */</font>
+<a name="line74"> 74: </a>  MatCreate(PETSC_COMM_WORLD,&amp;C);
+<a name="line75"> 75: </a>  MatSetSizes(C,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line76"> 76: </a>  MatSetFromOptions(C);
+<a name="line77"> 77: </a>  MatSetUp(C);
+
+<a name="line79"> 79: </a>  MatGetOwnershipRange(C,&amp;Istart,&amp;Iend);
+<a name="line80"> 80: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line81"> 81: </a>    <font color="#4169E1">if</font> (i==0) {
+<a name="line82"> 82: </a>      MatSetValue(C,i,n-1,-4.0,INSERT_VALUES);
+<a name="line83"> 83: </a>      MatSetValue(C,i,n-2,1.0,INSERT_VALUES);
+<a name="line84"> 84: </a>    }
+<a name="line85"> 85: </a>    <font color="#4169E1">if</font> (i==1) { MatSetValue(C,i,n-1,1.0,INSERT_VALUES); }
+<a name="line86"> 86: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(C,i,i-1,-4.0,INSERT_VALUES); }
+<a name="line87"> 87: </a>    <font color="#4169E1">if</font> (i&gt;1) { MatSetValue(C,i,i-2,1.0,INSERT_VALUES); }
+<a name="line88"> 88: </a>    MatSetValue(C,i,i,7.0,INSERT_VALUES);
+<a name="line89"> 89: </a>    <font color="#4169E1">if</font> (i==n-1) {
+<a name="line90"> 90: </a>      MatSetValue(C,i,0,-4.0,INSERT_VALUES);
+<a name="line91"> 91: </a>      MatSetValue(C,i,1,1.0,INSERT_VALUES);
+<a name="line92"> 92: </a>    }
+<a name="line93"> 93: </a>    <font color="#4169E1">if</font> (i==n-2) { MatSetValue(C,i,0,1.0,INSERT_VALUES); }
+<a name="line94"> 94: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(C,i,i+1,-4.0,INSERT_VALUES); }
+<a name="line95"> 95: </a>    <font color="#4169E1">if</font> (i&lt;n-2) { MatSetValue(C,i,i+2,1.0,INSERT_VALUES); }
+<a name="line96"> 96: </a>  }
+
+<a name="line98"> 98: </a>  MatAssemblyBegin(C,MAT_FINAL_ASSEMBLY);
+<a name="line99"> 99: </a>  MatAssemblyEnd(C,MAT_FINAL_ASSEMBLY);
+
+<a name="line101">101: </a>  <font color="#B22222">/* M is the identity matrix */</font>
+<a name="line102">102: </a>  MatCreate(PETSC_COMM_WORLD,&amp;M);
+<a name="line103">103: </a>  MatSetSizes(M,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line104">104: </a>  MatSetFromOptions(M);
+<a name="line105">105: </a>  MatSetUp(M);
+<a name="line106">106: </a>  MatGetOwnershipRange(M,&amp;Istart,&amp;Iend);
+<a name="line107">107: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line108">108: </a>    MatSetValue(M,i,i,1.0,INSERT_VALUES);
+<a name="line109">109: </a>  }
+<a name="line110">110: </a>  MatAssemblyBegin(M,MAT_FINAL_ASSEMBLY);
+<a name="line111">111: </a>  MatAssemblyEnd(M,MAT_FINAL_ASSEMBLY);
+
+<a name="line113">113: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line114">114: </a><font color="#B22222">                Create the eigensolver and solve the problem</font>
+<a name="line115">115: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line117">117: </a>  <a href="../../../../docs/manualpages/PEP/PEPCreate.html#PEPCreate">PEPCreate</a>(PETSC_COMM_WORLD,&amp;pep);
+<a name="line118">118: </a>  A[0] = K; A[1] = C; A[2] = M;
+<a name="line119">119: </a>  <a href="../../../../docs/manualpages/PEP/PEPSetOperators.html#PEPSetOperators">PEPSetOperators</a>(pep,3,A);
+<a name="line120">120: </a>  <a href="../../../../docs/manualpages/PEP/PEPSetFromOptions.html#PEPSetFromOptions">PEPSetFromOptions</a>(pep);
+<a name="line121">121: </a>  <a href="../../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(pep);
+
+<a name="line123">123: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line124">124: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line125">125: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line127">127: </a>  <font color="#B22222">/* show detailed info unless -terse option is given by user */</font>
+<a name="line128">128: </a>  PetscOptionsHasName(NULL,NULL,<font color="#666666">"-terse"</font>,&amp;terse);
+<a name="line129">129: </a>  <font color="#4169E1">if</font> (terse) {
+<a name="line130">130: </a>    <a href="../../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,NULL);
+<a name="line131">131: </a>  } <font color="#4169E1">else</font> {
+<a name="line132">132: </a>    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INFO_DETAIL);
+<a name="line133">133: </a>    <a href="../../../../docs/manualpages/PEP/PEPReasonView.html#PEPReasonView">PEPReasonView</a>(pep,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line134">134: </a>    <a href="../../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line135">135: </a>    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+<a name="line136">136: </a>  }
+<a name="line137">137: </a>  <a href="../../../../docs/manualpages/PEP/PEPDestroy.html#PEPDestroy">PEPDestroy</a>(&amp;pep);
+<a name="line138">138: </a>  MatDestroy(&amp;M);
+<a name="line139">139: </a>  MatDestroy(&amp;C);
+<a name="line140">140: </a>  MatDestroy(&amp;K);
+<a name="line141">141: </a>  <a href="../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line142">142: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line143">143: </a>}
+
+<a name="line145">145: </a><font color="#B22222">/*TEST</font>
+
+<a name="line147">147: </a><font color="#B22222">   testset:</font>
+<a name="line148">148: </a><font color="#B22222">      args: -n 100 -pep_nev 4 -pep_ncv 24 -st_type sinvert -terse</font>
+<a name="line149">149: </a><font color="#B22222">      output_file: output/sleeper_1.out</font>
+<a name="line150">150: </a><font color="#B22222">      test:</font>
+<a name="line151">151: </a><font color="#B22222">         suffix: 1</font>
+<a name="line152">152: </a><font color="#B22222">         args: -pep_type {{toar linear}} -pep_ncv 20</font>
+<a name="line153">153: </a><font color="#B22222">      test:</font>
+<a name="line154">154: </a><font color="#B22222">         suffix: 1_qarnoldi</font>
+<a name="line155">155: </a><font color="#B22222">         args: -pep_type qarnoldi -pep_qarnoldi_restart 0.4</font>
+
+<a name="line157">157: </a><font color="#B22222">   testset:</font>
+<a name="line158">158: </a><font color="#B22222">      args: -n 24 -pep_nev 4 -pep_ncv 9 -pep_target -.62 -terse</font>
+<a name="line159">159: </a><font color="#B22222">      output_file: output/sleeper_2.out</font>
+<a name="line160">160: </a><font color="#B22222">      test:</font>
+<a name="line161">161: </a><font color="#B22222">         suffix: 2_toar</font>
+<a name="line162">162: </a><font color="#B22222">         args: -pep_type toar -pep_toar_restart .3 -st_type sinvert</font>
+<a name="line163">163: </a><font color="#B22222">         requires: !single</font>
+<a name="line164">164: </a><font color="#B22222">      test:</font>
+<a name="line165">165: </a><font color="#B22222">         suffix: 2_jd</font>
+<a name="line166">166: </a><font color="#B22222">         args: -pep_type jd -pep_jd_restart .3 -pep_jd_projection orthogonal</font>
+
+<a name="line168">168: </a><font color="#B22222">   test:</font>
+<a name="line169">169: </a><font color="#B22222">      suffix: 3</font>
+<a name="line170">170: </a><font color="#B22222">      args: -n 275 -pep_type stoar -pep_hermitian -st_type sinvert -pep_nev 2 -pep_target -.89 -terse</font>
+<a name="line171">171: </a><font color="#B22222">      requires: !single</font>
+
+<a name="line173">173: </a><font color="#B22222">   test:</font>
+<a name="line174">174: </a><font color="#B22222">      suffix: 4</font>
+<a name="line175">175: </a><font color="#B22222">      args: -n 270 -pep_type stoar -pep_hermitian -pep_interval -3,-2.51 -st_type sinvert -st_pc_type cholesky -terse</font>
+<a name="line176">176: </a><font color="#B22222">      requires: !single</font>
+
+<a name="line178">178: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

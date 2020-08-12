@@ -1,0 +1,143 @@
+<center><a href="test6.c">Actual source code: test6.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/svd/tests/test6.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:02+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/svd/tests/test6.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> via the cross-product matrix with a user-provided <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = matrix rows.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = matrix columns (defaults to m+2).\n\n"</font>;
+
+<a name="line16"> 16: </a> #include <A href="../../../include/slepcsvd.h.html">&lt;slepcsvd.h&gt;</A>
+
+<a name="line18"> 18: </a><font color="#B22222">/*</font>
+<a name="line19"> 19: </a><font color="#B22222">   This example computes the singular values of a rectangular bidiagonal matrix</font>
+
+<a name="line21"> 21: </a><font color="#B22222">              |  1  2                     |</font>
+<a name="line22"> 22: </a><font color="#B22222">              |     1  2                  |</font>
+<a name="line23"> 23: </a><font color="#B22222">              |        1  2               |</font>
+<a name="line24"> 24: </a><font color="#B22222">          A = |          .  .             |</font>
+<a name="line25"> 25: </a><font color="#B22222">              |             .  .          |</font>
+<a name="line26"> 26: </a><font color="#B22222">              |                1  2       |</font>
+<a name="line27"> 27: </a><font color="#B22222">              |                   1  2    |</font>
+<a name="line28"> 28: </a><font color="#B22222"> */</font>
+
+<a name="line30"> 30: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line31"> 31: </a>{
+<a name="line32"> 32: </a>  Mat            A;
+<a name="line33"> 33: </a>  <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>            svd;
+<a name="line34"> 34: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;
+<a name="line35"> 35: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+<a name="line36"> 36: </a>  KSP            ksp;
+<a name="line37"> 37: </a>  PC             pc;
+<a name="line38"> 38: </a>  PetscInt       m=20,n,Istart,Iend,i,col[2];
+<a name="line39"> 39: </a>  PetscScalar    value[] = { 1, 2 };
+<a name="line40"> 40: </a>  PetscBool      flg,expmat;
+
+<a name="line43"> 43: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line44"> 44: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,NULL);
+<a name="line45"> 45: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,&amp;flg);
+<a name="line46"> 46: </a>  <font color="#4169E1">if</font> (!flg) n=m+2;
+<a name="line47"> 47: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nRectangular bidiagonal matrix, m=%D n=%D\n\n"</font>,m,n);
+
+<a name="line49"> 49: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line50"> 50: </a><font color="#B22222">        Generate the matrix</font>
+<a name="line51"> 51: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line53"> 53: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line54"> 54: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,m,n);
+<a name="line55"> 55: </a>  MatSetFromOptions(A);
+<a name="line56"> 56: </a>  MatSetUp(A);
+<a name="line57"> 57: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line58"> 58: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line59"> 59: </a>    col[0]=i; col[1]=i+1;
+<a name="line60"> 60: </a>    <font color="#4169E1">if</font> (i&lt;n-1) {
+<a name="line61"> 61: </a>      MatSetValues(A,1,&amp;i,2,col,value,INSERT_VALUES);
+<a name="line62"> 62: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (i==n-1) {
+<a name="line63"> 63: </a>      MatSetValue(A,i,col[0],value[0],INSERT_VALUES);
+<a name="line64"> 64: </a>    }
+<a name="line65"> 65: </a>  }
+<a name="line66"> 66: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line67"> 67: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line69"> 69: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line70"> 70: </a><font color="#B22222">        Create a standalone <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> with appropriate settings</font>
+<a name="line71"> 71: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line73"> 73: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line74"> 74: </a>  <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line75"> 75: </a>  <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STSINVERT);
+<a name="line76"> 76: </a>  <a href="../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;ksp);
+<a name="line77"> 77: </a>  KSPSetType(ksp,KSPBCGS);
+<a name="line78"> 78: </a>  KSPGetPC(ksp,&amp;pc);
+<a name="line79"> 79: </a>  PCSetType(pc,PCJACOBI);
+<a name="line80"> 80: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line82"> 82: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line83"> 83: </a><font color="#B22222">        Compute singular values</font>
+<a name="line84"> 84: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line86"> 86: </a>  <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>(PETSC_COMM_WORLD,&amp;svd);
+<a name="line87"> 87: </a>  <a href="../../../docs/manualpages/SVD/SVDSetOperator.html#SVDSetOperator">SVDSetOperator</a>(svd,A);
+<a name="line88"> 88: </a>  <a href="../../../docs/manualpages/SVD/SVDSetType.html#SVDSetType">SVDSetType</a>(svd,SVDCROSS);
+<a name="line89"> 89: </a>  <a href="../../../docs/manualpages/SVD/SVDCrossSetEPS.html#SVDCrossSetEPS">SVDCrossSetEPS</a>(svd,eps);
+<a name="line90"> 90: </a>  <a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>(svd,<a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_SMALLEST</a>);
+<a name="line91"> 91: </a>  <a href="../../../docs/manualpages/SVD/SVDSetFromOptions.html#SVDSetFromOptions">SVDSetFromOptions</a>(svd);
+<a name="line92"> 92: </a>  PetscObjectTypeCompare((PetscObject)svd,SVDCROSS,&amp;flg);
+<a name="line93"> 93: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line94"> 94: </a>    <a href="../../../docs/manualpages/SVD/SVDCrossGetExplicitMatrix.html#SVDCrossGetExplicitMatrix">SVDCrossGetExplicitMatrix</a>(svd,&amp;expmat);
+<a name="line95"> 95: </a>    <font color="#4169E1">if</font> (expmat) {
+<a name="line96"> 96: </a>      PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Using explicit matrix with cross solver\n"</font>);
+<a name="line97"> 97: </a>    }
+<a name="line98"> 98: </a>  }
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/SVD/SVDSolve.html#SVDSolve">SVDSolve</a>(svd);
+
+<a name="line101">101: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line102">102: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line103">103: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line104">104: </a>  <a href="../../../docs/manualpages/SVD/SVDErrorView.html#SVDErrorView">SVDErrorView</a>(svd,<a href="../../../docs/manualpages/SVD/SVDErrorType.html#SVDErrorType">SVD_ERROR_RELATIVE</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line105">105: </a>  <a href="../../../docs/manualpages/SVD/SVDDestroy.html#SVDDestroy">SVDDestroy</a>(&amp;svd);
+<a name="line106">106: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line107">107: </a>  MatDestroy(&amp;A);
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line109">109: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line110">110: </a>}
+
+<a name="line112">112: </a><font color="#B22222">/*TEST</font>
+
+<a name="line114">114: </a><font color="#B22222">   testset:</font>
+<a name="line115">115: </a><font color="#B22222">      output_file: output/test6_1.out</font>
+<a name="line116">116: </a><font color="#B22222">      test:</font>
+<a name="line117">117: </a><font color="#B22222">         suffix: 1_subspace</font>
+<a name="line118">118: </a><font color="#B22222">         args: -eps_type subspace</font>
+<a name="line119">119: </a><font color="#B22222">      test:</font>
+<a name="line120">120: </a><font color="#B22222">         suffix: 1_lobpcg</font>
+<a name="line121">121: </a><font color="#B22222">         args: -eps_type lobpcg -st_type precond</font>
+<a name="line122">122: </a><font color="#B22222">      test:</font>
+<a name="line123">123: </a><font color="#B22222">         suffix: 2_cuda</font>
+<a name="line124">124: </a><font color="#B22222">         args: -eps_type subspace -mat_type aijcusparse</font>
+<a name="line125">125: </a><font color="#B22222">         requires: cuda</font>
+
+<a name="line127">127: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

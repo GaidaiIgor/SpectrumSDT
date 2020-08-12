@@ -1,0 +1,275 @@
+<center><a href="ex24.c">Actual source code: ex24.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tutorials/ex24.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:58+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tutorials/ex24.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Spectrum folding for a standard symmetric eigenproblem.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The problem matrix is the 2-D Laplacian.\n\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x dimension.\n"</font>
+<a name="line15"> 15: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in y dimension.\n"</font>;
+
+<a name="line17"> 17: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line19"> 19: </a><font color="#B22222">/*</font>
+<a name="line20"> 20: </a><font color="#B22222">   User context for spectrum folding</font>
+<a name="line21"> 21: </a><font color="#B22222">*/</font>
+<a name="line22"> 22: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line23"> 23: </a>  Mat       A;
+<a name="line24"> 24: </a>  Vec       w;
+<a name="line25"> 25: </a>  PetscReal target;
+<a name="line26"> 26: </a>} CTX_FOLD;
+
+<a name="line28"> 28: </a><font color="#B22222">/*</font>
+<a name="line29"> 29: </a><font color="#B22222">   Auxiliary routines</font>
+<a name="line30"> 30: </a><font color="#B22222">*/</font>
+<a name="line31"> 31: </a><strong><font color="#4169E1">PetscErrorCode MatMult_Fold(Mat,Vec,Vec)</font></strong>;
+<a name="line32"> 32: </a><strong><font color="#4169E1">PetscErrorCode RayleighQuotient(Mat,Vec,PetscScalar*)</font></strong>;
+<a name="line33"> 33: </a><strong><font color="#4169E1">PetscErrorCode ComputeResidualNorm(Mat,PetscScalar,Vec,PetscReal*)</font></strong>;
+
+<a name="line35"> 35: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line36"> 36: </a>{
+<a name="line37"> 37: </a>  Mat            A,M,P;       <font color="#B22222">/* problem matrix, shell matrix and preconditioner */</font>
+<a name="line38"> 38: </a>  Vec            x;           <font color="#B22222">/* eigenvector */</font>
+<a name="line39"> 39: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;         <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line40"> 40: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;          <font color="#B22222">/* spectral transformation */</font>
+<a name="line41"> 41: </a>  KSP            ksp;
+<a name="line42"> 42: </a>  PC             pc;
+<a name="line43"> 43: </a>  <a href="../../../docs/manualpages/EPS/EPSType.html#EPSType">EPSType</a>        type;
+<a name="line44"> 44: </a>  CTX_FOLD       *ctx;
+<a name="line45"> 45: </a>  PetscInt       nconv,N,n=10,m,nloc,mloc,Istart,Iend,II,i,j;
+<a name="line46"> 46: </a>  PetscReal      *error,*evals,target=0.0,tol;
+<a name="line47"> 47: </a>  PetscScalar    lambda;
+<a name="line48"> 48: </a>  PetscBool      flag,terse,errok,hasmat;
+
+<a name="line51"> 51: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line53"> 53: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line54"> 54: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,&amp;flag);
+<a name="line55"> 55: </a>  <font color="#4169E1">if</font> (!flag) m=n;
+<a name="line56"> 56: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-target"</font>,&amp;target,NULL);
+<a name="line57"> 57: </a>  N = n*m;
+<a name="line58"> 58: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nSpectrum Folding, N=%D (%Dx%D grid) target=%f\n\n"</font>,N,n,m,(double)target);
+
+<a name="line60"> 60: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line61"> 61: </a><font color="#B22222">     Compute the 5-point stencil Laplacian</font>
+<a name="line62"> 62: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line64"> 64: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line65"> 65: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line66"> 66: </a>  MatSetFromOptions(A);
+<a name="line67"> 67: </a>  MatSetUp(A);
+
+<a name="line69"> 69: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line70"> 70: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line71"> 71: </a>    i = II/n; j = II-i*n;
+<a name="line72"> 72: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,II,II-n,-1.0,INSERT_VALUES); }
+<a name="line73"> 73: </a>    <font color="#4169E1">if</font> (i&lt;m-1) { MatSetValue(A,II,II+n,-1.0,INSERT_VALUES); }
+<a name="line74"> 74: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(A,II,II-1,-1.0,INSERT_VALUES); }
+<a name="line75"> 75: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(A,II,II+1,-1.0,INSERT_VALUES); }
+<a name="line76"> 76: </a>    MatSetValue(A,II,II,4.0,INSERT_VALUES);
+<a name="line77"> 77: </a>  }
+
+<a name="line79"> 79: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line80"> 80: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+<a name="line81"> 81: </a>  MatCreateVecs(A,&amp;x,NULL);
+<a name="line82"> 82: </a>  MatGetLocalSize(A,&amp;nloc,&amp;mloc);
+
+<a name="line84"> 84: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line85"> 85: </a><font color="#B22222">                Create shell matrix to perform spectrum folding</font>
+<a name="line86"> 86: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line87"> 87: </a>  PetscNew(&amp;ctx);
+<a name="line88"> 88: </a>  ctx-&gt;A = A;
+<a name="line89"> 89: </a>  ctx-&gt;target = target;
+<a name="line90"> 90: </a>  VecDuplicate(x,&amp;ctx-&gt;w);
+
+<a name="line92"> 92: </a>  MatCreateShell(PETSC_COMM_WORLD,nloc,mloc,N,N,ctx,&amp;M);
+<a name="line93"> 93: </a>  MatShellSetOperation(M,MATOP_MULT,(void(*)(void))MatMult_Fold);
+
+<a name="line95"> 95: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line96"> 96: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line97"> 97: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line100">100: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,M,NULL);
+<a name="line101">101: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>);
+<a name="line102">102: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>);
+<a name="line103">103: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line105">105: </a>  PetscObjectTypeCompareAny((PetscObject)eps,&amp;flag,EPSGD,EPSJD,EPSBLOPEX,EPSLOBPCG,EPSRQCG,<font color="#666666">""</font>);
+<a name="line106">106: </a>  <font color="#4169E1">if</font> (flag) {
+<a name="line107">107: </a>    <font color="#B22222">/*</font>
+<a name="line108">108: </a><font color="#B22222">       Build preconditioner specific for this application (diagonal of A^2)</font>
+<a name="line109">109: </a><font color="#B22222">    */</font>
+<a name="line110">110: </a>    MatGetRowSum(A,x);
+<a name="line111">111: </a>    VecScale(x,-1.0);
+<a name="line112">112: </a>    VecShift(x,20.0);
+<a name="line113">113: </a>    MatCreate(PETSC_COMM_WORLD,&amp;P);
+<a name="line114">114: </a>    MatSetSizes(P,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line115">115: </a>    MatSetFromOptions(P);
+<a name="line116">116: </a>    MatSetUp(P);
+<a name="line117">117: </a>    MatDiagonalSet(P,x,INSERT_VALUES);
+<a name="line118">118: </a>    <font color="#B22222">/*</font>
+<a name="line119">119: </a><font color="#B22222">       Set diagonal preconditioner</font>
+<a name="line120">120: </a><font color="#B22222">    */</font>
+<a name="line121">121: </a>    <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line122">122: </a>    <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STPRECOND);
+<a name="line123">123: </a>    <a href="../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a>(st,P);
+<a name="line124">124: </a>    MatDestroy(&amp;P);
+<a name="line125">125: </a>    <a href="../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;ksp);
+<a name="line126">126: </a>    KSPGetPC(ksp,&amp;pc);
+<a name="line127">127: </a>    PCSetType(pc,PCJACOBI);
+<a name="line128">128: </a>    <a href="../../../docs/manualpages/ST/STPrecondGetKSPHasMat.html#STPrecondGetKSPHasMat">STPrecondGetKSPHasMat</a>(st,&amp;hasmat);
+<a name="line129">129: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Preconditioned solver, hasmat=%s\n"</font>,hasmat?<font color="#666666">"true"</font>:<font color="#666666">"false"</font>);
+<a name="line130">130: </a>  }
+
+<a name="line132">132: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line133">133: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line134">134: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line136">136: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line137">137: </a>  <a href="../../../docs/manualpages/EPS/EPSGetType.html#EPSGetType">EPSGetType</a>(eps,&amp;type);
+<a name="line138">138: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solution method: %s\n\n"</font>,type);
+<a name="line139">139: </a>  <a href="../../../docs/manualpages/EPS/EPSGetTolerances.html#EPSGetTolerances">EPSGetTolerances</a>(eps,&amp;tol,NULL);
+
+<a name="line141">141: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line142">142: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line143">143: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line145">145: </a>  <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(eps,&amp;nconv);
+<a name="line146">146: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of converged eigenpairs: %D\n\n"</font>,nconv);
+<a name="line147">147: </a>  <font color="#4169E1">if</font> (nconv&gt;0) {
+<a name="line148">148: </a>    PetscMalloc2(nconv,&amp;evals,nconv,&amp;error);
+<a name="line149">149: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) {
+<a name="line150">150: </a>      <font color="#B22222">/*  Get i-th eigenvector, compute eigenvalue approximation from</font>
+<a name="line151">151: </a><font color="#B22222">          Rayleigh quotient and compute residual norm */</font>
+<a name="line152">152: </a>      <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(eps,i,NULL,NULL,x,NULL);
+<a name="line153">153: </a>      RayleighQuotient(A,x,&amp;lambda);
+<a name="line154">154: </a>      ComputeResidualNorm(A,lambda,x,&amp;error[i]);
+<a name="line155">155: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line156">156: </a>      evals[i] = PetscRealPart(lambda);
+<a name="line157">157: </a><font color="#A020F0">#else</font>
+<a name="line158">158: </a>      evals[i] = lambda;
+<a name="line159">159: </a><font color="#A020F0">#endif</font>
+<a name="line160">160: </a>    }
+<a name="line161">161: </a>    PetscOptionsHasName(NULL,NULL,<font color="#666666">"-terse"</font>,&amp;terse);
+<a name="line162">162: </a>    <font color="#4169E1">if</font> (!terse) {
+<a name="line163">163: </a>      PetscPrintf(PETSC_COMM_WORLD,
+<a name="line164">164: </a>           <font color="#666666">"           k              ||Ax-kx||\n"</font>
+<a name="line165">165: </a>           <font color="#666666">"   ----------------- ------------------\n"</font>);
+<a name="line166">166: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) {
+<a name="line167">167: </a>        PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"   %12f       %12.2g\n"</font>,(double)evals[i],(double)error[i]);
+<a name="line168">168: </a>      }
+<a name="line169">169: </a>    } <font color="#4169E1">else</font> {
+<a name="line170">170: </a>      errok = PETSC_TRUE;
+<a name="line171">171: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) errok = (errok &amp;&amp; error[i]&lt;5.0*tol)? PETSC_TRUE: PETSC_FALSE;
+<a name="line172">172: </a>      <font color="#4169E1">if</font> (!errok) {
+<a name="line173">173: </a>        PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Problem: some of the first %D relative errors are higher than the tolerance\n\n"</font>,nconv);
+<a name="line174">174: </a>      } <font color="#4169E1">else</font> {
+<a name="line175">175: </a>        PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" nconv=%D eigenvalues computed up to the required tolerance:"</font>,nconv);
+<a name="line176">176: </a>        <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) {
+<a name="line177">177: </a>          PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" %.5f"</font>,(double)evals[i]);
+<a name="line178">178: </a>        }
+<a name="line179">179: </a>      }
+<a name="line180">180: </a>    }
+<a name="line181">181: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n"</font>);
+<a name="line182">182: </a>    PetscFree2(evals,error);
+<a name="line183">183: </a>  }
+
+<a name="line185">185: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line186">186: </a>  MatDestroy(&amp;A);
+<a name="line187">187: </a>  MatDestroy(&amp;M);
+<a name="line188">188: </a>  VecDestroy(&amp;ctx-&gt;w);
+<a name="line189">189: </a>  VecDestroy(&amp;x);
+<a name="line190">190: </a>  PetscFree(ctx);
+<a name="line191">191: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line192">192: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line193">193: </a>}
+
+<a name="line195">195: </a><font color="#B22222">/*</font>
+<a name="line196">196: </a><font color="#B22222">    Matrix-vector product subroutine for the spectrum folding.</font>
+<a name="line197">197: </a><font color="#B22222">       y &lt;-- (A-t*I)^2*x</font>
+<a name="line198">198: </a><font color="#B22222"> */</font>
+<a name="line199">199: </a><strong><font color="#4169E1"><a name="MatMult_Fold"></a>PetscErrorCode MatMult_Fold(Mat M,Vec x,Vec y)</font></strong>
+<a name="line200">200: </a>{
+<a name="line201">201: </a>  CTX_FOLD       *ctx;
+<a name="line202">202: </a>  PetscScalar    sigma;
+
+<a name="line206">206: </a>  MatShellGetContext(M,&amp;ctx);
+<a name="line207">207: </a>  sigma = -ctx-&gt;target;
+<a name="line208">208: </a>  MatMult(ctx-&gt;A,x,ctx-&gt;w);
+<a name="line209">209: </a>  VecAXPY(ctx-&gt;w,sigma,x);
+<a name="line210">210: </a>  MatMult(ctx-&gt;A,ctx-&gt;w,y);
+<a name="line211">211: </a>  VecAXPY(y,sigma,ctx-&gt;w);
+<a name="line212">212: </a>  <font color="#4169E1">return</font>(0);
+<a name="line213">213: </a>}
+
+<a name="line215">215: </a><font color="#B22222">/*</font>
+<a name="line216">216: </a><font color="#B22222">    Computes the Rayleigh quotient of a vector x</font>
+<a name="line217">217: </a><font color="#B22222">       r &lt;-- x^T*A*x       (assumes x has unit norm)</font>
+<a name="line218">218: </a><font color="#B22222"> */</font>
+<a name="line219">219: </a><strong><font color="#4169E1"><a name="RayleighQuotient"></a>PetscErrorCode RayleighQuotient(Mat A,Vec x,PetscScalar *r)</font></strong>
+<a name="line220">220: </a>{
+<a name="line221">221: </a>  Vec            Ax;
+
+<a name="line225">225: </a>  VecDuplicate(x,&amp;Ax);
+<a name="line226">226: </a>  MatMult(A,x,Ax);
+<a name="line227">227: </a>  VecDot(Ax,x,r);
+<a name="line228">228: </a>  VecDestroy(&amp;Ax);
+<a name="line229">229: </a>  <font color="#4169E1">return</font>(0);
+<a name="line230">230: </a>}
+
+<a name="line232">232: </a><font color="#B22222">/*</font>
+<a name="line233">233: </a><font color="#B22222">    Computes the residual norm of an approximate eigenvector x, |A*x-lambda*x|</font>
+<a name="line234">234: </a><font color="#B22222"> */</font>
+<a name="line235">235: </a><strong><font color="#4169E1"><a name="ComputeResidualNorm"></a>PetscErrorCode ComputeResidualNorm(Mat A,PetscScalar lambda,Vec x,PetscReal *r)</font></strong>
+<a name="line236">236: </a>{
+<a name="line237">237: </a>  Vec            Ax;
+
+<a name="line241">241: </a>  VecDuplicate(x,&amp;Ax);
+<a name="line242">242: </a>  MatMult(A,x,Ax);
+<a name="line243">243: </a>  VecAXPY(Ax,-lambda,x);
+<a name="line244">244: </a>  VecNorm(Ax,NORM_2,r);
+<a name="line245">245: </a>  VecDestroy(&amp;Ax);
+<a name="line246">246: </a>  <font color="#4169E1">return</font>(0);
+<a name="line247">247: </a>}
+
+<a name="line249">249: </a><font color="#B22222">/*TEST</font>
+
+<a name="line251">251: </a><font color="#B22222">   testset:</font>
+<a name="line252">252: </a><font color="#B22222">      args: -n 15 -eps_nev 1 -eps_ncv 12 -eps_max_it 1000 -eps_tol 1e-5 -terse</font>
+<a name="line253">253: </a><font color="#B22222">      filter: grep -v Solution</font>
+<a name="line254">254: </a><font color="#B22222">      test:</font>
+<a name="line255">255: </a><font color="#B22222">         suffix: 1</font>
+<a name="line256">256: </a><font color="#B22222">      test:</font>
+<a name="line257">257: </a><font color="#B22222">         suffix: 1_lobpcg</font>
+<a name="line258">258: </a><font color="#B22222">         args: -eps_type lobpcg</font>
+<a name="line259">259: </a><font color="#B22222">         requires: !single</font>
+<a name="line260">260: </a><font color="#B22222">      test:</font>
+<a name="line261">261: </a><font color="#B22222">         suffix: 1_gd</font>
+<a name="line262">262: </a><font color="#B22222">         args: -eps_type gd</font>
+<a name="line263">263: </a><font color="#B22222">         requires: !single</font>
+
+<a name="line265">265: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

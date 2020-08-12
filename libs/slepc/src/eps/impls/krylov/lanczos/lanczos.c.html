@@ -1,0 +1,861 @@
+<center><a href="lanczos.c">Actual source code: lanczos.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/krylov/lanczos/lanczos.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:52+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/krylov/lanczos/lanczos.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "lanczos"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Explicitly Restarted Symmetric/Hermitian Lanczos</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       Lanczos method for symmetric (Hermitian) problems, with explicit</font>
+<a name="line18"> 18: </a><font color="#B22222">       restart and deflation. Several reorthogonalization strategies can</font>
+<a name="line19"> 19: </a><font color="#B22222">       be selected.</font>
+
+<a name="line21"> 21: </a><font color="#B22222">   References:</font>
+
+<a name="line23"> 23: </a><font color="#B22222">       [1] "Lanczos Methods in SLEPc", SLEPc Technical Report STR-5,</font>
+<a name="line24"> 24: </a><font color="#B22222">           available at https://slepc.upv.es.</font>
+<a name="line25"> 25: </a><font color="#B22222">*/</font>
+
+<a name="line27"> 27: </a> #include <A href="../../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line28"> 28: </a> #include <A href="../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line30"> 30: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line31"> 31: </a>  <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a> reorthog;      <font color="#B22222">/* user-provided reorthogonalization parameter */</font>
+<a name="line32"> 32: </a>  PetscInt               allocsize;     <font color="#B22222">/* number of columns of work <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>'s allocated at setup */</font>
+<a name="line33"> 33: </a>  <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>                     AV;            <font color="#B22222">/* work <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> used in selective reorthogonalization */</font>
+<a name="line34"> 34: </a>} EPS_LANCZOS;
+
+<a name="line36"> 36: </a><strong><font color="#4169E1"><a name="EPSSetUp_Lanczos"></a>PetscErrorCode EPSSetUp_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line37"> 37: </a>{
+<a name="line38"> 38: </a>  EPS_LANCZOS        *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+<a name="line39"> 39: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BVOrthogRefineType</a> refine;
+<a name="line40"> 40: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BVOrthogBlockType</a>  btype;
+<a name="line41"> 41: </a>  PetscReal          eta;
+<a name="line42"> 42: </a>  PetscErrorCode     ierr;
+
+<a name="line45"> 45: </a>  EPSSetDimensions_Default(eps,eps-&gt;nev,&amp;eps-&gt;ncv,&amp;eps-&gt;mpd);
+<a name="line46"> 46: </a>  <font color="#4169E1">if</font> (eps-&gt;ncv&gt;eps-&gt;nev+eps-&gt;mpd) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"The value of ncv must not be larger than nev+mpd"</font>);
+<a name="line47"> 47: </a>  <font color="#4169E1">if</font> (eps-&gt;max_it==PETSC_DEFAULT) eps-&gt;max_it = PetscMax(100,2*eps-&gt;n/eps-&gt;ncv);
+<a name="line48"> 48: </a>  <font color="#4169E1">if</font> (!eps-&gt;which) { EPSSetWhichEigenpairs_Default(eps); }
+<a name="line49"> 49: </a>  <font color="#4169E1">switch</font> (eps-&gt;which) {
+<a name="line50"> 50: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_IMAGINARY</a>:
+<a name="line51"> 51: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_IMAGINARY</a>:
+<a name="line52"> 52: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_IMAGINARY</a>:
+<a name="line53"> 53: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a>:
+<a name="line54"> 54: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"Wrong value of eps-&gt;which"</font>);
+<a name="line55"> 55: </a><strong><font color="#FF0000">    default:</font></strong> ; <font color="#B22222">/* default case to remove warning */</font>
+<a name="line56"> 56: </a>  }
+<a name="line57"> 57: </a>  <font color="#4169E1">if</font> (!eps-&gt;extraction) {
+<a name="line58"> 58: </a>    <a href="../../../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_RITZ</a>);
+<a name="line59"> 59: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (eps-&gt;extraction!=<a href="../../../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_RITZ</a>) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Unsupported extraction type"</font>);
+<a name="line60"> 60: </a>  <font color="#4169E1">if</font> (eps-&gt;arbitrary) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Arbitrary selection of eigenpairs not supported in this solver"</font>);
+
+<a name="line62"> 62: </a>  <a href="../../../../../docs/manualpages/EPS/EPSAllocateSolution.html#EPSAllocateSolution">EPSAllocateSolution</a>(eps,1);
+<a name="line63"> 63: </a>  EPS_SetInnerProduct(eps);
+<a name="line64"> 64: </a>  <font color="#4169E1">if</font> (lanczos-&gt;reorthog != <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_FULL</a>) {
+<a name="line65"> 65: </a>    <a href="../../../../../docs/manualpages/BV/BVGetOrthogonalization.html#BVGetOrthogonalization">BVGetOrthogonalization</a>(eps-&gt;V,NULL,&amp;refine,&amp;eta,&amp;btype);
+<a name="line66"> 66: </a>    <a href="../../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>(eps-&gt;V,<a href="../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BV_ORTHOG_MGS</a>,refine,eta,btype);
+<a name="line67"> 67: </a>    PetscInfo(eps,<font color="#666666">"Switching to MGS orthogonalization\n"</font>);
+<a name="line68"> 68: </a>  }
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (lanczos-&gt;reorthog == <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_SELECTIVE</a>) {
+<a name="line70"> 70: </a>    <font color="#4169E1">if</font> (!lanczos-&gt;allocsize) {
+<a name="line71"> 71: </a>      <a href="../../../../../docs/manualpages/BV/BVDuplicate.html#BVDuplicate">BVDuplicate</a>(eps-&gt;V,&amp;lanczos-&gt;AV);
+<a name="line72"> 72: </a>      <a href="../../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(lanczos-&gt;AV,NULL,NULL,&amp;lanczos-&gt;allocsize);
+<a name="line73"> 73: </a>    } <font color="#4169E1">else</font> { <font color="#B22222">/* make sure V and AV have the same size */</font>
+<a name="line74"> 74: </a>      <a href="../../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(eps-&gt;V,NULL,NULL,&amp;lanczos-&gt;allocsize);
+<a name="line75"> 75: </a>      <a href="../../../../../docs/manualpages/BV/BVResize.html#BVResize">BVResize</a>(lanczos-&gt;AV,lanczos-&gt;allocsize,PETSC_FALSE);
+<a name="line76"> 76: </a>    }
+<a name="line77"> 77: </a>  }
+
+<a name="line79"> 79: </a>  <a href="../../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(eps-&gt;ds,DSHEP);
+<a name="line80"> 80: </a>  <a href="../../../../../docs/manualpages/DS/DSSetCompact.html#DSSetCompact">DSSetCompact</a>(eps-&gt;ds,PETSC_TRUE);
+<a name="line81"> 81: </a>  <a href="../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(eps-&gt;ds,eps-&gt;ncv+1);
+<a name="line82"> 82: </a>  <font color="#4169E1">if</font> (lanczos-&gt;reorthog == <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_LOCAL</a>) {
+<a name="line83"> 83: </a>    <a href="../../../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(eps,1);
+<a name="line84"> 84: </a>  }
+
+<a name="line86"> 86: </a>  <font color="#4169E1">if</font> (!eps-&gt;ishermitian) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Requested method is only available for Hermitian problems"</font>);
+<a name="line87"> 87: </a>  <font color="#4169E1">if</font> (eps-&gt;isgeneralized &amp;&amp; eps-&gt;ishermitian &amp;&amp; !eps-&gt;ispositive) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Requested method does not work for indefinite problems"</font>);
+<a name="line88"> 88: </a>  <font color="#4169E1">return</font>(0);
+<a name="line89"> 89: </a>}
+
+<a name="line91"> 91: </a><font color="#B22222">/*</font>
+<a name="line92"> 92: </a><font color="#B22222">   EPSLocalLanczos - Local reorthogonalization.</font>
+
+<a name="line94"> 94: </a><font color="#B22222">   This is the simplest variant. At each Lanczos step, the corresponding Lanczos vector</font>
+<a name="line95"> 95: </a><font color="#B22222">   is orthogonalized with respect to the two previous Lanczos vectors, according to</font>
+<a name="line96"> 96: </a><font color="#B22222">   the three term Lanczos recurrence. WARNING: This variant does not track the loss of</font>
+<a name="line97"> 97: </a><font color="#B22222">   orthogonality that occurs in finite-precision arithmetic and, therefore, the</font>
+<a name="line98"> 98: </a><font color="#B22222">   generated vectors are not guaranteed to be (semi-)orthogonal.</font>
+<a name="line99"> 99: </a><font color="#B22222">*/</font>
+<a name="line100">100: </a><strong><font color="#4169E1"><a name="EPSLocalLanczos"></a>static PetscErrorCode EPSLocalLanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal *alpha,PetscReal *beta,PetscInt k,PetscInt *M,PetscBool *breakdown)</font></strong>
+<a name="line101">101: </a>{
+<a name="line103">103: </a>  PetscInt       i,j,m = *M;
+<a name="line104">104: </a>  Mat            Op;
+<a name="line105">105: </a>  PetscBool      *which,lwhich[100];
+<a name="line106">106: </a>  PetscScalar    *hwork,lhwork[100];
+
+<a name="line109">109: </a>  <font color="#4169E1">if</font> (m &gt; 100) {
+<a name="line110">110: </a>    PetscMalloc2(m,&amp;which,m,&amp;hwork);
+<a name="line111">111: </a>  } <font color="#4169E1">else</font> {
+<a name="line112">112: </a>    which = lwhich;
+<a name="line113">113: </a>    hwork = lhwork;
+<a name="line114">114: </a>  }
+<a name="line115">115: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) which[i] = PETSC_TRUE;
+
+<a name="line117">117: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,m);
+<a name="line118">118: </a>  <a href="../../../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line119">119: </a>  <font color="#4169E1">for</font> (j=k;j&lt;m;j++) {
+<a name="line120">120: </a>    <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(eps-&gt;V,Op,j);
+<a name="line121">121: </a>    which[j] = PETSC_TRUE;
+<a name="line122">122: </a>    <font color="#4169E1">if</font> (j-2&gt;=k) which[j-2] = PETSC_FALSE;
+<a name="line123">123: </a>    <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeSomeColumn.html#BVOrthogonalizeSomeColumn">BVOrthogonalizeSomeColumn</a>(eps-&gt;V,j+1,which,hwork,beta+j,breakdown);
+<a name="line124">124: </a>    alpha[j] = PetscRealPart(hwork[j]);
+<a name="line125">125: </a>    <font color="#4169E1">if</font> (*breakdown) {
+<a name="line126">126: </a>      *M = j+1;
+<a name="line127">127: </a>      <font color="#4169E1">break</font>;
+<a name="line128">128: </a>    } <font color="#4169E1">else</font> {
+<a name="line129">129: </a>      <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;V,j+1,1/beta[j]);
+<a name="line130">130: </a>    }
+<a name="line131">131: </a>  }
+<a name="line132">132: </a>  <a href="../../../../../docs/manualpages/ST/STRestoreOperator.html#STRestoreOperator">STRestoreOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line133">133: </a>  <font color="#4169E1">if</font> (m &gt; 100) {
+<a name="line134">134: </a>    PetscFree2(which,hwork);
+<a name="line135">135: </a>  }
+<a name="line136">136: </a>  <font color="#4169E1">return</font>(0);
+<a name="line137">137: </a>}
+
+<a name="line139">139: </a><font color="#B22222">/*</font>
+<a name="line140">140: </a><font color="#B22222">   DenseTridiagonal - Solves a real tridiagonal Hermitian Eigenvalue Problem.</font>
+
+<a name="line142">142: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line143">143: </a><font color="#B22222">+  n   - dimension of the eigenproblem</font>
+<a name="line144">144: </a><font color="#B22222">.  D   - pointer to the array containing the diagonal elements</font>
+<a name="line145">145: </a><font color="#B22222">-  E   - pointer to the array containing the off-diagonal elements</font>
+
+<a name="line147">147: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line148">148: </a><font color="#B22222">+  w  - pointer to the array to store the computed eigenvalues</font>
+<a name="line149">149: </a><font color="#B22222">-  V  - pointer to the array to store the eigenvectors</font>
+
+<a name="line151">151: </a><font color="#B22222">   Notes:</font>
+<a name="line152">152: </a><font color="#B22222">   If V is NULL then the eigenvectors are not computed.</font>
+
+<a name="line154">154: </a><font color="#B22222">   This routine use LAPACK routines xSTEVR.</font>
+<a name="line155">155: </a><font color="#B22222">*/</font>
+<a name="line156">156: </a><strong><font color="#4169E1"><a name="DenseTridiagonal"></a>static PetscErrorCode DenseTridiagonal(PetscInt n_,PetscReal *D,PetscReal *E,PetscReal *w,PetscScalar *V)</font></strong>
+<a name="line157">157: </a>{
+<a name="line159">159: </a>  PetscReal      abstol = 0.0,vl,vu,*work;
+<a name="line160">160: </a>  PetscBLASInt   il,iu,m,*isuppz,n,lwork,*iwork,liwork,info;
+<a name="line161">161: </a>  const char     *jobz;
+<a name="line162">162: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line163">163: </a>  PetscInt       i,j;
+<a name="line164">164: </a>  PetscReal      *VV=NULL;
+<a name="line165">165: </a><font color="#A020F0">#endif</font>
+
+<a name="line168">168: </a>  PetscBLASIntCast(n_,&amp;n);
+<a name="line169">169: </a>  PetscBLASIntCast(20*n_,&amp;lwork);
+<a name="line170">170: </a>  PetscBLASIntCast(10*n_,&amp;liwork);
+<a name="line171">171: </a>  <font color="#4169E1">if</font> (V) {
+<a name="line172">172: </a>    jobz = <font color="#666666">"V"</font>;
+<a name="line173">173: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line174">174: </a>    PetscMalloc1(n*n,&amp;VV);
+<a name="line175">175: </a><font color="#A020F0">#endif</font>
+<a name="line176">176: </a>  } <font color="#4169E1">else</font> jobz = <font color="#666666">"N"</font>;
+<a name="line177">177: </a>  PetscMalloc3(2*n,&amp;isuppz,lwork,&amp;work,liwork,&amp;iwork);
+<a name="line178">178: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line179">179: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line180">180: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKstevr"</font>,LAPACKstevr_(jobz,<font color="#666666">"A"</font>,&amp;n,D,E,&amp;vl,&amp;vu,&amp;il,&amp;iu,&amp;abstol,&amp;m,w,VV,&amp;n,isuppz,work,&amp;lwork,iwork,&amp;liwork,&amp;info));
+<a name="line181">181: </a><font color="#A020F0">#else</font>
+<a name="line182">182: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKstevr"</font>,LAPACKstevr_(jobz,<font color="#666666">"A"</font>,&amp;n,D,E,&amp;vl,&amp;vu,&amp;il,&amp;iu,&amp;abstol,&amp;m,w,V,&amp;n,isuppz,work,&amp;lwork,iwork,&amp;liwork,&amp;info));
+<a name="line183">183: </a><font color="#A020F0">#endif</font>
+<a name="line184">184: </a>  PetscFPTrapPop();
+<a name="line185">185: </a>  SlepcCheckLapackInfo(<font color="#666666">"stevr"</font>,info);
+<a name="line186">186: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line187">187: </a>  <font color="#4169E1">if</font> (V) {
+<a name="line188">188: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++)
+<a name="line189">189: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++)
+<a name="line190">190: </a>        V[i*n+j] = VV[i*n+j];
+<a name="line191">191: </a>    PetscFree(VV);
+<a name="line192">192: </a>  }
+<a name="line193">193: </a><font color="#A020F0">#endif</font>
+<a name="line194">194: </a>  PetscFree3(isuppz,work,iwork);
+<a name="line195">195: </a>  <font color="#4169E1">return</font>(0);
+<a name="line196">196: </a>}
+
+<a name="line198">198: </a><font color="#B22222">/*</font>
+<a name="line199">199: </a><font color="#B22222">   EPSSelectiveLanczos - Selective reorthogonalization.</font>
+<a name="line200">200: </a><font color="#B22222">*/</font>
+<a name="line201">201: </a><strong><font color="#4169E1"><a name="EPSSelectiveLanczos"></a>static PetscErrorCode EPSSelectiveLanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal *alpha,PetscReal *beta,PetscInt k,PetscInt *M,PetscBool *breakdown,PetscReal anorm)</font></strong>
+<a name="line202">202: </a>{
+<a name="line204">204: </a>  EPS_LANCZOS    *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+<a name="line205">205: </a>  PetscInt       i,j,m = *M,n,nritz=0,nritzo;
+<a name="line206">206: </a>  Vec            vj1,av;
+<a name="line207">207: </a>  Mat            Op;
+<a name="line208">208: </a>  PetscReal      *d,*e,*ritz,norm;
+<a name="line209">209: </a>  PetscScalar    *Y,*hwork;
+<a name="line210">210: </a>  PetscBool      *which;
+
+<a name="line213">213: </a>  PetscCalloc6(m+1,&amp;d,m,&amp;e,m,&amp;ritz,m*m,&amp;Y,m,&amp;which,m,&amp;hwork);
+<a name="line214">214: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) which[i] = PETSC_TRUE;
+<a name="line215">215: </a>  <a href="../../../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(eps-&gt;st,&amp;Op);
+
+<a name="line217">217: </a>  <font color="#4169E1">for</font> (j=k;j&lt;m;j++) {
+<a name="line218">218: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,m);
+
+<a name="line220">220: </a>    <font color="#B22222">/* Lanczos step */</font>
+<a name="line221">221: </a>    <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(eps-&gt;V,Op,j);
+<a name="line222">222: </a>    which[j] = PETSC_TRUE;
+<a name="line223">223: </a>    <font color="#4169E1">if</font> (j-2&gt;=k) which[j-2] = PETSC_FALSE;
+<a name="line224">224: </a>    <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeSomeColumn.html#BVOrthogonalizeSomeColumn">BVOrthogonalizeSomeColumn</a>(eps-&gt;V,j+1,which,hwork,&amp;norm,breakdown);
+<a name="line225">225: </a>    alpha[j] = PetscRealPart(hwork[j]);
+<a name="line226">226: </a>    beta[j] = norm;
+<a name="line227">227: </a>    <font color="#4169E1">if</font> (*breakdown) {
+<a name="line228">228: </a>      *M = j+1;
+<a name="line229">229: </a>      <font color="#4169E1">break</font>;
+<a name="line230">230: </a>    }
+
+<a name="line232">232: </a>    <font color="#B22222">/* Compute eigenvalues and eigenvectors Y of the tridiagonal block */</font>
+<a name="line233">233: </a>    n = j-k+1;
+<a name="line234">234: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line235">235: </a>      d[i] = alpha[i+k];
+<a name="line236">236: </a>      e[i] = beta[i+k];
+<a name="line237">237: </a>    }
+<a name="line238">238: </a>    DenseTridiagonal(n,d,e,ritz,Y);
+
+<a name="line240">240: </a>    <font color="#B22222">/* Estimate ||A|| */</font>
+<a name="line241">241: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++)
+<a name="line242">242: </a>      <font color="#4169E1">if</font> (PetscAbsReal(ritz[i]) &gt; anorm) anorm = PetscAbsReal(ritz[i]);
+
+<a name="line244">244: </a>    <font color="#B22222">/* Compute nearly converged Ritz vectors */</font>
+<a name="line245">245: </a>    nritzo = 0;
+<a name="line246">246: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line247">247: </a>      <font color="#4169E1">if</font> (norm*PetscAbsScalar(Y[i*n+n-1]) &lt; PETSC_SQRT_MACHINE_EPSILON*anorm) nritzo++;
+<a name="line248">248: </a>    }
+<a name="line249">249: </a>    <font color="#4169E1">if</font> (nritzo&gt;nritz) {
+<a name="line250">250: </a>      nritz = 0;
+<a name="line251">251: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line252">252: </a>        <font color="#4169E1">if</font> (norm*PetscAbsScalar(Y[i*n+n-1]) &lt; PETSC_SQRT_MACHINE_EPSILON*anorm) {
+<a name="line253">253: </a>          <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,k,k+n);
+<a name="line254">254: </a>          <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(lanczos-&gt;AV,nritz,&amp;av);
+<a name="line255">255: </a>          <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(eps-&gt;V,1.0,0.0,av,Y+i*n);
+<a name="line256">256: </a>          <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(lanczos-&gt;AV,nritz,&amp;av);
+<a name="line257">257: </a>          nritz++;
+<a name="line258">258: </a>        }
+<a name="line259">259: </a>      }
+<a name="line260">260: </a>    }
+<a name="line261">261: </a>    <font color="#4169E1">if</font> (nritz &gt; 0) {
+<a name="line262">262: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,j+1,&amp;vj1);
+<a name="line263">263: </a>      <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(lanczos-&gt;AV,0,nritz);
+<a name="line264">264: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(lanczos-&gt;AV,vj1,hwork,&amp;norm,breakdown);
+<a name="line265">265: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,j+1,&amp;vj1);
+<a name="line266">266: </a>      <font color="#4169E1">if</font> (*breakdown) {
+<a name="line267">267: </a>        *M = j+1;
+<a name="line268">268: </a>        <font color="#4169E1">break</font>;
+<a name="line269">269: </a>      }
+<a name="line270">270: </a>    }
+<a name="line271">271: </a>    <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;V,j+1,1.0/norm);
+<a name="line272">272: </a>  }
+
+<a name="line274">274: </a>  <a href="../../../../../docs/manualpages/ST/STRestoreOperator.html#STRestoreOperator">STRestoreOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line275">275: </a>  PetscFree6(d,e,ritz,Y,which,hwork);
+<a name="line276">276: </a>  <font color="#4169E1">return</font>(0);
+<a name="line277">277: </a>}
+
+<a name="line279">279: </a><strong><font color="#4169E1"><a name="update_omega"></a>static void update_omega(PetscReal *omega,PetscReal *omega_old,PetscInt j,PetscReal *alpha,PetscReal *beta,PetscReal eps1,PetscReal anorm)</font></strong>
+<a name="line280">280: </a>{
+<a name="line281">281: </a>  PetscInt  k;
+<a name="line282">282: </a>  PetscReal T,binv;
+
+<a name="line285">285: </a>  <font color="#B22222">/* Estimate of contribution to roundoff errors from A*v</font>
+<a name="line286">286: </a><font color="#B22222">       fl(A*v) = A*v + f,</font>
+<a name="line287">287: </a><font color="#B22222">     where ||f|| \approx eps1*||A||.</font>
+<a name="line288">288: </a><font color="#B22222">     For a full matrix A, a rule-of-thumb estimate is eps1 = sqrt(n)*eps */</font>
+<a name="line289">289: </a>  T = eps1*anorm;
+<a name="line290">290: </a>  binv = 1.0/beta[j+1];
+
+<a name="line292">292: </a>  <font color="#B22222">/* Update omega(1) using omega(0)==0 */</font>
+<a name="line293">293: </a>  omega_old[0]= beta[1]*omega[1] + (alpha[0]-alpha[j])*omega[0] - beta[j]*omega_old[0];
+<a name="line294">294: </a>  <font color="#4169E1">if</font> (omega_old[0] &gt; 0) omega_old[0] = binv*(omega_old[0] + T);
+<a name="line295">295: </a>  <font color="#4169E1">else</font> omega_old[0] = binv*(omega_old[0] - T);
+
+<a name="line297">297: </a>  <font color="#B22222">/* Update remaining components */</font>
+<a name="line298">298: </a>  <font color="#4169E1">for</font> (k=1;k&lt;j-1;k++) {
+<a name="line299">299: </a>    omega_old[k] = beta[k+1]*omega[k+1] + (alpha[k]-alpha[j])*omega[k] + beta[k]*omega[k-1] - beta[j]*omega_old[k];
+<a name="line300">300: </a>    <font color="#4169E1">if</font> (omega_old[k] &gt; 0) omega_old[k] = binv*(omega_old[k] + T);
+<a name="line301">301: </a>    <font color="#4169E1">else</font> omega_old[k] = binv*(omega_old[k] - T);
+<a name="line302">302: </a>  }
+<a name="line303">303: </a>  omega_old[j-1] = binv*T;
+
+<a name="line305">305: </a>  <font color="#B22222">/* Swap omega and omega_old */</font>
+<a name="line306">306: </a>  <font color="#4169E1">for</font> (k=0;k&lt;j;k++) {
+<a name="line307">307: </a>    omega[k] = omega_old[k];
+<a name="line308">308: </a>    omega_old[k] = omega[k];
+<a name="line309">309: </a>  }
+<a name="line310">310: </a>  omega[j] = eps1;
+<a name="line311">311: </a>  PetscFunctionReturnVoid();
+<a name="line312">312: </a>}
+
+<a name="line314">314: </a><strong><font color="#4169E1"><a name="compute_int"></a>static void compute_int(PetscBool *which,PetscReal *mu,PetscInt j,PetscReal delta,PetscReal eta)</font></strong>
+<a name="line315">315: </a>{
+<a name="line316">316: </a>  PetscInt  i,k,maxpos;
+<a name="line317">317: </a>  PetscReal max;
+<a name="line318">318: </a>  PetscBool found;
+
+<a name="line321">321: </a>  <font color="#B22222">/* initialize which */</font>
+<a name="line322">322: </a>  found = PETSC_FALSE;
+<a name="line323">323: </a>  maxpos = 0;
+<a name="line324">324: </a>  max = 0.0;
+<a name="line325">325: </a>  <font color="#4169E1">for</font> (i=0;i&lt;j;i++) {
+<a name="line326">326: </a>    <font color="#4169E1">if</font> (PetscAbsReal(mu[i]) &gt;= delta) {
+<a name="line327">327: </a>      which[i] = PETSC_TRUE;
+<a name="line328">328: </a>      found = PETSC_TRUE;
+<a name="line329">329: </a>    } <font color="#4169E1">else</font> which[i] = PETSC_FALSE;
+<a name="line330">330: </a>    <font color="#4169E1">if</font> (PetscAbsReal(mu[i]) &gt; max) {
+<a name="line331">331: </a>      maxpos = i;
+<a name="line332">332: </a>      max = PetscAbsReal(mu[i]);
+<a name="line333">333: </a>    }
+<a name="line334">334: </a>  }
+<a name="line335">335: </a>  <font color="#4169E1">if</font> (!found) which[maxpos] = PETSC_TRUE;
+
+<a name="line337">337: </a>  <font color="#4169E1">for</font> (i=0;i&lt;j;i++) {
+<a name="line338">338: </a>    <font color="#4169E1">if</font> (which[i]) {
+<a name="line339">339: </a>      <font color="#B22222">/* find left interval */</font>
+<a name="line340">340: </a>      <font color="#4169E1">for</font> (k=i;k&gt;=0;k--) {
+<a name="line341">341: </a>        <font color="#4169E1">if</font> (PetscAbsReal(mu[k])&lt;eta || which[k]) <font color="#4169E1">break</font>;
+<a name="line342">342: </a>        <font color="#4169E1">else</font> which[k] = PETSC_TRUE;
+<a name="line343">343: </a>      }
+<a name="line344">344: </a>      <font color="#B22222">/* find right interval */</font>
+<a name="line345">345: </a>      <font color="#4169E1">for</font> (k=i+1;k&lt;j;k++) {
+<a name="line346">346: </a>        <font color="#4169E1">if</font> (PetscAbsReal(mu[k])&lt;eta || which[k]) <font color="#4169E1">break</font>;
+<a name="line347">347: </a>        <font color="#4169E1">else</font> which[k] = PETSC_TRUE;
+<a name="line348">348: </a>      }
+<a name="line349">349: </a>    }
+<a name="line350">350: </a>  }
+<a name="line351">351: </a>  PetscFunctionReturnVoid();
+<a name="line352">352: </a>}
+
+<a name="line354">354: </a><font color="#B22222">/*</font>
+<a name="line355">355: </a><font color="#B22222">   EPSPartialLanczos - Partial reorthogonalization.</font>
+<a name="line356">356: </a><font color="#B22222">*/</font>
+<a name="line357">357: </a><strong><font color="#4169E1"><a name="EPSPartialLanczos"></a>static PetscErrorCode EPSPartialLanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal *alpha,PetscReal *beta,PetscInt k,PetscInt *M,PetscBool *breakdown,PetscReal anorm)</font></strong>
+<a name="line358">358: </a>{
+<a name="line360">360: </a>  EPS_LANCZOS    *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+<a name="line361">361: </a>  PetscInt       i,j,m = *M;
+<a name="line362">362: </a>  Mat            Op;
+<a name="line363">363: </a>  PetscReal      norm,*omega,lomega[100],*omega_old,lomega_old[100],eps1,delta,eta;
+<a name="line364">364: </a>  PetscBool      *which,lwhich[100],*which2,lwhich2[100];
+<a name="line365">365: </a>  PetscBool      reorth = PETSC_FALSE,force_reorth = PETSC_FALSE;
+<a name="line366">366: </a>  PetscBool      fro = PETSC_FALSE,estimate_anorm = PETSC_FALSE;
+<a name="line367">367: </a>  PetscScalar    *hwork,lhwork[100];
+
+<a name="line370">370: </a>  <font color="#4169E1">if</font> (m&gt;100) {
+<a name="line371">371: </a>    PetscMalloc5(m,&amp;omega,m,&amp;omega_old,m,&amp;which,m,&amp;which2,m,&amp;hwork);
+<a name="line372">372: </a>  } <font color="#4169E1">else</font> {
+<a name="line373">373: </a>    omega     = lomega;
+<a name="line374">374: </a>    omega_old = lomega_old;
+<a name="line375">375: </a>    which     = lwhich;
+<a name="line376">376: </a>    which2    = lwhich2;
+<a name="line377">377: </a>    hwork     = lhwork;
+<a name="line378">378: </a>  }
+
+<a name="line380">380: </a>  eps1 = PetscSqrtReal((PetscReal)eps-&gt;n)*PETSC_MACHINE_EPSILON/2;
+<a name="line381">381: </a>  delta = PETSC_SQRT_MACHINE_EPSILON/PetscSqrtReal((PetscReal)eps-&gt;ncv);
+<a name="line382">382: </a>  eta = PetscPowReal(PETSC_MACHINE_EPSILON,3.0/4.0)/PetscSqrtReal((PetscReal)eps-&gt;ncv);
+<a name="line383">383: </a>  <font color="#4169E1">if</font> (anorm &lt; 0.0) {
+<a name="line384">384: </a>    anorm = 1.0;
+<a name="line385">385: </a>    estimate_anorm = PETSC_TRUE;
+<a name="line386">386: </a>  }
+<a name="line387">387: </a>  <font color="#4169E1">for</font> (i=0;i&lt;PetscMax(100,m);i++) omega[i] = omega_old[i] = 0.0;
+<a name="line388">388: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) which[i] = PETSC_TRUE;
+
+<a name="line390">390: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,m);
+<a name="line391">391: </a>  <a href="../../../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line392">392: </a>  <font color="#4169E1">for</font> (j=k;j&lt;m;j++) {
+<a name="line393">393: </a>    <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(eps-&gt;V,Op,j);
+<a name="line394">394: </a>    <font color="#4169E1">if</font> (fro) {
+<a name="line395">395: </a>      <font color="#B22222">/* Lanczos step with full reorthogonalization */</font>
+<a name="line396">396: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(eps-&gt;V,j+1,hwork,&amp;norm,breakdown);
+<a name="line397">397: </a>      alpha[j] = PetscRealPart(hwork[j]);
+<a name="line398">398: </a>    } <font color="#4169E1">else</font> {
+<a name="line399">399: </a>      <font color="#B22222">/* Lanczos step */</font>
+<a name="line400">400: </a>      which[j] = PETSC_TRUE;
+<a name="line401">401: </a>      <font color="#4169E1">if</font> (j-2&gt;=k) which[j-2] = PETSC_FALSE;
+<a name="line402">402: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeSomeColumn.html#BVOrthogonalizeSomeColumn">BVOrthogonalizeSomeColumn</a>(eps-&gt;V,j+1,which,hwork,&amp;norm,breakdown);
+<a name="line403">403: </a>      alpha[j] = PetscRealPart(hwork[j]);
+<a name="line404">404: </a>      beta[j] = norm;
+
+<a name="line406">406: </a>      <font color="#B22222">/* Estimate ||A|| if needed */</font>
+<a name="line407">407: </a>      <font color="#4169E1">if</font> (estimate_anorm) {
+<a name="line408">408: </a>        <font color="#4169E1">if</font> (j&gt;k) anorm = PetscMax(anorm,PetscAbsReal(alpha[j])+norm+beta[j-1]);
+<a name="line409">409: </a>        <font color="#4169E1">else</font> anorm = PetscMax(anorm,PetscAbsReal(alpha[j])+norm);
+<a name="line410">410: </a>      }
+
+<a name="line412">412: </a>      <font color="#B22222">/* Check if reorthogonalization is needed */</font>
+<a name="line413">413: </a>      reorth = PETSC_FALSE;
+<a name="line414">414: </a>      <font color="#4169E1">if</font> (j&gt;k) {
+<a name="line415">415: </a>        update_omega(omega,omega_old,j,alpha,beta-1,eps1,anorm);
+<a name="line416">416: </a>        <font color="#4169E1">for</font> (i=0;i&lt;j-k;i++) {
+<a name="line417">417: </a>          <font color="#4169E1">if</font> (PetscAbsReal(omega[i]) &gt; delta) reorth = PETSC_TRUE;
+<a name="line418">418: </a>        }
+<a name="line419">419: </a>      }
+<a name="line420">420: </a>      <font color="#4169E1">if</font> (reorth || force_reorth) {
+<a name="line421">421: </a>        <font color="#4169E1">for</font> (i=0;i&lt;k;i++) which2[i] = PETSC_FALSE;
+<a name="line422">422: </a>        <font color="#4169E1">for</font> (i=k;i&lt;=j;i++) which2[i] = PETSC_TRUE;
+<a name="line423">423: </a>        <font color="#4169E1">if</font> (lanczos-&gt;reorthog == <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_PERIODIC</a>) {
+<a name="line424">424: </a>          <font color="#B22222">/* Periodic reorthogonalization */</font>
+<a name="line425">425: </a>          <font color="#4169E1">if</font> (force_reorth) force_reorth = PETSC_FALSE;
+<a name="line426">426: </a>          <font color="#4169E1">else</font> force_reorth = PETSC_TRUE;
+<a name="line427">427: </a>          <font color="#4169E1">for</font> (i=0;i&lt;j-k;i++) omega[i] = eps1;
+<a name="line428">428: </a>        } <font color="#4169E1">else</font> {
+<a name="line429">429: </a>          <font color="#B22222">/* Partial reorthogonalization */</font>
+<a name="line430">430: </a>          <font color="#4169E1">if</font> (force_reorth) force_reorth = PETSC_FALSE;
+<a name="line431">431: </a>          <font color="#4169E1">else</font> {
+<a name="line432">432: </a>            force_reorth = PETSC_TRUE;
+<a name="line433">433: </a>            compute_int(which2+k,omega,j-k,delta,eta);
+<a name="line434">434: </a>            <font color="#4169E1">for</font> (i=0;i&lt;j-k;i++) {
+<a name="line435">435: </a>              <font color="#4169E1">if</font> (which2[i+k]) omega[i] = eps1;
+<a name="line436">436: </a>            }
+<a name="line437">437: </a>          }
+<a name="line438">438: </a>        }
+<a name="line439">439: </a>        <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeSomeColumn.html#BVOrthogonalizeSomeColumn">BVOrthogonalizeSomeColumn</a>(eps-&gt;V,j+1,which2,hwork,&amp;norm,breakdown);
+<a name="line440">440: </a>      }
+<a name="line441">441: </a>    }
+
+<a name="line443">443: </a>    <font color="#4169E1">if</font> (*breakdown || norm &lt; eps-&gt;n*anorm*PETSC_MACHINE_EPSILON) {
+<a name="line444">444: </a>      *M = j+1;
+<a name="line445">445: </a>      <font color="#4169E1">break</font>;
+<a name="line446">446: </a>    }
+<a name="line447">447: </a>    <font color="#4169E1">if</font> (!fro &amp;&amp; norm*delta &lt; anorm*eps1) {
+<a name="line448">448: </a>      fro = PETSC_TRUE;
+<a name="line449">449: </a>      PetscInfo1(eps,<font color="#666666">"Switching to full reorthogonalization at iteration %D\n"</font>,eps-&gt;its);
+<a name="line450">450: </a>    }
+<a name="line451">451: </a>    beta[j] = norm;
+<a name="line452">452: </a>    <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;V,j+1,1.0/norm);
+<a name="line453">453: </a>  }
+
+<a name="line455">455: </a>  <a href="../../../../../docs/manualpages/ST/STRestoreOperator.html#STRestoreOperator">STRestoreOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line456">456: </a>  <font color="#4169E1">if</font> (m&gt;100) {
+<a name="line457">457: </a>    PetscFree5(omega,omega_old,which,which2,hwork);
+<a name="line458">458: </a>  }
+<a name="line459">459: </a>  <font color="#4169E1">return</font>(0);
+<a name="line460">460: </a>}
+
+<a name="line462">462: </a><font color="#B22222">/*</font>
+<a name="line463">463: </a><font color="#B22222">   EPSBasicLanczos - Computes an m-step Lanczos factorization. The first k</font>
+<a name="line464">464: </a><font color="#B22222">   columns are assumed to be locked and therefore they are not modified. On</font>
+<a name="line465">465: </a><font color="#B22222">   exit, the following relation is satisfied:</font>
+
+<a name="line467">467: </a><font color="#B22222">                    OP * V - V * T = f * e_m^T</font>
+
+<a name="line469">469: </a><font color="#B22222">   where the columns of V are the Lanczos vectors, T is a tridiagonal matrix,</font>
+<a name="line470">470: </a><font color="#B22222">   f is the residual vector and e_m is the m-th vector of the canonical basis.</font>
+<a name="line471">471: </a><font color="#B22222">   The Lanczos vectors (together with vector f) are B-orthogonal (to working</font>
+<a name="line472">472: </a><font color="#B22222">   accuracy) if full reorthogonalization is being used, otherwise they are</font>
+<a name="line473">473: </a><font color="#B22222">   (B-)semi-orthogonal. On exit, beta contains the B-norm of f and the next</font>
+<a name="line474">474: </a><font color="#B22222">   Lanczos vector can be computed as v_{m+1} = f / beta.</font>
+
+<a name="line476">476: </a><font color="#B22222">   This function simply calls another function which depends on the selected</font>
+<a name="line477">477: </a><font color="#B22222">   reorthogonalization strategy.</font>
+<a name="line478">478: </a><font color="#B22222">*/</font>
+<a name="line479">479: </a><strong><font color="#4169E1"><a name="EPSBasicLanczos"></a>static PetscErrorCode EPSBasicLanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal *alpha,PetscReal *beta,PetscInt k,PetscInt *m,PetscBool *breakdown,PetscReal anorm)</font></strong>
+<a name="line480">480: </a>{
+<a name="line481">481: </a>  PetscErrorCode     ierr;
+<a name="line482">482: </a>  EPS_LANCZOS        *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+<a name="line483">483: </a>  PetscScalar        *T;
+<a name="line484">484: </a>  PetscInt           i,n=*m;
+<a name="line485">485: </a>  PetscReal          betam;
+<a name="line486">486: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BVOrthogRefineType</a> orthog_ref;
+<a name="line487">487: </a>  Mat                Op;
+
+<a name="line490">490: </a>  <font color="#4169E1">switch</font> (lanczos-&gt;reorthog) {
+<a name="line491">491: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_LOCAL</a>:
+<a name="line492">492: </a>      EPSLocalLanczos(eps,alpha,beta,k,m,breakdown);
+<a name="line493">493: </a>      <font color="#4169E1">break</font>;
+<a name="line494">494: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_FULL</a>:
+<a name="line495">495: </a>      <a href="../../../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line496">496: </a>      <a href="../../../../../docs/manualpages/BV/BVMatLanczos.html#BVMatLanczos">BVMatLanczos</a>(eps-&gt;V,Op,alpha,beta,k,m,breakdown);
+<a name="line497">497: </a>      <a href="../../../../../docs/manualpages/ST/STRestoreOperator.html#STRestoreOperator">STRestoreOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line498">498: </a>      <font color="#4169E1">break</font>;
+<a name="line499">499: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_SELECTIVE</a>:
+<a name="line500">500: </a>      EPSSelectiveLanczos(eps,alpha,beta,k,m,breakdown,anorm);
+<a name="line501">501: </a>      <font color="#4169E1">break</font>;
+<a name="line502">502: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_PERIODIC</a>:
+<a name="line503">503: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_PARTIAL</a>:
+<a name="line504">504: </a>      EPSPartialLanczos(eps,alpha,beta,k,m,breakdown,anorm);
+<a name="line505">505: </a>      <font color="#4169E1">break</font>;
+<a name="line506">506: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_DELAYED</a>:
+<a name="line507">507: </a>      PetscMalloc1(n*n,&amp;T);
+<a name="line508">508: </a>      <a href="../../../../../docs/manualpages/BV/BVGetOrthogonalization.html#BVGetOrthogonalization">BVGetOrthogonalization</a>(eps-&gt;V,NULL,&amp;orthog_ref,NULL,NULL);
+<a name="line509">509: </a>      <font color="#4169E1">if</font> (orthog_ref == <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_NEVER</a>) {
+<a name="line510">510: </a>        EPSDelayedArnoldi1(eps,T,n,k,m,&amp;betam,breakdown);
+<a name="line511">511: </a>      } <font color="#4169E1">else</font> {
+<a name="line512">512: </a>        EPSDelayedArnoldi(eps,T,n,k,m,&amp;betam,breakdown);
+<a name="line513">513: </a>      }
+<a name="line514">514: </a>      <font color="#4169E1">for</font> (i=k;i&lt;n-1;i++) {
+<a name="line515">515: </a>        alpha[i] = PetscRealPart(T[n*i+i]);
+<a name="line516">516: </a>        beta[i] = PetscRealPart(T[n*i+i+1]);
+<a name="line517">517: </a>      }
+<a name="line518">518: </a>      alpha[n-1] = PetscRealPart(T[n*(n-1)+n-1]);
+<a name="line519">519: </a>      beta[n-1] = betam;
+<a name="line520">520: </a>      PetscFree(T);
+<a name="line521">521: </a>      <font color="#4169E1">break</font>;
+<a name="line522">522: </a>  }
+<a name="line523">523: </a>  <font color="#4169E1">return</font>(0);
+<a name="line524">524: </a>}
+
+<a name="line526">526: </a><strong><font color="#4169E1"><a name="EPSSolve_Lanczos"></a>PetscErrorCode EPSSolve_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line527">527: </a>{
+<a name="line528">528: </a>  EPS_LANCZOS    *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+<a name="line530">530: </a>  PetscInt       nconv,i,j,k,l,x,n,*perm,restart,ncv=eps-&gt;ncv,r,ld;
+<a name="line531">531: </a>  Vec            vi,vj,w;
+<a name="line532">532: </a>  Mat            U;
+<a name="line533">533: </a>  PetscScalar    *Y,*ritz,stmp;
+<a name="line534">534: </a>  PetscReal      *d,*e,*bnd,anorm,beta,norm,rtmp,resnorm;
+<a name="line535">535: </a>  PetscBool      breakdown;
+<a name="line536">536: </a>  char           *conv,ctmp;
+
+<a name="line539">539: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(eps-&gt;ds,&amp;ld);
+<a name="line540">540: </a>  PetscMalloc4(ncv,&amp;ritz,ncv,&amp;bnd,ncv,&amp;perm,ncv,&amp;conv);
+
+<a name="line542">542: </a>  <font color="#B22222">/* The first Lanczos vector is the normalized initial vector */</font>
+<a name="line543">543: </a>  EPSGetStartVector(eps,0,NULL);
+
+<a name="line545">545: </a>  anorm = -1.0;
+<a name="line546">546: </a>  nconv = 0;
+
+<a name="line548">548: </a>  <font color="#B22222">/* Restart loop */</font>
+<a name="line549">549: </a>  <font color="#4169E1">while</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+<a name="line550">550: </a>    eps-&gt;its++;
+
+<a name="line552">552: </a>    <font color="#B22222">/* Compute an ncv-step Lanczos factorization */</font>
+<a name="line553">553: </a>    n = PetscMin(nconv+eps-&gt;mpd,ncv);
+<a name="line554">554: </a>    <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>,&amp;d);
+<a name="line555">555: </a>    e = d + ld;
+<a name="line556">556: </a>    EPSBasicLanczos(eps,d,e,nconv,&amp;n,&amp;breakdown,anorm);
+<a name="line557">557: </a>    beta = e[n-1];
+<a name="line558">558: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>,&amp;d);
+<a name="line559">559: </a>    <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,n,0,nconv,0);
+<a name="line560">560: </a>    <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>);
+<a name="line561">561: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,nconv,n);
+
+<a name="line563">563: </a>    <font color="#B22222">/* Solve projected problem */</font>
+<a name="line564">564: </a>    <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;ds,ritz,NULL);
+<a name="line565">565: </a>    <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;ds,ritz,NULL,NULL,NULL,NULL);
+<a name="line566">566: </a>    <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;ds,ritz,NULL);
+
+<a name="line568">568: </a>    <font color="#B22222">/* Estimate ||A|| */</font>
+<a name="line569">569: </a>    <font color="#4169E1">for</font> (i=nconv;i&lt;n;i++)
+<a name="line570">570: </a>      anorm = PetscMax(anorm,PetscAbsReal(PetscRealPart(ritz[i])));
+
+<a name="line572">572: </a>    <font color="#B22222">/* Compute residual norm estimates as beta*abs(Y(m,:)) + eps*||A|| */</font>
+<a name="line573">573: </a>    <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Y);
+<a name="line574">574: </a>    <font color="#4169E1">for</font> (i=nconv;i&lt;n;i++) {
+<a name="line575">575: </a>      resnorm = beta*PetscAbsScalar(Y[n-1+i*ld]) + PETSC_MACHINE_EPSILON*anorm;
+<a name="line576">576: </a>      (*eps-&gt;converged)(eps,ritz[i],eps-&gt;eigi[i],resnorm,&amp;bnd[i],eps-&gt;convergedctx);
+<a name="line577">577: </a>      <font color="#4169E1">if</font> (bnd[i]&lt;eps-&gt;tol) conv[i] = 'C';
+<a name="line578">578: </a>      <font color="#4169E1">else</font> conv[i] = 'N';
+<a name="line579">579: </a>    }
+<a name="line580">580: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Y);
+
+<a name="line582">582: </a>    <font color="#B22222">/* purge repeated ritz values */</font>
+<a name="line583">583: </a>    <font color="#4169E1">if</font> (lanczos-&gt;reorthog == <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_LOCAL</a>) {
+<a name="line584">584: </a>      <font color="#4169E1">for</font> (i=nconv+1;i&lt;n;i++) {
+<a name="line585">585: </a>        <font color="#4169E1">if</font> (conv[i] == 'C' &amp;&amp; PetscAbsScalar((ritz[i]-ritz[i-1])/ritz[i]) &lt; eps-&gt;tol) conv[i] = 'R';
+<a name="line586">586: </a>      }
+<a name="line587">587: </a>    }
+
+<a name="line589">589: </a>    <font color="#B22222">/* Compute restart vector */</font>
+<a name="line590">590: </a>    <font color="#4169E1">if</font> (breakdown) {
+<a name="line591">591: </a>      PetscInfo2(eps,<font color="#666666">"Breakdown in Lanczos method (it=%D norm=%g)\n"</font>,eps-&gt;its,(double)beta);
+<a name="line592">592: </a>    } <font color="#4169E1">else</font> {
+<a name="line593">593: </a>      restart = nconv;
+<a name="line594">594: </a>      <font color="#4169E1">while</font> (restart&lt;n &amp;&amp; conv[restart] != 'N') restart++;
+<a name="line595">595: </a>      <font color="#4169E1">if</font> (restart &gt;= n) {
+<a name="line596">596: </a>        breakdown = PETSC_TRUE;
+<a name="line597">597: </a>      } <font color="#4169E1">else</font> {
+<a name="line598">598: </a>        <font color="#4169E1">for</font> (i=restart+1;i&lt;n;i++) {
+<a name="line599">599: </a>          <font color="#4169E1">if</font> (conv[i] == 'N') {
+<a name="line600">600: </a>            <a href="../../../../../docs/manualpages/sys/SlepcSCCompare.html#SlepcSCCompare">SlepcSCCompare</a>(eps-&gt;sc,ritz[restart],0.0,ritz[i],0.0,&amp;r);
+<a name="line601">601: </a>            <font color="#4169E1">if</font> (r&gt;0) restart = i;
+<a name="line602">602: </a>          }
+<a name="line603">603: </a>        }
+<a name="line604">604: </a>        <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Y);
+<a name="line605">605: </a>        <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(eps-&gt;V,1.0,0.0,n,Y+restart*ld+nconv);
+<a name="line606">606: </a>        <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Y);
+<a name="line607">607: </a>      }
+<a name="line608">608: </a>    }
+
+<a name="line610">610: </a>    <font color="#B22222">/* Count and put converged eigenvalues first */</font>
+<a name="line611">611: </a>    <font color="#4169E1">for</font> (i=nconv;i&lt;n;i++) perm[i] = i;
+<a name="line612">612: </a>    <font color="#4169E1">for</font> (k=nconv;k&lt;n;k++) {
+<a name="line613">613: </a>      <font color="#4169E1">if</font> (conv[perm[k]] != 'C') {
+<a name="line614">614: </a>        j = k + 1;
+<a name="line615">615: </a>        <font color="#4169E1">while</font> (j&lt;n &amp;&amp; conv[perm[j]] != 'C') j++;
+<a name="line616">616: </a>        <font color="#4169E1">if</font> (j&gt;=n) <font color="#4169E1">break</font>;
+<a name="line617">617: </a>        l = perm[k]; perm[k] = perm[j]; perm[j] = l;
+<a name="line618">618: </a>      }
+<a name="line619">619: </a>    }
+
+<a name="line621">621: </a>    <font color="#B22222">/* Sort eigenvectors according to permutation */</font>
+<a name="line622">622: </a>    <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Y);
+<a name="line623">623: </a>    <font color="#4169E1">for</font> (i=nconv;i&lt;k;i++) {
+<a name="line624">624: </a>      x = perm[i];
+<a name="line625">625: </a>      <font color="#4169E1">if</font> (x != i) {
+<a name="line626">626: </a>        j = i + 1;
+<a name="line627">627: </a>        <font color="#4169E1">while</font> (perm[j] != i) j++;
+<a name="line628">628: </a>        <font color="#B22222">/* swap eigenvalues i and j */</font>
+<a name="line629">629: </a>        stmp = ritz[x]; ritz[x] = ritz[i]; ritz[i] = stmp;
+<a name="line630">630: </a>        rtmp = bnd[x]; bnd[x] = bnd[i]; bnd[i] = rtmp;
+<a name="line631">631: </a>        ctmp = conv[x]; conv[x] = conv[i]; conv[i] = ctmp;
+<a name="line632">632: </a>        perm[j] = x; perm[i] = i;
+<a name="line633">633: </a>        <font color="#B22222">/* swap eigenvectors i and j */</font>
+<a name="line634">634: </a>        <font color="#4169E1">for</font> (l=0;l&lt;n;l++) {
+<a name="line635">635: </a>          stmp = Y[l+x*ld]; Y[l+x*ld] = Y[l+i*ld]; Y[l+i*ld] = stmp;
+<a name="line636">636: </a>        }
+<a name="line637">637: </a>      }
+<a name="line638">638: </a>    }
+<a name="line639">639: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Y);
+
+<a name="line641">641: </a>    <font color="#B22222">/* compute converged eigenvectors */</font>
+<a name="line642">642: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line643">643: </a>    <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;V,U,nconv,k);
+<a name="line644">644: </a>    MatDestroy(&amp;U);
+
+<a name="line646">646: </a>    <font color="#B22222">/* purge spurious ritz values */</font>
+<a name="line647">647: </a>    <font color="#4169E1">if</font> (lanczos-&gt;reorthog == <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_LOCAL</a>) {
+<a name="line648">648: </a>      <font color="#4169E1">for</font> (i=nconv;i&lt;k;i++) {
+<a name="line649">649: </a>        <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;vi);
+<a name="line650">650: </a>        VecNorm(vi,NORM_2,&amp;norm);
+<a name="line651">651: </a>        VecScale(vi,1.0/norm);
+<a name="line652">652: </a>        w = eps-&gt;work[0];
+<a name="line653">653: </a>        <a href="../../../../../docs/manualpages/ST/STApply.html#STApply">STApply</a>(eps-&gt;st,vi,w);
+<a name="line654">654: </a>        VecAXPY(w,-ritz[i],vi);
+<a name="line655">655: </a>        <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;vi);
+<a name="line656">656: </a>        VecNorm(w,NORM_2,&amp;norm);
+<a name="line657">657: </a>        (*eps-&gt;converged)(eps,ritz[i],eps-&gt;eigi[i],norm,&amp;bnd[i],eps-&gt;convergedctx);
+<a name="line658">658: </a>        <font color="#4169E1">if</font> (bnd[i]&gt;=eps-&gt;tol) conv[i] = 'S';
+<a name="line659">659: </a>      }
+<a name="line660">660: </a>      <font color="#4169E1">for</font> (i=nconv;i&lt;k;i++) {
+<a name="line661">661: </a>        <font color="#4169E1">if</font> (conv[i] != 'C') {
+<a name="line662">662: </a>          j = i + 1;
+<a name="line663">663: </a>          <font color="#4169E1">while</font> (j&lt;k &amp;&amp; conv[j] != 'C') j++;
+<a name="line664">664: </a>          <font color="#4169E1">if</font> (j&gt;=k) <font color="#4169E1">break</font>;
+<a name="line665">665: </a>          <font color="#B22222">/* swap eigenvalues i and j */</font>
+<a name="line666">666: </a>          stmp = ritz[j]; ritz[j] = ritz[i]; ritz[i] = stmp;
+<a name="line667">667: </a>          rtmp = bnd[j]; bnd[j] = bnd[i]; bnd[i] = rtmp;
+<a name="line668">668: </a>          ctmp = conv[j]; conv[j] = conv[i]; conv[i] = ctmp;
+<a name="line669">669: </a>          <font color="#B22222">/* swap eigenvectors i and j */</font>
+<a name="line670">670: </a>          <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;vi);
+<a name="line671">671: </a>          <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,j,&amp;vj);
+<a name="line672">672: </a>          VecSwap(vi,vj);
+<a name="line673">673: </a>          <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;vi);
+<a name="line674">674: </a>          <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,j,&amp;vj);
+<a name="line675">675: </a>        }
+<a name="line676">676: </a>      }
+<a name="line677">677: </a>      k = i;
+<a name="line678">678: </a>    }
+
+<a name="line680">680: </a>    <font color="#B22222">/* store ritz values and estimated errors */</font>
+<a name="line681">681: </a>    <font color="#4169E1">for</font> (i=nconv;i&lt;n;i++) {
+<a name="line682">682: </a>      eps-&gt;eigr[i] = ritz[i];
+<a name="line683">683: </a>      eps-&gt;errest[i] = bnd[i];
+<a name="line684">684: </a>    }
+<a name="line685">685: </a>    nconv = k;
+<a name="line686">686: </a>    EPSMonitor(eps,eps-&gt;its,nconv,eps-&gt;eigr,eps-&gt;eigi,eps-&gt;errest,n);
+<a name="line687">687: </a>    (*eps-&gt;stopping)(eps,eps-&gt;its,eps-&gt;max_it,nconv,eps-&gt;nev,&amp;eps-&gt;reason,eps-&gt;stoppingctx);
+
+<a name="line689">689: </a>    <font color="#4169E1">if</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) { <font color="#B22222">/* copy restart vector */</font>
+<a name="line690">690: </a>      <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(eps-&gt;V,n,nconv);
+<a name="line691">691: </a>      <font color="#4169E1">if</font> (lanczos-&gt;reorthog == <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_LOCAL</a> &amp;&amp; !breakdown) {
+<a name="line692">692: </a>        <font color="#B22222">/* Reorthonormalize restart vector */</font>
+<a name="line693">693: </a>        <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>(eps-&gt;V,nconv,PETSC_FALSE,NULL,&amp;breakdown);
+<a name="line694">694: </a>      }
+<a name="line695">695: </a>      <font color="#4169E1">if</font> (breakdown) {
+<a name="line696">696: </a>        <font color="#B22222">/* Use random vector for restarting */</font>
+<a name="line697">697: </a>        PetscInfo(eps,<font color="#666666">"Using random vector for restart\n"</font>);
+<a name="line698">698: </a>        EPSGetStartVector(eps,nconv,&amp;breakdown);
+<a name="line699">699: </a>      }
+<a name="line700">700: </a>      <font color="#4169E1">if</font> (breakdown) { <font color="#B22222">/* give up */</font>
+<a name="line701">701: </a>        eps-&gt;reason = <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_BREAKDOWN</a>;
+<a name="line702">702: </a>        PetscInfo(eps,<font color="#666666">"Unable to generate more start vectors\n"</font>);
+<a name="line703">703: </a>      }
+<a name="line704">704: </a>    }
+<a name="line705">705: </a>  }
+<a name="line706">706: </a>  eps-&gt;nconv = nconv;
+
+<a name="line708">708: </a>  PetscFree4(ritz,bnd,perm,conv);
+<a name="line709">709: </a>  <font color="#4169E1">return</font>(0);
+<a name="line710">710: </a>}
+
+<a name="line712">712: </a><strong><font color="#4169E1"><a name="EPSSetFromOptions_Lanczos"></a>PetscErrorCode EPSSetFromOptions_Lanczos(PetscOptionItems *PetscOptionsObject,<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line713">713: </a>{
+<a name="line714">714: </a>  PetscErrorCode         ierr;
+<a name="line715">715: </a>  EPS_LANCZOS            *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+<a name="line716">716: </a>  PetscBool              flg;
+<a name="line717">717: </a>  <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a> reorthog;
+
+<a name="line720">720: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> Lanczos Options"</font>);
+
+<a name="line722">722: </a>    PetscOptionsEnum(<font color="#666666">"-eps_lanczos_reorthog"</font>,<font color="#666666">"Lanczos reorthogonalization"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPSLanczosSetReorthog.html#EPSLanczosSetReorthog">EPSLanczosSetReorthog</a>"</font>,EPSLanczosReorthogTypes,(PetscEnum)lanczos-&gt;reorthog,(PetscEnum*)&amp;reorthog,&amp;flg);
+<a name="line723">723: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/EPS/EPSLanczosSetReorthog.html#EPSLanczosSetReorthog">EPSLanczosSetReorthog</a>(eps,reorthog); }
+
+<a name="line725">725: </a>  PetscOptionsTail();
+<a name="line726">726: </a>  <font color="#4169E1">return</font>(0);
+<a name="line727">727: </a>}
+
+<a name="line729">729: </a><strong><font color="#4169E1"><a name="EPSLanczosSetReorthog_Lanczos"></a>static PetscErrorCode EPSLanczosSetReorthog_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a> reorthog)</font></strong>
+<a name="line730">730: </a>{
+<a name="line731">731: </a>  EPS_LANCZOS *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+
+<a name="line734">734: </a>  <font color="#4169E1">switch</font> (reorthog) {
+<a name="line735">735: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_LOCAL</a>:
+<a name="line736">736: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_FULL</a>:
+<a name="line737">737: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_DELAYED</a>:
+<a name="line738">738: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_SELECTIVE</a>:
+<a name="line739">739: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_PERIODIC</a>:
+<a name="line740">740: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPS_LANCZOS_REORTHOG_PARTIAL</a>:
+<a name="line741">741: </a>      <font color="#4169E1">if</font> (lanczos-&gt;reorthog != reorthog) {
+<a name="line742">742: </a>        lanczos-&gt;reorthog = reorthog;
+<a name="line743">743: </a>        eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line744">744: </a>      }
+<a name="line745">745: </a>      <font color="#4169E1">break</font>;
+<a name="line746">746: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line747">747: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid reorthogonalization type"</font>);
+<a name="line748">748: </a>  }
+<a name="line749">749: </a>  <font color="#4169E1">return</font>(0);
+<a name="line750">750: </a>}
+
+<a name="line752">752: </a><font color="#B22222">/*@</font>
+<a name="line753">753: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLanczosSetReorthog.html#EPSLanczosSetReorthog">EPSLanczosSetReorthog</a> - Sets the type of reorthogonalization used during the Lanczos</font>
+<a name="line754">754: </a><font color="#B22222">   iteration.</font>
+
+<a name="line756">756: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line758">758: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line759">759: </a><font color="#B22222">+  eps - the eigenproblem solver context</font>
+<a name="line760">760: </a><font color="#B22222">-  reorthog - the type of reorthogonalization</font>
+
+<a name="line762">762: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line763">763: </a><font color="#B22222">.  -eps_lanczos_reorthog - Sets the reorthogonalization type (either 'local', 'selective',</font>
+<a name="line764">764: </a><font color="#B22222">                         'periodic', 'partial', 'full' or 'delayed')</font>
+
+<a name="line766">766: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line768">768: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLanczosGetReorthog.html#EPSLanczosGetReorthog">EPSLanczosGetReorthog</a>(), <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a></font>
+<a name="line769">769: </a><font color="#B22222">@*/</font>
+<a name="line770">770: </a><strong><font color="#4169E1"><a name="EPSLanczosSetReorthog"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLanczosSetReorthog.html#EPSLanczosSetReorthog">EPSLanczosSetReorthog</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a> reorthog)</font></strong>
+<a name="line771">771: </a>{
+
+<a name="line777">777: </a>  PetscTryMethod(eps,<font color="#666666">"EPSLanczosSetReorthog_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,<a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a>),(eps,reorthog));
+<a name="line778">778: </a>  <font color="#4169E1">return</font>(0);
+<a name="line779">779: </a>}
+
+<a name="line781">781: </a><strong><font color="#4169E1"><a name="EPSLanczosGetReorthog_Lanczos"></a>static PetscErrorCode EPSLanczosGetReorthog_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a> *reorthog)</font></strong>
+<a name="line782">782: </a>{
+<a name="line783">783: </a>  EPS_LANCZOS *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+
+<a name="line786">786: </a>  *reorthog = lanczos-&gt;reorthog;
+<a name="line787">787: </a>  <font color="#4169E1">return</font>(0);
+<a name="line788">788: </a>}
+
+<a name="line790">790: </a><font color="#B22222">/*@</font>
+<a name="line791">791: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSLanczosGetReorthog.html#EPSLanczosGetReorthog">EPSLanczosGetReorthog</a> - Gets the type of reorthogonalization used during</font>
+<a name="line792">792: </a><font color="#B22222">   the Lanczos iteration.</font>
+
+<a name="line794">794: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line796">796: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line797">797: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line799">799: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line800">800: </a><font color="#B22222">.  reorthog - the type of reorthogonalization</font>
+
+<a name="line802">802: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line804">804: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSLanczosSetReorthog.html#EPSLanczosSetReorthog">EPSLanczosSetReorthog</a>(), <a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a></font>
+<a name="line805">805: </a><font color="#B22222">@*/</font>
+<a name="line806">806: </a><strong><font color="#4169E1"><a name="EPSLanczosGetReorthog"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSLanczosGetReorthog.html#EPSLanczosGetReorthog">EPSLanczosGetReorthog</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a> *reorthog)</font></strong>
+<a name="line807">807: </a>{
+
+<a name="line813">813: </a>  PetscUseMethod(eps,<font color="#666666">"EPSLanczosGetReorthog_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,<a href="../../../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a>*),(eps,reorthog));
+<a name="line814">814: </a>  <font color="#4169E1">return</font>(0);
+<a name="line815">815: </a>}
+
+<a name="line817">817: </a><strong><font color="#4169E1"><a name="EPSReset_Lanczos"></a>PetscErrorCode EPSReset_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line818">818: </a>{
+<a name="line820">820: </a>  EPS_LANCZOS    *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+
+<a name="line823">823: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;lanczos-&gt;AV);
+<a name="line824">824: </a>  lanczos-&gt;allocsize = 0;
+<a name="line825">825: </a>  <font color="#4169E1">return</font>(0);
+<a name="line826">826: </a>}
+
+<a name="line828">828: </a><strong><font color="#4169E1"><a name="EPSDestroy_Lanczos"></a>PetscErrorCode EPSDestroy_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line829">829: </a>{
+
+<a name="line833">833: </a>  PetscFree(eps-&gt;data);
+<a name="line834">834: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLanczosSetReorthog_C"</font>,NULL);
+<a name="line835">835: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLanczosGetReorthog_C"</font>,NULL);
+<a name="line836">836: </a>  <font color="#4169E1">return</font>(0);
+<a name="line837">837: </a>}
+
+<a name="line839">839: </a><strong><font color="#4169E1"><a name="EPSView_Lanczos"></a>PetscErrorCode EPSView_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscViewer viewer)</font></strong>
+<a name="line840">840: </a>{
+<a name="line842">842: </a>  EPS_LANCZOS    *lanczos = (EPS_LANCZOS*)eps-&gt;data;
+<a name="line843">843: </a>  PetscBool      isascii;
+
+<a name="line846">846: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line847">847: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line848">848: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  %s reorthogonalization\n"</font>,EPSLanczosReorthogTypes[lanczos-&gt;reorthog]);
+<a name="line849">849: </a>  }
+<a name="line850">850: </a>  <font color="#4169E1">return</font>(0);
+<a name="line851">851: </a>}
+
+<a name="line853">853: </a><strong><font color="#4169E1"><a name="EPSCreate_Lanczos"></a>SLEPC_EXTERN PetscErrorCode EPSCreate_Lanczos(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line854">854: </a>{
+<a name="line855">855: </a>  EPS_LANCZOS    *ctx;
+
+<a name="line859">859: </a>  PetscNewLog(eps,&amp;ctx);
+<a name="line860">860: </a>  eps-&gt;data = (void*)ctx;
+
+<a name="line862">862: </a>  eps-&gt;useds = PETSC_TRUE;
+
+<a name="line864">864: </a>  eps-&gt;ops-&gt;solve          = EPSSolve_Lanczos;
+<a name="line865">865: </a>  eps-&gt;ops-&gt;setup          = EPSSetUp_Lanczos;
+<a name="line866">866: </a>  eps-&gt;ops-&gt;setfromoptions = EPSSetFromOptions_Lanczos;
+<a name="line867">867: </a>  eps-&gt;ops-&gt;destroy        = EPSDestroy_Lanczos;
+<a name="line868">868: </a>  eps-&gt;ops-&gt;reset          = EPSReset_Lanczos;
+<a name="line869">869: </a>  eps-&gt;ops-&gt;view           = EPSView_Lanczos;
+<a name="line870">870: </a>  eps-&gt;ops-&gt;backtransform  = EPSBackTransform_Default;
+<a name="line871">871: </a>  eps-&gt;ops-&gt;computevectors = EPSComputeVectors_Hermitian;
+
+<a name="line873">873: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLanczosSetReorthog_C"</font>,EPSLanczosSetReorthog_Lanczos);
+<a name="line874">874: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLanczosGetReorthog_C"</font>,EPSLanczosGetReorthog_Lanczos);
+<a name="line875">875: </a>  <font color="#4169E1">return</font>(0);
+<a name="line876">876: </a>}
+
+</pre>
+</body>
+
+</html>

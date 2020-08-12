@@ -1,0 +1,1460 @@
+<center><a href="epsopts.c">Actual source code: epsopts.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/interface/epsopts.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:51+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/interface/epsopts.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> routines related to options that can be set via the command-line</font>
+<a name="line12"> 12: </a><font color="#B22222">   or procedurally.</font>
+<a name="line13"> 13: </a><font color="#B22222">*/</font>
+
+<a name="line15"> 15: </a> #include <A href="../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line16"> 16: </a><font color="#A020F0">#include &lt;petscdraw.h&gt;</font>
+
+<a name="line18"> 18: </a><font color="#B22222">/*@C</font>
+<a name="line19"> 19: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSMonitorSetFromOptions.html#EPSMonitorSetFromOptions">EPSMonitorSetFromOptions</a> - Sets a monitor function and viewer appropriate for the type</font>
+<a name="line20"> 20: </a><font color="#B22222">   indicated by the user.</font>
+
+<a name="line22"> 22: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line24"> 24: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line25"> 25: </a><font color="#B22222">+  eps      - the eigensolver context</font>
+<a name="line26"> 26: </a><font color="#B22222">.  name     - the monitor option name</font>
+<a name="line27"> 27: </a><font color="#B22222">.  help     - message indicating what monitoring is done</font>
+<a name="line28"> 28: </a><font color="#B22222">.  manual   - manual page for the monitor</font>
+<a name="line29"> 29: </a><font color="#B22222">.  monitor  - the monitor function, whose context is a PetscViewerAndFormat</font>
+<a name="line30"> 30: </a><font color="#B22222">-  trackall - whether this monitor tracks all eigenvalues or not</font>
+
+<a name="line32"> 32: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line34"> 34: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(), <a href="../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a>(), <a href="../../../docs/manualpages/EPS/EPSConvMonitorSetFromOptions.html#EPSConvMonitorSetFromOptions">EPSConvMonitorSetFromOptions</a>()</font>
+<a name="line35"> 35: </a><font color="#B22222">@*/</font>
+<a name="line36"> 36: </a><strong><font color="#4169E1"><a name="EPSMonitorSetFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSMonitorSetFromOptions.html#EPSMonitorSetFromOptions">EPSMonitorSetFromOptions</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,const char name[],const char help[],const char manual[],PetscErrorCode (*monitor)(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt,PetscInt,PetscScalar*,PetscScalar*,PetscReal*,PetscInt,PetscViewerAndFormat*),PetscBool trackall)</font></strong>
+<a name="line37"> 37: </a>{
+<a name="line38"> 38: </a>  PetscErrorCode       ierr;
+<a name="line39"> 39: </a>  PetscBool            flg;
+<a name="line40"> 40: </a>  PetscViewer          viewer;
+<a name="line41"> 41: </a>  PetscViewerFormat    format;
+<a name="line42"> 42: </a>  PetscViewerAndFormat *vf;
+
+<a name="line45"> 45: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)eps),((PetscObject)eps)-&gt;options,((PetscObject)eps)-&gt;prefix,name,&amp;viewer,&amp;format,&amp;flg);
+<a name="line46"> 46: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line47"> 47: </a>    PetscViewerAndFormatCreate(viewer,format,&amp;vf);
+<a name="line48"> 48: </a>    PetscObjectDereference((PetscObject)viewer);
+<a name="line49"> 49: </a>    <a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(eps,(PetscErrorCode (*)(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt,PetscInt,PetscScalar*,PetscScalar*,PetscReal*,PetscInt,void*))monitor,vf,(PetscErrorCode (*)(void**))PetscViewerAndFormatDestroy);
+<a name="line50"> 50: </a>    <font color="#4169E1">if</font> (trackall) {
+<a name="line51"> 51: </a>      <a href="../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a>(eps,PETSC_TRUE);
+<a name="line52"> 52: </a>    }
+<a name="line53"> 53: </a>  }
+<a name="line54"> 54: </a>  <font color="#4169E1">return</font>(0);
+<a name="line55"> 55: </a>}
+
+<a name="line57"> 57: </a><font color="#B22222">/*@C</font>
+<a name="line58"> 58: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSConvMonitorSetFromOptions.html#EPSConvMonitorSetFromOptions">EPSConvMonitorSetFromOptions</a> - Sets a monitor function and viewer appropriate for the type</font>
+<a name="line59"> 59: </a><font color="#B22222">   indicated by the user (for monitors that only show iteration numbers of convergence).</font>
+
+<a name="line61"> 61: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line63"> 63: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line64"> 64: </a><font color="#B22222">+  eps      - the eigensolver context</font>
+<a name="line65"> 65: </a><font color="#B22222">.  name     - the monitor option name</font>
+<a name="line66"> 66: </a><font color="#B22222">.  help     - message indicating what monitoring is done</font>
+<a name="line67"> 67: </a><font color="#B22222">.  manual   - manual page for the monitor</font>
+<a name="line68"> 68: </a><font color="#B22222">-  monitor  - the monitor function, whose context is a SlepcConvMonitor</font>
+
+<a name="line70"> 70: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line72"> 72: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(), <a href="../../../docs/manualpages/EPS/EPSMonitorSetFromOptions.html#EPSMonitorSetFromOptions">EPSMonitorSetFromOptions</a>()</font>
+<a name="line73"> 73: </a><font color="#B22222">@*/</font>
+<a name="line74"> 74: </a><strong><font color="#4169E1"><a name="EPSConvMonitorSetFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSConvMonitorSetFromOptions.html#EPSConvMonitorSetFromOptions">EPSConvMonitorSetFromOptions</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,const char name[],const char help[],const char manual[],PetscErrorCode (*monitor)(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt,PetscInt,PetscScalar*,PetscScalar*,PetscReal*,PetscInt,SlepcConvMonitor))</font></strong>
+<a name="line75"> 75: </a>{
+<a name="line76"> 76: </a>  PetscErrorCode    ierr;
+<a name="line77"> 77: </a>  PetscBool         flg;
+<a name="line78"> 78: </a>  PetscViewer       viewer;
+<a name="line79"> 79: </a>  PetscViewerFormat format;
+<a name="line80"> 80: </a>  SlepcConvMonitor  ctx;
+
+<a name="line83"> 83: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)eps),((PetscObject)eps)-&gt;options,((PetscObject)eps)-&gt;prefix,name,&amp;viewer,&amp;format,&amp;flg);
+<a name="line84"> 84: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line85"> 85: </a>    <a href="../../../docs/manualpages/sys/SlepcConvMonitorCreate.html#SlepcConvMonitorCreate">SlepcConvMonitorCreate</a>(viewer,format,&amp;ctx);
+<a name="line86"> 86: </a>    PetscObjectDereference((PetscObject)viewer);
+<a name="line87"> 87: </a>    <a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(eps,(PetscErrorCode (*)(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt,PetscInt,PetscScalar*,PetscScalar*,PetscReal*,PetscInt,void*))monitor,ctx,(PetscErrorCode (*)(void**))<a href="../../../docs/manualpages/sys/SlepcConvMonitorDestroy.html#SlepcConvMonitorDestroy">SlepcConvMonitorDestroy</a>);
+<a name="line88"> 88: </a>  }
+<a name="line89"> 89: </a>  <font color="#4169E1">return</font>(0);
+<a name="line90"> 90: </a>}
+
+<a name="line92"> 92: </a><font color="#B22222">/*@</font>
+<a name="line93"> 93: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a> - Sets <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> options from the options database.</font>
+<a name="line94"> 94: </a><font color="#B22222">   This routine must be called before <a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>() if the user is to be</font>
+<a name="line95"> 95: </a><font color="#B22222">   allowed to set the solver type.</font>
+
+<a name="line97"> 97: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line99"> 99: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line100">100: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line102">102: </a><font color="#B22222">   Notes:</font>
+<a name="line103">103: </a><font color="#B22222">   To see all options, run your program with the -help option.</font>
+
+<a name="line105">105: </a><font color="#B22222">   Level: beginner</font>
+<a name="line106">106: </a><font color="#B22222">@*/</font>
+<a name="line107">107: </a><strong><font color="#4169E1"><a name="EPSSetFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line108">108: </a>{
+<a name="line110">110: </a>  char           type[256];
+<a name="line111">111: </a>  PetscBool      set,flg,flg1,flg2,flg3,bval;
+<a name="line112">112: </a>  PetscReal      r,array[2]={0,0};
+<a name="line113">113: </a>  PetscScalar    s;
+<a name="line114">114: </a>  PetscInt       i,j,k;
+<a name="line115">115: </a>  PetscDrawLG    lg;
+<a name="line116">116: </a>  <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPSBalance</a>     bal;
+
+<a name="line120">120: </a>  <a href="../../../docs/manualpages/EPS/EPSRegisterAll.html#EPSRegisterAll">EPSRegisterAll</a>();
+<a name="line121">121: </a>  PetscObjectOptionsBegin((PetscObject)eps);
+<a name="line122">122: </a>    PetscOptionsFList(<font color="#666666">"-eps_type"</font>,<font color="#666666">"Eigensolver method"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>"</font>,EPSList,(char*)(((PetscObject)eps)-&gt;type_name?((PetscObject)eps)-&gt;type_name:EPSKRYLOVSCHUR),type,256,&amp;flg);
+<a name="line123">123: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line124">124: </a>      <a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(eps,type);
+<a name="line125">125: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!((PetscObject)eps)-&gt;type_name) {
+<a name="line126">126: </a>      <a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(eps,EPSKRYLOVSCHUR);
+<a name="line127">127: </a>    }
+
+<a name="line129">129: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-eps_hermitian"</font>,<font color="#666666">"Hermitian eigenvalue problem"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>"</font>,&amp;flg);
+<a name="line130">130: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>); }
+<a name="line131">131: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_gen_hermitian"</font>,<font color="#666666">"Generalized Hermitian eigenvalue problem"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>"</font>,&amp;flg);
+<a name="line132">132: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHEP</a>); }
+<a name="line133">133: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_non_hermitian"</font>,<font color="#666666">"Non-Hermitian eigenvalue problem"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>"</font>,&amp;flg);
+<a name="line134">134: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_NHEP</a>); }
+<a name="line135">135: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_gen_non_hermitian"</font>,<font color="#666666">"Generalized non-Hermitian eigenvalue problem"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>"</font>,&amp;flg);
+<a name="line136">136: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GNHEP</a>); }
+<a name="line137">137: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_pos_gen_non_hermitian"</font>,<font color="#666666">"Generalized non-Hermitian eigenvalue problem with positive semi-definite B"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>"</font>,&amp;flg);
+<a name="line138">138: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_PGNHEP</a>); }
+<a name="line139">139: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-eps_gen_indefinite"</font>,<font color="#666666">"Generalized Hermitian-indefinite eigenvalue problem"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>"</font>,&amp;flg);
+<a name="line140">140: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHIEP</a>); }
+
+<a name="line142">142: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-eps_ritz"</font>,<font color="#666666">"Rayleigh-Ritz extraction"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>"</font>,&amp;flg);
+<a name="line143">143: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_RITZ</a>); }
+<a name="line144">144: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_harmonic"</font>,<font color="#666666">"Harmonic Ritz extraction"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>"</font>,&amp;flg);
+<a name="line145">145: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_HARMONIC</a>); }
+<a name="line146">146: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_harmonic_relative"</font>,<font color="#666666">"Relative harmonic Ritz extraction"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>"</font>,&amp;flg);
+<a name="line147">147: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_HARMONIC_RELATIVE</a>); }
+<a name="line148">148: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_harmonic_right"</font>,<font color="#666666">"Right harmonic Ritz extraction"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>"</font>,&amp;flg);
+<a name="line149">149: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_HARMONIC_RIGHT</a>); }
+<a name="line150">150: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_harmonic_largest"</font>,<font color="#666666">"Largest harmonic Ritz extraction"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>"</font>,&amp;flg);
+<a name="line151">151: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_HARMONIC_LARGEST</a>); }
+<a name="line152">152: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_refined"</font>,<font color="#666666">"Refined Ritz extraction"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>"</font>,&amp;flg);
+<a name="line153">153: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_REFINED</a>); }
+<a name="line154">154: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-eps_refined_harmonic"</font>,<font color="#666666">"Refined harmonic Ritz extraction"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>"</font>,&amp;flg);
+<a name="line155">155: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_REFINED_HARMONIC</a>); }
+
+<a name="line157">157: </a>    bal = eps-&gt;balance;
+<a name="line158">158: </a>    PetscOptionsEnum(<font color="#666666">"-eps_balance"</font>,<font color="#666666">"Balancing method"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetBalance.html#EPSSetBalance">EPSSetBalance</a>"</font>,EPSBalanceTypes,(PetscEnum)bal,(PetscEnum*)&amp;bal,&amp;flg1);
+<a name="line159">159: </a>    j = eps-&gt;balance_its;
+<a name="line160">160: </a>    PetscOptionsInt(<font color="#666666">"-eps_balance_its"</font>,<font color="#666666">"Number of iterations in balancing"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetBalance.html#EPSSetBalance">EPSSetBalance</a>"</font>,eps-&gt;balance_its,&amp;j,&amp;flg2);
+<a name="line161">161: </a>    r = eps-&gt;balance_cutoff;
+<a name="line162">162: </a>    PetscOptionsReal(<font color="#666666">"-eps_balance_cutoff"</font>,<font color="#666666">"Cutoff value in balancing"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetBalance.html#EPSSetBalance">EPSSetBalance</a>"</font>,eps-&gt;balance_cutoff,&amp;r,&amp;flg3);
+<a name="line163">163: </a>    <font color="#4169E1">if</font> (flg1 || flg2 || flg3) { <a href="../../../docs/manualpages/EPS/EPSSetBalance.html#EPSSetBalance">EPSSetBalance</a>(eps,bal,j,r); }
+
+<a name="line165">165: </a>    i = eps-&gt;max_it;
+<a name="line166">166: </a>    PetscOptionsInt(<font color="#666666">"-eps_max_it"</font>,<font color="#666666">"Maximum number of iterations"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>"</font>,eps-&gt;max_it,&amp;i,&amp;flg1);
+<a name="line167">167: </a>    r = eps-&gt;tol;
+<a name="line168">168: </a>    PetscOptionsReal(<font color="#666666">"-eps_tol"</font>,<font color="#666666">"Tolerance"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>"</font>,eps-&gt;tol==PETSC_DEFAULT?SLEPC_DEFAULT_TOL:eps-&gt;tol,&amp;r,&amp;flg2);
+<a name="line169">169: </a>    <font color="#4169E1">if</font> (flg1 || flg2) { <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(eps,r,i); }
+
+<a name="line171">171: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-eps_conv_rel"</font>,<font color="#666666">"Relative error convergence test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>"</font>,&amp;flg);
+<a name="line172">172: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(eps,<a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_REL</a>); }
+<a name="line173">173: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_conv_norm"</font>,<font color="#666666">"Convergence test relative to the eigenvalue and the matrix norms"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>"</font>,&amp;flg);
+<a name="line174">174: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(eps,<a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_NORM</a>); }
+<a name="line175">175: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_conv_abs"</font>,<font color="#666666">"Absolute error convergence test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>"</font>,&amp;flg);
+<a name="line176">176: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(eps,<a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_ABS</a>); }
+<a name="line177">177: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-eps_conv_user"</font>,<font color="#666666">"User-defined convergence test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>"</font>,&amp;flg);
+<a name="line178">178: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(eps,<a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_USER</a>); }
+
+<a name="line180">180: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-eps_stop_basic"</font>,<font color="#666666">"Stop iteration if all eigenvalues converged or max_it reached"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>"</font>,&amp;flg);
+<a name="line181">181: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>(eps,<a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_BASIC</a>); }
+<a name="line182">182: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-eps_stop_user"</font>,<font color="#666666">"User-defined stopping test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>"</font>,&amp;flg);
+<a name="line183">183: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>(eps,<a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_USER</a>); }
+
+<a name="line185">185: </a>    i = eps-&gt;nev;
+<a name="line186">186: </a>    PetscOptionsInt(<font color="#666666">"-eps_nev"</font>,<font color="#666666">"Number of eigenvalues to compute"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>"</font>,eps-&gt;nev,&amp;i,&amp;flg1);
+<a name="line187">187: </a>    j = eps-&gt;ncv;
+<a name="line188">188: </a>    PetscOptionsInt(<font color="#666666">"-eps_ncv"</font>,<font color="#666666">"Number of basis vectors"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>"</font>,eps-&gt;ncv,&amp;j,&amp;flg2);
+<a name="line189">189: </a>    k = eps-&gt;mpd;
+<a name="line190">190: </a>    PetscOptionsInt(<font color="#666666">"-eps_mpd"</font>,<font color="#666666">"Maximum dimension of projected problem"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>"</font>,eps-&gt;mpd,&amp;k,&amp;flg3);
+<a name="line191">191: </a>    <font color="#4169E1">if</font> (flg1 || flg2 || flg3) { <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(eps,i,j,k); }
+
+<a name="line193">193: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-eps_largest_magnitude"</font>,<font color="#666666">"Compute largest eigenvalues in magnitude"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line194">194: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a>); }
+<a name="line195">195: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_smallest_magnitude"</font>,<font color="#666666">"Compute smallest eigenvalues in magnitude"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line196">196: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_MAGNITUDE</a>); }
+<a name="line197">197: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_largest_real"</font>,<font color="#666666">"Compute eigenvalues with largest real parts"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line198">198: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>); }
+<a name="line199">199: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_smallest_real"</font>,<font color="#666666">"Compute eigenvalues with smallest real parts"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line200">200: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>); }
+<a name="line201">201: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_largest_imaginary"</font>,<font color="#666666">"Compute eigenvalues with largest imaginary parts"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line202">202: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_IMAGINARY</a>); }
+<a name="line203">203: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_smallest_imaginary"</font>,<font color="#666666">"Compute eigenvalues with smallest imaginary parts"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line204">204: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_IMAGINARY</a>); }
+<a name="line205">205: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_target_magnitude"</font>,<font color="#666666">"Compute eigenvalues closest to target"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line206">206: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a>); }
+<a name="line207">207: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_target_real"</font>,<font color="#666666">"Compute eigenvalues with real parts closest to target"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line208">208: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_REAL</a>); }
+<a name="line209">209: </a>    PetscOptionsBoolGroup(<font color="#666666">"-eps_target_imaginary"</font>,<font color="#666666">"Compute eigenvalues with imaginary parts closest to target"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line210">210: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_IMAGINARY</a>); }
+<a name="line211">211: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-eps_all"</font>,<font color="#666666">"Compute all eigenvalues in an interval or a region"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>"</font>,&amp;flg);
+<a name="line212">212: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a>); }
+
+<a name="line214">214: </a>    PetscOptionsScalar(<font color="#666666">"-eps_target"</font>,<font color="#666666">"Value of the target"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>"</font>,eps-&gt;target,&amp;s,&amp;flg);
+<a name="line215">215: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line216">216: </a>      <font color="#4169E1">if</font> (eps-&gt;which!=<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_REAL</a> &amp;&amp; eps-&gt;which!=<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_IMAGINARY</a>) {
+<a name="line217">217: </a>        <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a>);
+<a name="line218">218: </a>      }
+<a name="line219">219: </a>      <a href="../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(eps,s);
+<a name="line220">220: </a>    }
+
+<a name="line222">222: </a>    k = 2;
+<a name="line223">223: </a>    PetscOptionsRealArray(<font color="#666666">"-eps_interval"</font>,<font color="#666666">"Computational interval (two real values separated with a comma without spaces)"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line224">224: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line225">225: </a>      <font color="#4169E1">if</font> (k&lt;2) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_SIZ,<font color="#666666">"Must pass two values in -eps_interval (comma-separated without spaces)"</font>);
+<a name="line226">226: </a>      <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a>);
+<a name="line227">227: </a>      <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>(eps,array[0],array[1]);
+<a name="line228">228: </a>    }
+
+<a name="line230">230: </a>    PetscOptionsBool(<font color="#666666">"-eps_true_residual"</font>,<font color="#666666">"Compute true residuals explicitly"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetTrueResidual.html#EPSSetTrueResidual">EPSSetTrueResidual</a>"</font>,eps-&gt;trueres,&amp;eps-&gt;trueres,NULL);
+<a name="line231">231: </a>    PetscOptionsBool(<font color="#666666">"-eps_purify"</font>,<font color="#666666">"Postprocess eigenvectors for purification"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetPurify.html#EPSSetPurify">EPSSetPurify</a>"</font>,eps-&gt;purify,&amp;bval,&amp;flg);
+<a name="line232">232: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetPurify.html#EPSSetPurify">EPSSetPurify</a>(eps,bval); }
+<a name="line233">233: </a>    PetscOptionsBool(<font color="#666666">"-eps_two_sided"</font>,<font color="#666666">"Use two-sided variant (to compute left eigenvectors)"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>"</font>,eps-&gt;twosided,&amp;bval,&amp;flg);
+<a name="line234">234: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>(eps,bval); }
+
+<a name="line236">236: </a>    <font color="#B22222">/* -----------------------------------------------------------------------*/</font>
+<a name="line237">237: </a>    <font color="#B22222">/*</font>
+<a name="line238">238: </a><font color="#B22222">      Cancels all monitors hardwired into code before call to <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>()</font>
+<a name="line239">239: </a><font color="#B22222">    */</font>
+<a name="line240">240: </a>    PetscOptionsBool(<font color="#666666">"-eps_monitor_cancel"</font>,<font color="#666666">"Remove any hardwired monitor routines"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSMonitorCancel.html#EPSMonitorCancel">EPSMonitorCancel</a>"</font>,PETSC_FALSE,&amp;flg,&amp;set);
+<a name="line241">241: </a>    <font color="#4169E1">if</font> (set &amp;&amp; flg) {
+<a name="line242">242: </a>      <a href="../../../docs/manualpages/EPS/EPSMonitorCancel.html#EPSMonitorCancel">EPSMonitorCancel</a>(eps);
+<a name="line243">243: </a>    }
+<a name="line244">244: </a>    <font color="#B22222">/*</font>
+<a name="line245">245: </a><font color="#B22222">      Text monitors</font>
+<a name="line246">246: </a><font color="#B22222">    */</font>
+<a name="line247">247: </a>    <a href="../../../docs/manualpages/EPS/EPSMonitorSetFromOptions.html#EPSMonitorSetFromOptions">EPSMonitorSetFromOptions</a>(eps,<font color="#666666">"-eps_monitor"</font>,<font color="#666666">"Monitor first unconverged approximate eigenvalue and error estimate"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSMonitorFirst.html#EPSMonitorFirst">EPSMonitorFirst</a>"</font>,<a href="../../../docs/manualpages/EPS/EPSMonitorFirst.html#EPSMonitorFirst">EPSMonitorFirst</a>,PETSC_FALSE);
+<a name="line248">248: </a>    <a href="../../../docs/manualpages/EPS/EPSConvMonitorSetFromOptions.html#EPSConvMonitorSetFromOptions">EPSConvMonitorSetFromOptions</a>(eps,<font color="#666666">"-eps_monitor_conv"</font>,<font color="#666666">"Monitor approximate eigenvalues and error estimates as they converge"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSMonitorConverged.html#EPSMonitorConverged">EPSMonitorConverged</a>"</font>,<a href="../../../docs/manualpages/EPS/EPSMonitorConverged.html#EPSMonitorConverged">EPSMonitorConverged</a>);
+<a name="line249">249: </a>    <a href="../../../docs/manualpages/EPS/EPSMonitorSetFromOptions.html#EPSMonitorSetFromOptions">EPSMonitorSetFromOptions</a>(eps,<font color="#666666">"-eps_monitor_all"</font>,<font color="#666666">"Monitor approximate eigenvalues and error estimates"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSMonitorAll.html#EPSMonitorAll">EPSMonitorAll</a>"</font>,<a href="../../../docs/manualpages/EPS/EPSMonitorAll.html#EPSMonitorAll">EPSMonitorAll</a>,PETSC_TRUE);
+<a name="line250">250: </a>    <font color="#B22222">/*</font>
+<a name="line251">251: </a><font color="#B22222">      Line graph monitors</font>
+<a name="line252">252: </a><font color="#B22222">    */</font>
+<a name="line253">253: </a>    PetscOptionsBool(<font color="#666666">"-eps_monitor_lg"</font>,<font color="#666666">"Monitor first unconverged approximate eigenvalue and error estimate graphically"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>"</font>,PETSC_FALSE,&amp;flg,&amp;set);
+<a name="line254">254: </a>    <font color="#4169E1">if</font> (set &amp;&amp; flg) {
+<a name="line255">255: </a>      <a href="../../../docs/manualpages/EPS/EPSMonitorLGCreate.html#EPSMonitorLGCreate">EPSMonitorLGCreate</a>(PetscObjectComm((PetscObject)eps),NULL,<font color="#666666">"Error estimates"</font>,PETSC_DECIDE,PETSC_DECIDE,300,300,&amp;lg);
+<a name="line256">256: </a>      <a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(eps,EPSMonitorLG,lg,(PetscErrorCode (*)(void**))PetscDrawLGDestroy);
+<a name="line257">257: </a>    }
+<a name="line258">258: </a>    PetscOptionsBool(<font color="#666666">"-eps_monitor_lg_all"</font>,<font color="#666666">"Monitor error estimates graphically"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>"</font>,PETSC_FALSE,&amp;flg,&amp;set);
+<a name="line259">259: </a>    <font color="#4169E1">if</font> (set &amp;&amp; flg) {
+<a name="line260">260: </a>      <a href="../../../docs/manualpages/EPS/EPSMonitorLGCreate.html#EPSMonitorLGCreate">EPSMonitorLGCreate</a>(PetscObjectComm((PetscObject)eps),NULL,<font color="#666666">"Error estimates"</font>,PETSC_DECIDE,PETSC_DECIDE,300,300,&amp;lg);
+<a name="line261">261: </a>      <a href="../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(eps,EPSMonitorLGAll,lg,(PetscErrorCode (*)(void**))PetscDrawLGDestroy);
+<a name="line262">262: </a>      <a href="../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a>(eps,PETSC_TRUE);
+<a name="line263">263: </a>    }
+
+<a name="line265">265: </a>    <font color="#B22222">/* -----------------------------------------------------------------------*/</font>
+<a name="line266">266: </a>    PetscOptionsName(<font color="#666666">"-eps_view"</font>,<font color="#666666">"Print detailed information on solver used"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSView.html#EPSView">EPSView</a>"</font>,NULL);
+<a name="line267">267: </a>    PetscOptionsName(<font color="#666666">"-eps_view_vectors"</font>,<font color="#666666">"View computed eigenvectors"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSVectorsView.html#EPSVectorsView">EPSVectorsView</a>"</font>,NULL);
+<a name="line268">268: </a>    PetscOptionsName(<font color="#666666">"-eps_view_values"</font>,<font color="#666666">"View computed eigenvalues"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSValuesView.html#EPSValuesView">EPSValuesView</a>"</font>,NULL);
+<a name="line269">269: </a>    PetscOptionsName(<font color="#666666">"-eps_converged_reason"</font>,<font color="#666666">"Print reason for convergence, and number of iterations"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSReasonView.html#EPSReasonView">EPSReasonView</a>"</font>,NULL);
+<a name="line270">270: </a>    PetscOptionsName(<font color="#666666">"-eps_error_absolute"</font>,<font color="#666666">"Print absolute errors of each eigenpair"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>"</font>,NULL);
+<a name="line271">271: </a>    PetscOptionsName(<font color="#666666">"-eps_error_relative"</font>,<font color="#666666">"Print relative errors of each eigenpair"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>"</font>,NULL);
+<a name="line272">272: </a>    PetscOptionsName(<font color="#666666">"-eps_error_backward"</font>,<font color="#666666">"Print backward errors of each eigenpair"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>"</font>,NULL);
+
+<a name="line274">274: </a>    <font color="#4169E1">if</font> (eps-&gt;ops-&gt;setfromoptions) {
+<a name="line275">275: </a>      (*eps-&gt;ops-&gt;setfromoptions)(PetscOptionsObject,eps);
+<a name="line276">276: </a>    }
+<a name="line277">277: </a>    PetscObjectProcessOptionsHandlers(PetscOptionsObject,(PetscObject)eps);
+<a name="line278">278: </a>  PetscOptionsEnd();
+
+<a name="line280">280: </a>  <font color="#4169E1">if</font> (!eps-&gt;V) { <a href="../../../docs/manualpages/EPS/EPSGetBV.html#EPSGetBV">EPSGetBV</a>(eps,&amp;eps-&gt;V); }
+<a name="line281">281: </a>  <a href="../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(eps-&gt;V);
+<a name="line282">282: </a>  <font color="#4169E1">if</font> (!eps-&gt;rg) { <a href="../../../docs/manualpages/EPS/EPSGetRG.html#EPSGetRG">EPSGetRG</a>(eps,&amp;eps-&gt;rg); }
+<a name="line283">283: </a>  <a href="../../../docs/manualpages/RG/RGSetFromOptions.html#RGSetFromOptions">RGSetFromOptions</a>(eps-&gt;rg);
+<a name="line284">284: </a>  <font color="#4169E1">if</font> (eps-&gt;useds) {
+<a name="line285">285: </a>    <font color="#4169E1">if</font> (!eps-&gt;ds) { <a href="../../../docs/manualpages/EPS/EPSGetDS.html#EPSGetDS">EPSGetDS</a>(eps,&amp;eps-&gt;ds); }
+<a name="line286">286: </a>    <a href="../../../docs/manualpages/DS/DSSetFromOptions.html#DSSetFromOptions">DSSetFromOptions</a>(eps-&gt;ds);
+<a name="line287">287: </a>  }
+<a name="line288">288: </a>  <font color="#4169E1">if</font> (!eps-&gt;st) { <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;eps-&gt;st); }
+<a name="line289">289: </a>  EPSSetDefaultST(eps);
+<a name="line290">290: </a>  <a href="../../../docs/manualpages/ST/STSetFromOptions.html#STSetFromOptions">STSetFromOptions</a>(eps-&gt;st);
+<a name="line291">291: </a>  <font color="#4169E1">return</font>(0);
+<a name="line292">292: </a>}
+
+<a name="line294">294: </a><font color="#B22222">/*@C</font>
+<a name="line295">295: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetTolerances.html#EPSGetTolerances">EPSGetTolerances</a> - Gets the tolerance and maximum iteration count used</font>
+<a name="line296">296: </a><font color="#B22222">   by the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> convergence tests.</font>
+
+<a name="line298">298: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line300">300: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line301">301: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line303">303: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line304">304: </a><font color="#B22222">+  tol - the convergence tolerance</font>
+<a name="line305">305: </a><font color="#B22222">-  maxits - maximum number of iterations</font>
+
+<a name="line307">307: </a><font color="#B22222">   Notes:</font>
+<a name="line308">308: </a><font color="#B22222">   The user can specify NULL for any parameter that is not needed.</font>
+
+<a name="line310">310: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line312">312: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>()</font>
+<a name="line313">313: </a><font color="#B22222">@*/</font>
+<a name="line314">314: </a><strong><font color="#4169E1"><a name="EPSGetTolerances"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetTolerances.html#EPSGetTolerances">EPSGetTolerances</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal *tol,PetscInt *maxits)</font></strong>
+<a name="line315">315: </a>{
+<a name="line318">318: </a>  <font color="#4169E1">if</font> (tol)    *tol    = eps-&gt;tol;
+<a name="line319">319: </a>  <font color="#4169E1">if</font> (maxits) *maxits = eps-&gt;max_it;
+<a name="line320">320: </a>  <font color="#4169E1">return</font>(0);
+<a name="line321">321: </a>}
+
+<a name="line323">323: </a><font color="#B22222">/*@</font>
+<a name="line324">324: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a> - Sets the tolerance and maximum iteration count used</font>
+<a name="line325">325: </a><font color="#B22222">   by the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> convergence tests.</font>
+
+<a name="line327">327: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line329">329: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line330">330: </a><font color="#B22222">+  eps - the eigensolver context</font>
+<a name="line331">331: </a><font color="#B22222">.  tol - the convergence tolerance</font>
+<a name="line332">332: </a><font color="#B22222">-  maxits - maximum number of iterations to use</font>
+
+<a name="line334">334: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line335">335: </a><font color="#B22222">+  -eps_tol &lt;tol&gt; - Sets the convergence tolerance</font>
+<a name="line336">336: </a><font color="#B22222">-  -eps_max_it &lt;maxits&gt; - Sets the maximum number of iterations allowed</font>
+
+<a name="line338">338: </a><font color="#B22222">   Notes:</font>
+<a name="line339">339: </a><font color="#B22222">   Use PETSC_DEFAULT for either argument to assign a reasonably good value.</font>
+
+<a name="line341">341: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line343">343: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetTolerances.html#EPSGetTolerances">EPSGetTolerances</a>()</font>
+<a name="line344">344: </a><font color="#B22222">@*/</font>
+<a name="line345">345: </a><strong><font color="#4169E1"><a name="EPSSetTolerances"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscReal tol,PetscInt maxits)</font></strong>
+<a name="line346">346: </a>{
+<a name="line351">351: </a>  <font color="#4169E1">if</font> (tol == PETSC_DEFAULT) {
+<a name="line352">352: </a>    eps-&gt;tol   = PETSC_DEFAULT;
+<a name="line353">353: </a>    eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line354">354: </a>  } <font color="#4169E1">else</font> {
+<a name="line355">355: </a>    <font color="#4169E1">if</font> (tol &lt;= 0.0) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of tol. Must be &gt; 0"</font>);
+<a name="line356">356: </a>    eps-&gt;tol = tol;
+<a name="line357">357: </a>  }
+<a name="line358">358: </a>  <font color="#4169E1">if</font> (maxits == PETSC_DEFAULT || maxits == PETSC_DECIDE) {
+<a name="line359">359: </a>    eps-&gt;max_it = PETSC_DEFAULT;
+<a name="line360">360: </a>    eps-&gt;state  = EPS_STATE_INITIAL;
+<a name="line361">361: </a>  } <font color="#4169E1">else</font> {
+<a name="line362">362: </a>    <font color="#4169E1">if</font> (maxits &lt;= 0) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of maxits. Must be &gt; 0"</font>);
+<a name="line363">363: </a>    eps-&gt;max_it = maxits;
+<a name="line364">364: </a>  }
+<a name="line365">365: </a>  <font color="#4169E1">return</font>(0);
+<a name="line366">366: </a>}
+
+<a name="line368">368: </a><font color="#B22222">/*@C</font>
+<a name="line369">369: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a> - Gets the number of eigenvalues to compute</font>
+<a name="line370">370: </a><font color="#B22222">   and the dimension of the subspace.</font>
+
+<a name="line372">372: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line374">374: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line375">375: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line377">377: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line378">378: </a><font color="#B22222">+  nev - number of eigenvalues to compute</font>
+<a name="line379">379: </a><font color="#B22222">.  ncv - the maximum dimension of the subspace to be used by the solver</font>
+<a name="line380">380: </a><font color="#B22222">-  mpd - the maximum dimension allowed for the projected problem</font>
+
+<a name="line382">382: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line384">384: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>()</font>
+<a name="line385">385: </a><font color="#B22222">@*/</font>
+<a name="line386">386: </a><strong><font color="#4169E1"><a name="EPSGetDimensions"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *nev,PetscInt *ncv,PetscInt *mpd)</font></strong>
+<a name="line387">387: </a>{
+<a name="line390">390: </a>  <font color="#4169E1">if</font> (nev) *nev = eps-&gt;nev;
+<a name="line391">391: </a>  <font color="#4169E1">if</font> (ncv) *ncv = eps-&gt;ncv;
+<a name="line392">392: </a>  <font color="#4169E1">if</font> (mpd) *mpd = eps-&gt;mpd;
+<a name="line393">393: </a>  <font color="#4169E1">return</font>(0);
+<a name="line394">394: </a>}
+
+<a name="line396">396: </a><font color="#B22222">/*@</font>
+<a name="line397">397: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a> - Sets the number of eigenvalues to compute</font>
+<a name="line398">398: </a><font color="#B22222">   and the dimension of the subspace.</font>
+
+<a name="line400">400: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line402">402: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line403">403: </a><font color="#B22222">+  eps - the eigensolver context</font>
+<a name="line404">404: </a><font color="#B22222">.  nev - number of eigenvalues to compute</font>
+<a name="line405">405: </a><font color="#B22222">.  ncv - the maximum dimension of the subspace to be used by the solver</font>
+<a name="line406">406: </a><font color="#B22222">-  mpd - the maximum dimension allowed for the projected problem</font>
+
+<a name="line408">408: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line409">409: </a><font color="#B22222">+  -eps_nev &lt;nev&gt; - Sets the number of eigenvalues</font>
+<a name="line410">410: </a><font color="#B22222">.  -eps_ncv &lt;ncv&gt; - Sets the dimension of the subspace</font>
+<a name="line411">411: </a><font color="#B22222">-  -eps_mpd &lt;mpd&gt; - Sets the maximum projected dimension</font>
+
+<a name="line413">413: </a><font color="#B22222">   Notes:</font>
+<a name="line414">414: </a><font color="#B22222">   Use PETSC_DEFAULT for ncv and mpd to assign a reasonably good value, which is</font>
+<a name="line415">415: </a><font color="#B22222">   dependent on the solution method.</font>
+
+<a name="line417">417: </a><font color="#B22222">   The parameters ncv and mpd are intimately related, so that the user is advised</font>
+<a name="line418">418: </a><font color="#B22222">   to set one of them at most. Normal usage is that</font>
+<a name="line419">419: </a><font color="#B22222">   (a) in cases where nev is small, the user sets ncv (a reasonable default is 2*nev); and</font>
+<a name="line420">420: </a><font color="#B22222">   (b) in cases where nev is large, the user sets mpd.</font>
+
+<a name="line422">422: </a><font color="#B22222">   The value of ncv should always be between nev and (nev+mpd), typically</font>
+<a name="line423">423: </a><font color="#B22222">   ncv=nev+mpd. If nev is not too large, mpd=nev is a reasonable choice, otherwise</font>
+<a name="line424">424: </a><font color="#B22222">   a smaller value should be used.</font>
+
+<a name="line426">426: </a><font color="#B22222">   When computing all eigenvalues in an interval, see <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>(), these</font>
+<a name="line427">427: </a><font color="#B22222">   parameters lose relevance, and tuning must be done with</font>
+<a name="line428">428: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetDimensions.html#EPSKrylovSchurSetDimensions">EPSKrylovSchurSetDimensions</a>().</font>
+
+<a name="line430">430: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line432">432: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(), <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>(), <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetDimensions.html#EPSKrylovSchurSetDimensions">EPSKrylovSchurSetDimensions</a>()</font>
+<a name="line433">433: </a><font color="#B22222">@*/</font>
+<a name="line434">434: </a><strong><font color="#4169E1"><a name="EPSSetDimensions"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt nev,PetscInt ncv,PetscInt mpd)</font></strong>
+<a name="line435">435: </a>{
+<a name="line441">441: </a>  <font color="#4169E1">if</font> (nev&lt;1) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of nev. Must be &gt; 0"</font>);
+<a name="line442">442: </a>  eps-&gt;nev = nev;
+<a name="line443">443: </a>  <font color="#4169E1">if</font> (ncv == PETSC_DECIDE || ncv == PETSC_DEFAULT) {
+<a name="line444">444: </a>    eps-&gt;ncv = PETSC_DEFAULT;
+<a name="line445">445: </a>  } <font color="#4169E1">else</font> {
+<a name="line446">446: </a>    <font color="#4169E1">if</font> (ncv&lt;1) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of ncv. Must be &gt; 0"</font>);
+<a name="line447">447: </a>    eps-&gt;ncv = ncv;
+<a name="line448">448: </a>  }
+<a name="line449">449: </a>  <font color="#4169E1">if</font> (mpd == PETSC_DECIDE || mpd == PETSC_DEFAULT) {
+<a name="line450">450: </a>    eps-&gt;mpd = PETSC_DEFAULT;
+<a name="line451">451: </a>  } <font color="#4169E1">else</font> {
+<a name="line452">452: </a>    <font color="#4169E1">if</font> (mpd&lt;1) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of mpd. Must be &gt; 0"</font>);
+<a name="line453">453: </a>    eps-&gt;mpd = mpd;
+<a name="line454">454: </a>  }
+<a name="line455">455: </a>  eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line456">456: </a>  <font color="#4169E1">return</font>(0);
+<a name="line457">457: </a>}
+
+<a name="line459">459: </a><font color="#B22222">/*@</font>
+<a name="line460">460: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a> - Specifies which portion of the spectrum is</font>
+<a name="line461">461: </a><font color="#B22222">   to be sought.</font>
+
+<a name="line463">463: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line465">465: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line466">466: </a><font color="#B22222">+  eps   - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line467">467: </a><font color="#B22222">-  which - the portion of the spectrum to be sought</font>
+
+<a name="line469">469: </a><font color="#B22222">   Possible values:</font>
+<a name="line470">470: </a><font color="#B22222">   The parameter 'which' can have one of these values</font>
+
+<a name="line472">472: </a><font color="#B22222">+     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a> - largest eigenvalues in magnitude (default)</font>
+<a name="line473">473: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_MAGNITUDE</a> - smallest eigenvalues in magnitude</font>
+<a name="line474">474: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a> - largest real parts</font>
+<a name="line475">475: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a> - smallest real parts</font>
+<a name="line476">476: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_IMAGINARY</a> - largest imaginary parts</font>
+<a name="line477">477: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_IMAGINARY</a> - smallest imaginary parts</font>
+<a name="line478">478: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a> - eigenvalues closest to the target (in magnitude)</font>
+<a name="line479">479: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_REAL</a> - eigenvalues with real part closest to target</font>
+<a name="line480">480: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_IMAGINARY</a> - eigenvalues with imaginary part closest to target</font>
+<a name="line481">481: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a> - all eigenvalues contained in a given interval or region</font>
+<a name="line482">482: </a><font color="#B22222">-     <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_WHICH_USER</a> - user defined ordering set with <a href="../../../docs/manualpages/EPS/EPSSetEigenvalueComparison.html#EPSSetEigenvalueComparison">EPSSetEigenvalueComparison</a>()</font>
+
+<a name="line484">484: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line485">485: </a><font color="#B22222">+   -eps_largest_magnitude - Sets largest eigenvalues in magnitude</font>
+<a name="line486">486: </a><font color="#B22222">.   -eps_smallest_magnitude - Sets smallest eigenvalues in magnitude</font>
+<a name="line487">487: </a><font color="#B22222">.   -eps_largest_real - Sets largest real parts</font>
+<a name="line488">488: </a><font color="#B22222">.   -eps_smallest_real - Sets smallest real parts</font>
+<a name="line489">489: </a><font color="#B22222">.   -eps_largest_imaginary - Sets largest imaginary parts</font>
+<a name="line490">490: </a><font color="#B22222">.   -eps_smallest_imaginary - Sets smallest imaginary parts</font>
+<a name="line491">491: </a><font color="#B22222">.   -eps_target_magnitude - Sets eigenvalues closest to target</font>
+<a name="line492">492: </a><font color="#B22222">.   -eps_target_real - Sets real parts closest to target</font>
+<a name="line493">493: </a><font color="#B22222">.   -eps_target_imaginary - Sets imaginary parts closest to target</font>
+<a name="line494">494: </a><font color="#B22222">-   -eps_all - Sets all eigenvalues in an interval or region</font>
+
+<a name="line496">496: </a><font color="#B22222">   Notes:</font>
+<a name="line497">497: </a><font color="#B22222">   Not all eigensolvers implemented in <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> account for all the possible values</font>
+<a name="line498">498: </a><font color="#B22222">   stated above. Also, some values make sense only for certain types of</font>
+<a name="line499">499: </a><font color="#B22222">   problems. If SLEPc is compiled for real numbers <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_IMAGINARY</a></font>
+<a name="line500">500: </a><font color="#B22222">   and <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_IMAGINARY</a> use the absolute value of the imaginary part</font>
+<a name="line501">501: </a><font color="#B22222">   for eigenvalue selection.</font>
+
+<a name="line503">503: </a><font color="#B22222">   The target is a scalar value provided with <a href="../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>().</font>
+
+<a name="line505">505: </a><font color="#B22222">   The criterion <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_IMAGINARY</a> is available only in case PETSc and</font>
+<a name="line506">506: </a><font color="#B22222">   SLEPc have been built with complex scalars.</font>
+
+<a name="line508">508: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a> is intended for use in combination with an interval (see</font>
+<a name="line509">509: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>()), when all eigenvalues within the interval are requested,</font>
+<a name="line510">510: </a><font color="#B22222">   or in the context of the CISS solver for computing all eigenvalues in a region.</font>
+<a name="line511">511: </a><font color="#B22222">   In those cases, the number of eigenvalues is unknown, so the nev parameter</font>
+<a name="line512">512: </a><font color="#B22222">   has a different sense, see <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>().</font>
+
+<a name="line514">514: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line516">516: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetWhichEigenpairs.html#EPSGetWhichEigenpairs">EPSGetWhichEigenpairs</a>(), <a href="../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(), <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>(),</font>
+<a name="line517">517: </a><font color="#B22222">          <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(), <a href="../../../docs/manualpages/EPS/EPSSetEigenvalueComparison.html#EPSSetEigenvalueComparison">EPSSetEigenvalueComparison</a>(), <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPSWhich</a></font>
+<a name="line518">518: </a><font color="#B22222">@*/</font>
+<a name="line519">519: </a><strong><font color="#4169E1"><a name="EPSSetWhichEigenpairs"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPSWhich</a> which)</font></strong>
+<a name="line520">520: </a>{
+<a name="line524">524: </a>  <font color="#4169E1">switch</font> (which) {
+<a name="line525">525: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a>:
+<a name="line526">526: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_MAGNITUDE</a>:
+<a name="line527">527: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>:
+<a name="line528">528: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>:
+<a name="line529">529: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_IMAGINARY</a>:
+<a name="line530">530: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_IMAGINARY</a>:
+<a name="line531">531: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a>:
+<a name="line532">532: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_REAL</a>:
+<a name="line533">533: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line534">534: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_IMAGINARY</a>:
+<a name="line535">535: </a><font color="#A020F0">#endif</font>
+<a name="line536">536: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a>:
+<a name="line537">537: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_WHICH_USER</a>:
+<a name="line538">538: </a>      <font color="#4169E1">if</font> (eps-&gt;which != which) {
+<a name="line539">539: </a>        eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line540">540: </a>        eps-&gt;which = which;
+<a name="line541">541: </a>      }
+<a name="line542">542: </a>      <font color="#4169E1">break</font>;
+<a name="line543">543: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line544">544: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid 'which' value"</font>);
+<a name="line545">545: </a>  }
+<a name="line546">546: </a>  <font color="#4169E1">return</font>(0);
+<a name="line547">547: </a>}
+
+<a name="line549">549: </a><font color="#B22222">/*@</font>
+<a name="line550">550: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetWhichEigenpairs.html#EPSGetWhichEigenpairs">EPSGetWhichEigenpairs</a> - Returns which portion of the spectrum is to be</font>
+<a name="line551">551: </a><font color="#B22222">   sought.</font>
+
+<a name="line553">553: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line555">555: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line556">556: </a><font color="#B22222">.  eps - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+
+<a name="line558">558: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line559">559: </a><font color="#B22222">.  which - the portion of the spectrum to be sought</font>
+
+<a name="line561">561: </a><font color="#B22222">   Notes:</font>
+<a name="line562">562: </a><font color="#B22222">   See <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>() for possible values of 'which'.</font>
+
+<a name="line564">564: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line566">566: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(), <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPSWhich</a></font>
+<a name="line567">567: </a><font color="#B22222">@*/</font>
+<a name="line568">568: </a><strong><font color="#4169E1"><a name="EPSGetWhichEigenpairs"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetWhichEigenpairs.html#EPSGetWhichEigenpairs">EPSGetWhichEigenpairs</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPSWhich</a> *which)</font></strong>
+<a name="line569">569: </a>{
+<a name="line573">573: </a>  *which = eps-&gt;which;
+<a name="line574">574: </a>  <font color="#4169E1">return</font>(0);
+<a name="line575">575: </a>}
+
+<a name="line577">577: </a><font color="#B22222">/*@C</font>
+<a name="line578">578: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetEigenvalueComparison.html#EPSSetEigenvalueComparison">EPSSetEigenvalueComparison</a> - Specifies the eigenvalue comparison function</font>
+<a name="line579">579: </a><font color="#B22222">   when <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>() is set to <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_WHICH_USER</a>.</font>
+
+<a name="line581">581: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line583">583: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line584">584: </a><font color="#B22222">+  eps  - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line585">585: </a><font color="#B22222">.  func - a pointer to the comparison function</font>
+<a name="line586">586: </a><font color="#B22222">-  ctx  - a context pointer (the last parameter to the comparison function)</font>
+
+<a name="line588">588: </a><font color="#B22222">   Calling Sequence of func:</font>
+<a name="line589">589: </a><font color="#B22222">$   func(PetscScalar ar,PetscScalar ai,PetscScalar br,PetscScalar bi,PetscInt *res,void *ctx)</font>
+
+<a name="line591">591: </a><font color="#B22222">+   ar     - real part of the 1st eigenvalue</font>
+<a name="line592">592: </a><font color="#B22222">.   ai     - imaginary part of the 1st eigenvalue</font>
+<a name="line593">593: </a><font color="#B22222">.   br     - real part of the 2nd eigenvalue</font>
+<a name="line594">594: </a><font color="#B22222">.   bi     - imaginary part of the 2nd eigenvalue</font>
+<a name="line595">595: </a><font color="#B22222">.   res    - result of comparison</font>
+<a name="line596">596: </a><font color="#B22222">-   ctx    - optional context, as set by <a href="../../../docs/manualpages/EPS/EPSSetEigenvalueComparison.html#EPSSetEigenvalueComparison">EPSSetEigenvalueComparison</a>()</font>
+
+<a name="line598">598: </a><font color="#B22222">   Note:</font>
+<a name="line599">599: </a><font color="#B22222">   The returning parameter 'res' can be</font>
+<a name="line600">600: </a><font color="#B22222">+  negative - if the 1st eigenvalue is preferred to the 2st one</font>
+<a name="line601">601: </a><font color="#B22222">.  zero     - if both eigenvalues are equally preferred</font>
+<a name="line602">602: </a><font color="#B22222">-  positive - if the 2st eigenvalue is preferred to the 1st one</font>
+
+<a name="line604">604: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line606">606: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(), <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPSWhich</a></font>
+<a name="line607">607: </a><font color="#B22222">@*/</font>
+<a name="line608">608: </a><strong><font color="#4169E1"><a name="EPSSetEigenvalueComparison"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetEigenvalueComparison.html#EPSSetEigenvalueComparison">EPSSetEigenvalueComparison</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscErrorCode (*func)(PetscScalar,PetscScalar,PetscScalar,PetscScalar,PetscInt*,void*),void* ctx)</font></strong>
+<a name="line609">609: </a>{
+<a name="line612">612: </a>  eps-&gt;sc-&gt;comparison    = func;
+<a name="line613">613: </a>  eps-&gt;sc-&gt;comparisonctx = ctx;
+<a name="line614">614: </a>  eps-&gt;which             = <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_WHICH_USER</a>;
+<a name="line615">615: </a>  <font color="#4169E1">return</font>(0);
+<a name="line616">616: </a>}
+
+<a name="line618">618: </a><font color="#B22222">/*@C</font>
+<a name="line619">619: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetArbitrarySelection.html#EPSSetArbitrarySelection">EPSSetArbitrarySelection</a> - Specifies a function intended to look for</font>
+<a name="line620">620: </a><font color="#B22222">   eigenvalues according to an arbitrary selection criterion. This criterion</font>
+<a name="line621">621: </a><font color="#B22222">   can be based on a computation involving the current eigenvector approximation.</font>
+
+<a name="line623">623: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line625">625: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line626">626: </a><font color="#B22222">+  eps  - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line627">627: </a><font color="#B22222">.  func - a pointer to the evaluation function</font>
+<a name="line628">628: </a><font color="#B22222">-  ctx  - a context pointer (the last parameter to the evaluation function)</font>
+
+<a name="line630">630: </a><font color="#B22222">   Calling Sequence of func:</font>
+<a name="line631">631: </a><font color="#B22222">$   func(PetscScalar er,PetscScalar ei,Vec xr,Vec xi,PetscScalar *rr,PetscScalar *ri,void *ctx)</font>
+
+<a name="line633">633: </a><font color="#B22222">+   er     - real part of the current eigenvalue approximation</font>
+<a name="line634">634: </a><font color="#B22222">.   ei     - imaginary part of the current eigenvalue approximation</font>
+<a name="line635">635: </a><font color="#B22222">.   xr     - real part of the current eigenvector approximation</font>
+<a name="line636">636: </a><font color="#B22222">.   xi     - imaginary part of the current eigenvector approximation</font>
+<a name="line637">637: </a><font color="#B22222">.   rr     - result of evaluation (real part)</font>
+<a name="line638">638: </a><font color="#B22222">.   ri     - result of evaluation (imaginary part)</font>
+<a name="line639">639: </a><font color="#B22222">-   ctx    - optional context, as set by <a href="../../../docs/manualpages/EPS/EPSSetArbitrarySelection.html#EPSSetArbitrarySelection">EPSSetArbitrarySelection</a>()</font>
+
+<a name="line641">641: </a><font color="#B22222">   Notes:</font>
+<a name="line642">642: </a><font color="#B22222">   This provides a mechanism to select eigenpairs by evaluating a user-defined</font>
+<a name="line643">643: </a><font color="#B22222">   function. When a function has been provided, the default selection based on</font>
+<a name="line644">644: </a><font color="#B22222">   sorting the eigenvalues is replaced by the sorting of the results of this</font>
+<a name="line645">645: </a><font color="#B22222">   function (with the same sorting criterion given in <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>()).</font>
+
+<a name="line647">647: </a><font color="#B22222">   For instance, suppose you want to compute those eigenvectors that maximize</font>
+<a name="line648">648: </a><font color="#B22222">   a certain computable expression. Then implement the computation using</font>
+<a name="line649">649: </a><font color="#B22222">   the arguments xr and xi, and return the result in rr. Then set the standard</font>
+<a name="line650">650: </a><font color="#B22222">   sorting by magnitude so that the eigenpair with largest value of rr is</font>
+<a name="line651">651: </a><font color="#B22222">   selected.</font>
+
+<a name="line653">653: </a><font color="#B22222">   This evaluation function is collective, that is, all processes call it and</font>
+<a name="line654">654: </a><font color="#B22222">   it can use collective operations; furthermore, the computed result must</font>
+<a name="line655">655: </a><font color="#B22222">   be the same in all processes.</font>
+
+<a name="line657">657: </a><font color="#B22222">   The result of func is expressed as a complex number so that it is possible to</font>
+<a name="line658">658: </a><font color="#B22222">   use the standard eigenvalue sorting functions, but normally only rr is used.</font>
+<a name="line659">659: </a><font color="#B22222">   Set ri to zero unless it is meaningful in your application.</font>
+
+<a name="line661">661: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line663">663: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>()</font>
+<a name="line664">664: </a><font color="#B22222">@*/</font>
+<a name="line665">665: </a><strong><font color="#4169E1"><a name="EPSSetArbitrarySelection"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetArbitrarySelection.html#EPSSetArbitrarySelection">EPSSetArbitrarySelection</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscErrorCode (*func)(PetscScalar,PetscScalar,Vec,Vec,PetscScalar*,PetscScalar*,void*),void* ctx)</font></strong>
+<a name="line666">666: </a>{
+<a name="line669">669: </a>  eps-&gt;arbitrary    = func;
+<a name="line670">670: </a>  eps-&gt;arbitraryctx = ctx;
+<a name="line671">671: </a>  eps-&gt;state        = EPS_STATE_INITIAL;
+<a name="line672">672: </a>  <font color="#4169E1">return</font>(0);
+<a name="line673">673: </a>}
+
+<a name="line675">675: </a><font color="#B22222">/*@C</font>
+<a name="line676">676: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTestFunction.html#EPSSetConvergenceTestFunction">EPSSetConvergenceTestFunction</a> - Sets a function to compute the error estimate</font>
+<a name="line677">677: </a><font color="#B22222">   used in the convergence test.</font>
+
+<a name="line679">679: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line681">681: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line682">682: </a><font color="#B22222">+  eps     - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line683">683: </a><font color="#B22222">.  func    - a pointer to the convergence test function</font>
+<a name="line684">684: </a><font color="#B22222">.  ctx     - context for private data for the convergence routine (may be null)</font>
+<a name="line685">685: </a><font color="#B22222">-  destroy - a routine for destroying the context (may be null)</font>
+
+<a name="line687">687: </a><font color="#B22222">   Calling Sequence of func:</font>
+<a name="line688">688: </a><font color="#B22222">$   func(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscScalar eigr,PetscScalar eigi,PetscReal res,PetscReal *errest,void *ctx)</font>
+
+<a name="line690">690: </a><font color="#B22222">+   eps    - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line691">691: </a><font color="#B22222">.   eigr   - real part of the eigenvalue</font>
+<a name="line692">692: </a><font color="#B22222">.   eigi   - imaginary part of the eigenvalue</font>
+<a name="line693">693: </a><font color="#B22222">.   res    - residual norm associated to the eigenpair</font>
+<a name="line694">694: </a><font color="#B22222">.   errest - (output) computed error estimate</font>
+<a name="line695">695: </a><font color="#B22222">-   ctx    - optional context, as set by <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTestFunction.html#EPSSetConvergenceTestFunction">EPSSetConvergenceTestFunction</a>()</font>
+
+<a name="line697">697: </a><font color="#B22222">   Note:</font>
+<a name="line698">698: </a><font color="#B22222">   If the error estimate returned by the convergence test function is less than</font>
+<a name="line699">699: </a><font color="#B22222">   the tolerance, then the eigenvalue is accepted as converged.</font>
+
+<a name="line701">701: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line703">703: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(), <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>()</font>
+<a name="line704">704: </a><font color="#B22222">@*/</font>
+<a name="line705">705: </a><strong><font color="#4169E1"><a name="EPSSetConvergenceTestFunction"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTestFunction.html#EPSSetConvergenceTestFunction">EPSSetConvergenceTestFunction</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscErrorCode (*func)(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscScalar,PetscScalar,PetscReal,PetscReal*,void*),void* ctx,PetscErrorCode (*destroy)(void*))</font></strong>
+<a name="line706">706: </a>{
+
+<a name="line711">711: </a>  <font color="#4169E1">if</font> (eps-&gt;convergeddestroy) {
+<a name="line712">712: </a>    (*eps-&gt;convergeddestroy)(eps-&gt;convergedctx);
+<a name="line713">713: </a>  }
+<a name="line714">714: </a>  eps-&gt;convergeduser    = func;
+<a name="line715">715: </a>  eps-&gt;convergeddestroy = destroy;
+<a name="line716">716: </a>  eps-&gt;convergedctx     = ctx;
+<a name="line717">717: </a>  <font color="#4169E1">if</font> (func == EPSConvergedRelative) eps-&gt;conv = <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_REL</a>;
+<a name="line718">718: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (func == EPSConvergedNorm) eps-&gt;conv = <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_NORM</a>;
+<a name="line719">719: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (func == EPSConvergedAbsolute) eps-&gt;conv = <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_ABS</a>;
+<a name="line720">720: </a>  <font color="#4169E1">else</font> {
+<a name="line721">721: </a>    eps-&gt;conv      = <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_USER</a>;
+<a name="line722">722: </a>    eps-&gt;converged = eps-&gt;convergeduser;
+<a name="line723">723: </a>  }
+<a name="line724">724: </a>  <font color="#4169E1">return</font>(0);
+<a name="line725">725: </a>}
+
+<a name="line727">727: </a><font color="#B22222">/*@</font>
+<a name="line728">728: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a> - Specifies how to compute the error estimate</font>
+<a name="line729">729: </a><font color="#B22222">   used in the convergence test.</font>
+
+<a name="line731">731: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line733">733: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line734">734: </a><font color="#B22222">+  eps  - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line735">735: </a><font color="#B22222">-  conv - the type of convergence test</font>
+
+<a name="line737">737: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line738">738: </a><font color="#B22222">+  -eps_conv_abs  - Sets the absolute convergence test</font>
+<a name="line739">739: </a><font color="#B22222">.  -eps_conv_rel  - Sets the convergence test relative to the eigenvalue</font>
+<a name="line740">740: </a><font color="#B22222">.  -eps_conv_norm - Sets the convergence test relative to the matrix norms</font>
+<a name="line741">741: </a><font color="#B22222">-  -eps_conv_user - Selects the user-defined convergence test</font>
+
+<a name="line743">743: </a><font color="#B22222">   Note:</font>
+<a name="line744">744: </a><font color="#B22222">   The parameter 'conv' can have one of these values</font>
+<a name="line745">745: </a><font color="#B22222">+     <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_ABS</a>  - absolute error ||r||</font>
+<a name="line746">746: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_REL</a>  - error relative to the eigenvalue l, ||r||/|l|</font>
+<a name="line747">747: </a><font color="#B22222">.     <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_NORM</a> - error relative to the matrix norms, ||r||/(||A||+|l|*||B||)</font>
+<a name="line748">748: </a><font color="#B22222">-     <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_USER</a> - function set by <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTestFunction.html#EPSSetConvergenceTestFunction">EPSSetConvergenceTestFunction</a>()</font>
+
+<a name="line750">750: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line752">752: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetConvergenceTest.html#EPSGetConvergenceTest">EPSGetConvergenceTest</a>(), <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTestFunction.html#EPSSetConvergenceTestFunction">EPSSetConvergenceTestFunction</a>(), <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>(), <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPSConv</a></font>
+<a name="line753">753: </a><font color="#B22222">@*/</font>
+<a name="line754">754: </a><strong><font color="#4169E1"><a name="EPSSetConvergenceTest"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPSConv</a> conv)</font></strong>
+<a name="line755">755: </a>{
+<a name="line759">759: </a>  <font color="#4169E1">switch</font> (conv) {
+<a name="line760">760: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_ABS</a>:  eps-&gt;converged = EPSConvergedAbsolute; <font color="#4169E1">break</font>;
+<a name="line761">761: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_REL</a>:  eps-&gt;converged = EPSConvergedRelative; <font color="#4169E1">break</font>;
+<a name="line762">762: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_NORM</a>: eps-&gt;converged = EPSConvergedNorm; <font color="#4169E1">break</font>;
+<a name="line763">763: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_USER</a>:
+<a name="line764">764: </a>      <font color="#4169E1">if</font> (!eps-&gt;convergeduser) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ORDER,<font color="#666666">"Must call <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTestFunction.html#EPSSetConvergenceTestFunction">EPSSetConvergenceTestFunction</a>() first"</font>);
+<a name="line765">765: </a>      eps-&gt;converged = eps-&gt;convergeduser;
+<a name="line766">766: </a>      <font color="#4169E1">break</font>;
+<a name="line767">767: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line768">768: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid 'conv' value"</font>);
+<a name="line769">769: </a>  }
+<a name="line770">770: </a>  eps-&gt;conv = conv;
+<a name="line771">771: </a>  <font color="#4169E1">return</font>(0);
+<a name="line772">772: </a>}
+
+<a name="line774">774: </a><font color="#B22222">/*@</font>
+<a name="line775">775: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetConvergenceTest.html#EPSGetConvergenceTest">EPSGetConvergenceTest</a> - Gets the method used to compute the error estimate</font>
+<a name="line776">776: </a><font color="#B22222">   used in the convergence test.</font>
+
+<a name="line778">778: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line780">780: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line781">781: </a><font color="#B22222">.  eps   - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+
+<a name="line783">783: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line784">784: </a><font color="#B22222">.  conv  - the type of convergence test</font>
+
+<a name="line786">786: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line788">788: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(), <a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPSConv</a></font>
+<a name="line789">789: </a><font color="#B22222">@*/</font>
+<a name="line790">790: </a><strong><font color="#4169E1"><a name="EPSGetConvergenceTest"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetConvergenceTest.html#EPSGetConvergenceTest">EPSGetConvergenceTest</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPSConv</a> *conv)</font></strong>
+<a name="line791">791: </a>{
+<a name="line795">795: </a>  *conv = eps-&gt;conv;
+<a name="line796">796: </a>  <font color="#4169E1">return</font>(0);
+<a name="line797">797: </a>}
+
+<a name="line799">799: </a><font color="#B22222">/*@C</font>
+<a name="line800">800: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetStoppingTestFunction.html#EPSSetStoppingTestFunction">EPSSetStoppingTestFunction</a> - Sets a function to decide when to stop the outer</font>
+<a name="line801">801: </a><font color="#B22222">   iteration of the eigensolver.</font>
+
+<a name="line803">803: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line805">805: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line806">806: </a><font color="#B22222">+  eps     - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line807">807: </a><font color="#B22222">.  func    - pointer to the stopping test function</font>
+<a name="line808">808: </a><font color="#B22222">.  ctx     - context for private data for the stopping routine (may be null)</font>
+<a name="line809">809: </a><font color="#B22222">-  destroy - a routine for destroying the context (may be null)</font>
+
+<a name="line811">811: </a><font color="#B22222">   Calling Sequence of func:</font>
+<a name="line812">812: </a><font color="#B22222">$   func(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt its,PetscInt max_it,PetscInt nconv,PetscInt nev,<a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a> *reason,void *ctx)</font>
+
+<a name="line814">814: </a><font color="#B22222">+   eps    - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line815">815: </a><font color="#B22222">.   its    - current number of iterations</font>
+<a name="line816">816: </a><font color="#B22222">.   max_it - maximum number of iterations</font>
+<a name="line817">817: </a><font color="#B22222">.   nconv  - number of currently converged eigenpairs</font>
+<a name="line818">818: </a><font color="#B22222">.   nev    - number of requested eigenpairs</font>
+<a name="line819">819: </a><font color="#B22222">.   reason - (output) result of the stopping test</font>
+<a name="line820">820: </a><font color="#B22222">-   ctx    - optional context, as set by <a href="../../../docs/manualpages/EPS/EPSSetStoppingTestFunction.html#EPSSetStoppingTestFunction">EPSSetStoppingTestFunction</a>()</font>
+
+<a name="line822">822: </a><font color="#B22222">   Note:</font>
+<a name="line823">823: </a><font color="#B22222">   Normal usage is to first call the default routine <a href="../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a>() and then</font>
+<a name="line824">824: </a><font color="#B22222">   set reason to <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_USER</a> if some user-defined conditions have been</font>
+<a name="line825">825: </a><font color="#B22222">   met. To let the eigensolver continue iterating, the result must be left as</font>
+<a name="line826">826: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>.</font>
+
+<a name="line828">828: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line830">830: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>(), <a href="../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a>()</font>
+<a name="line831">831: </a><font color="#B22222">@*/</font>
+<a name="line832">832: </a><strong><font color="#4169E1"><a name="EPSSetStoppingTestFunction"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetStoppingTestFunction.html#EPSSetStoppingTestFunction">EPSSetStoppingTestFunction</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscErrorCode (*func)(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt,PetscInt,PetscInt,PetscInt,<a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a>*,void*),void* ctx,PetscErrorCode (*destroy)(void*))</font></strong>
+<a name="line833">833: </a>{
+
+<a name="line838">838: </a>  <font color="#4169E1">if</font> (eps-&gt;stoppingdestroy) {
+<a name="line839">839: </a>    (*eps-&gt;stoppingdestroy)(eps-&gt;stoppingctx);
+<a name="line840">840: </a>  }
+<a name="line841">841: </a>  eps-&gt;stoppinguser    = func;
+<a name="line842">842: </a>  eps-&gt;stoppingdestroy = destroy;
+<a name="line843">843: </a>  eps-&gt;stoppingctx     = ctx;
+<a name="line844">844: </a>  <font color="#4169E1">if</font> (func == <a href="../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a>) eps-&gt;stop = <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_BASIC</a>;
+<a name="line845">845: </a>  <font color="#4169E1">else</font> {
+<a name="line846">846: </a>    eps-&gt;stop     = <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_USER</a>;
+<a name="line847">847: </a>    eps-&gt;stopping = eps-&gt;stoppinguser;
+<a name="line848">848: </a>  }
+<a name="line849">849: </a>  <font color="#4169E1">return</font>(0);
+<a name="line850">850: </a>}
+
+<a name="line852">852: </a><font color="#B22222">/*@</font>
+<a name="line853">853: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a> - Specifies how to decide the termination of the outer</font>
+<a name="line854">854: </a><font color="#B22222">   loop of the eigensolver.</font>
+
+<a name="line856">856: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line858">858: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line859">859: </a><font color="#B22222">+  eps  - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line860">860: </a><font color="#B22222">-  stop - the type of stopping test</font>
+
+<a name="line862">862: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line863">863: </a><font color="#B22222">+  -eps_stop_basic - Sets the default stopping test</font>
+<a name="line864">864: </a><font color="#B22222">-  -eps_stop_user  - Selects the user-defined stopping test</font>
+
+<a name="line866">866: </a><font color="#B22222">   Note:</font>
+<a name="line867">867: </a><font color="#B22222">   The parameter 'stop' can have one of these values</font>
+<a name="line868">868: </a><font color="#B22222">+     <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_BASIC</a> - default stopping test</font>
+<a name="line869">869: </a><font color="#B22222">-     <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_USER</a>  - function set by <a href="../../../docs/manualpages/EPS/EPSSetStoppingTestFunction.html#EPSSetStoppingTestFunction">EPSSetStoppingTestFunction</a>()</font>
+
+<a name="line871">871: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line873">873: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetStoppingTest.html#EPSGetStoppingTest">EPSGetStoppingTest</a>(), <a href="../../../docs/manualpages/EPS/EPSSetStoppingTestFunction.html#EPSSetStoppingTestFunction">EPSSetStoppingTestFunction</a>(), <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(), <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPSStop</a></font>
+<a name="line874">874: </a><font color="#B22222">@*/</font>
+<a name="line875">875: </a><strong><font color="#4169E1"><a name="EPSSetStoppingTest"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPSStop</a> stop)</font></strong>
+<a name="line876">876: </a>{
+<a name="line880">880: </a>  <font color="#4169E1">switch</font> (stop) {
+<a name="line881">881: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_BASIC</a>: eps-&gt;stopping = <a href="../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a>; <font color="#4169E1">break</font>;
+<a name="line882">882: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPS_STOP_USER</a>:
+<a name="line883">883: </a>      <font color="#4169E1">if</font> (!eps-&gt;stoppinguser) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ORDER,<font color="#666666">"Must call <a href="../../../docs/manualpages/EPS/EPSSetStoppingTestFunction.html#EPSSetStoppingTestFunction">EPSSetStoppingTestFunction</a>() first"</font>);
+<a name="line884">884: </a>      eps-&gt;stopping = eps-&gt;stoppinguser;
+<a name="line885">885: </a>      <font color="#4169E1">break</font>;
+<a name="line886">886: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line887">887: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid 'stop' value"</font>);
+<a name="line888">888: </a>  }
+<a name="line889">889: </a>  eps-&gt;stop = stop;
+<a name="line890">890: </a>  <font color="#4169E1">return</font>(0);
+<a name="line891">891: </a>}
+
+<a name="line893">893: </a><font color="#B22222">/*@</font>
+<a name="line894">894: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetStoppingTest.html#EPSGetStoppingTest">EPSGetStoppingTest</a> - Gets the method used to decide the termination of the outer</font>
+<a name="line895">895: </a><font color="#B22222">   loop of the eigensolver.</font>
+
+<a name="line897">897: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line899">899: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line900">900: </a><font color="#B22222">.  eps   - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+
+<a name="line902">902: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line903">903: </a><font color="#B22222">.  stop  - the type of stopping test</font>
+
+<a name="line905">905: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line907">907: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>(), <a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPSStop</a></font>
+<a name="line908">908: </a><font color="#B22222">@*/</font>
+<a name="line909">909: </a><strong><font color="#4169E1"><a name="EPSGetStoppingTest"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetStoppingTest.html#EPSGetStoppingTest">EPSGetStoppingTest</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSStop.html#EPSStop">EPSStop</a> *stop)</font></strong>
+<a name="line910">910: </a>{
+<a name="line914">914: </a>  *stop = eps-&gt;stop;
+<a name="line915">915: </a>  <font color="#4169E1">return</font>(0);
+<a name="line916">916: </a>}
+
+<a name="line918">918: </a><font color="#B22222">/*@</font>
+<a name="line919">919: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a> - Specifies the type of the eigenvalue problem.</font>
+
+<a name="line921">921: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line923">923: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line924">924: </a><font color="#B22222">+  eps      - the eigensolver context</font>
+<a name="line925">925: </a><font color="#B22222">-  type     - a known type of eigenvalue problem</font>
+
+<a name="line927">927: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line928">928: </a><font color="#B22222">+  -eps_hermitian - Hermitian eigenvalue problem</font>
+<a name="line929">929: </a><font color="#B22222">.  -eps_gen_hermitian - generalized Hermitian eigenvalue problem</font>
+<a name="line930">930: </a><font color="#B22222">.  -eps_non_hermitian - non-Hermitian eigenvalue problem</font>
+<a name="line931">931: </a><font color="#B22222">.  -eps_gen_non_hermitian - generalized non-Hermitian eigenvalue problem</font>
+<a name="line932">932: </a><font color="#B22222">-  -eps_pos_gen_non_hermitian - generalized non-Hermitian eigenvalue problem</font>
+<a name="line933">933: </a><font color="#B22222">   with positive semi-definite B</font>
+
+<a name="line935">935: </a><font color="#B22222">   Notes:</font>
+<a name="line936">936: </a><font color="#B22222">   Allowed values for the problem type are: Hermitian (<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>), non-Hermitian</font>
+<a name="line937">937: </a><font color="#B22222">   (<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_NHEP</a>), generalized Hermitian (<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHEP</a>), generalized non-Hermitian</font>
+<a name="line938">938: </a><font color="#B22222">   (<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GNHEP</a>), generalized non-Hermitian with positive semi-definite B</font>
+<a name="line939">939: </a><font color="#B22222">   (<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_PGNHEP</a>), and generalized Hermitian-indefinite (<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHIEP</a>).</font>
+
+<a name="line941">941: </a><font color="#B22222">   This function must be used to instruct SLEPc to exploit symmetry. If no</font>
+<a name="line942">942: </a><font color="#B22222">   problem type is specified, by default a non-Hermitian problem is assumed</font>
+<a name="line943">943: </a><font color="#B22222">   (either standard or generalized). If the user knows that the problem is</font>
+<a name="line944">944: </a><font color="#B22222">   Hermitian (i.e. A=A^H) or generalized Hermitian (i.e. A=A^H, B=B^H, and</font>
+<a name="line945">945: </a><font color="#B22222">   B positive definite) then it is recommended to set the problem type so</font>
+<a name="line946">946: </a><font color="#B22222">   that eigensolver can exploit these properties.</font>
+
+<a name="line948">948: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line950">950: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(), <a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(), <a href="../../../docs/manualpages/EPS/EPSGetProblemType.html#EPSGetProblemType">EPSGetProblemType</a>(), <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPSProblemType</a></font>
+<a name="line951">951: </a><font color="#B22222">@*/</font>
+<a name="line952">952: </a><strong><font color="#4169E1"><a name="EPSSetProblemType"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPSProblemType</a> type)</font></strong>
+<a name="line953">953: </a>{
+<a name="line957">957: </a>  <font color="#4169E1">if</font> (type == eps-&gt;problem_type) <font color="#4169E1">return</font>(0);
+<a name="line958">958: </a>  <font color="#4169E1">switch</font> (type) {
+<a name="line959">959: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>:
+<a name="line960">960: </a>      eps-&gt;isgeneralized = PETSC_FALSE;
+<a name="line961">961: </a>      eps-&gt;ishermitian = PETSC_TRUE;
+<a name="line962">962: </a>      eps-&gt;ispositive = PETSC_FALSE;
+<a name="line963">963: </a>      <font color="#4169E1">break</font>;
+<a name="line964">964: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_NHEP</a>:
+<a name="line965">965: </a>      eps-&gt;isgeneralized = PETSC_FALSE;
+<a name="line966">966: </a>      eps-&gt;ishermitian = PETSC_FALSE;
+<a name="line967">967: </a>      eps-&gt;ispositive = PETSC_FALSE;
+<a name="line968">968: </a>      <font color="#4169E1">break</font>;
+<a name="line969">969: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHEP</a>:
+<a name="line970">970: </a>      eps-&gt;isgeneralized = PETSC_TRUE;
+<a name="line971">971: </a>      eps-&gt;ishermitian = PETSC_TRUE;
+<a name="line972">972: </a>      eps-&gt;ispositive = PETSC_TRUE;
+<a name="line973">973: </a>      <font color="#4169E1">break</font>;
+<a name="line974">974: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GNHEP</a>:
+<a name="line975">975: </a>      eps-&gt;isgeneralized = PETSC_TRUE;
+<a name="line976">976: </a>      eps-&gt;ishermitian = PETSC_FALSE;
+<a name="line977">977: </a>      eps-&gt;ispositive = PETSC_FALSE;
+<a name="line978">978: </a>      <font color="#4169E1">break</font>;
+<a name="line979">979: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_PGNHEP</a>:
+<a name="line980">980: </a>      eps-&gt;isgeneralized = PETSC_TRUE;
+<a name="line981">981: </a>      eps-&gt;ishermitian = PETSC_FALSE;
+<a name="line982">982: </a>      eps-&gt;ispositive = PETSC_TRUE;
+<a name="line983">983: </a>      <font color="#4169E1">break</font>;
+<a name="line984">984: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHIEP</a>:
+<a name="line985">985: </a>      eps-&gt;isgeneralized = PETSC_TRUE;
+<a name="line986">986: </a>      eps-&gt;ishermitian = PETSC_TRUE;
+<a name="line987">987: </a>      eps-&gt;ispositive = PETSC_FALSE;
+<a name="line988">988: </a>      <font color="#4169E1">break</font>;
+<a name="line989">989: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line990">990: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_WRONG,<font color="#666666">"Unknown eigenvalue problem type"</font>);
+<a name="line991">991: </a>  }
+<a name="line992">992: </a>  eps-&gt;problem_type = type;
+<a name="line993">993: </a>  eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line994">994: </a>  <font color="#4169E1">return</font>(0);
+<a name="line995">995: </a>}
+
+<a name="line997">997: </a><font color="#B22222">/*@</font>
+<a name="line998">998: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetProblemType.html#EPSGetProblemType">EPSGetProblemType</a> - Gets the problem type from the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> object.</font>
+
+<a name="line1000">1000: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1002">1002: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1003">1003: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1005">1005: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1006">1006: </a><font color="#B22222">.  type - the problem type</font>
+
+<a name="line1008">1008: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line1010">1010: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(), <a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPSProblemType</a></font>
+<a name="line1011">1011: </a><font color="#B22222">@*/</font>
+<a name="line1012">1012: </a><strong><font color="#4169E1"><a name="EPSGetProblemType"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetProblemType.html#EPSGetProblemType">EPSGetProblemType</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPSProblemType</a> *type)</font></strong>
+<a name="line1013">1013: </a>{
+<a name="line1017">1017: </a>  *type = eps-&gt;problem_type;
+<a name="line1018">1018: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1019">1019: </a>}
+
+<a name="line1021">1021: </a><font color="#B22222">/*@</font>
+<a name="line1022">1022: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a> - Specifies the type of extraction technique to be employed</font>
+<a name="line1023">1023: </a><font color="#B22222">   by the eigensolver.</font>
+
+<a name="line1025">1025: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1027">1027: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1028">1028: </a><font color="#B22222">+  eps  - the eigensolver context</font>
+<a name="line1029">1029: </a><font color="#B22222">-  extr - a known type of extraction</font>
+
+<a name="line1031">1031: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line1032">1032: </a><font color="#B22222">+  -eps_ritz - Rayleigh-Ritz extraction</font>
+<a name="line1033">1033: </a><font color="#B22222">.  -eps_harmonic - harmonic Ritz extraction</font>
+<a name="line1034">1034: </a><font color="#B22222">.  -eps_harmonic_relative - harmonic Ritz extraction relative to the eigenvalue</font>
+<a name="line1035">1035: </a><font color="#B22222">.  -eps_harmonic_right - harmonic Ritz extraction for rightmost eigenvalues</font>
+<a name="line1036">1036: </a><font color="#B22222">.  -eps_harmonic_largest - harmonic Ritz extraction for largest magnitude</font>
+<a name="line1037">1037: </a><font color="#B22222">   (without target)</font>
+<a name="line1038">1038: </a><font color="#B22222">.  -eps_refined - refined Ritz extraction</font>
+<a name="line1039">1039: </a><font color="#B22222">-  -eps_refined_harmonic - refined harmonic Ritz extraction</font>
+
+<a name="line1041">1041: </a><font color="#B22222">   Notes:</font>
+<a name="line1042">1042: </a><font color="#B22222">   Not all eigensolvers support all types of extraction. See the SLEPc</font>
+<a name="line1043">1043: </a><font color="#B22222">   Users Manual for details.</font>
+
+<a name="line1045">1045: </a><font color="#B22222">   By default, a standard Rayleigh-Ritz extraction is used. Other extractions</font>
+<a name="line1046">1046: </a><font color="#B22222">   may be useful when computing interior eigenvalues.</font>
+
+<a name="line1048">1048: </a><font color="#B22222">   Harmonic-type extractions are used in combination with a 'target'.</font>
+
+<a name="line1050">1050: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1052">1052: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(), <a href="../../../docs/manualpages/EPS/EPSGetExtraction.html#EPSGetExtraction">EPSGetExtraction</a>(), <a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPSExtraction</a></font>
+<a name="line1053">1053: </a><font color="#B22222">@*/</font>
+<a name="line1054">1054: </a><strong><font color="#4169E1"><a name="EPSSetExtraction"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPSExtraction</a> extr)</font></strong>
+<a name="line1055">1055: </a>{
+<a name="line1059">1059: </a>  eps-&gt;extraction = extr;
+<a name="line1060">1060: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1061">1061: </a>}
+
+<a name="line1063">1063: </a><font color="#B22222">/*@</font>
+<a name="line1064">1064: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetExtraction.html#EPSGetExtraction">EPSGetExtraction</a> - Gets the extraction type used by the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> object.</font>
+
+<a name="line1066">1066: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1068">1068: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1069">1069: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1071">1071: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1072">1072: </a><font color="#B22222">.  extr - name of extraction type</font>
+
+<a name="line1074">1074: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1076">1076: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetExtraction.html#EPSSetExtraction">EPSSetExtraction</a>(), <a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPSExtraction</a></font>
+<a name="line1077">1077: </a><font color="#B22222">@*/</font>
+<a name="line1078">1078: </a><strong><font color="#4169E1"><a name="EPSGetExtraction"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetExtraction.html#EPSGetExtraction">EPSGetExtraction</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPSExtraction</a> *extr)</font></strong>
+<a name="line1079">1079: </a>{
+<a name="line1083">1083: </a>  *extr = eps-&gt;extraction;
+<a name="line1084">1084: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1085">1085: </a>}
+
+<a name="line1087">1087: </a><font color="#B22222">/*@</font>
+<a name="line1088">1088: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetBalance.html#EPSSetBalance">EPSSetBalance</a> - Specifies the balancing technique to be employed by the</font>
+<a name="line1089">1089: </a><font color="#B22222">   eigensolver, and some parameters associated to it.</font>
+
+<a name="line1091">1091: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1093">1093: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1094">1094: </a><font color="#B22222">+  eps    - the eigensolver context</font>
+<a name="line1095">1095: </a><font color="#B22222">.  bal    - the balancing method, one of <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a>, <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_ONESIDE</a>,</font>
+<a name="line1096">1096: </a><font color="#B22222">            <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_TWOSIDE</a>, or <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_USER</a></font>
+<a name="line1097">1097: </a><font color="#B22222">.  its    - number of iterations of the balancing algorithm</font>
+<a name="line1098">1098: </a><font color="#B22222">-  cutoff - cutoff value</font>
+
+<a name="line1100">1100: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line1101">1101: </a><font color="#B22222">+  -eps_balance &lt;method&gt; - the balancing method, where &lt;method&gt; is one of</font>
+<a name="line1102">1102: </a><font color="#B22222">                           'none', 'oneside', 'twoside', or 'user'</font>
+<a name="line1103">1103: </a><font color="#B22222">.  -eps_balance_its &lt;its&gt; - number of iterations</font>
+<a name="line1104">1104: </a><font color="#B22222">-  -eps_balance_cutoff &lt;cutoff&gt; - cutoff value</font>
+
+<a name="line1106">1106: </a><font color="#B22222">   Notes:</font>
+<a name="line1107">1107: </a><font color="#B22222">   When balancing is enabled, the solver works implicitly with matrix DAD^-1,</font>
+<a name="line1108">1108: </a><font color="#B22222">   where D is an appropriate diagonal matrix. This improves the accuracy of</font>
+<a name="line1109">1109: </a><font color="#B22222">   the computed results in some cases. See the SLEPc Users Manual for details.</font>
+
+<a name="line1111">1111: </a><font color="#B22222">   Balancing makes sense only for non-Hermitian problems when the required</font>
+<a name="line1112">1112: </a><font color="#B22222">   precision is high (i.e. a small tolerance such as 1e-15).</font>
+
+<a name="line1114">1114: </a><font color="#B22222">   By default, balancing is disabled. The two-sided method is much more</font>
+<a name="line1115">1115: </a><font color="#B22222">   effective than the one-sided counterpart, but it requires the system</font>
+<a name="line1116">1116: </a><font color="#B22222">   matrices to have the MatMultTranspose operation defined.</font>
+
+<a name="line1118">1118: </a><font color="#B22222">   The parameter 'its' is the number of iterations performed by the method. The</font>
+<a name="line1119">1119: </a><font color="#B22222">   cutoff value is used only in the two-side variant. Use PETSC_DEFAULT to assign</font>
+<a name="line1120">1120: </a><font color="#B22222">   a reasonably good value.</font>
+
+<a name="line1122">1122: </a><font color="#B22222">   User-defined balancing is allowed provided that the corresponding matrix</font>
+<a name="line1123">1123: </a><font color="#B22222">   is set via <a href="../../../docs/manualpages/ST/STSetBalanceMatrix.html#STSetBalanceMatrix">STSetBalanceMatrix</a>.</font>
+
+<a name="line1125">1125: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line1127">1127: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetBalance.html#EPSGetBalance">EPSGetBalance</a>(), <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPSBalance</a>, <a href="../../../docs/manualpages/ST/STSetBalanceMatrix.html#STSetBalanceMatrix">STSetBalanceMatrix</a>()</font>
+<a name="line1128">1128: </a><font color="#B22222">@*/</font>
+<a name="line1129">1129: </a><strong><font color="#4169E1"><a name="EPSSetBalance"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetBalance.html#EPSSetBalance">EPSSetBalance</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPSBalance</a> bal,PetscInt its,PetscReal cutoff)</font></strong>
+<a name="line1130">1130: </a>{
+<a name="line1136">1136: </a>  <font color="#4169E1">switch</font> (bal) {
+<a name="line1137">1137: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a>:
+<a name="line1138">1138: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_ONESIDE</a>:
+<a name="line1139">1139: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_TWOSIDE</a>:
+<a name="line1140">1140: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_USER</a>:
+<a name="line1141">1141: </a>      <font color="#4169E1">if</font> (eps-&gt;balance != bal) {
+<a name="line1142">1142: </a>        eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line1143">1143: </a>        eps-&gt;balance = bal;
+<a name="line1144">1144: </a>      }
+<a name="line1145">1145: </a>      <font color="#4169E1">break</font>;
+<a name="line1146">1146: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line1147">1147: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid value of argument 'bal'"</font>);
+<a name="line1148">1148: </a>  }
+<a name="line1149">1149: </a>  <font color="#4169E1">if</font> (its==PETSC_DECIDE || its==PETSC_DEFAULT) eps-&gt;balance_its = 5;
+<a name="line1150">1150: </a>  <font color="#4169E1">else</font> {
+<a name="line1151">1151: </a>    <font color="#4169E1">if</font> (its &lt;= 0) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of its. Must be &gt; 0"</font>);
+<a name="line1152">1152: </a>    eps-&gt;balance_its = its;
+<a name="line1153">1153: </a>  }
+<a name="line1154">1154: </a>  <font color="#4169E1">if</font> (cutoff==PETSC_DECIDE || cutoff==PETSC_DEFAULT) eps-&gt;balance_cutoff = 1e-8;
+<a name="line1155">1155: </a>  <font color="#4169E1">else</font> {
+<a name="line1156">1156: </a>    <font color="#4169E1">if</font> (cutoff &lt;= 0.0) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of cutoff. Must be &gt; 0"</font>);
+<a name="line1157">1157: </a>    eps-&gt;balance_cutoff = cutoff;
+<a name="line1158">1158: </a>  }
+<a name="line1159">1159: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1160">1160: </a>}
+
+<a name="line1162">1162: </a><font color="#B22222">/*@C</font>
+<a name="line1163">1163: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetBalance.html#EPSGetBalance">EPSGetBalance</a> - Gets the balancing type used by the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> object, and the</font>
+<a name="line1164">1164: </a><font color="#B22222">   associated parameters.</font>
+
+<a name="line1166">1166: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1168">1168: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1169">1169: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1171">1171: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line1172">1172: </a><font color="#B22222">+  bal    - the balancing method</font>
+<a name="line1173">1173: </a><font color="#B22222">.  its    - number of iterations of the balancing algorithm</font>
+<a name="line1174">1174: </a><font color="#B22222">-  cutoff - cutoff value</font>
+
+<a name="line1176">1176: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line1178">1178: </a><font color="#B22222">   Note:</font>
+<a name="line1179">1179: </a><font color="#B22222">   The user can specify NULL for any parameter that is not needed.</font>
+
+<a name="line1181">1181: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetBalance.html#EPSSetBalance">EPSSetBalance</a>(), <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPSBalance</a></font>
+<a name="line1182">1182: </a><font color="#B22222">@*/</font>
+<a name="line1183">1183: </a><strong><font color="#4169E1"><a name="EPSGetBalance"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetBalance.html#EPSGetBalance">EPSGetBalance</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPSBalance</a> *bal,PetscInt *its,PetscReal *cutoff)</font></strong>
+<a name="line1184">1184: </a>{
+<a name="line1187">1187: </a>  <font color="#4169E1">if</font> (bal)    *bal = eps-&gt;balance;
+<a name="line1188">1188: </a>  <font color="#4169E1">if</font> (its)    *its = eps-&gt;balance_its;
+<a name="line1189">1189: </a>  <font color="#4169E1">if</font> (cutoff) *cutoff = eps-&gt;balance_cutoff;
+<a name="line1190">1190: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1191">1191: </a>}
+
+<a name="line1193">1193: </a><font color="#B22222">/*@</font>
+<a name="line1194">1194: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a> - Sets the solver to use a two-sided variant so that left</font>
+<a name="line1195">1195: </a><font color="#B22222">   eigenvectors are also computed.</font>
+
+<a name="line1197">1197: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1199">1199: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1200">1200: </a><font color="#B22222">+  eps      - the eigensolver context</font>
+<a name="line1201">1201: </a><font color="#B22222">-  twosided - whether the two-sided variant is to be used or not</font>
+
+<a name="line1203">1203: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line1204">1204: </a><font color="#B22222">.  -eps_two_sided &lt;boolean&gt; - Sets/resets the twosided flag</font>
+
+<a name="line1206">1206: </a><font color="#B22222">   Notes:</font>
+<a name="line1207">1207: </a><font color="#B22222">   If the user sets twosided=PETSC_TRUE then the solver uses a variant of</font>
+<a name="line1208">1208: </a><font color="#B22222">   the algorithm that computes both right and left eigenvectors. This is</font>
+<a name="line1209">1209: </a><font color="#B22222">   usually much more costly. This option is not available in all solvers.</font>
+
+<a name="line1211">1211: </a><font color="#B22222">   When using two-sided solvers, the problem matrices must have both the</font>
+<a name="line1212">1212: </a><font color="#B22222">   MatMult and MatMultTranspose operations defined.</font>
+
+<a name="line1214">1214: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1216">1216: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetTwoSided.html#EPSGetTwoSided">EPSGetTwoSided</a>(), <a href="../../../docs/manualpages/EPS/EPSGetLeftEigenvector.html#EPSGetLeftEigenvector">EPSGetLeftEigenvector</a>()</font>
+<a name="line1217">1217: </a><font color="#B22222">@*/</font>
+<a name="line1218">1218: </a><strong><font color="#4169E1"><a name="EPSSetTwoSided"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool twosided)</font></strong>
+<a name="line1219">1219: </a>{
+<a name="line1223">1223: </a>  <font color="#4169E1">if</font> (twosided!=eps-&gt;twosided) {
+<a name="line1224">1224: </a>    eps-&gt;twosided = twosided;
+<a name="line1225">1225: </a>    eps-&gt;state    = EPS_STATE_INITIAL;
+<a name="line1226">1226: </a>  }
+<a name="line1227">1227: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1228">1228: </a>}
+
+<a name="line1230">1230: </a><font color="#B22222">/*@</font>
+<a name="line1231">1231: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetTwoSided.html#EPSGetTwoSided">EPSGetTwoSided</a> - Returns the flag indicating whether a two-sided variant</font>
+<a name="line1232">1232: </a><font color="#B22222">   of the algorithm is being used or not.</font>
+
+<a name="line1234">1234: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1236">1236: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1237">1237: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1239">1239: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1240">1240: </a><font color="#B22222">.  twosided - the returned flag</font>
+
+<a name="line1242">1242: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1244">1244: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>()</font>
+<a name="line1245">1245: </a><font color="#B22222">@*/</font>
+<a name="line1246">1246: </a><strong><font color="#4169E1"><a name="EPSGetTwoSided"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetTwoSided.html#EPSGetTwoSided">EPSGetTwoSided</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool *twosided)</font></strong>
+<a name="line1247">1247: </a>{
+<a name="line1251">1251: </a>  *twosided = eps-&gt;twosided;
+<a name="line1252">1252: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1253">1253: </a>}
+
+<a name="line1255">1255: </a><font color="#B22222">/*@</font>
+<a name="line1256">1256: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetTrueResidual.html#EPSSetTrueResidual">EPSSetTrueResidual</a> - Specifies if the solver must compute the true residual</font>
+<a name="line1257">1257: </a><font color="#B22222">   explicitly or not.</font>
+
+<a name="line1259">1259: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1261">1261: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1262">1262: </a><font color="#B22222">+  eps     - the eigensolver context</font>
+<a name="line1263">1263: </a><font color="#B22222">-  trueres - whether true residuals are required or not</font>
+
+<a name="line1265">1265: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line1266">1266: </a><font color="#B22222">.  -eps_true_residual &lt;boolean&gt; - Sets/resets the boolean flag 'trueres'</font>
+
+<a name="line1268">1268: </a><font color="#B22222">   Notes:</font>
+<a name="line1269">1269: </a><font color="#B22222">   If the user sets trueres=PETSC_TRUE then the solver explicitly computes</font>
+<a name="line1270">1270: </a><font color="#B22222">   the true residual for each eigenpair approximation, and uses it for</font>
+<a name="line1271">1271: </a><font color="#B22222">   convergence testing. Computing the residual is usually an expensive</font>
+<a name="line1272">1272: </a><font color="#B22222">   operation. Some solvers (e.g., Krylov solvers) can avoid this computation</font>
+<a name="line1273">1273: </a><font color="#B22222">   by using a cheap estimate of the residual norm, but this may sometimes</font>
+<a name="line1274">1274: </a><font color="#B22222">   give inaccurate results (especially if a spectral transform is being</font>
+<a name="line1275">1275: </a><font color="#B22222">   used). On the contrary, preconditioned eigensolvers (e.g., Davidson solvers)</font>
+<a name="line1276">1276: </a><font color="#B22222">   do rely on computing the true residual, so this option is irrelevant for them.</font>
+
+<a name="line1278">1278: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1280">1280: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetTrueResidual.html#EPSGetTrueResidual">EPSGetTrueResidual</a>()</font>
+<a name="line1281">1281: </a><font color="#B22222">@*/</font>
+<a name="line1282">1282: </a><strong><font color="#4169E1"><a name="EPSSetTrueResidual"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetTrueResidual.html#EPSSetTrueResidual">EPSSetTrueResidual</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool trueres)</font></strong>
+<a name="line1283">1283: </a>{
+<a name="line1287">1287: </a>  eps-&gt;trueres = trueres;
+<a name="line1288">1288: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1289">1289: </a>}
+
+<a name="line1291">1291: </a><font color="#B22222">/*@</font>
+<a name="line1292">1292: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetTrueResidual.html#EPSGetTrueResidual">EPSGetTrueResidual</a> - Returns the flag indicating whether true</font>
+<a name="line1293">1293: </a><font color="#B22222">   residuals must be computed explicitly or not.</font>
+
+<a name="line1295">1295: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1297">1297: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1298">1298: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1300">1300: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1301">1301: </a><font color="#B22222">.  trueres - the returned flag</font>
+
+<a name="line1303">1303: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1305">1305: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetTrueResidual.html#EPSSetTrueResidual">EPSSetTrueResidual</a>()</font>
+<a name="line1306">1306: </a><font color="#B22222">@*/</font>
+<a name="line1307">1307: </a><strong><font color="#4169E1"><a name="EPSGetTrueResidual"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetTrueResidual.html#EPSGetTrueResidual">EPSGetTrueResidual</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool *trueres)</font></strong>
+<a name="line1308">1308: </a>{
+<a name="line1312">1312: </a>  *trueres = eps-&gt;trueres;
+<a name="line1313">1313: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1314">1314: </a>}
+
+<a name="line1316">1316: </a><font color="#B22222">/*@</font>
+<a name="line1317">1317: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a> - Specifies if the solver must compute the residual norm of all</font>
+<a name="line1318">1318: </a><font color="#B22222">   approximate eigenpairs or not.</font>
+
+<a name="line1320">1320: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1322">1322: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1323">1323: </a><font color="#B22222">+  eps      - the eigensolver context</font>
+<a name="line1324">1324: </a><font color="#B22222">-  trackall - whether to compute all residuals or not</font>
+
+<a name="line1326">1326: </a><font color="#B22222">   Notes:</font>
+<a name="line1327">1327: </a><font color="#B22222">   If the user sets trackall=PETSC_TRUE then the solver computes (or estimates)</font>
+<a name="line1328">1328: </a><font color="#B22222">   the residual norm for each eigenpair approximation. Computing the residual is</font>
+<a name="line1329">1329: </a><font color="#B22222">   usually an expensive operation and solvers commonly compute only the residual</font>
+<a name="line1330">1330: </a><font color="#B22222">   associated to the first unconverged eigenpair.</font>
+
+<a name="line1332">1332: </a><font color="#B22222">   The options '-eps_monitor_all' and '-eps_monitor_lg_all' automatically</font>
+<a name="line1333">1333: </a><font color="#B22222">   activate this option.</font>
+
+<a name="line1335">1335: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line1337">1337: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetTrackAll.html#EPSGetTrackAll">EPSGetTrackAll</a>()</font>
+<a name="line1338">1338: </a><font color="#B22222">@*/</font>
+<a name="line1339">1339: </a><strong><font color="#4169E1"><a name="EPSSetTrackAll"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool trackall)</font></strong>
+<a name="line1340">1340: </a>{
+<a name="line1344">1344: </a>  eps-&gt;trackall = trackall;
+<a name="line1345">1345: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1346">1346: </a>}
+
+<a name="line1348">1348: </a><font color="#B22222">/*@</font>
+<a name="line1349">1349: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetTrackAll.html#EPSGetTrackAll">EPSGetTrackAll</a> - Returns the flag indicating whether all residual norms must</font>
+<a name="line1350">1350: </a><font color="#B22222">   be computed or not.</font>
+
+<a name="line1352">1352: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1354">1354: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1355">1355: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1357">1357: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1358">1358: </a><font color="#B22222">.  trackall - the returned flag</font>
+
+<a name="line1360">1360: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line1362">1362: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a>()</font>
+<a name="line1363">1363: </a><font color="#B22222">@*/</font>
+<a name="line1364">1364: </a><strong><font color="#4169E1"><a name="EPSGetTrackAll"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetTrackAll.html#EPSGetTrackAll">EPSGetTrackAll</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool *trackall)</font></strong>
+<a name="line1365">1365: </a>{
+<a name="line1369">1369: </a>  *trackall = eps-&gt;trackall;
+<a name="line1370">1370: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1371">1371: </a>}
+
+<a name="line1373">1373: </a><font color="#B22222">/*@</font>
+<a name="line1374">1374: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetPurify.html#EPSSetPurify">EPSSetPurify</a> - Deactivate eigenvector purification (which is activated by default).</font>
+
+<a name="line1376">1376: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1378">1378: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1379">1379: </a><font color="#B22222">+  eps    - the eigensolver context</font>
+<a name="line1380">1380: </a><font color="#B22222">-  purify - whether purification is required or not</font>
+
+<a name="line1382">1382: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line1383">1383: </a><font color="#B22222">.  -eps_purify &lt;boolean&gt; - Sets/resets the boolean flag 'purify'</font>
+
+<a name="line1385">1385: </a><font color="#B22222">   Notes:</font>
+<a name="line1386">1386: </a><font color="#B22222">   By default, eigenvectors of generalized symmetric eigenproblems are purified</font>
+<a name="line1387">1387: </a><font color="#B22222">   in order to purge directions in the nullspace of matrix B. If the user knows</font>
+<a name="line1388">1388: </a><font color="#B22222">   that B is non-singular, then purification can be safely deactivated and some</font>
+<a name="line1389">1389: </a><font color="#B22222">   computational cost is avoided (this is particularly important in interval computations).</font>
+
+<a name="line1391">1391: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line1393">1393: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetPurify.html#EPSGetPurify">EPSGetPurify</a>(), <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>()</font>
+<a name="line1394">1394: </a><font color="#B22222">@*/</font>
+<a name="line1395">1395: </a><strong><font color="#4169E1"><a name="EPSSetPurify"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetPurify.html#EPSSetPurify">EPSSetPurify</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool purify)</font></strong>
+<a name="line1396">1396: </a>{
+<a name="line1400">1400: </a>  <font color="#4169E1">if</font> (purify!=eps-&gt;purify) {
+<a name="line1401">1401: </a>    eps-&gt;purify = purify;
+<a name="line1402">1402: </a>    eps-&gt;state  = EPS_STATE_INITIAL;
+<a name="line1403">1403: </a>  }
+<a name="line1404">1404: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1405">1405: </a>}
+
+<a name="line1407">1407: </a><font color="#B22222">/*@</font>
+<a name="line1408">1408: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetPurify.html#EPSGetPurify">EPSGetPurify</a> - Returns the flag indicating whether purification is activated</font>
+<a name="line1409">1409: </a><font color="#B22222">   or not.</font>
+
+<a name="line1411">1411: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1413">1413: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1414">1414: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1416">1416: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1417">1417: </a><font color="#B22222">.  purify - the returned flag</font>
+
+<a name="line1419">1419: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line1421">1421: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetPurify.html#EPSSetPurify">EPSSetPurify</a>()</font>
+<a name="line1422">1422: </a><font color="#B22222">@*/</font>
+<a name="line1423">1423: </a><strong><font color="#4169E1"><a name="EPSGetPurify"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetPurify.html#EPSGetPurify">EPSGetPurify</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool *purify)</font></strong>
+<a name="line1424">1424: </a>{
+<a name="line1428">1428: </a>  *purify = eps-&gt;purify;
+<a name="line1429">1429: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1430">1430: </a>}
+
+<a name="line1432">1432: </a><font color="#B22222">/*@C</font>
+<a name="line1433">1433: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a> - Sets the prefix used for searching for all</font>
+<a name="line1434">1434: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> options in the database.</font>
+
+<a name="line1436">1436: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1438">1438: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1439">1439: </a><font color="#B22222">+  eps - the eigensolver context</font>
+<a name="line1440">1440: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> option requests</font>
+
+<a name="line1442">1442: </a><font color="#B22222">   Notes:</font>
+<a name="line1443">1443: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line1444">1444: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the</font>
+<a name="line1445">1445: </a><font color="#B22222">   hyphen.</font>
+
+<a name="line1447">1447: </a><font color="#B22222">   For example, to distinguish between the runtime options for two</font>
+<a name="line1448">1448: </a><font color="#B22222">   different <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> contexts, one could call</font>
+<a name="line1449">1449: </a><font color="#B22222">.vb</font>
+<a name="line1450">1450: </a><font color="#B22222">      <a href="../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(eps1,"eig1_")</font>
+<a name="line1451">1451: </a><font color="#B22222">      <a href="../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(eps2,"eig2_")</font>
+<a name="line1452">1452: </a><font color="#B22222">.ve</font>
+
+<a name="line1454">1454: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1456">1456: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSAppendOptionsPrefix.html#EPSAppendOptionsPrefix">EPSAppendOptionsPrefix</a>(), <a href="../../../docs/manualpages/EPS/EPSGetOptionsPrefix.html#EPSGetOptionsPrefix">EPSGetOptionsPrefix</a>()</font>
+<a name="line1457">1457: </a><font color="#B22222">@*/</font>
+<a name="line1458">1458: </a><strong><font color="#4169E1"><a name="EPSSetOptionsPrefix"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,const char *prefix)</font></strong>
+<a name="line1459">1459: </a>{
+
+<a name="line1464">1464: </a>  <font color="#4169E1">if</font> (!eps-&gt;st) { <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;eps-&gt;st); }
+<a name="line1465">1465: </a>  <a href="../../../docs/manualpages/ST/STSetOptionsPrefix.html#STSetOptionsPrefix">STSetOptionsPrefix</a>(eps-&gt;st,prefix);
+<a name="line1466">1466: </a>  <font color="#4169E1">if</font> (!eps-&gt;V) { <a href="../../../docs/manualpages/EPS/EPSGetBV.html#EPSGetBV">EPSGetBV</a>(eps,&amp;eps-&gt;V); }
+<a name="line1467">1467: </a>  <a href="../../../docs/manualpages/BV/BVSetOptionsPrefix.html#BVSetOptionsPrefix">BVSetOptionsPrefix</a>(eps-&gt;V,prefix);
+<a name="line1468">1468: </a>  <font color="#4169E1">if</font> (!eps-&gt;ds) { <a href="../../../docs/manualpages/EPS/EPSGetDS.html#EPSGetDS">EPSGetDS</a>(eps,&amp;eps-&gt;ds); }
+<a name="line1469">1469: </a>  <a href="../../../docs/manualpages/DS/DSSetOptionsPrefix.html#DSSetOptionsPrefix">DSSetOptionsPrefix</a>(eps-&gt;ds,prefix);
+<a name="line1470">1470: </a>  <font color="#4169E1">if</font> (!eps-&gt;rg) { <a href="../../../docs/manualpages/EPS/EPSGetRG.html#EPSGetRG">EPSGetRG</a>(eps,&amp;eps-&gt;rg); }
+<a name="line1471">1471: </a>  <a href="../../../docs/manualpages/RG/RGSetOptionsPrefix.html#RGSetOptionsPrefix">RGSetOptionsPrefix</a>(eps-&gt;rg,prefix);
+<a name="line1472">1472: </a>  PetscObjectSetOptionsPrefix((PetscObject)eps,prefix);
+<a name="line1473">1473: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1474">1474: </a>}
+
+<a name="line1476">1476: </a><font color="#B22222">/*@C</font>
+<a name="line1477">1477: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSAppendOptionsPrefix.html#EPSAppendOptionsPrefix">EPSAppendOptionsPrefix</a> - Appends to the prefix used for searching for all</font>
+<a name="line1478">1478: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> options in the database.</font>
+
+<a name="line1480">1480: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line1482">1482: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1483">1483: </a><font color="#B22222">+  eps - the eigensolver context</font>
+<a name="line1484">1484: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> option requests</font>
+
+<a name="line1486">1486: </a><font color="#B22222">   Notes:</font>
+<a name="line1487">1487: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line1488">1488: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the hyphen.</font>
+
+<a name="line1490">1490: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1492">1492: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(), <a href="../../../docs/manualpages/EPS/EPSGetOptionsPrefix.html#EPSGetOptionsPrefix">EPSGetOptionsPrefix</a>()</font>
+<a name="line1493">1493: </a><font color="#B22222">@*/</font>
+<a name="line1494">1494: </a><strong><font color="#4169E1"><a name="EPSAppendOptionsPrefix"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSAppendOptionsPrefix.html#EPSAppendOptionsPrefix">EPSAppendOptionsPrefix</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,const char *prefix)</font></strong>
+<a name="line1495">1495: </a>{
+
+<a name="line1500">1500: </a>  <font color="#4169E1">if</font> (!eps-&gt;st) { <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;eps-&gt;st); }
+<a name="line1501">1501: </a>  <a href="../../../docs/manualpages/ST/STAppendOptionsPrefix.html#STAppendOptionsPrefix">STAppendOptionsPrefix</a>(eps-&gt;st,prefix);
+<a name="line1502">1502: </a>  <font color="#4169E1">if</font> (!eps-&gt;V) { <a href="../../../docs/manualpages/EPS/EPSGetBV.html#EPSGetBV">EPSGetBV</a>(eps,&amp;eps-&gt;V); }
+<a name="line1503">1503: </a>  <a href="../../../docs/manualpages/BV/BVAppendOptionsPrefix.html#BVAppendOptionsPrefix">BVAppendOptionsPrefix</a>(eps-&gt;V,prefix);
+<a name="line1504">1504: </a>  <font color="#4169E1">if</font> (!eps-&gt;ds) { <a href="../../../docs/manualpages/EPS/EPSGetDS.html#EPSGetDS">EPSGetDS</a>(eps,&amp;eps-&gt;ds); }
+<a name="line1505">1505: </a>  <a href="../../../docs/manualpages/DS/DSAppendOptionsPrefix.html#DSAppendOptionsPrefix">DSAppendOptionsPrefix</a>(eps-&gt;ds,prefix);
+<a name="line1506">1506: </a>  <font color="#4169E1">if</font> (!eps-&gt;rg) { <a href="../../../docs/manualpages/EPS/EPSGetRG.html#EPSGetRG">EPSGetRG</a>(eps,&amp;eps-&gt;rg); }
+<a name="line1507">1507: </a>  <a href="../../../docs/manualpages/RG/RGAppendOptionsPrefix.html#RGAppendOptionsPrefix">RGAppendOptionsPrefix</a>(eps-&gt;rg,prefix);
+<a name="line1508">1508: </a>  PetscObjectAppendOptionsPrefix((PetscObject)eps,prefix);
+<a name="line1509">1509: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1510">1510: </a>}
+
+<a name="line1512">1512: </a><font color="#B22222">/*@C</font>
+<a name="line1513">1513: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetOptionsPrefix.html#EPSGetOptionsPrefix">EPSGetOptionsPrefix</a> - Gets the prefix used for searching for all</font>
+<a name="line1514">1514: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> options in the database.</font>
+
+<a name="line1516">1516: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1518">1518: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1519">1519: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line1521">1521: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line1522">1522: </a><font color="#B22222">.  prefix - pointer to the prefix string used is returned</font>
+
+<a name="line1524">1524: </a><font color="#B22222">   Note:</font>
+<a name="line1525">1525: </a><font color="#B22222">   On the Fortran side, the user should pass in a string 'prefix' of</font>
+<a name="line1526">1526: </a><font color="#B22222">   sufficient length to hold the prefix.</font>
+
+<a name="line1528">1528: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1530">1530: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(), <a href="../../../docs/manualpages/EPS/EPSAppendOptionsPrefix.html#EPSAppendOptionsPrefix">EPSAppendOptionsPrefix</a>()</font>
+<a name="line1531">1531: </a><font color="#B22222">@*/</font>
+<a name="line1532">1532: </a><strong><font color="#4169E1"><a name="EPSGetOptionsPrefix"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetOptionsPrefix.html#EPSGetOptionsPrefix">EPSGetOptionsPrefix</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,const char *prefix[])</font></strong>
+<a name="line1533">1533: </a>{
+
+<a name="line1539">1539: </a>  PetscObjectGetOptionsPrefix((PetscObject)eps,prefix);
+<a name="line1540">1540: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1541">1541: </a>}
+
+</pre>
+</body>
+
+</html>

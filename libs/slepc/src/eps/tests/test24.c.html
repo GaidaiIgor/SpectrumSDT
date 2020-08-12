@@ -1,0 +1,150 @@
+<center><a href="test24.c">Actual source code: test24.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tests/test24.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:56+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tests/test24.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Eigenproblem for the 1-D Laplacian with constraints. "</font>
+<a name="line12"> 12: </a>  <font color="#666666">"Based on ex1.\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions = matrix dimension.\n\n"</font>;
+
+<a name="line16"> 16: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line18"> 18: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line19"> 19: </a>{
+<a name="line20"> 20: </a>  Mat            A;
+<a name="line21"> 21: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;
+<a name="line22"> 22: </a>  <a href="../../../docs/manualpages/EPS/EPSType.html#EPSType">EPSType</a>        type;
+<a name="line23"> 23: </a>  Vec            *vi=NULL,*vc=NULL,t;
+<a name="line24"> 24: </a>  PetscInt       n=30,nev=4,i,j,Istart,Iend,nini=0,ncon=0,bs;
+<a name="line25"> 25: </a>  PetscReal      alpha,beta,restart;
+<a name="line26"> 26: </a>  PetscBool      flg,lock;
+
+<a name="line29"> 29: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line30"> 30: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line31"> 31: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-nini"</font>,&amp;nini,NULL);
+<a name="line32"> 32: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-ncon"</font>,&amp;ncon,NULL);
+<a name="line33"> 33: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n1-D Laplacian Eigenproblem, n=%D nini=%D ncon=%D\n\n"</font>,n,nini,ncon);
+
+<a name="line35"> 35: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line36"> 36: </a><font color="#B22222">     Compute the operator matrix that defines the eigensystem, Ax=kx</font>
+<a name="line37"> 37: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line39"> 39: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line40"> 40: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line41"> 41: </a>  MatSetFromOptions(A);
+<a name="line42"> 42: </a>  MatSetUp(A);
+
+<a name="line44"> 44: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line45"> 45: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line46"> 46: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,i,i-1,-1.0,INSERT_VALUES); }
+<a name="line47"> 47: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(A,i,i+1,-1.0,INSERT_VALUES); }
+<a name="line48"> 48: </a>    MatSetValue(A,i,i,2.0,INSERT_VALUES);
+<a name="line49"> 49: </a>  }
+<a name="line50"> 50: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line51"> 51: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line53"> 53: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line54"> 54: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line55"> 55: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line56"> 56: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line57"> 57: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,NULL);
+<a name="line58"> 58: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>);
+<a name="line59"> 59: </a>  <a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(eps,EPSLOBPCG);
+<a name="line60"> 60: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>);
+<a name="line61"> 61: </a>  <a href="../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(eps,<a href="../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_ABS</a>);
+<a name="line62"> 62: </a>  <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(eps,nev,PETSC_DEFAULT,PETSC_DEFAULT);
+<a name="line63"> 63: </a>  <a href="../../../docs/manualpages/EPS/EPSLOBPCGSetBlockSize.html#EPSLOBPCGSetBlockSize">EPSLOBPCGSetBlockSize</a>(eps,nev);
+<a name="line64"> 64: </a>  <a href="../../../docs/manualpages/EPS/EPSLOBPCGSetRestart.html#EPSLOBPCGSetRestart">EPSLOBPCGSetRestart</a>(eps,0.7);
+<a name="line65"> 65: </a>  <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(eps,1e-8,1200);
+<a name="line66"> 66: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line68"> 68: </a>  MatCreateVecs(A,&amp;t,NULL);
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (nini) {
+<a name="line70"> 70: </a>    VecDuplicateVecs(t,nini,&amp;vi);
+<a name="line71"> 71: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nini;i++) {
+<a name="line72"> 72: </a>      VecSetRandom(vi[i],NULL);
+<a name="line73"> 73: </a>    }
+<a name="line74"> 74: </a>    <a href="../../../docs/manualpages/EPS/EPSSetInitialSpace.html#EPSSetInitialSpace">EPSSetInitialSpace</a>(eps,nini,vi);
+<a name="line75"> 75: </a>  }
+<a name="line76"> 76: </a>  <font color="#4169E1">if</font> (ncon) {   <font color="#B22222">/* constraints are exact eigenvectors of lowest eigenvalues */</font>
+<a name="line77"> 77: </a>    alpha = PETSC_PI/(n+1);
+<a name="line78"> 78: </a>    beta  = PetscSqrtReal(2.0/(n+1));
+<a name="line79"> 79: </a>    VecDuplicateVecs(t,ncon,&amp;vc);
+<a name="line80"> 80: </a>    <font color="#4169E1">for</font> (i=0;i&lt;ncon;i++) {
+<a name="line81"> 81: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line82"> 82: </a>        VecSetValue(vc[i],j,PetscSinReal(alpha*(j+1)*(i+1))*beta,INSERT_VALUES);
+<a name="line83"> 83: </a>      }
+<a name="line84"> 84: </a>      VecAssemblyBegin(vc[i]);
+<a name="line85"> 85: </a>      VecAssemblyEnd(vc[i]);
+<a name="line86"> 86: </a>    }
+<a name="line87"> 87: </a>    <a href="../../../docs/manualpages/EPS/EPSSetDeflationSpace.html#EPSSetDeflationSpace">EPSSetDeflationSpace</a>(eps,ncon,vc);
+<a name="line88"> 88: </a>  }
+
+<a name="line90"> 90: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line91"> 91: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line92"> 92: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line94"> 94: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line95"> 95: </a>  <a href="../../../docs/manualpages/EPS/EPSGetType.html#EPSGetType">EPSGetType</a>(eps,&amp;type);
+<a name="line96"> 96: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solution method: %s\n"</font>,type);
+<a name="line97"> 97: </a>  PetscObjectTypeCompare((PetscObject)eps,EPSLOBPCG,&amp;flg);
+<a name="line98"> 98: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line99"> 99: </a>    <a href="../../../docs/manualpages/EPS/EPSLOBPCGGetLocking.html#EPSLOBPCGGetLocking">EPSLOBPCGGetLocking</a>(eps,&amp;lock);
+<a name="line100">100: </a>    <font color="#4169E1">if</font> (lock) { PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Using soft locking\n"</font>); }
+<a name="line101">101: </a>    <a href="../../../docs/manualpages/EPS/EPSLOBPCGGetRestart.html#EPSLOBPCGGetRestart">EPSLOBPCGGetRestart</a>(eps,&amp;restart);
+<a name="line102">102: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" LOBPCG Restart parameter=%.4g\n"</font>,(double)restart);
+<a name="line103">103: </a>    <a href="../../../docs/manualpages/EPS/EPSLOBPCGGetBlockSize.html#EPSLOBPCGGetBlockSize">EPSLOBPCGGetBlockSize</a>(eps,&amp;bs);
+<a name="line104">104: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" LOBPCG Block size=%D\n"</font>,bs);
+<a name="line105">105: </a>  }
+
+<a name="line107">107: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line108">108: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line109">109: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line111">111: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+<a name="line112">112: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line113">113: </a>  MatDestroy(&amp;A);
+<a name="line114">114: </a>  VecDestroyVecs(nini,&amp;vi);
+<a name="line115">115: </a>  VecDestroyVecs(ncon,&amp;vc);
+<a name="line116">116: </a>  VecDestroy(&amp;t);
+<a name="line117">117: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line118">118: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line119">119: </a>}
+
+<a name="line121">121: </a><font color="#B22222">/*TEST</font>
+
+<a name="line123">123: </a><font color="#B22222">   testset:</font>
+<a name="line124">124: </a><font color="#B22222">      args: -ncon 2</font>
+<a name="line125">125: </a><font color="#B22222">      output_file: output/test24_1.out</font>
+<a name="line126">126: </a><font color="#B22222">      test:</font>
+<a name="line127">127: </a><font color="#B22222">         suffix: 1</font>
+<a name="line128">128: </a><font color="#B22222">         requires: !single</font>
+<a name="line129">129: </a><font color="#B22222">      test:</font>
+<a name="line130">130: </a><font color="#B22222">         suffix: 2_cuda</font>
+<a name="line131">131: </a><font color="#B22222">         args: -mat_type aijcusparse</font>
+<a name="line132">132: </a><font color="#B22222">         requires: cuda !single</font>
+
+<a name="line134">134: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

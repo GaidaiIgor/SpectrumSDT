@@ -1,0 +1,767 @@
+<center><a href="bvorthog.c">Actual source code: bvorthog.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/interface/bvorthog.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:43+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/interface/bvorthog.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> orthogonalization routines</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#B22222">/*</font>
+<a name="line17"> 17: </a><font color="#B22222">   BV_NormVecOrColumn - Compute the 2-norm of the working vector, irrespective of</font>
+<a name="line18"> 18: </a><font color="#B22222">   whether it is in a column or not</font>
+<a name="line19"> 19: </a><font color="#B22222">*/</font>
+<a name="line20"> 20: </a><strong><font color="#4169E1"><a name="BV_NormVecOrColumn"></a>PETSC_STATIC_INLINE PetscErrorCode BV_NormVecOrColumn(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,Vec v,PetscReal *nrm)</font></strong>
+<a name="line21"> 21: </a>{
+
+<a name="line25"> 25: </a>  <font color="#4169E1">if</font> (v) { <a href="../../../../../docs/manualpages/BV/BVNormVec.html#BVNormVec">BVNormVec</a>(bv,v,NORM_2,nrm); }
+<a name="line26"> 26: </a>  <font color="#4169E1">else</font> { <a href="../../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(bv,j,NORM_2,nrm); }
+<a name="line27"> 27: </a>  <font color="#4169E1">return</font>(0);
+<a name="line28"> 28: </a>}
+
+<a name="line30"> 30: </a><font color="#B22222">/*</font>
+<a name="line31"> 31: </a><font color="#B22222">   BVDotColumnInc - Same as <a href="../../../../../docs/manualpages/BV/BVDotColumn.html#BVDotColumn">BVDotColumn</a>() but also including column j, which</font>
+<a name="line32"> 32: </a><font color="#B22222">   is multiplied by itself</font>
+<a name="line33"> 33: </a><font color="#B22222">*/</font>
+<a name="line34"> 34: </a><strong><font color="#4169E1"><a name="BVDotColumnInc"></a>PETSC_STATIC_INLINE PetscErrorCode BVDotColumnInc(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,PetscInt j,PetscScalar *q)</font></strong>
+<a name="line35"> 35: </a>{
+<a name="line37"> 37: </a>  PetscInt       ksave;
+<a name="line38"> 38: </a>  Vec            y;
+
+<a name="line41"> 41: </a>  PetscLogEventBegin(BV_DotVec,X,0,0,0);
+<a name="line42"> 42: </a>  ksave = X-&gt;k;
+<a name="line43"> 43: </a>  X-&gt;k = j+1;
+<a name="line44"> 44: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(X,j,&amp;y);
+<a name="line45"> 45: </a>  (*X-&gt;ops-&gt;dotvec)(X,y,q);
+<a name="line46"> 46: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(X,j,&amp;y);
+<a name="line47"> 47: </a>  X-&gt;k = ksave;
+<a name="line48"> 48: </a>  PetscLogEventEnd(BV_DotVec,X,0,0,0);
+<a name="line49"> 49: </a>  <font color="#4169E1">return</font>(0);
+<a name="line50"> 50: </a>}
+
+<a name="line52"> 52: </a><font color="#B22222">/*</font>
+<a name="line53"> 53: </a><font color="#B22222">   BVOrthogonalizeMGS1 - Compute one step of Modified Gram-Schmidt</font>
+<a name="line54"> 54: </a><font color="#B22222">*/</font>
+<a name="line55"> 55: </a><strong><font color="#4169E1"><a name="BVOrthogonalizeMGS1"></a>static PetscErrorCode BVOrthogonalizeMGS1(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,Vec v,PetscBool *which,PetscScalar *h,PetscScalar *c,PetscReal *onrm,PetscReal *nrm)</font></strong>
+<a name="line56"> 56: </a>{
+<a name="line58"> 58: </a>  PetscInt          i;
+<a name="line59"> 59: </a>  PetscScalar       dot;
+<a name="line60"> 60: </a>  Vec               vi,z,w=v;
+<a name="line61"> 61: </a>  const PetscScalar *omega;
+
+<a name="line64"> 64: </a>  <font color="#4169E1">if</font> (!v) { <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(bv,j,&amp;w); }
+<a name="line65"> 65: </a>  <font color="#4169E1">if</font> (onrm) { <a href="../../../../../docs/manualpages/BV/BVNormVec.html#BVNormVec">BVNormVec</a>(bv,w,NORM_2,onrm); }
+<a name="line66"> 66: </a>  z = w;
+<a name="line67"> 67: </a>  <font color="#4169E1">if</font> (bv-&gt;indef) {
+<a name="line68"> 68: </a>    VecGetArrayRead(bv-&gt;omega,&amp;omega);
+<a name="line69"> 69: </a>  }
+<a name="line70"> 70: </a>  <font color="#4169E1">for</font> (i=-bv-&gt;nc;i&lt;j;i++) {
+<a name="line71"> 71: </a>    <font color="#4169E1">if</font> (which &amp;&amp; i&gt;=0 &amp;&amp; !which[i]) <font color="#4169E1">continue</font>;
+<a name="line72"> 72: </a>    <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(bv,i,&amp;vi);
+<a name="line73"> 73: </a>    <font color="#B22222">/* h_i = (v, v_i) */</font>
+<a name="line74"> 74: </a>    <font color="#4169E1">if</font> (bv-&gt;matrix) {
+<a name="line75"> 75: </a>      BV_IPMatMult(bv,w);
+<a name="line76"> 76: </a>      z = bv-&gt;Bx;
+<a name="line77"> 77: </a>    }
+<a name="line78"> 78: </a>    VecDot(z,vi,&amp;dot);
+<a name="line79"> 79: </a>    <font color="#B22222">/* v &lt;- v - h_i v_i */</font>
+<a name="line80"> 80: </a>    BV_SetValue(bv,i,0,c,dot);
+<a name="line81"> 81: </a>    <font color="#4169E1">if</font> (bv-&gt;indef) dot /= PetscRealPart(omega[bv-&gt;nc+i]);
+<a name="line82"> 82: </a>    VecAXPY(w,-dot,vi);
+<a name="line83"> 83: </a>    <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(bv,i,&amp;vi);
+<a name="line84"> 84: </a>  }
+<a name="line85"> 85: </a>  <font color="#4169E1">if</font> (nrm) { <a href="../../../../../docs/manualpages/BV/BVNormVec.html#BVNormVec">BVNormVec</a>(bv,w,NORM_2,nrm); }
+<a name="line86"> 86: </a>  <font color="#4169E1">if</font> (!v) { <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(bv,j,&amp;w); }
+<a name="line87"> 87: </a>  BV_AddCoefficients(bv,j,h,c);
+<a name="line88"> 88: </a>  <font color="#4169E1">if</font> (bv-&gt;indef) {
+<a name="line89"> 89: </a>    VecRestoreArrayRead(bv-&gt;omega,&amp;omega);
+<a name="line90"> 90: </a>  }
+<a name="line91"> 91: </a>  <font color="#4169E1">return</font>(0);
+<a name="line92"> 92: </a>}
+
+<a name="line94"> 94: </a><font color="#B22222">/*</font>
+<a name="line95"> 95: </a><font color="#B22222">   BVOrthogonalizeCGS1 - Compute |v'| (estimated), |v| and one step of CGS with</font>
+<a name="line96"> 96: </a><font color="#B22222">   only one global synchronization</font>
+<a name="line97"> 97: </a><font color="#B22222">*/</font>
+<a name="line98"> 98: </a><strong><font color="#4169E1"><a name="BVOrthogonalizeCGS1"></a>static PetscErrorCode BVOrthogonalizeCGS1(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,Vec v,PetscBool *which,PetscScalar *h,PetscScalar *c,PetscReal *onorm,PetscReal *norm)</font></strong>
+<a name="line99"> 99: </a>{
+<a name="line101">101: </a>  PetscReal      sum,beta;
+
+<a name="line104">104: </a>  <font color="#B22222">/* h = W^* v ; alpha = (v, v) */</font>
+<a name="line105">105: </a>  bv-&gt;k = j;
+<a name="line106">106: </a>  <font color="#4169E1">if</font> (onorm || norm) {
+<a name="line107">107: </a>    <font color="#4169E1">if</font> (!v) {
+<a name="line108">108: </a>      BVDotColumnInc(bv,j,c);
+<a name="line109">109: </a>      BV_SquareRoot(bv,j,c,&amp;beta);
+<a name="line110">110: </a>    } <font color="#4169E1">else</font> {
+<a name="line111">111: </a>      <a href="../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(bv,v,c);
+<a name="line112">112: </a>      <a href="../../../../../docs/manualpages/BV/BVNormVec.html#BVNormVec">BVNormVec</a>(bv,v,NORM_2,&amp;beta);
+<a name="line113">113: </a>    }
+<a name="line114">114: </a>  } <font color="#4169E1">else</font> {
+<a name="line115">115: </a>    <font color="#4169E1">if</font> (!v) { <a href="../../../../../docs/manualpages/BV/BVDotColumn.html#BVDotColumn">BVDotColumn</a>(bv,j,c); }
+<a name="line116">116: </a>    <font color="#4169E1">else</font> { <a href="../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(bv,v,c); }
+<a name="line117">117: </a>  }
+
+<a name="line119">119: </a>  <font color="#B22222">/* q = v - V h */</font>
+<a name="line120">120: </a>  <font color="#4169E1">if</font> (bv-&gt;indef) { BV_ApplySignature(bv,j,c,PETSC_TRUE); }
+<a name="line121">121: </a>  <font color="#4169E1">if</font> (!v) { <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(bv,-1.0,1.0,j,c); }
+<a name="line122">122: </a>  <font color="#4169E1">else</font> { <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(bv,-1.0,1.0,v,c); }
+<a name="line123">123: </a>  <font color="#4169E1">if</font> (bv-&gt;indef) { BV_ApplySignature(bv,j,c,PETSC_FALSE); }
+
+<a name="line125">125: </a>  <font color="#B22222">/* compute |v| */</font>
+<a name="line126">126: </a>  <font color="#4169E1">if</font> (onorm) *onorm = beta;
+
+<a name="line128">128: </a>  <font color="#4169E1">if</font> (norm) {
+<a name="line129">129: </a>    <font color="#4169E1">if</font> (bv-&gt;indef) {
+<a name="line130">130: </a>      BV_NormVecOrColumn(bv,j,v,norm);
+<a name="line131">131: </a>    } <font color="#4169E1">else</font> {
+<a name="line132">132: </a>      <font color="#B22222">/* estimate |v'| from |v| */</font>
+<a name="line133">133: </a>      BV_SquareSum(bv,j,c,&amp;sum);
+<a name="line134">134: </a>      *norm = beta*beta-sum;
+<a name="line135">135: </a>      <font color="#4169E1">if</font> (*norm &lt;= 0.0) {
+<a name="line136">136: </a>        BV_NormVecOrColumn(bv,j,v,norm);
+<a name="line137">137: </a>      } <font color="#4169E1">else</font> *norm = PetscSqrtReal(*norm);
+<a name="line138">138: </a>    }
+<a name="line139">139: </a>  }
+<a name="line140">140: </a>  BV_AddCoefficients(bv,j,h,c);
+<a name="line141">141: </a>  <font color="#4169E1">return</font>(0);
+<a name="line142">142: </a>}
+
+<a name="line144">144: </a><strong><font color="#228B22">#define BVOrthogonalizeGS1(a,b,c,d,e,f,g,h) ((bv-&gt;ops-&gt;gramschmidt)?(*bv-&gt;ops-&gt;gramschmidt):(mgs?BVOrthogonalizeMGS1:BVOrthogonalizeCGS1))(a,b,c,d,e,f,g,h)</font></strong>
+
+<a name="line146">146: </a><font color="#B22222">/*</font>
+<a name="line147">147: </a><font color="#B22222">   BVOrthogonalizeGS - Orthogonalize with (classical or modified) Gram-Schmidt</font>
+
+<a name="line149">149: </a><font color="#B22222">   j      - the index of the column to orthogonalize (cannot use both j and v)</font>
+<a name="line150">150: </a><font color="#B22222">   v      - the vector to orthogonalize (cannot use both j and v)</font>
+<a name="line151">151: </a><font color="#B22222">   which  - logical array indicating selected columns (only used in MGS)</font>
+<a name="line152">152: </a><font color="#B22222">   norm   - (optional) norm of the vector after being orthogonalized</font>
+<a name="line153">153: </a><font color="#B22222">   lindep - (optional) flag indicating possible linear dependence</font>
+<a name="line154">154: </a><font color="#B22222">*/</font>
+<a name="line155">155: </a><strong><font color="#4169E1"><a name="BVOrthogonalizeGS"></a>static PetscErrorCode BVOrthogonalizeGS(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,Vec v,PetscBool *which,PetscReal *norm,PetscBool *lindep)</font></strong>
+<a name="line156">156: </a>{
+<a name="line158">158: </a>  PetscScalar    *h,*c,*omega;
+<a name="line159">159: </a>  PetscReal      onrm,nrm;
+<a name="line160">160: </a>  PetscInt       k,l;
+<a name="line161">161: </a>  PetscBool      mgs,dolindep,signature;
+
+<a name="line164">164: </a>  <font color="#4169E1">if</font> (v) {
+<a name="line165">165: </a>    k = bv-&gt;k;
+<a name="line166">166: </a>    h = bv-&gt;h;
+<a name="line167">167: </a>    c = bv-&gt;c;
+<a name="line168">168: </a>  } <font color="#4169E1">else</font> {
+<a name="line169">169: </a>    k = j;
+<a name="line170">170: </a>    h = NULL;
+<a name="line171">171: </a>    c = NULL;
+<a name="line172">172: </a>  }
+
+<a name="line174">174: </a>  mgs = (bv-&gt;orthog_type==<a href="../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BV_ORTHOG_MGS</a>)? PETSC_TRUE: PETSC_FALSE;
+
+<a name="line176">176: </a>  <font color="#B22222">/* if indefinite inner product, skip the computation of lindep */</font>
+<a name="line177">177: </a>  <font color="#4169E1">if</font> (bv-&gt;indef &amp;&amp; lindep) *lindep = PETSC_FALSE;
+<a name="line178">178: </a>  dolindep = (!bv-&gt;indef &amp;&amp; lindep)? PETSC_TRUE: PETSC_FALSE;
+
+<a name="line180">180: </a>  <font color="#B22222">/* if indefinite and we are orthogonalizing a column, the norm must always be computed */</font>
+<a name="line181">181: </a>  signature = (bv-&gt;indef &amp;&amp; !v)? PETSC_TRUE: PETSC_FALSE;
+
+<a name="line183">183: </a>  BV_CleanCoefficients(bv,k,h);
+
+<a name="line185">185: </a>  <font color="#4169E1">switch</font> (bv-&gt;orthog_ref) {
+
+<a name="line187">187: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_IFNEEDED</a>:
+<a name="line188">188: </a>    BVOrthogonalizeGS1(bv,k,v,which,h,c,&amp;onrm,&amp;nrm);
+<a name="line189">189: </a>    <font color="#B22222">/* repeat if ||q|| &lt; eta ||h|| */</font>
+<a name="line190">190: </a>    l = 1;
+<a name="line191">191: </a>    <font color="#4169E1">while</font> (l&lt;3 &amp;&amp; nrm &amp;&amp; PetscAbsReal(nrm) &lt; bv-&gt;orthog_eta*PetscAbsReal(onrm)) {
+<a name="line192">192: </a>      l++;
+<a name="line193">193: </a>      <font color="#4169E1">if</font> (mgs||bv-&gt;indef) onrm = nrm;
+<a name="line194">194: </a>      BVOrthogonalizeGS1(bv,k,v,which,h,c,(mgs||bv-&gt;indef)?NULL:&amp;onrm,&amp;nrm);
+<a name="line195">195: </a>    }
+<a name="line196">196: </a>    <font color="#B22222">/* linear dependence check: criterion not satisfied in the last iteration */</font>
+<a name="line197">197: </a>    <font color="#4169E1">if</font> (dolindep) *lindep = PetscNot(nrm &amp;&amp; PetscAbsReal(nrm) &gt;= bv-&gt;orthog_eta*PetscAbsReal(onrm));
+<a name="line198">198: </a>    <font color="#4169E1">break</font>;
+
+<a name="line200">200: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_NEVER</a>:
+<a name="line201">201: </a>    BVOrthogonalizeGS1(bv,k,v,which,h,c,NULL,NULL);
+<a name="line202">202: </a>    <font color="#B22222">/* compute ||v|| */</font>
+<a name="line203">203: </a>    <font color="#4169E1">if</font> (norm || dolindep || signature) {
+<a name="line204">204: </a>      BV_NormVecOrColumn(bv,k,v,&amp;nrm);
+<a name="line205">205: </a>    }
+<a name="line206">206: </a>    <font color="#B22222">/* linear dependence check: just test for exactly zero norm */</font>
+<a name="line207">207: </a>    <font color="#4169E1">if</font> (dolindep) *lindep = PetscNot(nrm);
+<a name="line208">208: </a>    <font color="#4169E1">break</font>;
+
+<a name="line210">210: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_ALWAYS</a>:
+<a name="line211">211: </a>    BVOrthogonalizeGS1(bv,k,v,which,h,c,NULL,NULL);
+<a name="line212">212: </a>    BVOrthogonalizeGS1(bv,k,v,which,h,c,dolindep?&amp;onrm:NULL,(norm||dolindep||signature)?&amp;nrm:NULL);
+<a name="line213">213: </a>    <font color="#B22222">/* linear dependence check: criterion not satisfied in the second iteration */</font>
+<a name="line214">214: </a>    <font color="#4169E1">if</font> (dolindep) *lindep = PetscNot(nrm &amp;&amp; PetscAbsReal(nrm) &gt;= bv-&gt;orthog_eta*PetscAbsReal(onrm));
+<a name="line215">215: </a>    <font color="#4169E1">break</font>;
+<a name="line216">216: </a>  }
+<a name="line217">217: </a>  <font color="#4169E1">if</font> (signature) {
+<a name="line218">218: </a>    VecGetArray(bv-&gt;omega,&amp;omega);
+<a name="line219">219: </a>    omega[bv-&gt;nc+k] = (nrm&lt;0.0)? -1.0: 1.0;
+<a name="line220">220: </a>    VecRestoreArray(bv-&gt;omega,&amp;omega);
+<a name="line221">221: </a>  }
+<a name="line222">222: </a>  <font color="#4169E1">if</font> (norm) {
+<a name="line223">223: </a>    *norm = nrm;
+<a name="line224">224: </a>    <font color="#4169E1">if</font> (!v) { <font color="#B22222">/* store norm value next to the orthogonalization coefficients */</font>
+<a name="line225">225: </a>      <font color="#4169E1">if</font> (dolindep &amp;&amp; *lindep) { BV_SetValue(bv,k,k,h,0.0); }
+<a name="line226">226: </a>      <font color="#4169E1">else</font> { BV_SetValue(bv,k,k,h,nrm); }
+<a name="line227">227: </a>    }
+<a name="line228">228: </a>  }
+<a name="line229">229: </a>  <font color="#4169E1">return</font>(0);
+<a name="line230">230: </a>}
+
+<a name="line232">232: </a><font color="#B22222">/*@</font>
+<a name="line233">233: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a> - Orthogonalize a given vector with respect to all</font>
+<a name="line234">234: </a><font color="#B22222">   active columns.</font>
+
+<a name="line236">236: </a><font color="#B22222">   Collective on bv</font>
+
+<a name="line238">238: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line239">239: </a><font color="#B22222">+  bv     - the basis vectors context</font>
+<a name="line240">240: </a><font color="#B22222">-  v      - the vector</font>
+
+<a name="line242">242: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line243">243: </a><font color="#B22222">+  H      - (optional) coefficients computed during orthogonalization</font>
+<a name="line244">244: </a><font color="#B22222">.  norm   - (optional) norm of the vector after being orthogonalized</font>
+<a name="line245">245: </a><font color="#B22222">-  lindep - (optional) flag indicating that refinement did not improve the quality</font>
+<a name="line246">246: </a><font color="#B22222">            of orthogonalization</font>
+
+<a name="line248">248: </a><font color="#B22222">   Notes:</font>
+<a name="line249">249: </a><font color="#B22222">   This function is equivalent to <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>() but orthogonalizes</font>
+<a name="line250">250: </a><font color="#B22222">   a vector as an argument rather than taking one of the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> columns. The</font>
+<a name="line251">251: </a><font color="#B22222">   vector is orthogonalized against all active columns (k) and the constraints.</font>
+<a name="line252">252: </a><font color="#B22222">   If H is given, it must have enough space to store k-l coefficients, where l</font>
+<a name="line253">253: </a><font color="#B22222">   is the number of leading columns.</font>
+
+<a name="line255">255: </a><font color="#B22222">   In the case of an indefinite inner product, the lindep parameter is not</font>
+<a name="line256">256: </a><font color="#B22222">   computed (set to false).</font>
+
+<a name="line258">258: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line260">260: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(), <a href="../../../../../docs/manualpages/BV/BVGetNumConstraints.html#BVGetNumConstraints">BVGetNumConstraints</a>()</font>
+<a name="line261">261: </a><font color="#B22222">@*/</font>
+<a name="line262">262: </a><strong><font color="#4169E1"><a name="BVOrthogonalizeVec"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,Vec v,PetscScalar *H,PetscReal *norm,PetscBool *lindep)</font></strong>
+<a name="line263">263: </a>{
+<a name="line265">265: </a>  PetscInt       ksave,lsave;
+
+<a name="line271">271: </a>  BVCheckSizes(bv,1);
+
+<a name="line275">275: </a>  PetscLogEventBegin(BV_OrthogonalizeVec,bv,0,0,0);
+<a name="line276">276: </a>  ksave = bv-&gt;k;
+<a name="line277">277: </a>  lsave = bv-&gt;l;
+<a name="line278">278: </a>  bv-&gt;l = -bv-&gt;nc;  <font color="#B22222">/* must also orthogonalize against constraints and leading columns */</font>
+<a name="line279">279: </a>  BV_AllocateCoeffs(bv);
+<a name="line280">280: </a>  BV_AllocateSignature(bv);
+<a name="line281">281: </a>  BVOrthogonalizeGS(bv,0,v,NULL,norm,lindep);
+<a name="line282">282: </a>  bv-&gt;k = ksave;
+<a name="line283">283: </a>  bv-&gt;l = lsave;
+<a name="line284">284: </a>  <font color="#4169E1">if</font> (H) { BV_StoreCoefficients(bv,bv-&gt;k,bv-&gt;h,H); }
+<a name="line285">285: </a>  PetscLogEventEnd(BV_OrthogonalizeVec,bv,0,0,0);
+<a name="line286">286: </a>  <font color="#4169E1">return</font>(0);
+<a name="line287">287: </a>}
+
+<a name="line289">289: </a><font color="#B22222">/*@</font>
+<a name="line290">290: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a> - Orthogonalize one of the column vectors with respect to</font>
+<a name="line291">291: </a><font color="#B22222">   the previous ones.</font>
+
+<a name="line293">293: </a><font color="#B22222">   Collective on bv</font>
+
+<a name="line295">295: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line296">296: </a><font color="#B22222">+  bv     - the basis vectors context</font>
+<a name="line297">297: </a><font color="#B22222">-  j      - index of column to be orthogonalized</font>
+
+<a name="line299">299: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line300">300: </a><font color="#B22222">+  H      - (optional) coefficients computed during orthogonalization</font>
+<a name="line301">301: </a><font color="#B22222">.  norm   - (optional) norm of the vector after being orthogonalized</font>
+<a name="line302">302: </a><font color="#B22222">-  lindep - (optional) flag indicating that refinement did not improve the quality</font>
+<a name="line303">303: </a><font color="#B22222">            of orthogonalization</font>
+
+<a name="line305">305: </a><font color="#B22222">   Notes:</font>
+<a name="line306">306: </a><font color="#B22222">   This function applies an orthogonal projector to project vector V[j] onto</font>
+<a name="line307">307: </a><font color="#B22222">   the orthogonal complement of the span of the columns of V[0..j-1],</font>
+<a name="line308">308: </a><font color="#B22222">   where V[.] are the vectors of <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>. The columns V[0..j-1] are assumed to be</font>
+<a name="line309">309: </a><font color="#B22222">   mutually orthonormal.</font>
+
+<a name="line311">311: </a><font color="#B22222">   Leading columns V[0..l-1] also participate in the orthogonalization, as well</font>
+<a name="line312">312: </a><font color="#B22222">   as the constraints. If H is given, it must have enough space to store</font>
+<a name="line313">313: </a><font color="#B22222">   j-l+1 coefficients (the last coefficient will contain the value norm, unless</font>
+<a name="line314">314: </a><font color="#B22222">   the norm argument is NULL).</font>
+
+<a name="line316">316: </a><font color="#B22222">   If a non-standard inner product has been specified with <a href="../../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>(),</font>
+<a name="line317">317: </a><font color="#B22222">   then the vector is B-orthogonalized, using the non-standard inner product</font>
+<a name="line318">318: </a><font color="#B22222">   defined by matrix B. The output vector satisfies V[j]'*B*V[0..j-1] = 0.</font>
+
+<a name="line320">320: </a><font color="#B22222">   This routine does not normalize the resulting vector, see <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>().</font>
+
+<a name="line322">322: </a><font color="#B22222">   In the case of an indefinite inner product, the lindep parameter is not</font>
+<a name="line323">323: </a><font color="#B22222">   computed (set to false).</font>
+
+<a name="line325">325: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line327">327: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>(), <a href="../../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(), <a href="../../../../../docs/manualpages/BV/BVGetNumConstraints.html#BVGetNumConstraints">BVGetNumConstraints</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>()</font>
+<a name="line328">328: </a><font color="#B22222">@*/</font>
+<a name="line329">329: </a><strong><font color="#4169E1"><a name="BVOrthogonalizeColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscScalar *H,PetscReal *norm,PetscBool *lindep)</font></strong>
+<a name="line330">330: </a>{
+<a name="line332">332: </a>  PetscInt       ksave,lsave;
+
+<a name="line338">338: </a>  BVCheckSizes(bv,1);
+<a name="line339">339: </a>  <font color="#4169E1">if</font> (j&lt;0) SETERRQ(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j must be non-negative"</font>);
+<a name="line340">340: </a>  <font color="#4169E1">if</font> (j&gt;=bv-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j=%D but <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> only has %D columns"</font>,j,bv-&gt;m);
+
+<a name="line342">342: </a>  PetscLogEventBegin(BV_OrthogonalizeVec,bv,0,0,0);
+<a name="line343">343: </a>  ksave = bv-&gt;k;
+<a name="line344">344: </a>  lsave = bv-&gt;l;
+<a name="line345">345: </a>  bv-&gt;l = -bv-&gt;nc;  <font color="#B22222">/* must also orthogonalize against constraints and leading columns */</font>
+<a name="line346">346: </a>  <font color="#4169E1">if</font> (!bv-&gt;buffer) { <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>(bv,&amp;bv-&gt;buffer); }
+<a name="line347">347: </a>  BV_AllocateSignature(bv);
+<a name="line348">348: </a>  BVOrthogonalizeGS(bv,j,NULL,NULL,norm,lindep);
+<a name="line349">349: </a>  bv-&gt;k = ksave;
+<a name="line350">350: </a>  bv-&gt;l = lsave;
+<a name="line351">351: </a>  <font color="#4169E1">if</font> (H) { BV_StoreCoefficients(bv,j,NULL,H); }
+<a name="line352">352: </a>  PetscLogEventEnd(BV_OrthogonalizeVec,bv,0,0,0);
+<a name="line353">353: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line354">354: </a>  <font color="#4169E1">return</font>(0);
+<a name="line355">355: </a>}
+
+<a name="line357">357: </a><font color="#B22222">/*@</font>
+<a name="line358">358: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a> - Orthonormalize one of the column vectors with respect to</font>
+<a name="line359">359: </a><font color="#B22222">   the previous ones. This is equivalent to a call to <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>()</font>
+<a name="line360">360: </a><font color="#B22222">   followed by a call to <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>() with the reciprocal of the norm.</font>
+
+<a name="line362">362: </a><font color="#B22222">   Collective on bv</font>
+
+<a name="line364">364: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line365">365: </a><font color="#B22222">+  bv      - the basis vectors context</font>
+<a name="line366">366: </a><font color="#B22222">.  j       - index of column to be orthonormalized</font>
+<a name="line367">367: </a><font color="#B22222">-  replace - whether it is allowed to set the vector randomly</font>
+
+<a name="line369">369: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line370">370: </a><font color="#B22222">+  norm    - (optional) norm of the vector after orthogonalization and before normalization</font>
+<a name="line371">371: </a><font color="#B22222">-  lindep  - (optional) flag indicating that linear dependence was determined during</font>
+<a name="line372">372: </a><font color="#B22222">             orthogonalization</font>
+
+<a name="line374">374: </a><font color="#B22222">   Notes:</font>
+<a name="line375">375: </a><font color="#B22222">   This function first orthogonalizes vector V[j] with respect to V[0..j-1],</font>
+<a name="line376">376: </a><font color="#B22222">   where V[.] are the vectors of <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>. A byproduct of this computation is norm,</font>
+<a name="line377">377: </a><font color="#B22222">   the norm of the vector after orthogonalization. Secondly, it scales the</font>
+<a name="line378">378: </a><font color="#B22222">   vector with 1/norm, so that the resulting vector has unit norm.</font>
+
+<a name="line380">380: </a><font color="#B22222">   If after orthogonalization the vector V[j] is exactly zero, it cannot be normalized</font>
+<a name="line381">381: </a><font color="#B22222">   because norm=0. In that case, it could be left as zero or replaced by a random</font>
+<a name="line382">382: </a><font color="#B22222">   vector that is then orthonormalized. The latter is achieved by setting the</font>
+<a name="line383">383: </a><font color="#B22222">   argument replace to TRUE. The vector will be replaced by a random vector also</font>
+<a name="line384">384: </a><font color="#B22222">   if lindep was set to TRUE, even if the norm is not exaclty zero.</font>
+
+<a name="line386">386: </a><font color="#B22222">   If the vector has been replaced by a random vector, the output arguments norm and</font>
+<a name="line387">387: </a><font color="#B22222">   lindep will be set according to the orthogonalization of this new vector.</font>
+
+<a name="line389">389: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line391">391: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>()</font>
+<a name="line392">392: </a><font color="#B22222">@*/</font>
+<a name="line393">393: </a><strong><font color="#4169E1"><a name="BVOrthonormalizeColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscBool replace,PetscReal *norm,PetscBool *lindep)</font></strong>
+<a name="line394">394: </a>{
+<a name="line396">396: </a>  PetscScalar    alpha;
+<a name="line397">397: </a>  PetscReal      nrm;
+<a name="line398">398: </a>  PetscInt       ksave,lsave;
+<a name="line399">399: </a>  PetscBool      lndep;
+
+<a name="line405">405: </a>  BVCheckSizes(bv,1);
+<a name="line406">406: </a>  <font color="#4169E1">if</font> (j&lt;0) SETERRQ(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j must be non-negative"</font>);
+<a name="line407">407: </a>  <font color="#4169E1">if</font> (j&gt;=bv-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j=%D but <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> only has %D columns"</font>,j,bv-&gt;m);
+
+<a name="line409">409: </a>  <font color="#B22222">/* orthogonalize */</font>
+<a name="line410">410: </a>  PetscLogEventBegin(BV_OrthogonalizeVec,bv,0,0,0);
+<a name="line411">411: </a>  ksave = bv-&gt;k;
+<a name="line412">412: </a>  lsave = bv-&gt;l;
+<a name="line413">413: </a>  bv-&gt;l = -bv-&gt;nc;  <font color="#B22222">/* must also orthogonalize against constraints and leading columns */</font>
+<a name="line414">414: </a>  <font color="#4169E1">if</font> (!bv-&gt;buffer) { <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>(bv,&amp;bv-&gt;buffer); }
+<a name="line415">415: </a>  BV_AllocateSignature(bv);
+<a name="line416">416: </a>  BVOrthogonalizeGS(bv,j,NULL,NULL,&amp;nrm,&amp;lndep);
+<a name="line417">417: </a>  <font color="#4169E1">if</font> (replace &amp;&amp; (nrm==0.0 || lndep)) {
+<a name="line418">418: </a>    PetscInfo(bv,<font color="#666666">"Vector was linearly dependent, generating a new random vector\n"</font>);
+<a name="line419">419: </a>    <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(bv,j);
+<a name="line420">420: </a>    BVOrthogonalizeGS(bv,j,NULL,NULL,&amp;nrm,&amp;lndep);
+<a name="line421">421: </a>    <font color="#4169E1">if</font> (nrm==0.0 || lndep) {  <font color="#B22222">/* yet another attempt */</font>
+<a name="line422">422: </a>      <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(bv,j);
+<a name="line423">423: </a>      BVOrthogonalizeGS(bv,j,NULL,NULL,&amp;nrm,&amp;lndep);
+<a name="line424">424: </a>    }
+<a name="line425">425: </a>  }
+<a name="line426">426: </a>  bv-&gt;k = ksave;
+<a name="line427">427: </a>  bv-&gt;l = lsave;
+<a name="line428">428: </a>  PetscLogEventEnd(BV_OrthogonalizeVec,bv,0,0,0);
+
+<a name="line430">430: </a>  <font color="#B22222">/* scale */</font>
+<a name="line431">431: </a>  <font color="#4169E1">if</font> (nrm!=1.0 &amp;&amp; nrm!=0.0) {
+<a name="line432">432: </a>    alpha = 1.0/nrm;
+<a name="line433">433: </a>    PetscLogEventBegin(BV_Scale,bv,0,0,0);
+<a name="line434">434: </a>    <font color="#4169E1">if</font> (bv-&gt;n) {
+<a name="line435">435: </a>      (*bv-&gt;ops-&gt;scale)(bv,j,alpha);
+<a name="line436">436: </a>    }
+<a name="line437">437: </a>    PetscLogEventEnd(BV_Scale,bv,0,0,0);
+<a name="line438">438: </a>  }
+<a name="line439">439: </a>  <font color="#4169E1">if</font> (norm) *norm = nrm;
+<a name="line440">440: </a>  <font color="#4169E1">if</font> (lindep) *lindep = lndep;
+<a name="line441">441: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line442">442: </a>  <font color="#4169E1">return</font>(0);
+<a name="line443">443: </a>}
+
+<a name="line445">445: </a><font color="#B22222">/*@</font>
+<a name="line446">446: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeSomeColumn.html#BVOrthogonalizeSomeColumn">BVOrthogonalizeSomeColumn</a> - Orthogonalize one of the column vectors with</font>
+<a name="line447">447: </a><font color="#B22222">   respect to some of the previous ones.</font>
+
+<a name="line449">449: </a><font color="#B22222">   Collective on bv</font>
+
+<a name="line451">451: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line452">452: </a><font color="#B22222">+  bv     - the basis vectors context</font>
+<a name="line453">453: </a><font color="#B22222">.  j      - index of column to be orthogonalized</font>
+<a name="line454">454: </a><font color="#B22222">-  which  - logical array indicating selected columns</font>
+
+<a name="line456">456: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line457">457: </a><font color="#B22222">+  H      - (optional) coefficients computed during orthogonalization</font>
+<a name="line458">458: </a><font color="#B22222">.  norm   - (optional) norm of the vector after being orthogonalized</font>
+<a name="line459">459: </a><font color="#B22222">-  lindep - (optional) flag indicating that refinement did not improve the quality</font>
+<a name="line460">460: </a><font color="#B22222">            of orthogonalization</font>
+
+<a name="line462">462: </a><font color="#B22222">   Notes:</font>
+<a name="line463">463: </a><font color="#B22222">   This function is similar to <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(), but V[j] is</font>
+<a name="line464">464: </a><font color="#B22222">   orthogonalized only against columns V[i] having which[i]=PETSC_TRUE.</font>
+<a name="line465">465: </a><font color="#B22222">   The length of array which must be j at least.</font>
+
+<a name="line467">467: </a><font color="#B22222">   The use of this operation is restricted to MGS orthogonalization type.</font>
+
+<a name="line469">469: </a><font color="#B22222">   In the case of an indefinite inner product, the lindep parameter is not</font>
+<a name="line470">470: </a><font color="#B22222">   computed (set to false).</font>
+
+<a name="line472">472: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line474">474: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>()</font>
+<a name="line475">475: </a><font color="#B22222">@*/</font>
+<a name="line476">476: </a><strong><font color="#4169E1"><a name="BVOrthogonalizeSomeColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeSomeColumn.html#BVOrthogonalizeSomeColumn">BVOrthogonalizeSomeColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscBool *which,PetscScalar *H,PetscReal *norm,PetscBool *lindep)</font></strong>
+<a name="line477">477: </a>{
+<a name="line479">479: </a>  PetscInt       ksave,lsave;
+
+<a name="line486">486: </a>  BVCheckSizes(bv,1);
+<a name="line487">487: </a>  <font color="#4169E1">if</font> (j&lt;0) SETERRQ(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j must be non-negative"</font>);
+<a name="line488">488: </a>  <font color="#4169E1">if</font> (j&gt;=bv-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j=%D but <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> only has %D columns"</font>,j,bv-&gt;m);
+<a name="line489">489: </a>  <font color="#4169E1">if</font> (bv-&gt;orthog_type!=<a href="../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BV_ORTHOG_MGS</a>) SETERRQ(PetscObjectComm((PetscObject)bv),PETSC_ERR_SUP,<font color="#666666">"Operation only available for MGS orthogonalization"</font>);
+
+<a name="line491">491: </a>  PetscLogEventBegin(BV_OrthogonalizeVec,bv,0,0,0);
+<a name="line492">492: </a>  ksave = bv-&gt;k;
+<a name="line493">493: </a>  lsave = bv-&gt;l;
+<a name="line494">494: </a>  bv-&gt;l = -bv-&gt;nc;  <font color="#B22222">/* must also orthogonalize against constraints and leading columns */</font>
+<a name="line495">495: </a>  <font color="#4169E1">if</font> (!bv-&gt;buffer) { <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>(bv,&amp;bv-&gt;buffer); }
+<a name="line496">496: </a>  BV_AllocateSignature(bv);
+<a name="line497">497: </a>  BVOrthogonalizeGS(bv,j,NULL,which,norm,lindep);
+<a name="line498">498: </a>  bv-&gt;k = ksave;
+<a name="line499">499: </a>  bv-&gt;l = lsave;
+<a name="line500">500: </a>  <font color="#4169E1">if</font> (H) { BV_StoreCoefficients(bv,j,NULL,H); }
+<a name="line501">501: </a>  PetscLogEventEnd(BV_OrthogonalizeVec,bv,0,0,0);
+<a name="line502">502: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line503">503: </a>  <font color="#4169E1">return</font>(0);
+<a name="line504">504: </a>}
+
+<a name="line506">506: </a><font color="#B22222">/*</font>
+<a name="line507">507: </a><font color="#B22222">   Block Gram-Schmidt: V2 = V2 - V1*R12, where R12 = V1'*V2</font>
+<a name="line508">508: </a><font color="#B22222"> */</font>
+<a name="line509">509: </a><strong><font color="#4169E1"><a name="BVOrthogonalize_BlockGS"></a>static PetscErrorCode BVOrthogonalize_BlockGS(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat R)</font></strong>
+<a name="line510">510: </a>{
+<a name="line512">512: </a>  <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>             V1;
+
+<a name="line515">515: </a>  <a href="../../../../../docs/manualpages/BV/BVGetSplit.html#BVGetSplit">BVGetSplit</a>(V,&amp;V1,NULL);
+<a name="line516">516: </a>  <a href="../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(V,V1,R);
+<a name="line517">517: </a>  <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(V,-1.0,1.0,V1,R);
+<a name="line518">518: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreSplit.html#BVRestoreSplit">BVRestoreSplit</a>(V,&amp;V1,NULL);
+<a name="line519">519: </a>  <font color="#4169E1">return</font>(0);
+<a name="line520">520: </a>}
+
+<a name="line522">522: </a><font color="#B22222">/*</font>
+<a name="line523">523: </a><font color="#B22222">   Orthogonalize a set of vectors with Gram-Schmidt, column by column.</font>
+<a name="line524">524: </a><font color="#B22222"> */</font>
+<a name="line525">525: </a><strong><font color="#4169E1"><a name="BVOrthogonalize_GS"></a>static PetscErrorCode BVOrthogonalize_GS(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat R)</font></strong>
+<a name="line526">526: </a>{
+<a name="line528">528: </a>  PetscScalar    *r=NULL;
+<a name="line529">529: </a>  PetscReal      norm;
+<a name="line530">530: </a>  PetscInt       j,ldr,lsave;
+<a name="line531">531: </a>  Vec            v,w;
+
+<a name="line534">534: </a>  <font color="#4169E1">if</font> (R) {
+<a name="line535">535: </a>    MatGetSize(R,&amp;ldr,NULL);
+<a name="line536">536: </a>    MatDenseGetArray(R,&amp;r);
+<a name="line537">537: </a>  }
+<a name="line538">538: </a>  <font color="#4169E1">if</font> (V-&gt;matrix) {
+<a name="line539">539: </a>    <a href="../../../../../docs/manualpages/BV/BVGetCachedBV.html#BVGetCachedBV">BVGetCachedBV</a>(V,&amp;V-&gt;cached);
+<a name="line540">540: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V-&gt;cached,V-&gt;l,V-&gt;k);
+<a name="line541">541: </a>  }
+<a name="line542">542: </a>  <font color="#4169E1">for</font> (j=V-&gt;l;j&lt;V-&gt;k;j++) {
+<a name="line543">543: </a>    <font color="#4169E1">if</font> (V-&gt;matrix &amp;&amp; V-&gt;orthog_type==<a href="../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BV_ORTHOG_MGS</a>) {  <font color="#B22222">/* fill cached <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> */</font>
+<a name="line544">544: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V-&gt;cached,j,&amp;v);
+<a name="line545">545: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j,&amp;w);
+<a name="line546">546: </a>      MatMult(V-&gt;matrix,w,v);
+<a name="line547">547: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j,&amp;w);
+<a name="line548">548: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V-&gt;cached,j,&amp;v);
+<a name="line549">549: </a>    }
+<a name="line550">550: </a>    <font color="#4169E1">if</font> (R) {
+<a name="line551">551: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(V,j,NULL,&amp;norm,NULL);
+<a name="line552">552: </a>      lsave = V-&gt;l;
+<a name="line553">553: </a>      V-&gt;l = -V-&gt;nc;
+<a name="line554">554: </a>      BV_StoreCoefficients(V,j,NULL,r+j*ldr);
+<a name="line555">555: </a>      V-&gt;l = lsave;
+<a name="line556">556: </a>      r[j+j*ldr] = norm;
+<a name="line557">557: </a>    } <font color="#4169E1">else</font> {
+<a name="line558">558: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(V,j,NULL,&amp;norm,NULL);
+<a name="line559">559: </a>    }
+<a name="line560">560: </a>    <font color="#4169E1">if</font> (!norm) SETERRQ(PetscObjectComm((PetscObject)V),1,<font color="#666666">"Breakdown in <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a> due to a linearly dependent column"</font>);
+<a name="line561">561: </a>    <font color="#4169E1">if</font> (V-&gt;matrix &amp;&amp; V-&gt;orthog_type==<a href="../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BV_ORTHOG_CGS</a>) {  <font color="#B22222">/* fill cached <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> */</font>
+<a name="line562">562: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V-&gt;cached,j,&amp;v);
+<a name="line563">563: </a>      VecCopy(V-&gt;Bx,v);
+<a name="line564">564: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V-&gt;cached,j,&amp;v);
+<a name="line565">565: </a>    }
+<a name="line566">566: </a>    <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(V,j,1.0/norm);
+<a name="line567">567: </a>  }
+<a name="line568">568: </a>  <font color="#4169E1">if</font> (R) { MatDenseRestoreArray(R,&amp;r); }
+<a name="line569">569: </a>  <font color="#4169E1">return</font>(0);
+<a name="line570">570: </a>}
+
+<a name="line572">572: </a><font color="#B22222">/*</font>
+<a name="line573">573: </a><font color="#B22222">  BV_GetBufferMat - Create auxiliary seqdense matrix that wraps the bv-&gt;buffer.</font>
+<a name="line574">574: </a><font color="#B22222">*/</font>
+<a name="line575">575: </a><strong><font color="#4169E1"><a name="BV_GetBufferMat"></a>PETSC_STATIC_INLINE PetscErrorCode BV_GetBufferMat(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line576">576: </a>{
+<a name="line578">578: </a>  PetscInt       ld;
+<a name="line579">579: </a>  PetscScalar    *array;
+
+<a name="line582">582: </a>  <font color="#4169E1">if</font> (!bv-&gt;Abuffer) {
+<a name="line583">583: </a>    <font color="#4169E1">if</font> (!bv-&gt;buffer) { <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>(bv,&amp;bv-&gt;buffer); }
+<a name="line584">584: </a>    ld = bv-&gt;m+bv-&gt;nc;
+<a name="line585">585: </a>    VecGetArray(bv-&gt;buffer,&amp;array);
+<a name="line586">586: </a>    MatCreateSeqDense(PETSC_COMM_SELF,ld,bv-&gt;m,array,&amp;bv-&gt;Abuffer);
+<a name="line587">587: </a>    VecRestoreArray(bv-&gt;buffer,&amp;array);
+<a name="line588">588: </a>    PetscLogObjectParent((PetscObject)bv,(PetscObject)bv-&gt;Abuffer);
+<a name="line589">589: </a>  }
+<a name="line590">590: </a>  <font color="#4169E1">return</font>(0);
+<a name="line591">591: </a>}
+
+<a name="line593">593: </a><font color="#B22222">/*</font>
+<a name="line594">594: </a><font color="#B22222">   BV_StoreCoeffsBlock_Default - Copy the contents of the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> buffer to a dense Mat</font>
+<a name="line595">595: </a><font color="#B22222">   provided by the caller. Only columns l:k-1 are copied, restricting to the upper</font>
+<a name="line596">596: </a><font color="#B22222">   triangular part if tri=PETSC_TRUE.</font>
+<a name="line597">597: </a><font color="#B22222">*/</font>
+<a name="line598">598: </a><strong><font color="#4169E1"><a name="BV_StoreCoeffsBlock_Default"></a>PETSC_STATIC_INLINE PetscErrorCode BV_StoreCoeffsBlock_Default(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,Mat R,PetscBool tri)</font></strong>
+<a name="line599">599: </a>{
+<a name="line600">600: </a>  PetscErrorCode    ierr;
+<a name="line601">601: </a>  const PetscScalar *bb;
+<a name="line602">602: </a>  PetscScalar       *rr;
+<a name="line603">603: </a>  PetscInt          j,ldr,ldb;
+
+<a name="line606">606: </a>  MatGetSize(R,&amp;ldr,NULL);
+<a name="line607">607: </a>  MatDenseGetArray(R,&amp;rr);
+<a name="line608">608: </a>  ldb  = bv-&gt;m+bv-&gt;nc;
+<a name="line609">609: </a>  VecGetArrayRead(bv-&gt;buffer,&amp;bb);
+<a name="line610">610: </a>  <font color="#4169E1">for</font> (j=bv-&gt;l;j&lt;bv-&gt;k;j++) {
+<a name="line611">611: </a>    PetscArraycpy(rr+j*ldr,bb+j*ldb,(tri?(j+1):bv-&gt;k)+bv-&gt;nc);
+<a name="line612">612: </a>  }
+<a name="line613">613: </a>  VecRestoreArrayRead(bv-&gt;buffer,&amp;bb);
+<a name="line614">614: </a>  MatDenseRestoreArray(R,&amp;rr);
+<a name="line615">615: </a>  <font color="#4169E1">return</font>(0);
+<a name="line616">616: </a>}
+
+<a name="line618">618: </a><font color="#B22222">/*</font>
+<a name="line619">619: </a><font color="#B22222">   Orthogonalize a set of vectors with Cholesky: R=chol(V'*V), Q=V*inv(R)</font>
+<a name="line620">620: </a><font color="#B22222"> */</font>
+<a name="line621">621: </a><strong><font color="#4169E1"><a name="BVOrthogonalize_Chol"></a>static PetscErrorCode BVOrthogonalize_Chol(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Rin)</font></strong>
+<a name="line622">622: </a>{
+<a name="line624">624: </a>  Mat            R,S;
+
+<a name="line627">627: </a>  BV_GetBufferMat(V);
+<a name="line628">628: </a>  R = V-&gt;Abuffer;
+<a name="line629">629: </a>  <font color="#4169E1">if</font> (Rin) S = Rin;   <font color="#B22222">/* use Rin as a workspace for S */</font>
+<a name="line630">630: </a>  <font color="#4169E1">else</font> S = R;
+<a name="line631">631: </a>  <font color="#4169E1">if</font> (V-&gt;l) { BVOrthogonalize_BlockGS(V,R); }
+<a name="line632">632: </a>  <a href="../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(V,V,R);
+<a name="line633">633: </a>  BVMatCholInv_LAPACK_Private(V,R,S);
+<a name="line634">634: </a>  <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(V,S,V-&gt;l,V-&gt;k);
+<a name="line635">635: </a>  <font color="#4169E1">if</font> (Rin) { BV_StoreCoeffsBlock_Default(V,Rin,PETSC_TRUE); }
+<a name="line636">636: </a>  <font color="#4169E1">return</font>(0);
+<a name="line637">637: </a>}
+
+<a name="line639">639: </a><font color="#B22222">/*</font>
+<a name="line640">640: </a><font color="#B22222">   Orthogonalize a set of vectors with the Tall-Skinny QR method</font>
+<a name="line641">641: </a><font color="#B22222"> */</font>
+<a name="line642">642: </a><strong><font color="#4169E1"><a name="BVOrthogonalize_TSQR"></a>static PetscErrorCode BVOrthogonalize_TSQR(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Rin)</font></strong>
+<a name="line643">643: </a>{
+<a name="line645">645: </a>  PetscScalar    *pv,*r=NULL;
+<a name="line646">646: </a>  PetscInt       ldr;
+<a name="line647">647: </a>  Mat            R;
+
+<a name="line650">650: </a>  BV_GetBufferMat(V);
+<a name="line651">651: </a>  R = V-&gt;Abuffer;
+<a name="line652">652: </a>  <font color="#4169E1">if</font> (V-&gt;l) { BVOrthogonalize_BlockGS(V,R); }
+<a name="line653">653: </a>  MatGetSize(R,&amp;ldr,NULL);
+<a name="line654">654: </a>  MatDenseGetArray(R,&amp;r);
+<a name="line655">655: </a>  <a href="../../../../../docs/manualpages/BV/BVGetArray.html#BVGetArray">BVGetArray</a>(V,&amp;pv);
+<a name="line656">656: </a>  BVOrthogonalize_LAPACK_TSQR(V,V-&gt;n,V-&gt;k-V-&gt;l,pv+(V-&gt;nc+V-&gt;l)*V-&gt;n,r+V-&gt;l*ldr+V-&gt;l,ldr);
+<a name="line657">657: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreArray.html#BVRestoreArray">BVRestoreArray</a>(V,&amp;pv);
+<a name="line658">658: </a>  MatDenseRestoreArray(R,&amp;r);
+<a name="line659">659: </a>  <font color="#4169E1">if</font> (Rin) { BV_StoreCoeffsBlock_Default(V,Rin,PETSC_TRUE); }
+<a name="line660">660: </a>  <font color="#4169E1">return</font>(0);
+<a name="line661">661: </a>}
+
+<a name="line663">663: </a><font color="#B22222">/*</font>
+<a name="line664">664: </a><font color="#B22222">   Orthogonalize a set of vectors with TSQR, but computing R only, then doing Q=V*inv(R)</font>
+<a name="line665">665: </a><font color="#B22222"> */</font>
+<a name="line666">666: </a><strong><font color="#4169E1"><a name="BVOrthogonalize_TSQRCHOL"></a>static PetscErrorCode BVOrthogonalize_TSQRCHOL(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Rin)</font></strong>
+<a name="line667">667: </a>{
+<a name="line669">669: </a>  PetscScalar    *pv,*r=NULL;
+<a name="line670">670: </a>  PetscInt       ldr;
+<a name="line671">671: </a>  Mat            R,S;
+
+<a name="line674">674: </a>  BV_GetBufferMat(V);
+<a name="line675">675: </a>  R = V-&gt;Abuffer;
+<a name="line676">676: </a>  <font color="#4169E1">if</font> (Rin) S = Rin;   <font color="#B22222">/* use Rin as a workspace for S */</font>
+<a name="line677">677: </a>  <font color="#4169E1">else</font> S = R;
+<a name="line678">678: </a>  <font color="#4169E1">if</font> (V-&gt;l) { BVOrthogonalize_BlockGS(V,R); }
+<a name="line679">679: </a>  MatGetSize(R,&amp;ldr,NULL);
+<a name="line680">680: </a>  MatDenseGetArray(R,&amp;r);
+<a name="line681">681: </a>  <a href="../../../../../docs/manualpages/BV/BVGetArray.html#BVGetArray">BVGetArray</a>(V,&amp;pv);
+<a name="line682">682: </a>  BVOrthogonalize_LAPACK_TSQR_OnlyR(V,V-&gt;n,V-&gt;k-V-&gt;l,pv+(V-&gt;nc+V-&gt;l)*V-&gt;n,r+V-&gt;l*ldr+V-&gt;l,ldr);
+<a name="line683">683: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreArray.html#BVRestoreArray">BVRestoreArray</a>(V,&amp;pv);
+<a name="line684">684: </a>  MatDenseRestoreArray(R,&amp;r);
+<a name="line685">685: </a>  BVMatTriInv_LAPACK_Private(V,R,S);
+<a name="line686">686: </a>  <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(V,S,V-&gt;l,V-&gt;k);
+<a name="line687">687: </a>  <font color="#4169E1">if</font> (Rin) { BV_StoreCoeffsBlock_Default(V,Rin,PETSC_TRUE); }
+<a name="line688">688: </a>  <font color="#4169E1">return</font>(0);
+<a name="line689">689: </a>}
+
+<a name="line691">691: </a><font color="#B22222">/*</font>
+<a name="line692">692: </a><font color="#B22222">   Orthogonalize a set of vectors with SVQB</font>
+<a name="line693">693: </a><font color="#B22222"> */</font>
+<a name="line694">694: </a><strong><font color="#4169E1"><a name="BVOrthogonalize_SVQB"></a>static PetscErrorCode BVOrthogonalize_SVQB(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Rin)</font></strong>
+<a name="line695">695: </a>{
+<a name="line697">697: </a>  Mat            R,S;
+
+<a name="line700">700: </a>  BV_GetBufferMat(V);
+<a name="line701">701: </a>  R = V-&gt;Abuffer;
+<a name="line702">702: </a>  <font color="#4169E1">if</font> (Rin) S = Rin;   <font color="#B22222">/* use Rin as a workspace for S */</font>
+<a name="line703">703: </a>  <font color="#4169E1">else</font> S = R;
+<a name="line704">704: </a>  <font color="#4169E1">if</font> (V-&gt;l) { BVOrthogonalize_BlockGS(V,R); }
+<a name="line705">705: </a>  <a href="../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(V,V,R);
+<a name="line706">706: </a>  BVMatSVQB_LAPACK_Private(V,R,S);
+<a name="line707">707: </a>  <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(V,S,V-&gt;l,V-&gt;k);
+<a name="line708">708: </a>  <font color="#4169E1">if</font> (Rin) { BV_StoreCoeffsBlock_Default(V,Rin,PETSC_FALSE); }
+<a name="line709">709: </a>  <font color="#4169E1">return</font>(0);
+<a name="line710">710: </a>}
+
+<a name="line712">712: </a><font color="#B22222">/*@</font>
+<a name="line713">713: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a> - Orthogonalize all columns (starting from the leading ones),</font>
+<a name="line714">714: </a><font color="#B22222">   that is, compute the QR decomposition.</font>
+
+<a name="line716">716: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line718">718: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line719">719: </a><font color="#B22222">+  V - basis vectors to be orthogonalized (or B-orthogonalized)</font>
+<a name="line720">720: </a><font color="#B22222">-  R - a sequential dense matrix (or NULL)</font>
+
+<a name="line722">722: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line723">723: </a><font color="#B22222">+  V - the modified basis vectors</font>
+<a name="line724">724: </a><font color="#B22222">-  R - (if not NULL) the triangular factor of the QR decomposition</font>
+
+<a name="line726">726: </a><font color="#B22222">   Notes:</font>
+<a name="line727">727: </a><font color="#B22222">   On input, matrix R must be a square sequential dense Mat, with at least as many</font>
+<a name="line728">728: </a><font color="#B22222">   rows and columns as the number of active columns of V. The output satisfies</font>
+<a name="line729">729: </a><font color="#B22222">   V0 = V*R (where V0 represent the input V) and V'*V = I (or V'*B*V = I if an</font>
+<a name="line730">730: </a><font color="#B22222">   inner product matrix B has been specified with <a href="../../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>()).</font>
+
+<a name="line732">732: </a><font color="#B22222">   If V has leading columns, then they are not modified (are assumed to be already</font>
+<a name="line733">733: </a><font color="#B22222">   orthonormal) and the leading columns of R are not referenced. Let the</font>
+<a name="line734">734: </a><font color="#B22222">   decomposition be</font>
+<a name="line735">735: </a><font color="#B22222">.vb</font>
+<a name="line736">736: </a><font color="#B22222">   [ V01 V02 ] = [ V1 V2 ] [ R11 R12 ]</font>
+<a name="line737">737: </a><font color="#B22222">                           [  0  R22 ]</font>
+<a name="line738">738: </a><font color="#B22222">.ve</font>
+<a name="line739">739: </a><font color="#B22222">   then V1 is left unchanged (equal to V01) as well as R11 (it should satisfy</font>
+<a name="line740">740: </a><font color="#B22222">   V01 = V1*R11).</font>
+
+<a name="line742">742: </a><font color="#B22222">   Can pass NULL if R is not required.</font>
+
+<a name="line744">744: </a><font color="#B22222">   The method to be used for block orthogonalization can be set with</font>
+<a name="line745">745: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>(). If set to GS, the computation is done column by</font>
+<a name="line746">746: </a><font color="#B22222">   column with successive calls to <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(). Note that in the</font>
+<a name="line747">747: </a><font color="#B22222">   SVQB method the R factor is not upper triangular.</font>
+
+<a name="line749">749: </a><font color="#B22222">   If V is rank-deficient or very ill-conditioned, that is, one or more columns are</font>
+<a name="line750">750: </a><font color="#B22222">   (almost) linearly dependent with respect to the rest, then the algorithm may</font>
+<a name="line751">751: </a><font color="#B22222">   break down or result in larger numerical error. Linearly dependent columns are</font>
+<a name="line752">752: </a><font color="#B22222">   essentially replaced by random directions, and the corresponding diagonal entry</font>
+<a name="line753">753: </a><font color="#B22222">   in R is set to (nearly) zero.</font>
+
+<a name="line755">755: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line757">757: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(), <a href="../../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(), <a href="../../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BVOrthogBlockType</a></font>
+<a name="line758">758: </a><font color="#B22222">@*/</font>
+<a name="line759">759: </a><strong><font color="#4169E1"><a name="BVOrthogonalize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat R)</font></strong>
+<a name="line760">760: </a>{
+<a name="line762">762: </a>  PetscBool      match;
+<a name="line763">763: </a>  PetscInt       m,n;
+
+<a name="line768">768: </a>  BVCheckSizes(V,1);
+<a name="line769">769: </a>  <font color="#4169E1">if</font> (R) {
+<a name="line772">772: </a>    PetscObjectTypeCompare((PetscObject)R,MATSEQDENSE,&amp;match);
+<a name="line773">773: </a>    <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_SUP,<font color="#666666">"Mat argument must be of type seqdense"</font>);
+<a name="line774">774: </a>    MatGetSize(R,&amp;m,&amp;n);
+<a name="line775">775: </a>    <font color="#4169E1">if</font> (m!=n) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat argument is not square, it has %D rows and %D columns"</font>,m,n);
+<a name="line776">776: </a>    <font color="#4169E1">if</font> (n&lt;V-&gt;k) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat size %D is smaller than the number of <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> active columns %D"</font>,n,V-&gt;k);
+<a name="line777">777: </a>  }
+<a name="line778">778: </a>  <font color="#4169E1">if</font> (V-&gt;nc) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_SUP,<font color="#666666">"Not implemented for <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> with constraints, use <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>() instead"</font>);
+
+<a name="line780">780: </a>  PetscLogEventBegin(BV_Orthogonalize,V,R,0,0);
+<a name="line781">781: </a>  <font color="#4169E1">switch</font> (V-&gt;orthog_block) {
+<a name="line782">782: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BV_ORTHOG_BLOCK_GS</a>: <font color="#B22222">/* proceed column by column with Gram-Schmidt */</font>
+<a name="line783">783: </a>    BVOrthogonalize_GS(V,R);
+<a name="line784">784: </a>    <font color="#4169E1">break</font>;
+<a name="line785">785: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BV_ORTHOG_BLOCK_CHOL</a>:
+<a name="line786">786: </a>    BVOrthogonalize_Chol(V,R);
+<a name="line787">787: </a>    <font color="#4169E1">break</font>;
+<a name="line788">788: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BV_ORTHOG_BLOCK_TSQR</a>:
+<a name="line789">789: </a>    <font color="#4169E1">if</font> (V-&gt;matrix) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_SUP,<font color="#666666">"Orthogonalization method not available for non-standard inner product"</font>);
+<a name="line790">790: </a>    BVOrthogonalize_TSQR(V,R);
+<a name="line791">791: </a>    <font color="#4169E1">break</font>;
+<a name="line792">792: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BV_ORTHOG_BLOCK_TSQRCHOL</a>:
+<a name="line793">793: </a>    <font color="#4169E1">if</font> (V-&gt;matrix) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_SUP,<font color="#666666">"Orthogonalization method not available for non-standard inner product"</font>);
+<a name="line794">794: </a>    BVOrthogonalize_TSQRCHOL(V,R);
+<a name="line795">795: </a>    <font color="#4169E1">break</font>;
+<a name="line796">796: </a>  <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BV_ORTHOG_BLOCK_SVQB</a>:
+<a name="line797">797: </a>    BVOrthogonalize_SVQB(V,R);
+<a name="line798">798: </a>    <font color="#4169E1">break</font>;
+<a name="line799">799: </a>  }
+<a name="line800">800: </a>  PetscLogEventEnd(BV_Orthogonalize,V,R,0,0);
+<a name="line801">801: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line802">802: </a>  <font color="#4169E1">return</font>(0);
+<a name="line803">803: </a>}
+
+</pre>
+</body>
+
+</html>

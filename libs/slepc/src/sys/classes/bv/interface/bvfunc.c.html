@@ -1,0 +1,699 @@
+<center><a href="bvfunc.c">Actual source code: bvfunc.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/interface/bvfunc.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:43+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/interface/bvfunc.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> (basis vectors) interface routines, callable by users</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+
+<a name="line16"> 16: </a>PetscClassId     BV_CLASSID = 0;
+<a name="line17"> 17: </a>PetscLogEvent    BV_Create = 0,BV_Copy = 0,BV_Mult = 0,BV_MultVec = 0,BV_MultInPlace = 0,BV_Dot = 0,BV_DotVec = 0,BV_Orthogonalize = 0,BV_OrthogonalizeVec = 0,BV_Scale = 0,BV_Norm = 0,BV_NormVec = 0,BV_SetRandom = 0,BV_MatMult = 0,BV_MatMultVec = 0,BV_MatProject = 0;
+<a name="line18"> 18: </a>static PetscBool BVPackageInitialized = PETSC_FALSE;
+<a name="line19"> 19: </a>MPI_Op MPIU_TSQR = 0;
+
+<a name="line21"> 21: </a>const char *BVOrthogTypes[] = {<font color="#666666">"CGS"</font>,<font color="#666666">"MGS"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BVOrthogType</a>"</font>,<font color="#666666">"BV_ORTHOG_"</font>,0};
+<a name="line22"> 22: </a>const char *BVOrthogRefineTypes[] = {<font color="#666666">"IFNEEDED"</font>,<font color="#666666">"NEVER"</font>,<font color="#666666">"ALWAYS"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BVOrthogRefineType</a>"</font>,<font color="#666666">"BV_ORTHOG_REFINE_"</font>,0};
+<a name="line23"> 23: </a>const char *BVOrthogBlockTypes[] = {<font color="#666666">"GS"</font>,<font color="#666666">"CHOL"</font>,<font color="#666666">"TSQR"</font>,<font color="#666666">"TSQRCHOL"</font>,<font color="#666666">"SVQB"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BVOrthogBlockType</a>"</font>,<font color="#666666">"BV_ORTHOG_BLOCK_"</font>,0};
+<a name="line24"> 24: </a>const char *BVMatMultTypes[] = {<font color="#666666">"VECS"</font>,<font color="#666666">"MAT"</font>,<font color="#666666">"MAT_SAVE"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVMatMultType.html#BVMatMultType">BVMatMultType</a>"</font>,<font color="#666666">"BV_MATMULT_"</font>,0};
+
+<a name="line26"> 26: </a><font color="#B22222">/*@C</font>
+<a name="line27"> 27: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVFinalizePackage.html#BVFinalizePackage">BVFinalizePackage</a> - This function destroys everything in the Slepc interface</font>
+<a name="line28"> 28: </a><font color="#B22222">   to the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> package. It is called from <a href="../../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>().</font>
+
+<a name="line30"> 30: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line32"> 32: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>()</font>
+<a name="line33"> 33: </a><font color="#B22222">@*/</font>
+<a name="line34"> 34: </a><strong><font color="#4169E1"><a name="BVFinalizePackage"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVFinalizePackage.html#BVFinalizePackage">BVFinalizePackage</a>(void)</font></strong>
+<a name="line35"> 35: </a>{
+
+<a name="line39"> 39: </a>  PetscFunctionListDestroy(&amp;BVList);
+<a name="line40"> 40: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Op_free.html#MPI_Op_free">MPI_Op_free</a>(&amp;MPIU_TSQR);
+<a name="line41"> 41: </a>  BVPackageInitialized = PETSC_FALSE;
+<a name="line42"> 42: </a>  BVRegisterAllCalled  = PETSC_FALSE;
+<a name="line43"> 43: </a>  <font color="#4169E1">return</font>(0);
+<a name="line44"> 44: </a>}
+
+<a name="line46"> 46: </a><font color="#B22222">/*@C</font>
+<a name="line47"> 47: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVInitializePackage.html#BVInitializePackage">BVInitializePackage</a> - This function initializes everything in the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> package.</font>
+<a name="line48"> 48: </a><font color="#B22222">   It is called from PetscDLLibraryRegister() when using dynamic libraries, and</font>
+<a name="line49"> 49: </a><font color="#B22222">   on the first call to <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>() when using static libraries.</font>
+
+<a name="line51"> 51: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line53"> 53: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>()</font>
+<a name="line54"> 54: </a><font color="#B22222">@*/</font>
+<a name="line55"> 55: </a><strong><font color="#4169E1"><a name="BVInitializePackage"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVInitializePackage.html#BVInitializePackage">BVInitializePackage</a>(void)</font></strong>
+<a name="line56"> 56: </a>{
+<a name="line57"> 57: </a>  char           logList[256];
+<a name="line58"> 58: </a>  PetscBool      opt,pkg;
+<a name="line59"> 59: </a>  PetscClassId   classids[1];
+
+<a name="line63"> 63: </a>  <font color="#4169E1">if</font> (BVPackageInitialized) <font color="#4169E1">return</font>(0);
+<a name="line64"> 64: </a>  BVPackageInitialized = PETSC_TRUE;
+<a name="line65"> 65: </a>  <font color="#B22222">/* Register Classes */</font>
+<a name="line66"> 66: </a>  PetscClassIdRegister(<font color="#666666">"Basis Vectors"</font>,&amp;BV_CLASSID);
+<a name="line67"> 67: </a>  <font color="#B22222">/* Register Constructors */</font>
+<a name="line68"> 68: </a>  <a href="../../../../../docs/manualpages/BV/BVRegisterAll.html#BVRegisterAll">BVRegisterAll</a>();
+<a name="line69"> 69: </a>  <font color="#B22222">/* Register Events */</font>
+<a name="line70"> 70: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>"</font>,BV_CLASSID,&amp;BV_Create);
+<a name="line71"> 71: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>"</font>,BV_CLASSID,&amp;BV_Copy);
+<a name="line72"> 72: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>"</font>,BV_CLASSID,&amp;BV_Mult);
+<a name="line73"> 73: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>"</font>,BV_CLASSID,&amp;BV_MultVec);
+<a name="line74"> 74: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>"</font>,BV_CLASSID,&amp;BV_MultInPlace);
+<a name="line75"> 75: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>"</font>,BV_CLASSID,&amp;BV_Dot);
+<a name="line76"> 76: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>"</font>,BV_CLASSID,&amp;BV_DotVec);
+<a name="line77"> 77: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>"</font>,BV_CLASSID,&amp;BV_Orthogonalize);
+<a name="line78"> 78: </a>  PetscLogEventRegister(<font color="#666666">"BVOrthogonalizeV"</font>,BV_CLASSID,&amp;BV_OrthogonalizeVec);
+<a name="line79"> 79: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVScale.html#BVScale">BVScale</a>"</font>,BV_CLASSID,&amp;BV_Scale);
+<a name="line80"> 80: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVNorm.html#BVNorm">BVNorm</a>"</font>,BV_CLASSID,&amp;BV_Norm);
+<a name="line81"> 81: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVNormVec.html#BVNormVec">BVNormVec</a>"</font>,BV_CLASSID,&amp;BV_NormVec);
+<a name="line82"> 82: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVSetRandom.html#BVSetRandom">BVSetRandom</a>"</font>,BV_CLASSID,&amp;BV_SetRandom);
+<a name="line83"> 83: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>"</font>,BV_CLASSID,&amp;BV_MatMult);
+<a name="line84"> 84: </a>  PetscLogEventRegister(<font color="#666666">"BVMatMultVec"</font>,BV_CLASSID,&amp;BV_MatMultVec);
+<a name="line85"> 85: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>"</font>,BV_CLASSID,&amp;BV_MatProject);
+<a name="line86"> 86: </a>  <font color="#B22222">/* MPI reduction operation used in <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a> */</font>
+<a name="line87"> 87: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Op_create.html#MPI_Op_create">MPI_Op_create</a>(SlepcGivensPacked,PETSC_FALSE,&amp;MPIU_TSQR);
+<a name="line88"> 88: </a>  <font color="#B22222">/* Process Info */</font>
+<a name="line89"> 89: </a>  classids[0] = BV_CLASSID;
+<a name="line90"> 90: </a>  PetscInfoProcessClass(<font color="#666666">"bv"</font>,1,&amp;classids[0]);
+<a name="line91"> 91: </a>  <font color="#B22222">/* Process summary exclusions */</font>
+<a name="line92"> 92: </a>  PetscOptionsGetString(NULL,NULL,<font color="#666666">"-log_exclude"</font>,logList,<font color="#4169E1">sizeof</font>(logList),&amp;opt);
+<a name="line93"> 93: </a>  <font color="#4169E1">if</font> (opt) {
+<a name="line94"> 94: </a>    PetscStrInList(<font color="#666666">"bv"</font>,logList,',',&amp;pkg);
+<a name="line95"> 95: </a>    <font color="#4169E1">if</font> (pkg) { PetscLogEventDeactivateClass(BV_CLASSID); }
+<a name="line96"> 96: </a>  }
+<a name="line97"> 97: </a>  <font color="#B22222">/* Register package finalizer */</font>
+<a name="line98"> 98: </a>  PetscRegisterFinalize(<a href="../../../../../docs/manualpages/BV/BVFinalizePackage.html#BVFinalizePackage">BVFinalizePackage</a>);
+<a name="line99"> 99: </a>  <font color="#4169E1">return</font>(0);
+<a name="line100">100: </a>}
+
+<a name="line102">102: </a><font color="#B22222">/*@</font>
+<a name="line103">103: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a> - Destroys <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> context that was created with <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>().</font>
+
+<a name="line105">105: </a><font color="#B22222">   Collective on bv</font>
+
+<a name="line107">107: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line108">108: </a><font color="#B22222">.  bv - the basis vectors context</font>
+
+<a name="line110">110: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line112">112: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>()</font>
+<a name="line113">113: </a><font color="#B22222">@*/</font>
+<a name="line114">114: </a><strong><font color="#4169E1"><a name="BVDestroy"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *bv)</font></strong>
+<a name="line115">115: </a>{
+
+<a name="line119">119: </a>  <font color="#4169E1">if</font> (!*bv) <font color="#4169E1">return</font>(0);
+<a name="line121">121: </a>  <font color="#4169E1">if</font> ((*bv)-&gt;lsplit) SETERRQ(PetscObjectComm((PetscObject)(*bv)),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Must call <a href="../../../../../docs/manualpages/BV/BVRestoreSplit.html#BVRestoreSplit">BVRestoreSplit</a> before destroying the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>"</font>);
+<a name="line122">122: </a>  <font color="#4169E1">if</font> (--((PetscObject)(*bv))-&gt;refct &gt; 0) { *bv = 0; <font color="#4169E1">return</font>(0); }
+<a name="line123">123: </a>  <font color="#4169E1">if</font> ((*bv)-&gt;ops-&gt;destroy) { (*(*bv)-&gt;ops-&gt;destroy)(*bv); }
+<a name="line124">124: </a>  VecDestroy(&amp;(*bv)-&gt;t);
+<a name="line125">125: </a>  MatDestroy(&amp;(*bv)-&gt;matrix);
+<a name="line126">126: </a>  VecDestroy(&amp;(*bv)-&gt;Bx);
+<a name="line127">127: </a>  VecDestroy(&amp;(*bv)-&gt;buffer);
+<a name="line128">128: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;(*bv)-&gt;cached);
+<a name="line129">129: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;(*bv)-&gt;L);
+<a name="line130">130: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;(*bv)-&gt;R);
+<a name="line131">131: </a>  PetscFree((*bv)-&gt;work);
+<a name="line132">132: </a>  PetscFree2((*bv)-&gt;h,(*bv)-&gt;c);
+<a name="line133">133: </a>  VecDestroy(&amp;(*bv)-&gt;omega);
+<a name="line134">134: </a>  MatDestroy(&amp;(*bv)-&gt;Acreate);
+<a name="line135">135: </a>  MatDestroy(&amp;(*bv)-&gt;Aget);
+<a name="line136">136: </a>  MatDestroy(&amp;(*bv)-&gt;Abuffer);
+<a name="line137">137: </a>  PetscRandomDestroy(&amp;(*bv)-&gt;rand);
+<a name="line138">138: </a>  PetscHeaderDestroy(bv);
+<a name="line139">139: </a>  <font color="#4169E1">return</font>(0);
+<a name="line140">140: </a>}
+
+<a name="line142">142: </a><font color="#B22222">/*@</font>
+<a name="line143">143: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a> - Creates a basis vectors context.</font>
+
+<a name="line145">145: </a><font color="#B22222">   Collective</font>
+
+<a name="line147">147: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line148">148: </a><font color="#B22222">.  comm - MPI communicator</font>
+
+<a name="line150">150: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line151">151: </a><font color="#B22222">.  bv - location to put the basis vectors context</font>
+
+<a name="line153">153: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line155">155: </a><font color="#B22222">.seealso: BVSetUp(), <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(), <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a></font>
+<a name="line156">156: </a><font color="#B22222">@*/</font>
+<a name="line157">157: </a><strong><font color="#4169E1"><a name="BVCreate"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>(MPI_Comm comm,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *newbv)</font></strong>
+<a name="line158">158: </a>{
+<a name="line160">160: </a>  <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>             bv;
+
+<a name="line164">164: </a>  *newbv = 0;
+<a name="line165">165: </a>  <a href="../../../../../docs/manualpages/BV/BVInitializePackage.html#BVInitializePackage">BVInitializePackage</a>();
+<a name="line166">166: </a>  SlepcHeaderCreate(bv,BV_CLASSID,<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>"</font>,<font color="#666666">"Basis Vectors"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>"</font>,comm,<a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>,<a href="../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>);
+
+<a name="line168">168: </a>  bv-&gt;t            = NULL;
+<a name="line169">169: </a>  bv-&gt;n            = -1;
+<a name="line170">170: </a>  bv-&gt;N            = -1;
+<a name="line171">171: </a>  bv-&gt;m            = 0;
+<a name="line172">172: </a>  bv-&gt;l            = 0;
+<a name="line173">173: </a>  bv-&gt;k            = 0;
+<a name="line174">174: </a>  bv-&gt;nc           = 0;
+<a name="line175">175: </a>  bv-&gt;orthog_type  = <a href="../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BV_ORTHOG_CGS</a>;
+<a name="line176">176: </a>  bv-&gt;orthog_ref   = <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_IFNEEDED</a>;
+<a name="line177">177: </a>  bv-&gt;orthog_eta   = 0.7071;
+<a name="line178">178: </a>  bv-&gt;orthog_block = <a href="../../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BV_ORTHOG_BLOCK_GS</a>;
+<a name="line179">179: </a>  bv-&gt;matrix       = NULL;
+<a name="line180">180: </a>  bv-&gt;indef        = PETSC_FALSE;
+<a name="line181">181: </a>  bv-&gt;vmm          = <a href="../../../../../docs/manualpages/BV/BVMatMultType.html#BVMatMultType">BV_MATMULT_MAT</a>;
+
+<a name="line183">183: </a>  bv-&gt;Bx           = NULL;
+<a name="line184">184: </a>  bv-&gt;buffer       = NULL;
+<a name="line185">185: </a>  bv-&gt;Abuffer      = NULL;
+<a name="line186">186: </a>  bv-&gt;xid          = 0;
+<a name="line187">187: </a>  bv-&gt;xstate       = 0;
+<a name="line188">188: </a>  bv-&gt;cv[0]        = NULL;
+<a name="line189">189: </a>  bv-&gt;cv[1]        = NULL;
+<a name="line190">190: </a>  bv-&gt;ci[0]        = -1;
+<a name="line191">191: </a>  bv-&gt;ci[1]        = -1;
+<a name="line192">192: </a>  bv-&gt;st[0]        = -1;
+<a name="line193">193: </a>  bv-&gt;st[1]        = -1;
+<a name="line194">194: </a>  bv-&gt;id[0]        = 0;
+<a name="line195">195: </a>  bv-&gt;id[1]        = 0;
+<a name="line196">196: </a>  bv-&gt;h            = NULL;
+<a name="line197">197: </a>  bv-&gt;c            = NULL;
+<a name="line198">198: </a>  bv-&gt;omega        = NULL;
+<a name="line199">199: </a>  bv-&gt;defersfo     = PETSC_FALSE;
+<a name="line200">200: </a>  bv-&gt;cached       = NULL;
+<a name="line201">201: </a>  bv-&gt;bvstate      = 0;
+<a name="line202">202: </a>  bv-&gt;L            = NULL;
+<a name="line203">203: </a>  bv-&gt;R            = NULL;
+<a name="line204">204: </a>  bv-&gt;lstate       = 0;
+<a name="line205">205: </a>  bv-&gt;rstate       = 0;
+<a name="line206">206: </a>  bv-&gt;lsplit       = 0;
+<a name="line207">207: </a>  bv-&gt;issplit      = 0;
+<a name="line208">208: </a>  bv-&gt;splitparent  = NULL;
+<a name="line209">209: </a>  bv-&gt;rand         = NULL;
+<a name="line210">210: </a>  bv-&gt;rrandom      = PETSC_FALSE;
+<a name="line211">211: </a>  bv-&gt;Acreate      = NULL;
+<a name="line212">212: </a>  bv-&gt;Aget         = NULL;
+<a name="line213">213: </a>  bv-&gt;cuda         = PETSC_FALSE;
+<a name="line214">214: </a>  bv-&gt;work         = NULL;
+<a name="line215">215: </a>  bv-&gt;lwork        = 0;
+<a name="line216">216: </a>  bv-&gt;data         = NULL;
+
+<a name="line218">218: </a>  *newbv = bv;
+<a name="line219">219: </a>  <font color="#4169E1">return</font>(0);
+<a name="line220">220: </a>}
+
+<a name="line222">222: </a><font color="#B22222">/*@</font>
+<a name="line223">223: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVCreateFromMat.html#BVCreateFromMat">BVCreateFromMat</a> - Creates a basis vectors object from a dense Mat object.</font>
+
+<a name="line225">225: </a><font color="#B22222">   Collective on A</font>
+
+<a name="line227">227: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line228">228: </a><font color="#B22222">.  A - a dense tall-skinny matrix</font>
+
+<a name="line230">230: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line231">231: </a><font color="#B22222">.  bv - the new basis vectors context</font>
+
+<a name="line233">233: </a><font color="#B22222">   Notes:</font>
+<a name="line234">234: </a><font color="#B22222">   The matrix values are copied to the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> data storage, memory is not shared.</font>
+
+<a name="line236">236: </a><font color="#B22222">   The communicator of the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> object will be the same as A, and so will be</font>
+<a name="line237">237: </a><font color="#B22222">   the dimensions.</font>
+
+<a name="line239">239: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line241">241: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>(), <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(), <a href="../../../../../docs/manualpages/BV/BVCreateMat.html#BVCreateMat">BVCreateMat</a>()</font>
+<a name="line242">242: </a><font color="#B22222">@*/</font>
+<a name="line243">243: </a><strong><font color="#4169E1"><a name="BVCreateFromMat"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVCreateFromMat.html#BVCreateFromMat">BVCreateFromMat</a>(Mat A,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *bv)</font></strong>
+<a name="line244">244: </a>{
+<a name="line246">246: </a>  PetscBool      match;
+<a name="line247">247: </a>  PetscInt       n,N,k;
+
+<a name="line251">251: </a>  PetscObjectTypeCompareAny((PetscObject)A,&amp;match,MATSEQDENSE,MATMPIDENSE,<font color="#666666">""</font>);
+<a name="line252">252: </a>  <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)A),PETSC_ERR_SUP,<font color="#666666">"Matrix must be of type dense"</font>);
+
+<a name="line254">254: </a>  MatGetSize(A,&amp;N,&amp;k);
+<a name="line255">255: </a>  MatGetLocalSize(A,&amp;n,NULL);
+<a name="line256">256: </a>  <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>(PetscObjectComm((PetscObject)A),bv);
+<a name="line257">257: </a>  <a href="../../../../../docs/manualpages/BV/BVSetSizes.html#BVSetSizes">BVSetSizes</a>(*bv,n,N,k);
+
+<a name="line259">259: </a>  (*bv)-&gt;Acreate = A;
+<a name="line260">260: </a>  PetscObjectReference((PetscObject)A);
+<a name="line261">261: </a>  <font color="#4169E1">return</font>(0);
+<a name="line262">262: </a>}
+
+<a name="line264">264: </a><font color="#B22222">/*@</font>
+<a name="line265">265: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a> - Insert a vector into the specified column.</font>
+
+<a name="line267">267: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line269">269: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line270">270: </a><font color="#B22222">+  V - basis vectors</font>
+<a name="line271">271: </a><font color="#B22222">.  j - the column of V to be overwritten</font>
+<a name="line272">272: </a><font color="#B22222">-  w - the vector to be copied</font>
+
+<a name="line274">274: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line276">276: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVInsertVecs.html#BVInsertVecs">BVInsertVecs</a>()</font>
+<a name="line277">277: </a><font color="#B22222">@*/</font>
+<a name="line278">278: </a><strong><font color="#4169E1"><a name="BVInsertVec"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt j,Vec w)</font></strong>
+<a name="line279">279: </a>{
+<a name="line281">281: </a>  PetscInt       n,N;
+<a name="line282">282: </a>  Vec            v;
+
+<a name="line289">289: </a>  BVCheckSizes(V,1);
+
+<a name="line292">292: </a>  VecGetSize(w,&amp;N);
+<a name="line293">293: </a>  VecGetLocalSize(w,&amp;n);
+<a name="line294">294: </a>  <font color="#4169E1">if</font> (N!=V-&gt;N || n!=V-&gt;n) SETERRQ4(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Vec sizes (global %D, local %D) do not match <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> sizes (global %D, local %D)"</font>,N,n,V-&gt;N,V-&gt;n);
+<a name="line295">295: </a>  <font color="#4169E1">if</font> (j&lt;-V-&gt;nc || j&gt;=V-&gt;m) SETERRQ3(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument j has wrong value %D, should be between %D and %D"</font>,j,-V-&gt;nc,V-&gt;m-1);
+
+<a name="line297">297: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j,&amp;v);
+<a name="line298">298: </a>  VecCopy(w,v);
+<a name="line299">299: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j,&amp;v);
+<a name="line300">300: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line301">301: </a>  <font color="#4169E1">return</font>(0);
+<a name="line302">302: </a>}
+
+<a name="line304">304: </a><font color="#B22222">/*@</font>
+<a name="line305">305: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVInsertVecs.html#BVInsertVecs">BVInsertVecs</a> - Insert a set of vectors into the specified columns.</font>
+
+<a name="line307">307: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line309">309: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line310">310: </a><font color="#B22222">+  V - basis vectors</font>
+<a name="line311">311: </a><font color="#B22222">.  s - first column of V to be overwritten</font>
+<a name="line312">312: </a><font color="#B22222">.  W - set of vectors to be copied</font>
+<a name="line313">313: </a><font color="#B22222">-  orth - flag indicating if the vectors must be orthogonalized</font>
+
+<a name="line315">315: </a><font color="#B22222">   Input/Output Parameter:</font>
+<a name="line316">316: </a><font color="#B22222">.  m - number of input vectors, on output the number of linearly independent</font>
+<a name="line317">317: </a><font color="#B22222">       vectors</font>
+
+<a name="line319">319: </a><font color="#B22222">   Notes:</font>
+<a name="line320">320: </a><font color="#B22222">   Copies the contents of vectors W to V(:,s:s+n). If the orthogonalization</font>
+<a name="line321">321: </a><font color="#B22222">   flag is set, then the vectors are copied one by one and then orthogonalized</font>
+<a name="line322">322: </a><font color="#B22222">   against the previous ones. If any of them is linearly dependent then it</font>
+<a name="line323">323: </a><font color="#B22222">   is discarded and the value of m is decreased.</font>
+
+<a name="line325">325: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line327">327: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>()</font>
+<a name="line328">328: </a><font color="#B22222">@*/</font>
+<a name="line329">329: </a><strong><font color="#4169E1"><a name="BVInsertVecs"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVInsertVecs.html#BVInsertVecs">BVInsertVecs</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt s,PetscInt *m,Vec *W,PetscBool orth)</font></strong>
+<a name="line330">330: </a>{
+<a name="line332">332: </a>  PetscInt       n,N,i,ndep;
+<a name="line333">333: </a>  PetscBool      lindep;
+<a name="line334">334: </a>  PetscReal      norm;
+<a name="line335">335: </a>  Vec            v;
+
+<a name="line342">342: </a>  <font color="#4169E1">if</font> (!*m) <font color="#4169E1">return</font>(0);
+<a name="line343">343: </a>  <font color="#4169E1">if</font> (*m&lt;0) SETERRQ1(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Number of vectors (given %D) cannot be negative"</font>,*m);
+<a name="line348">348: </a>  BVCheckSizes(V,1);
+
+<a name="line351">351: </a>  VecGetSize(*W,&amp;N);
+<a name="line352">352: </a>  VecGetLocalSize(*W,&amp;n);
+<a name="line353">353: </a>  <font color="#4169E1">if</font> (N!=V-&gt;N || n!=V-&gt;n) SETERRQ4(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Vec sizes (global %D, local %D) do not match <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> sizes (global %D, local %D)"</font>,N,n,V-&gt;N,V-&gt;n);
+<a name="line354">354: </a>  <font color="#4169E1">if</font> (s&lt;0 || s&gt;=V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument s has wrong value %D, should be between 0 and %D"</font>,s,V-&gt;m-1);
+<a name="line355">355: </a>  <font color="#4169E1">if</font> (s+(*m)&gt;V-&gt;m) SETERRQ1(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Too many vectors provided, there is only room for %D"</font>,V-&gt;m);
+
+<a name="line357">357: </a>  ndep = 0;
+<a name="line358">358: </a>  <font color="#4169E1">for</font> (i=0;i&lt;*m;i++) {
+<a name="line359">359: </a>    <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,s+i-ndep,&amp;v);
+<a name="line360">360: </a>    VecCopy(W[i],v);
+<a name="line361">361: </a>    <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,s+i-ndep,&amp;v);
+<a name="line362">362: </a>    <font color="#4169E1">if</font> (orth) {
+<a name="line363">363: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(V,s+i-ndep,NULL,&amp;norm,&amp;lindep);
+<a name="line364">364: </a>      <font color="#4169E1">if</font> (norm==0.0 || lindep) {
+<a name="line365">365: </a>        PetscInfo1(V,<font color="#666666">"Removing linearly dependent vector %D\n"</font>,i);
+<a name="line366">366: </a>        ndep++;
+<a name="line367">367: </a>      } <font color="#4169E1">else</font> {
+<a name="line368">368: </a>        <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(V,s+i-ndep,1.0/norm);
+<a name="line369">369: </a>      }
+<a name="line370">370: </a>    }
+<a name="line371">371: </a>  }
+<a name="line372">372: </a>  *m -= ndep;
+<a name="line373">373: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line374">374: </a>  <font color="#4169E1">return</font>(0);
+<a name="line375">375: </a>}
+
+<a name="line377">377: </a><font color="#B22222">/*@</font>
+<a name="line378">378: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVInsertConstraints.html#BVInsertConstraints">BVInsertConstraints</a> - Insert a set of vectors as constraints.</font>
+
+<a name="line380">380: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line382">382: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line383">383: </a><font color="#B22222">+  V - basis vectors</font>
+<a name="line384">384: </a><font color="#B22222">-  C - set of vectors to be inserted as constraints</font>
+
+<a name="line386">386: </a><font color="#B22222">   Input/Output Parameter:</font>
+<a name="line387">387: </a><font color="#B22222">.  nc - number of input vectors, on output the number of linearly independent</font>
+<a name="line388">388: </a><font color="#B22222">       vectors</font>
+
+<a name="line390">390: </a><font color="#B22222">   Notes:</font>
+<a name="line391">391: </a><font color="#B22222">   The constraints are relevant only during orthogonalization. Constraint</font>
+<a name="line392">392: </a><font color="#B22222">   vectors span a subspace that is deflated in every orthogonalization</font>
+<a name="line393">393: </a><font color="#B22222">   operation, so they are intended for removing those directions from the</font>
+<a name="line394">394: </a><font color="#B22222">   orthogonal basis computed in regular <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> columns.</font>
+
+<a name="line396">396: </a><font color="#B22222">   Constraints are not stored in regular <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> colums, but in a special part of</font>
+<a name="line397">397: </a><font color="#B22222">   the storage. They can be accessed with negative indices in <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>().</font>
+
+<a name="line399">399: </a><font color="#B22222">   This operation is DESTRUCTIVE, meaning that all data contained in the</font>
+<a name="line400">400: </a><font color="#B22222">   columns of V is lost. This is typically invoked just after creating the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>.</font>
+<a name="line401">401: </a><font color="#B22222">   Once a set of constraints has been set, it is not allowed to call this</font>
+<a name="line402">402: </a><font color="#B22222">   function again.</font>
+
+<a name="line404">404: </a><font color="#B22222">   The vectors are copied one by one and then orthogonalized against the</font>
+<a name="line405">405: </a><font color="#B22222">   previous ones. If any of them is linearly dependent then it is discarded</font>
+<a name="line406">406: </a><font color="#B22222">   and the value of nc is decreased. The behaviour is similar to <a href="../../../../../docs/manualpages/BV/BVInsertVecs.html#BVInsertVecs">BVInsertVecs</a>().</font>
+
+<a name="line408">408: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line410">410: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVInsertVecs.html#BVInsertVecs">BVInsertVecs</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVGetNumConstraints.html#BVGetNumConstraints">BVGetNumConstraints</a>()</font>
+<a name="line411">411: </a><font color="#B22222">@*/</font>
+<a name="line412">412: </a><strong><font color="#4169E1"><a name="BVInsertConstraints"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVInsertConstraints.html#BVInsertConstraints">BVInsertConstraints</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt *nc,Vec *C)</font></strong>
+<a name="line413">413: </a>{
+<a name="line415">415: </a>  PetscInt       msave;
+
+<a name="line421">421: </a>  <font color="#4169E1">if</font> (!*nc) <font color="#4169E1">return</font>(0);
+<a name="line422">422: </a>  <font color="#4169E1">if</font> (*nc&lt;0) SETERRQ1(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Number of constraints (given %D) cannot be negative"</font>,*nc);
+<a name="line426">426: </a>  BVCheckSizes(V,1);
+<a name="line428">428: </a>  <font color="#4169E1">if</font> (V-&gt;issplit) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Operation not permitted for a <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> obtained from <a href="../../../../../docs/manualpages/BV/BVGetSplit.html#BVGetSplit">BVGetSplit</a>"</font>);
+<a name="line429">429: </a>  <font color="#4169E1">if</font> (V-&gt;nc) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Constraints already present in this <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> object"</font>);
+<a name="line430">430: </a>  <font color="#4169E1">if</font> (V-&gt;ci[0]!=-1 || V-&gt;ci[1]!=-1) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_SUP,<font color="#666666">"Cannot call <a href="../../../../../docs/manualpages/BV/BVInsertConstraints.html#BVInsertConstraints">BVInsertConstraints</a> after <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>"</font>);
+
+<a name="line432">432: </a>  msave = V-&gt;m;
+<a name="line433">433: </a>  <a href="../../../../../docs/manualpages/BV/BVResize.html#BVResize">BVResize</a>(V,*nc+V-&gt;m,PETSC_FALSE);
+<a name="line434">434: </a>  <a href="../../../../../docs/manualpages/BV/BVInsertVecs.html#BVInsertVecs">BVInsertVecs</a>(V,0,nc,C,PETSC_TRUE);
+<a name="line435">435: </a>  V-&gt;nc = *nc;
+<a name="line436">436: </a>  V-&gt;m  = msave;
+<a name="line437">437: </a>  V-&gt;ci[0] = -V-&gt;nc-1;
+<a name="line438">438: </a>  V-&gt;ci[1] = -V-&gt;nc-1;
+<a name="line439">439: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line440">440: </a>  <font color="#4169E1">return</font>(0);
+<a name="line441">441: </a>}
+
+<a name="line443">443: </a><font color="#B22222">/*@C</font>
+<a name="line444">444: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVSetOptionsPrefix.html#BVSetOptionsPrefix">BVSetOptionsPrefix</a> - Sets the prefix used for searching for all</font>
+<a name="line445">445: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> options in the database.</font>
+
+<a name="line447">447: </a><font color="#B22222">   Logically Collective on bv</font>
+
+<a name="line449">449: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line450">450: </a><font color="#B22222">+  bv     - the basis vectors context</font>
+<a name="line451">451: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> option requests</font>
+
+<a name="line453">453: </a><font color="#B22222">   Notes:</font>
+<a name="line454">454: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line455">455: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the</font>
+<a name="line456">456: </a><font color="#B22222">   hyphen.</font>
+
+<a name="line458">458: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line460">460: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVAppendOptionsPrefix.html#BVAppendOptionsPrefix">BVAppendOptionsPrefix</a>(), <a href="../../../../../docs/manualpages/BV/BVGetOptionsPrefix.html#BVGetOptionsPrefix">BVGetOptionsPrefix</a>()</font>
+<a name="line461">461: </a><font color="#B22222">@*/</font>
+<a name="line462">462: </a><strong><font color="#4169E1"><a name="BVSetOptionsPrefix"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVSetOptionsPrefix.html#BVSetOptionsPrefix">BVSetOptionsPrefix</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,const char *prefix)</font></strong>
+<a name="line463">463: </a>{
+
+<a name="line468">468: </a>  PetscObjectSetOptionsPrefix((PetscObject)bv,prefix);
+<a name="line469">469: </a>  <font color="#4169E1">return</font>(0);
+<a name="line470">470: </a>}
+
+<a name="line472">472: </a><font color="#B22222">/*@C</font>
+<a name="line473">473: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVAppendOptionsPrefix.html#BVAppendOptionsPrefix">BVAppendOptionsPrefix</a> - Appends to the prefix used for searching for all</font>
+<a name="line474">474: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> options in the database.</font>
+
+<a name="line476">476: </a><font color="#B22222">   Logically Collective on bv</font>
+
+<a name="line478">478: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line479">479: </a><font color="#B22222">+  bv     - the basis vectors context</font>
+<a name="line480">480: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> option requests</font>
+
+<a name="line482">482: </a><font color="#B22222">   Notes:</font>
+<a name="line483">483: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line484">484: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the</font>
+<a name="line485">485: </a><font color="#B22222">   hyphen.</font>
+
+<a name="line487">487: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line489">489: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVSetOptionsPrefix.html#BVSetOptionsPrefix">BVSetOptionsPrefix</a>(), <a href="../../../../../docs/manualpages/BV/BVGetOptionsPrefix.html#BVGetOptionsPrefix">BVGetOptionsPrefix</a>()</font>
+<a name="line490">490: </a><font color="#B22222">@*/</font>
+<a name="line491">491: </a><strong><font color="#4169E1"><a name="BVAppendOptionsPrefix"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVAppendOptionsPrefix.html#BVAppendOptionsPrefix">BVAppendOptionsPrefix</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,const char *prefix)</font></strong>
+<a name="line492">492: </a>{
+
+<a name="line497">497: </a>  PetscObjectAppendOptionsPrefix((PetscObject)bv,prefix);
+<a name="line498">498: </a>  <font color="#4169E1">return</font>(0);
+<a name="line499">499: </a>}
+
+<a name="line501">501: </a><font color="#B22222">/*@C</font>
+<a name="line502">502: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVGetOptionsPrefix.html#BVGetOptionsPrefix">BVGetOptionsPrefix</a> - Gets the prefix used for searching for all</font>
+<a name="line503">503: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> options in the database.</font>
+
+<a name="line505">505: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line507">507: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line508">508: </a><font color="#B22222">.  bv - the basis vectors context</font>
+
+<a name="line510">510: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line511">511: </a><font color="#B22222">.  prefix - pointer to the prefix string used, is returned</font>
+
+<a name="line513">513: </a><font color="#B22222">   Note:</font>
+<a name="line514">514: </a><font color="#B22222">   On the Fortran side, the user should pass in a string 'prefix' of</font>
+<a name="line515">515: </a><font color="#B22222">   sufficient length to hold the prefix.</font>
+
+<a name="line517">517: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line519">519: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVSetOptionsPrefix.html#BVSetOptionsPrefix">BVSetOptionsPrefix</a>(), <a href="../../../../../docs/manualpages/BV/BVAppendOptionsPrefix.html#BVAppendOptionsPrefix">BVAppendOptionsPrefix</a>()</font>
+<a name="line520">520: </a><font color="#B22222">@*/</font>
+<a name="line521">521: </a><strong><font color="#4169E1"><a name="BVGetOptionsPrefix"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVGetOptionsPrefix.html#BVGetOptionsPrefix">BVGetOptionsPrefix</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,const char *prefix[])</font></strong>
+<a name="line522">522: </a>{
+
+<a name="line528">528: </a>  PetscObjectGetOptionsPrefix((PetscObject)bv,prefix);
+<a name="line529">529: </a>  <font color="#4169E1">return</font>(0);
+<a name="line530">530: </a>}
+
+<a name="line532">532: </a><strong><font color="#4169E1"><a name="BVView_Default"></a>static PetscErrorCode BVView_Default(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscViewer viewer)</font></strong>
+<a name="line533">533: </a>{
+<a name="line534">534: </a>  PetscErrorCode    ierr;
+<a name="line535">535: </a>  PetscInt          j;
+<a name="line536">536: </a>  Vec               v;
+<a name="line537">537: </a>  PetscViewerFormat format;
+<a name="line538">538: </a>  PetscBool         isascii,ismatlab=PETSC_FALSE;
+<a name="line539">539: </a>  const char        *bvname,*name;
+
+<a name="line542">542: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line543">543: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line544">544: </a>    PetscViewerGetFormat(viewer,&amp;format);
+<a name="line545">545: </a>    <font color="#4169E1">if</font> (format == PETSC_VIEWER_ASCII_MATLAB) ismatlab = PETSC_TRUE;
+<a name="line546">546: </a>  }
+<a name="line547">547: </a>  <font color="#4169E1">if</font> (ismatlab) {
+<a name="line548">548: </a>    PetscObjectGetName((PetscObject)bv,&amp;bvname);
+<a name="line549">549: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s=[];\n"</font>,bvname);
+<a name="line550">550: </a>  }
+<a name="line551">551: </a>  <font color="#4169E1">for</font> (j=-bv-&gt;nc;j&lt;bv-&gt;m;j++) {
+<a name="line552">552: </a>    <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(bv,j,&amp;v);
+<a name="line553">553: </a>    VecView(v,viewer);
+<a name="line554">554: </a>    <font color="#4169E1">if</font> (ismatlab) {
+<a name="line555">555: </a>      PetscObjectGetName((PetscObject)v,&amp;name);
+<a name="line556">556: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s=[%s,%s];clear %s\n"</font>,bvname,bvname,name,name);
+<a name="line557">557: </a>    }
+<a name="line558">558: </a>    <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(bv,j,&amp;v);
+<a name="line559">559: </a>  }
+<a name="line560">560: </a>  <font color="#4169E1">return</font>(0);
+<a name="line561">561: </a>}
+
+<a name="line563">563: </a><font color="#B22222">/*@C</font>
+<a name="line564">564: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a> - Prints the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> data structure.</font>
+
+<a name="line566">566: </a><font color="#B22222">   Collective on bv</font>
+
+<a name="line568">568: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line569">569: </a><font color="#B22222">+  bv     - the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> context</font>
+<a name="line570">570: </a><font color="#B22222">-  viewer - optional visualization context</font>
+
+<a name="line572">572: </a><font color="#B22222">   Note:</font>
+<a name="line573">573: </a><font color="#B22222">   The available visualization contexts include</font>
+<a name="line574">574: </a><font color="#B22222">+     PETSC_VIEWER_STDOUT_SELF - standard output (default)</font>
+<a name="line575">575: </a><font color="#B22222">-     PETSC_VIEWER_STDOUT_WORLD - synchronized standard</font>
+<a name="line576">576: </a><font color="#B22222">         output where only the first processor opens</font>
+<a name="line577">577: </a><font color="#B22222">         the file.  All other processors send their</font>
+<a name="line578">578: </a><font color="#B22222">         data to the first processor to print.</font>
+
+<a name="line580">580: </a><font color="#B22222">   The user can open an alternative visualization contexts with</font>
+<a name="line581">581: </a><font color="#B22222">   PetscViewerASCIIOpen() (output to a specified file).</font>
+
+<a name="line583">583: </a><font color="#B22222">   Level: beginner</font>
+<a name="line584">584: </a><font color="#B22222">@*/</font>
+<a name="line585">585: </a><strong><font color="#4169E1"><a name="BVView"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscViewer viewer)</font></strong>
+<a name="line586">586: </a>{
+<a name="line587">587: </a>  PetscErrorCode    ierr;
+<a name="line588">588: </a>  PetscBool         isascii;
+<a name="line589">589: </a>  PetscViewerFormat format;
+<a name="line590">590: </a>  const char        *orthname[2] = {<font color="#666666">"classical"</font>,<font color="#666666">"modified"</font>};
+<a name="line591">591: </a>  const char        *refname[3] = {<font color="#666666">"if needed"</font>,<font color="#666666">"never"</font>,<font color="#666666">"always"</font>};
+
+<a name="line595">595: </a>  <font color="#4169E1">if</font> (!viewer) {
+<a name="line596">596: </a>    PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)bv),&amp;viewer);
+<a name="line597">597: </a>  }
+
+<a name="line600">600: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line601">601: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line602">602: </a>    PetscObjectPrintClassNamePrefixType((PetscObject)bv,viewer);
+<a name="line603">603: </a>    PetscViewerGetFormat(viewer,&amp;format);
+<a name="line604">604: </a>    <font color="#4169E1">if</font> (format == PETSC_VIEWER_ASCII_INFO || format == PETSC_VIEWER_ASCII_INFO_DETAIL) {
+<a name="line605">605: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  %D columns of global length %D%s\n"</font>,bv-&gt;m,bv-&gt;N,bv-&gt;cuda?<font color="#666666">" (CUDA)"</font>:<font color="#666666">""</font>);
+<a name="line606">606: </a>      <font color="#4169E1">if</font> (bv-&gt;nc&gt;0) {
+<a name="line607">607: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  number of constraints: %D\n"</font>,bv-&gt;nc);
+<a name="line608">608: </a>      }
+<a name="line609">609: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  vector orthogonalization method: %s Gram-Schmidt\n"</font>,orthname[bv-&gt;orthog_type]);
+<a name="line610">610: </a>      <font color="#4169E1">switch</font> (bv-&gt;orthog_ref) {
+<a name="line611">611: </a>        <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_IFNEEDED</a>:
+<a name="line612">612: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"  orthogonalization refinement: %s (eta: %g)\n"</font>,refname[bv-&gt;orthog_ref],(double)bv-&gt;orthog_eta);
+<a name="line613">613: </a>          <font color="#4169E1">break</font>;
+<a name="line614">614: </a>        <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_NEVER</a>:
+<a name="line615">615: </a>        <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BV_ORTHOG_REFINE_ALWAYS</a>:
+<a name="line616">616: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"  orthogonalization refinement: %s\n"</font>,refname[bv-&gt;orthog_ref]);
+<a name="line617">617: </a>          <font color="#4169E1">break</font>;
+<a name="line618">618: </a>      }
+<a name="line619">619: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  block orthogonalization method: %s\n"</font>,BVOrthogBlockTypes[bv-&gt;orthog_block]);
+<a name="line620">620: </a>      <font color="#4169E1">if</font> (bv-&gt;matrix) {
+<a name="line621">621: </a>        <font color="#4169E1">if</font> (bv-&gt;indef) {
+<a name="line622">622: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"  indefinite inner product\n"</font>);
+<a name="line623">623: </a>        } <font color="#4169E1">else</font> {
+<a name="line624">624: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"  non-standard inner product\n"</font>);
+<a name="line625">625: </a>        }
+<a name="line626">626: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  inner product matrix:\n"</font>);
+<a name="line627">627: </a>        PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_INFO);
+<a name="line628">628: </a>        PetscViewerASCIIPushTab(viewer);
+<a name="line629">629: </a>        MatView(bv-&gt;matrix,viewer);
+<a name="line630">630: </a>        PetscViewerASCIIPopTab(viewer);
+<a name="line631">631: </a>        PetscViewerPopFormat(viewer);
+<a name="line632">632: </a>      }
+<a name="line633">633: </a>      <font color="#4169E1">switch</font> (bv-&gt;vmm) {
+<a name="line634">634: </a>        <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVMatMultType.html#BVMatMultType">BV_MATMULT_VECS</a>:
+<a name="line635">635: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"  doing matmult as matrix-vector products\n"</font>);
+<a name="line636">636: </a>          <font color="#4169E1">break</font>;
+<a name="line637">637: </a>        <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVMatMultType.html#BVMatMultType">BV_MATMULT_MAT</a>:
+<a name="line638">638: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"  doing matmult as a single matrix-matrix product\n"</font>);
+<a name="line639">639: </a>          <font color="#4169E1">break</font>;
+<a name="line640">640: </a>        <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/BV/BVMatMultType.html#BVMatMultType">BV_MATMULT_MAT_SAVE</a>:
+<a name="line641">641: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"  mat_save is deprecated, use mat\n"</font>);
+<a name="line642">642: </a>          <font color="#4169E1">break</font>;
+<a name="line643">643: </a>      }
+<a name="line644">644: </a>      <font color="#4169E1">if</font> (bv-&gt;rrandom) {
+<a name="line645">645: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  generating random vectors independent of the number of processes\n"</font>);
+<a name="line646">646: </a>      }
+<a name="line647">647: </a>      <font color="#4169E1">if</font> (bv-&gt;ops-&gt;view) { (*bv-&gt;ops-&gt;view)(bv,viewer); }
+<a name="line648">648: </a>    } <font color="#4169E1">else</font> {
+<a name="line649">649: </a>      <font color="#4169E1">if</font> (bv-&gt;ops-&gt;view) { (*bv-&gt;ops-&gt;view)(bv,viewer); }
+<a name="line650">650: </a>      <font color="#4169E1">else</font> { BVView_Default(bv,viewer); }
+<a name="line651">651: </a>    }
+<a name="line652">652: </a>  } <font color="#4169E1">else</font> {
+<a name="line653">653: </a>    (*bv-&gt;ops-&gt;view)(bv,viewer);
+<a name="line654">654: </a>  }
+<a name="line655">655: </a>  <font color="#4169E1">return</font>(0);
+<a name="line656">656: </a>}
+
+<a name="line658">658: </a><font color="#B22222">/*@C</font>
+<a name="line659">659: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVViewFromOptions.html#BVViewFromOptions">BVViewFromOptions</a> - View from options</font>
+
+<a name="line661">661: </a><font color="#B22222">   Collective on <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a></font>
+
+<a name="line663">663: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line664">664: </a><font color="#B22222">+  bv   - the basis vectors context</font>
+<a name="line665">665: </a><font color="#B22222">.  obj  - optional object</font>
+<a name="line666">666: </a><font color="#B22222">-  name - command line option</font>
+
+<a name="line668">668: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line670">670: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(), <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>()</font>
+<a name="line671">671: </a><font color="#B22222">@*/</font>
+<a name="line672">672: </a><strong><font color="#4169E1"><a name="BVViewFromOptions"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVViewFromOptions.html#BVViewFromOptions">BVViewFromOptions</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscObject obj,const char name[])</font></strong>
+<a name="line673">673: </a>{
+
+<a name="line678">678: </a>  PetscObjectViewFromOptions((PetscObject)bv,obj,name);
+<a name="line679">679: </a>  <font color="#4169E1">return</font>(0);
+<a name="line680">680: </a>}
+
+<a name="line682">682: </a><font color="#B22222">/*@C</font>
+<a name="line683">683: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVRegister.html#BVRegister">BVRegister</a> - Adds a new storage format to the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> package.</font>
+
+<a name="line685">685: </a><font color="#B22222">   Not collective</font>
+
+<a name="line687">687: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line688">688: </a><font color="#B22222">+  name     - name of a new user-defined <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a></font>
+<a name="line689">689: </a><font color="#B22222">-  function - routine to create context</font>
+
+<a name="line691">691: </a><font color="#B22222">   Notes:</font>
+<a name="line692">692: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVRegister.html#BVRegister">BVRegister</a>() may be called multiple times to add several user-defined</font>
+<a name="line693">693: </a><font color="#B22222">   basis vectors.</font>
+
+<a name="line695">695: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line697">697: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVRegisterAll.html#BVRegisterAll">BVRegisterAll</a>()</font>
+<a name="line698">698: </a><font color="#B22222">@*/</font>
+<a name="line699">699: </a><strong><font color="#4169E1"><a name="BVRegister"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVRegister.html#BVRegister">BVRegister</a>(const char *name,PetscErrorCode (*function)(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>))</font></strong>
+<a name="line700">700: </a>{
+
+<a name="line704">704: </a>  <a href="../../../../../docs/manualpages/BV/BVInitializePackage.html#BVInitializePackage">BVInitializePackage</a>();
+<a name="line705">705: </a>  PetscFunctionListAdd(&amp;BVList,name,function);
+<a name="line706">706: </a>  <font color="#4169E1">return</font>(0);
+<a name="line707">707: </a>}
+
+<a name="line709">709: </a><strong><font color="#4169E1"><a name="BVAllocateWork_Private"></a>PetscErrorCode BVAllocateWork_Private(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt s)</font></strong>
+<a name="line710">710: </a>{
+
+<a name="line714">714: </a>  <font color="#4169E1">if</font> (s&gt;bv-&gt;lwork) {
+<a name="line715">715: </a>    PetscFree(bv-&gt;work);
+<a name="line716">716: </a>    PetscMalloc1(s,&amp;bv-&gt;work);
+<a name="line717">717: </a>    PetscLogObjectMemory((PetscObject)bv,(s-bv-&gt;lwork)*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line718">718: </a>    bv-&gt;lwork = s;
+<a name="line719">719: </a>  }
+<a name="line720">720: </a>  <font color="#4169E1">return</font>(0);
+<a name="line721">721: </a>}
+
+<a name="line723">723: </a><font color="#A020F0">#if defined(PETSC_USE_DEBUG)</font>
+<a name="line724">724: </a><font color="#B22222">/*</font>
+<a name="line725">725: </a><font color="#B22222">   SlepcDebugBVView - partially view a <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> object, to be used from within a debugger.</font>
+
+<a name="line727">727: </a><font color="#B22222">     ini, end: columns to be viewed</font>
+<a name="line728">728: </a><font color="#B22222">     s: name of Matlab variable</font>
+<a name="line729">729: </a><font color="#B22222">     filename: optionally write output to a file</font>
+<a name="line730">730: </a><font color="#B22222"> */</font>
+<a name="line731">731: </a><strong><font color="#4169E1"><a name="SlepcDebugBVView"></a>PETSC_UNUSED PetscErrorCode SlepcDebugBVView(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt ini,PetscInt end,const char *s,const char *filename)</font></strong>
+<a name="line732">732: </a>{
+<a name="line734">734: </a>  PetscInt       N,m;
+<a name="line735">735: </a>  PetscScalar    *array;
+
+<a name="line738">738: </a>  <a href="../../../../../docs/manualpages/BV/BVGetArray.html#BVGetArray">BVGetArray</a>(bv,&amp;array);
+<a name="line739">739: </a>  <a href="../../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(bv,NULL,&amp;N,&amp;m);
+<a name="line740">740: </a>  SlepcDebugViewMatrix(N,end-ini+1,array+ini*N,NULL,N,s,filename);
+<a name="line741">741: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreArray.html#BVRestoreArray">BVRestoreArray</a>(bv,&amp;array);
+<a name="line742">742: </a>  <font color="#4169E1">return</font>(0);
+<a name="line743">743: </a>}
+<a name="line744">744: </a><font color="#A020F0">#endif</font>
+
+</pre>
+</body>
+
+</html>

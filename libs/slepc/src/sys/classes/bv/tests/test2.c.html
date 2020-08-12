@@ -1,0 +1,203 @@
+<center><a href="test2.c">Actual source code: test2.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/tests/test2.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:44+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/tests/test2.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Test <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> orthogonalization functions.\n\n"</font>;
+
+<a name="line13"> 13: </a> #include <A href="../../../../../include/slepcbv.h.html">&lt;slepcbv.h&gt;</A>
+
+<a name="line15"> 15: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line16"> 16: </a>{
+<a name="line18"> 18: </a>  <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>             X,Y,Z;
+<a name="line19"> 19: </a>  Mat            M,R;
+<a name="line20"> 20: </a>  Vec            v,t,e;
+<a name="line21"> 21: </a>  PetscInt       i,j,n=20,k=8;
+<a name="line22"> 22: </a>  PetscViewer    view;
+<a name="line23"> 23: </a>  PetscBool      verbose;
+<a name="line24"> 24: </a>  PetscReal      norm,condn=1.0;
+<a name="line25"> 25: </a>  PetscScalar    alpha;
+
+<a name="line27"> 27: </a>  <a href="../../../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line28"> 28: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line29"> 29: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-k"</font>,&amp;k,NULL);
+<a name="line30"> 30: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-condn"</font>,&amp;condn,NULL);
+<a name="line31"> 31: </a>  <font color="#4169E1">if</font> (condn&lt;1.0) SETERRQ(PETSC_COMM_WORLD,1,<font color="#666666">"The condition number must be &gt; 1"</font>);
+<a name="line32"> 32: </a>  PetscOptionsHasName(NULL,NULL,<font color="#666666">"-verbose"</font>,&amp;verbose);
+<a name="line33"> 33: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Test <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> orthogonalization with %D columns of length %D.\n"</font>,k,n);
+<a name="line34"> 34: </a>  <font color="#4169E1">if</font> (condn&gt;1.0) {
+<a name="line35"> 35: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" - Using a random <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> with condition number = %g\n"</font>,(double)condn);
+<a name="line36"> 36: </a>  }
+
+<a name="line38"> 38: </a>  <font color="#B22222">/* Create template vector */</font>
+<a name="line39"> 39: </a>  VecCreate(PETSC_COMM_WORLD,&amp;t);
+<a name="line40"> 40: </a>  VecSetSizes(t,PETSC_DECIDE,n);
+<a name="line41"> 41: </a>  VecSetFromOptions(t);
+
+<a name="line43"> 43: </a>  <font color="#B22222">/* Create <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> object X */</font>
+<a name="line44"> 44: </a>  <a href="../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>(PETSC_COMM_WORLD,&amp;X);
+<a name="line45"> 45: </a>  PetscObjectSetName((PetscObject)X,<font color="#666666">"X"</font>);
+<a name="line46"> 46: </a>  <a href="../../../../../docs/manualpages/BV/BVSetSizesFromVec.html#BVSetSizesFromVec">BVSetSizesFromVec</a>(X,t,k);
+<a name="line47"> 47: </a>  <a href="../../../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(X);
+
+<a name="line49"> 49: </a>  <font color="#B22222">/* Set up viewer */</font>
+<a name="line50"> 50: </a>  PetscViewerASCIIGetStdout(PETSC_COMM_WORLD,&amp;view);
+<a name="line51"> 51: </a>  <font color="#4169E1">if</font> (verbose) {
+<a name="line52"> 52: </a>    PetscViewerPushFormat(view,PETSC_VIEWER_ASCII_MATLAB);
+<a name="line53"> 53: </a>  }
+
+<a name="line55"> 55: </a>  <font color="#B22222">/* Fill X entries */</font>
+<a name="line56"> 56: </a>  <font color="#4169E1">if</font> (condn==1.0) {
+<a name="line57"> 57: </a>    <font color="#4169E1">for</font> (j=0;j&lt;k;j++) {
+<a name="line58"> 58: </a>      <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(X,j,&amp;v);
+<a name="line59"> 59: </a>      VecSet(v,0.0);
+<a name="line60"> 60: </a>      <font color="#4169E1">for</font> (i=0;i&lt;=n/2;i++) {
+<a name="line61"> 61: </a>        <font color="#4169E1">if</font> (i+j&lt;n) {
+<a name="line62"> 62: </a>          alpha = (3.0*i+j-2)/(2*(i+j+1));
+<a name="line63"> 63: </a>          VecSetValue(v,i+j,alpha,INSERT_VALUES);
+<a name="line64"> 64: </a>        }
+<a name="line65"> 65: </a>      }
+<a name="line66"> 66: </a>      VecAssemblyBegin(v);
+<a name="line67"> 67: </a>      VecAssemblyEnd(v);
+<a name="line68"> 68: </a>      <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(X,j,&amp;v);
+<a name="line69"> 69: </a>    }
+<a name="line70"> 70: </a>  } <font color="#4169E1">else</font> {
+<a name="line71"> 71: </a>    <a href="../../../../../docs/manualpages/BV/BVSetRandomCond.html#BVSetRandomCond">BVSetRandomCond</a>(X,condn);
+<a name="line72"> 72: </a>  }
+<a name="line73"> 73: </a>  <font color="#4169E1">if</font> (verbose) {
+<a name="line74"> 74: </a>    <a href="../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(X,view);
+<a name="line75"> 75: </a>  }
+
+<a name="line77"> 77: </a>  <font color="#B22222">/* Create copies on Y and Z */</font>
+<a name="line78"> 78: </a>  <a href="../../../../../docs/manualpages/BV/BVDuplicate.html#BVDuplicate">BVDuplicate</a>(X,&amp;Y);
+<a name="line79"> 79: </a>  PetscObjectSetName((PetscObject)Y,<font color="#666666">"Y"</font>);
+<a name="line80"> 80: </a>  <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(X,Y);
+<a name="line81"> 81: </a>  <a href="../../../../../docs/manualpages/BV/BVDuplicate.html#BVDuplicate">BVDuplicate</a>(X,&amp;Z);
+<a name="line82"> 82: </a>  PetscObjectSetName((PetscObject)Z,<font color="#666666">"Z"</font>);
+<a name="line83"> 83: </a>  <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(X,Z);
+
+<a name="line85"> 85: </a>  <font color="#B22222">/* Test <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a> */</font>
+<a name="line86"> 86: </a>  <font color="#4169E1">for</font> (j=0;j&lt;k;j++) {
+<a name="line87"> 87: </a>    <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(X,j,NULL,&amp;norm,NULL);
+<a name="line88"> 88: </a>    alpha = 1.0/norm;
+<a name="line89"> 89: </a>    <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(X,j,alpha);
+<a name="line90"> 90: </a>  }
+<a name="line91"> 91: </a>  <font color="#4169E1">if</font> (verbose) {
+<a name="line92"> 92: </a>    <a href="../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(X,view);
+<a name="line93"> 93: </a>  }
+
+<a name="line95"> 95: </a>  <font color="#B22222">/* Check orthogonality */</font>
+<a name="line96"> 96: </a>  MatCreateSeqDense(PETSC_COMM_SELF,k,k,NULL,&amp;M);
+<a name="line97"> 97: </a>  <a href="../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(X,X,M);
+<a name="line98"> 98: </a>  MatShift(M,-1.0);
+<a name="line99"> 99: </a>  MatNorm(M,NORM_1,&amp;norm);
+<a name="line100">100: </a>  <font color="#4169E1">if</font> (norm&lt;100*PETSC_MACHINE_EPSILON) {
+<a name="line101">101: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Level of orthogonality &lt; 100*eps\n"</font>);
+<a name="line102">102: </a>  } <font color="#4169E1">else</font> {
+<a name="line103">103: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Level of orthogonality: %g\n"</font>,(double)norm);
+<a name="line104">104: </a>  }
+
+<a name="line106">106: </a>  <font color="#B22222">/* Test <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a> */</font>
+<a name="line107">107: </a>  MatCreateSeqDense(PETSC_COMM_SELF,k,k,NULL,&amp;R);
+<a name="line108">108: </a>  PetscObjectSetName((PetscObject)R,<font color="#666666">"R"</font>);
+<a name="line109">109: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(Y,R);
+<a name="line110">110: </a>  <font color="#4169E1">if</font> (verbose) {
+<a name="line111">111: </a>    <a href="../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(Y,view);
+<a name="line112">112: </a>    MatView(R,view);
+<a name="line113">113: </a>  }
+
+<a name="line115">115: </a>  <font color="#B22222">/* Check orthogonality */</font>
+<a name="line116">116: </a>  <a href="../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(Y,Y,M);
+<a name="line117">117: </a>  MatShift(M,-1.0);
+<a name="line118">118: </a>  MatNorm(M,NORM_1,&amp;norm);
+<a name="line119">119: </a>  <font color="#4169E1">if</font> (norm&lt;100*PETSC_MACHINE_EPSILON) {
+<a name="line120">120: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Level of orthogonality &lt; 100*eps\n"</font>);
+<a name="line121">121: </a>  } <font color="#4169E1">else</font> {
+<a name="line122">122: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Level of orthogonality: %g\n"</font>,(double)norm);
+<a name="line123">123: </a>  }
+
+<a name="line125">125: </a>  <font color="#B22222">/* Check residual */</font>
+<a name="line126">126: </a>  <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(Z,-1.0,1.0,Y,R);
+<a name="line127">127: </a>  <a href="../../../../../docs/manualpages/BV/BVNorm.html#BVNorm">BVNorm</a>(Z,NORM_FROBENIUS,&amp;norm);
+<a name="line128">128: </a>  <font color="#4169E1">if</font> (norm&lt;100*PETSC_MACHINE_EPSILON) {
+<a name="line129">129: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Residual ||X-QR|| &lt; 100*eps\n"</font>);
+<a name="line130">130: </a>  } <font color="#4169E1">else</font> {
+<a name="line131">131: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Residual ||X-QR||: %g\n"</font>,(double)norm);
+<a name="line132">132: </a>  }
+
+<a name="line134">134: </a>  <font color="#B22222">/* Test <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a> */</font>
+<a name="line135">135: </a>  VecDuplicate(t,&amp;e);
+<a name="line136">136: </a>  VecSet(e,1.0);
+<a name="line137">137: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(X,e,NULL,&amp;norm,NULL);
+<a name="line138">138: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"Norm of ones(n,1) after orthogonalizing against X: %g\n"</font>,(double)norm);
+
+<a name="line140">140: </a>  MatDestroy(&amp;M);
+<a name="line141">141: </a>  MatDestroy(&amp;R);
+<a name="line142">142: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;X);
+<a name="line143">143: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;Y);
+<a name="line144">144: </a>  <a href="../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;Z);
+<a name="line145">145: </a>  VecDestroy(&amp;e);
+<a name="line146">146: </a>  VecDestroy(&amp;t);
+<a name="line147">147: </a>  <a href="../../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line148">148: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line149">149: </a>}
+
+<a name="line151">151: </a><font color="#B22222">/*TEST</font>
+
+<a name="line153">153: </a><font color="#B22222">   test:</font>
+<a name="line154">154: </a><font color="#B22222">      suffix: 1</font>
+<a name="line155">155: </a><font color="#B22222">      nsize: 1</font>
+<a name="line156">156: </a><font color="#B22222">      args: -bv_type {{vecs contiguous svec mat}shared output} -bv_orthog_type cgs</font>
+<a name="line157">157: </a><font color="#B22222">      output_file: output/test2_1.out</font>
+
+<a name="line159">159: </a><font color="#B22222">   test:</font>
+<a name="line160">160: </a><font color="#B22222">      suffix: 1_cuda</font>
+<a name="line161">161: </a><font color="#B22222">      nsize: 1</font>
+<a name="line162">162: </a><font color="#B22222">      args: -bv_type svec -vec_type cuda -bv_orthog_type cgs</font>
+<a name="line163">163: </a><font color="#B22222">      requires: cuda</font>
+<a name="line164">164: </a><font color="#B22222">      output_file: output/test2_1.out</font>
+
+<a name="line166">166: </a><font color="#B22222">   test:</font>
+<a name="line167">167: </a><font color="#B22222">      suffix: 2</font>
+<a name="line168">168: </a><font color="#B22222">      nsize: 1</font>
+<a name="line169">169: </a><font color="#B22222">      args: -bv_type {{vecs contiguous svec mat}shared output} -bv_orthog_type mgs</font>
+<a name="line170">170: </a><font color="#B22222">      output_file: output/test2_1.out</font>
+
+<a name="line172">172: </a><font color="#B22222">   test:</font>
+<a name="line173">173: </a><font color="#B22222">      suffix: 2_cuda</font>
+<a name="line174">174: </a><font color="#B22222">      nsize: 1</font>
+<a name="line175">175: </a><font color="#B22222">      args: -bv_type svec -vec_type cuda -bv_orthog_type mgs</font>
+<a name="line176">176: </a><font color="#B22222">      requires: cuda</font>
+<a name="line177">177: </a><font color="#B22222">      output_file: output/test2_1.out</font>
+
+<a name="line179">179: </a><font color="#B22222">   test:</font>
+<a name="line180">180: </a><font color="#B22222">      suffix: 3</font>
+<a name="line181">181: </a><font color="#B22222">      nsize: 1</font>
+<a name="line182">182: </a><font color="#B22222">      args: -bv_type {{vecs contiguous svec mat}shared output} -condn 1e8</font>
+<a name="line183">183: </a><font color="#B22222">      requires: !single</font>
+<a name="line184">184: </a><font color="#B22222">      filter: grep -v "against"</font>
+<a name="line185">185: </a><font color="#B22222">      output_file: output/test2_3.out</font>
+
+<a name="line187">187: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

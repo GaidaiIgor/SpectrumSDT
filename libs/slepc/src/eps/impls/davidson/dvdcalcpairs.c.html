@@ -1,0 +1,586 @@
+<center><a href="dvdcalcpairs.c">Actual source code: dvdcalcpairs.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/davidson/dvdcalcpairs.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:52+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/davidson/dvdcalcpairs.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "davidson"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Step: calculate the best eigenpairs in the subspace V</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   For that, performs these steps:</font>
+<a name="line16"> 16: </a><font color="#B22222">     1) Update W &lt;- A * V</font>
+<a name="line17"> 17: </a><font color="#B22222">     2) Update H &lt;- V' * W</font>
+<a name="line18"> 18: </a><font color="#B22222">     3) Obtain eigenpairs of H</font>
+<a name="line19"> 19: </a><font color="#B22222">     4) Select some eigenpairs</font>
+<a name="line20"> 20: </a><font color="#B22222">     5) Compute the Ritz pairs of the selected ones</font>
+<a name="line21"> 21: </a><font color="#B22222">*/</font>
+
+<a name="line23"> 23: </a><font color="#A020F0">#include </font><font color="#666666">"davidson.h"</font><font color="#A020F0"></font>
+<a name="line24"> 24: </a> #include <A href="../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line26"> 26: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_qz_start"></a>static PetscErrorCode dvd_calcpairs_qz_start(dvdDashboard *d)</font></strong>
+<a name="line27"> 27: </a>{
+
+<a name="line31"> 31: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,0,0);
+<a name="line32"> 32: </a>  <font color="#4169E1">if</font> (d-&gt;W) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W,0,0); }
+<a name="line33"> 33: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,0,0);
+<a name="line34"> 34: </a>  <font color="#4169E1">if</font> (d-&gt;BX) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;BX,0,0); }
+<a name="line35"> 35: </a>  <font color="#4169E1">return</font>(0);
+<a name="line36"> 36: </a>}
+
+<a name="line38"> 38: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_qz_d"></a>static PetscErrorCode dvd_calcpairs_qz_d(dvdDashboard *d)</font></strong>
+<a name="line39"> 39: </a>{
+<a name="line40"> 40: </a>  PetscErrorCode  ierr;
+
+<a name="line43"> 43: </a>  <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;d-&gt;W);
+<a name="line44"> 44: </a>  <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;d-&gt;AX);
+<a name="line45"> 45: </a>  <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;d-&gt;BX);
+<a name="line46"> 46: </a>  <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;d-&gt;auxBV);
+<a name="line47"> 47: </a>  MatDestroy(&amp;d-&gt;H);
+<a name="line48"> 48: </a>  MatDestroy(&amp;d-&gt;G);
+<a name="line49"> 49: </a>  MatDestroy(&amp;d-&gt;auxM);
+<a name="line50"> 50: </a>  <a href="../../../../docs/manualpages/sys/SlepcVecPoolDestroy.html#SlepcVecPoolDestroy">SlepcVecPoolDestroy</a>(&amp;d-&gt;auxV);
+<a name="line51"> 51: </a>  PetscFree(d-&gt;nBds);
+<a name="line52"> 52: </a>  <font color="#4169E1">return</font>(0);
+<a name="line53"> 53: </a>}
+
+<a name="line55"> 55: </a><font color="#B22222">/* in complex, d-&gt;size_H real auxiliary values are needed */</font>
+<a name="line56"> 56: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_projeig_solve"></a>static PetscErrorCode dvd_calcpairs_projeig_solve(dvdDashboard *d)</font></strong>
+<a name="line57"> 57: </a>{
+<a name="line58"> 58: </a>  PetscErrorCode    ierr;
+<a name="line59"> 59: </a>  Vec               v;
+<a name="line60"> 60: </a>  PetscScalar       *pA;
+<a name="line61"> 61: </a>  const PetscScalar *pv;
+<a name="line62"> 62: </a>  PetscInt          i,lV,kV,n,ld;
+
+<a name="line65"> 65: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;lV,&amp;kV);
+<a name="line66"> 66: </a>  n = kV-lV;
+<a name="line67"> 67: </a>  <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(d-&gt;eps-&gt;ds,n,0,0,0);
+<a name="line68"> 68: </a>  <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,0,0,d-&gt;H,lV,lV,n,n,PETSC_FALSE);
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (d-&gt;G) {
+<a name="line70"> 70: </a>    <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,0,0,d-&gt;G,lV,lV,n,n,PETSC_FALSE);
+<a name="line71"> 71: </a>  }
+<a name="line72"> 72: </a>  <font color="#B22222">/* Set the signature on projected matrix B */</font>
+<a name="line73"> 73: </a>  <font color="#4169E1">if</font> (DVD_IS(d-&gt;sEP,DVD_EP_INDEFINITE)) {
+<a name="line74"> 74: </a>    <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(d-&gt;eps-&gt;ds,&amp;ld);
+<a name="line75"> 75: </a>    <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,&amp;pA);
+<a name="line76"> 76: </a>    PetscArrayzero(pA,n*ld);
+<a name="line77"> 77: </a>    VecCreateSeq(PETSC_COMM_SELF,kV,&amp;v);
+<a name="line78"> 78: </a>    <a href="../../../../docs/manualpages/BV/BVGetSignature.html#BVGetSignature">BVGetSignature</a>(d-&gt;eps-&gt;V,v);
+<a name="line79"> 79: </a>    VecGetArrayRead(v,&amp;pv);
+<a name="line80"> 80: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line81"> 81: </a>      pA[i+ld*i] = d-&gt;nBds[i] = PetscRealPart(pv[lV+i]);
+<a name="line82"> 82: </a>    }
+<a name="line83"> 83: </a>    VecRestoreArrayRead(v,&amp;pv);
+<a name="line84"> 84: </a>    VecDestroy(&amp;v);
+<a name="line85"> 85: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,&amp;pA);
+<a name="line86"> 86: </a>  }
+<a name="line87"> 87: </a>  <a href="../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line88"> 88: </a>  <a href="../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(d-&gt;eps-&gt;ds,d-&gt;eigr,d-&gt;eigi);
+<a name="line89"> 89: </a>  <font color="#4169E1">return</font>(0);
+<a name="line90"> 90: </a>}
+
+<a name="line92"> 92: </a><font color="#B22222">/*</font>
+<a name="line93"> 93: </a><font color="#B22222">   A(lA:kA-1,lA:kA-1) &lt;- Z(l:k-1)'*A(l:k-1,l:k-1)*Q(l,k-1), where k=l+kA-lA</font>
+<a name="line94"> 94: </a><font color="#B22222"> */</font>
+<a name="line95"> 95: </a><strong><font color="#4169E1"><a name="EPSXDUpdateProj"></a>static PetscErrorCode EPSXDUpdateProj(Mat Q,Mat Z,PetscInt l,Mat A,PetscInt lA,PetscInt kA,Mat aux)</font></strong>
+<a name="line96"> 96: </a>{
+<a name="line98"> 98: </a>  PetscScalar    one=1.0,zero=0.0;
+<a name="line99"> 99: </a>  PetscInt       i,j,dA_=kA-lA,m0,n0,ldA_,ldQ_,ldZ_,nQ_;
+<a name="line100">100: </a>  PetscBLASInt   dA,nQ,ldA,ldQ,ldZ;
+<a name="line101">101: </a>  PetscScalar    *pA,*pQ,*pZ,*pW;
+<a name="line102">102: </a>  PetscBool      symm=PETSC_FALSE,set,flg;
+
+<a name="line105">105: </a>  MatGetSize(A,&amp;m0,&amp;n0); ldA_=m0;
+<a name="line106">106: </a>  <font color="#4169E1">if</font> (m0!=n0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"A should be square"</font>);
+<a name="line107">107: </a>  <font color="#4169E1">if</font> (lA&lt;0 || lA&gt;m0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Invalid initial row, column in A"</font>);
+<a name="line108">108: </a>  <font color="#4169E1">if</font> (kA&lt;0 || kA&lt;lA || kA&gt;m0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Invalid final row, column in A"</font>);
+<a name="line109">109: </a>  MatIsHermitianKnown(A,&amp;set,&amp;flg);
+<a name="line110">110: </a>  symm = set? flg: PETSC_FALSE;
+<a name="line111">111: </a>  MatGetSize(Q,&amp;m0,&amp;n0); ldQ_=nQ_=m0;
+<a name="line112">112: </a>  <font color="#4169E1">if</font> (l&lt;0 || l&gt;n0 || l+dA_&gt;n0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Invalid initial column in Q"</font>);
+<a name="line113">113: </a>  MatGetSize(Z,&amp;m0,&amp;n0); ldZ_=m0;
+<a name="line114">114: </a>  <font color="#4169E1">if</font> (l&lt;0 || l&gt;n0 || l+dA_&gt;n0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Invalid initial column in Z"</font>);
+<a name="line115">115: </a>  MatGetSize(aux,&amp;m0,&amp;n0);
+<a name="line116">116: </a>  <font color="#4169E1">if</font> (m0*n0&lt;nQ_*dA_) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"aux should be larger"</font>);
+<a name="line117">117: </a>  PetscBLASIntCast(dA_,&amp;dA);
+<a name="line118">118: </a>  PetscBLASIntCast(nQ_,&amp;nQ);
+<a name="line119">119: </a>  PetscBLASIntCast(ldA_,&amp;ldA);
+<a name="line120">120: </a>  PetscBLASIntCast(ldQ_,&amp;ldQ);
+<a name="line121">121: </a>  PetscBLASIntCast(ldZ_,&amp;ldZ);
+<a name="line122">122: </a>  MatDenseGetArray(A,&amp;pA);
+<a name="line123">123: </a>  MatDenseGetArray(Q,&amp;pQ);
+<a name="line124">124: </a>  <font color="#4169E1">if</font> (Q!=Z) { MatDenseGetArray(Z,&amp;pZ); }
+<a name="line125">125: </a>  <font color="#4169E1">else</font> pZ = pQ;
+<a name="line126">126: </a><font color="#A020F0">#if PETSC_USE_DEBUG</font>
+<a name="line127">127: </a>  <font color="#B22222">/* Avoid valgrind warning in xgemm and xsymm */</font>
+<a name="line128">128: </a>  MatZeroEntries(aux);
+<a name="line129">129: </a><font color="#A020F0">#endif</font>
+<a name="line130">130: </a>  MatDenseGetArray(aux,&amp;pW);
+<a name="line131">131: </a>  <font color="#B22222">/* W = A*Q */</font>
+<a name="line132">132: </a>  <font color="#4169E1">if</font> (symm) {
+<a name="line133">133: </a>    <font color="#B22222">/* symmetrize before multiplying */</font>
+<a name="line134">134: </a>    <font color="#4169E1">for</font> (i=lA+1;i&lt;lA+nQ;i++) {
+<a name="line135">135: </a>      <font color="#4169E1">for</font> (j=lA;j&lt;i;j++) pA[i+j*ldA] = PetscConj(pA[j+i*ldA]);
+<a name="line136">136: </a>    }
+<a name="line137">137: </a>  }
+<a name="line138">138: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;nQ,&amp;dA,&amp;nQ,&amp;one,&amp;pA[ldA*lA+lA],&amp;ldA,&amp;pQ[ldQ*l+l],&amp;ldQ,&amp;zero,pW,&amp;nQ));
+<a name="line139">139: </a>  <font color="#B22222">/* A = Q'*W */</font>
+<a name="line140">140: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;dA,&amp;dA,&amp;nQ,&amp;one,&amp;pZ[ldZ*l+l],&amp;ldZ,pW,&amp;nQ,&amp;zero,&amp;pA[ldA*lA+lA],&amp;ldA));
+<a name="line141">141: </a>  MatDenseRestoreArray(A,&amp;pA);
+<a name="line142">142: </a>  MatDenseRestoreArray(Q,&amp;pQ);
+<a name="line143">143: </a>  <font color="#4169E1">if</font> (Q!=Z) { MatDenseGetArray(Z,&amp;pZ); }
+<a name="line144">144: </a>  <font color="#4169E1">else</font> pZ = pQ;
+<a name="line145">145: </a>  MatDenseRestoreArray(aux,&amp;pW);
+<a name="line146">146: </a>  <font color="#4169E1">return</font>(0);
+<a name="line147">147: </a>}
+
+<a name="line149">149: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_updateproj"></a>static PetscErrorCode dvd_calcpairs_updateproj(dvdDashboard *d)</font></strong>
+<a name="line150">150: </a>{
+<a name="line152">152: </a>  Mat            Q,Z;
+<a name="line153">153: </a>  PetscInt       lV,kV;
+<a name="line154">154: </a>  PetscBool      symm;
+
+<a name="line157">157: </a>  <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line158">158: </a>  <font color="#4169E1">if</font> (d-&gt;W) { <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>,&amp;Z); }
+<a name="line159">159: </a>  <font color="#4169E1">else</font> Z = Q;
+<a name="line160">160: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;lV,&amp;kV);
+<a name="line161">161: </a>  EPSXDUpdateProj(Q,Z,0,d-&gt;H,lV,lV+d-&gt;V_tra_e,d-&gt;auxM);
+<a name="line162">162: </a>  <font color="#4169E1">if</font> (d-&gt;G) { EPSXDUpdateProj(Q,Z,0,d-&gt;G,lV,lV+d-&gt;V_tra_e,d-&gt;auxM); }
+<a name="line163">163: </a>  MatDestroy(&amp;Q);
+<a name="line164">164: </a>  <font color="#4169E1">if</font> (d-&gt;W) { MatDestroy(&amp;Z); }
+
+<a name="line166">166: </a>  PetscObjectTypeCompareAny((PetscObject)d-&gt;eps-&gt;ds,&amp;symm,DSHEP,DSGHIEP,DSGHEP,<font color="#666666">""</font>);
+<a name="line167">167: </a>  <font color="#4169E1">if</font> (d-&gt;V_tra_s==0 || symm) <font color="#4169E1">return</font>(0);
+<a name="line168">168: </a>  <font color="#B22222">/* Compute upper part of H (and G): H(0:l-1,l:k-1) &lt;- W(0:l-1)' * AV(l:k-1), where</font>
+<a name="line169">169: </a><font color="#B22222">     k=l+d-&gt;V_tra_s */</font>
+<a name="line170">170: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,0,lV);
+<a name="line171">171: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,lV,lV+d-&gt;V_tra_s);
+<a name="line172">172: </a>  <a href="../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(d-&gt;AX,d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,d-&gt;H);
+<a name="line173">173: </a>  <font color="#4169E1">if</font> (d-&gt;G) {
+<a name="line174">174: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;BX?d-&gt;BX:d-&gt;eps-&gt;V,lV,lV+d-&gt;V_tra_s);
+<a name="line175">175: </a>    <a href="../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(d-&gt;BX?d-&gt;BX:d-&gt;eps-&gt;V,d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,d-&gt;G);
+<a name="line176">176: </a>  }
+<a name="line177">177: </a>  PetscObjectTypeCompareAny((PetscObject)d-&gt;eps-&gt;ds,&amp;symm,DSGHEP,<font color="#666666">""</font>);
+<a name="line178">178: </a>  <font color="#4169E1">if</font> (!symm) {
+<a name="line179">179: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,lV,lV+d-&gt;V_tra_s);
+<a name="line180">180: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,0,lV);
+<a name="line181">181: </a>    <a href="../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(d-&gt;AX,d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,d-&gt;H);
+<a name="line182">182: </a>    <font color="#4169E1">if</font> (d-&gt;G) {
+<a name="line183">183: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;BX?d-&gt;BX:d-&gt;eps-&gt;V,0,lV);
+<a name="line184">184: </a>      <a href="../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(d-&gt;BX?d-&gt;BX:d-&gt;eps-&gt;V,d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,d-&gt;G);
+<a name="line185">185: </a>    }
+<a name="line186">186: </a>  }
+<a name="line187">187: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,lV,kV);
+<a name="line188">188: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,lV,kV);
+<a name="line189">189: </a>  <font color="#4169E1">if</font> (d-&gt;BX) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;BX,lV,kV); }
+<a name="line190">190: </a>  <font color="#4169E1">if</font> (d-&gt;W) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W,lV,kV); }
+<a name="line191">191: </a>  <font color="#4169E1">if</font> (d-&gt;W) { dvd_harm_updateproj(d); }
+<a name="line192">192: </a>  <font color="#4169E1">return</font>(0);
+<a name="line193">193: </a>}
+
+<a name="line195">195: </a><font color="#B22222">/*</font>
+<a name="line196">196: </a><font color="#B22222">   <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> &lt;- <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>*MT</font>
+<a name="line197">197: </a><font color="#B22222"> */</font>
+<a name="line198">198: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_updateBV0_gen"></a>PETSC_STATIC_INLINE PetscErrorCode dvd_calcpairs_updateBV0_gen(dvdDashboard *d,<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> mat)</font></strong>
+<a name="line199">199: </a>{
+<a name="line201">201: </a>  PetscInt       l,k,n;
+<a name="line202">202: </a>  Mat            auxM;
+
+<a name="line205">205: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;l,&amp;k);
+<a name="line206">206: </a>  MatCreateSeqDense(PETSC_COMM_SELF,k,k,NULL,&amp;auxM);
+<a name="line207">207: </a>  MatZeroEntries(auxM);
+<a name="line208">208: </a>  <a href="../../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(d-&gt;eps-&gt;ds,&amp;n,NULL,NULL,NULL,NULL);
+<a name="line209">209: </a>  <font color="#4169E1">if</font> (k-l!=n) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Consistency broken"</font>);
+<a name="line210">210: </a>  <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,mat,0,0,auxM,l,l,n,d-&gt;V_tra_e,PETSC_TRUE);
+<a name="line211">211: </a>  <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(bv,auxM,l,l+d-&gt;V_tra_e);
+<a name="line212">212: </a>  MatDestroy(&amp;auxM);
+<a name="line213">213: </a>  <font color="#4169E1">return</font>(0);
+<a name="line214">214: </a>}
+
+<a name="line216">216: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_proj"></a>static PetscErrorCode dvd_calcpairs_proj(dvdDashboard *d)</font></strong>
+<a name="line217">217: </a>{
+<a name="line219">219: </a>  PetscInt       i,l,k;
+<a name="line220">220: </a>  Vec            v1,v2;
+<a name="line221">221: </a>  PetscScalar    *pv;
+
+<a name="line224">224: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;l,&amp;k);
+<a name="line225">225: </a>  <font color="#B22222">/* Update AV, <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>, W and the projected matrices */</font>
+<a name="line226">226: </a>  <font color="#B22222">/* 1. S &lt;- S*MT */</font>
+<a name="line227">227: </a>  <font color="#4169E1">if</font> (d-&gt;V_tra_s != d-&gt;V_tra_e || d-&gt;V_tra_e &gt; 0) {
+<a name="line228">228: </a>    dvd_calcpairs_updateBV0_gen(d,d-&gt;eps-&gt;V,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>);
+<a name="line229">229: </a>    <font color="#4169E1">if</font> (d-&gt;W) { dvd_calcpairs_updateBV0_gen(d,d-&gt;W,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>); }
+<a name="line230">230: </a>    dvd_calcpairs_updateBV0_gen(d,d-&gt;AX,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>);
+<a name="line231">231: </a>    <font color="#4169E1">if</font> (d-&gt;BX) { dvd_calcpairs_updateBV0_gen(d,d-&gt;BX,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>); }
+<a name="line232">232: </a>    dvd_calcpairs_updateproj(d);
+<a name="line233">233: </a>    <font color="#B22222">/* Update signature */</font>
+<a name="line234">234: </a>    <font color="#4169E1">if</font> (d-&gt;nBds) {
+<a name="line235">235: </a>      VecCreateSeq(PETSC_COMM_SELF,l+d-&gt;V_tra_e,&amp;v1);
+<a name="line236">236: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,0,l+d-&gt;V_tra_e);
+<a name="line237">237: </a>      <a href="../../../../docs/manualpages/BV/BVGetSignature.html#BVGetSignature">BVGetSignature</a>(d-&gt;eps-&gt;V,v1);
+<a name="line238">238: </a>      VecGetArray(v1,&amp;pv);
+<a name="line239">239: </a>      <font color="#4169E1">for</font> (i=0;i&lt;d-&gt;V_tra_e;i++) pv[l+i] = d-&gt;nBds[i];
+<a name="line240">240: </a>      VecRestoreArray(v1,&amp;pv);
+<a name="line241">241: </a>      <a href="../../../../docs/manualpages/BV/BVSetSignature.html#BVSetSignature">BVSetSignature</a>(d-&gt;eps-&gt;V,v1);
+<a name="line242">242: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,l,k);
+<a name="line243">243: </a>      VecDestroy(&amp;v1);
+<a name="line244">244: </a>    }
+<a name="line245">245: </a>    k = l+d-&gt;V_tra_e;
+<a name="line246">246: </a>    l+= d-&gt;V_tra_s;
+<a name="line247">247: </a>  } <font color="#4169E1">else</font> {
+<a name="line248">248: </a>    <font color="#B22222">/* 2. V &lt;- orth(V, V_new) */</font>
+<a name="line249">249: </a>    dvd_orthV(d-&gt;eps-&gt;V,l+d-&gt;V_new_s,l+d-&gt;V_new_e);
+<a name="line250">250: </a>    <font color="#B22222">/* 3. AV &lt;- [AV A * V(V_new_s:V_new_e-1)] */</font>
+<a name="line251">251: </a>    <font color="#B22222">/* Check consistency */</font>
+<a name="line252">252: </a>    <font color="#4169E1">if</font> (k-l != d-&gt;V_new_s) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Consistency broken"</font>);
+<a name="line253">253: </a>    <font color="#4169E1">for</font> (i=l+d-&gt;V_new_s;i&lt;l+d-&gt;V_new_e;i++) {
+<a name="line254">254: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(d-&gt;eps-&gt;V,i,&amp;v1);
+<a name="line255">255: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(d-&gt;AX,i,&amp;v2);
+<a name="line256">256: </a>      MatMult(d-&gt;A,v1,v2);
+<a name="line257">257: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(d-&gt;eps-&gt;V,i,&amp;v1);
+<a name="line258">258: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(d-&gt;AX,i,&amp;v2);
+<a name="line259">259: </a>    }
+<a name="line260">260: </a>    <font color="#B22222">/* 4. <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> &lt;- [<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> B * V(V_new_s:V_new_e-1)] */</font>
+<a name="line261">261: </a>    <font color="#4169E1">if</font> (d-&gt;BX) {
+<a name="line262">262: </a>      <font color="#B22222">/* Check consistency */</font>
+<a name="line263">263: </a>      <font color="#4169E1">if</font> (k-l != d-&gt;V_new_s) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Consistency broken"</font>);
+<a name="line264">264: </a>      <font color="#4169E1">for</font> (i=l+d-&gt;V_new_s;i&lt;l+d-&gt;V_new_e;i++) {
+<a name="line265">265: </a>        <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(d-&gt;eps-&gt;V,i,&amp;v1);
+<a name="line266">266: </a>        <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(d-&gt;BX,i,&amp;v2);
+<a name="line267">267: </a>        MatMult(d-&gt;B,v1,v2);
+<a name="line268">268: </a>        <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(d-&gt;eps-&gt;V,i,&amp;v1);
+<a name="line269">269: </a>        <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(d-&gt;BX,i,&amp;v2);
+<a name="line270">270: </a>      }
+<a name="line271">271: </a>    }
+<a name="line272">272: </a>    <font color="#B22222">/* 5. W &lt;- [W f(AV,<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>)] */</font>
+<a name="line273">273: </a>    <font color="#4169E1">if</font> (d-&gt;W) {
+<a name="line274">274: </a>      d-&gt;calcpairs_W(d);
+<a name="line275">275: </a>      dvd_orthV(d-&gt;W,l+d-&gt;V_new_s,l+d-&gt;V_new_e);
+<a name="line276">276: </a>    }
+<a name="line277">277: </a>    <font color="#B22222">/* 6. H &lt;- W' * AX; G &lt;- W' * BX */</font>
+<a name="line278">278: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,l+d-&gt;V_new_s,l+d-&gt;V_new_e);
+<a name="line279">279: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,l+d-&gt;V_new_s,l+d-&gt;V_new_e);
+<a name="line280">280: </a>    <font color="#4169E1">if</font> (d-&gt;BX) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;BX,l+d-&gt;V_new_s,l+d-&gt;V_new_e); }
+<a name="line281">281: </a>    <font color="#4169E1">if</font> (d-&gt;W) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W,l+d-&gt;V_new_s,l+d-&gt;V_new_e); }
+<a name="line282">282: </a>    <a href="../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(d-&gt;AX,NULL,d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,d-&gt;H);
+<a name="line283">283: </a>    <font color="#4169E1">if</font> (d-&gt;G) { <a href="../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(d-&gt;BX?d-&gt;BX:d-&gt;eps-&gt;V,NULL,d-&gt;W?d-&gt;W:d-&gt;eps-&gt;V,d-&gt;G); }
+<a name="line284">284: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,l,k);
+<a name="line285">285: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,l,k);
+<a name="line286">286: </a>    <font color="#4169E1">if</font> (d-&gt;BX) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;BX,l,k); }
+<a name="line287">287: </a>    <font color="#4169E1">if</font> (d-&gt;W) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W,l,k); }
+
+<a name="line289">289: </a>    <font color="#B22222">/* Perform the transformation on the projected problem */</font>
+<a name="line290">290: </a>    <font color="#4169E1">if</font> (d-&gt;W) {
+<a name="line291">291: </a>      d-&gt;calcpairs_proj_trans(d);
+<a name="line292">292: </a>    }
+<a name="line293">293: </a>    k = l+d-&gt;V_new_e;
+<a name="line294">294: </a>  }
+<a name="line295">295: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,l,k);
+<a name="line296">296: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,l,k);
+<a name="line297">297: </a>  <font color="#4169E1">if</font> (d-&gt;BX) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;BX,l,k); }
+<a name="line298">298: </a>  <font color="#4169E1">if</font> (d-&gt;W) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W,l,k); }
+
+<a name="line300">300: </a>  <font color="#B22222">/* Solve the projected problem */</font>
+<a name="line301">301: </a>  dvd_calcpairs_projeig_solve(d);
+
+<a name="line303">303: </a>  d-&gt;V_tra_s = d-&gt;V_tra_e = 0;
+<a name="line304">304: </a>  d-&gt;V_new_s = d-&gt;V_new_e;
+<a name="line305">305: </a>  <font color="#4169E1">return</font>(0);
+<a name="line306">306: </a>}
+
+<a name="line308">308: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_apply_arbitrary"></a>static PetscErrorCode dvd_calcpairs_apply_arbitrary(dvdDashboard *d,PetscInt r_s,PetscInt r_e,PetscScalar *rr,PetscScalar *ri)</font></strong>
+<a name="line309">309: </a>{
+<a name="line310">310: </a>  PetscInt       i,k,ld;
+<a name="line311">311: </a>  PetscScalar    *pX;
+<a name="line312">312: </a>  Vec            *X,xr,xi;
+<a name="line314">314: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line315">315: </a>  PetscInt       N=1;
+<a name="line316">316: </a><font color="#A020F0">#else</font>
+<a name="line317">317: </a>  PetscInt       N=2,j;
+<a name="line318">318: </a><font color="#A020F0">#endif</font>
+
+<a name="line321">321: </a>  <font color="#B22222">/* Quick exit without neither arbitrary selection nor harmonic extraction */</font>
+<a name="line322">322: </a>  <font color="#4169E1">if</font> (!d-&gt;eps-&gt;arbitrary &amp;&amp; !d-&gt;calcpairs_eig_backtrans) <font color="#4169E1">return</font>(0);
+
+<a name="line324">324: </a>  <font color="#B22222">/* Quick exit without arbitrary selection, but with harmonic extraction */</font>
+<a name="line325">325: </a>  <font color="#4169E1">if</font> (d-&gt;calcpairs_eig_backtrans) {
+<a name="line326">326: </a>    <font color="#4169E1">for</font> (i=r_s; i&lt;r_e; i++) {
+<a name="line327">327: </a>      d-&gt;calcpairs_eig_backtrans(d,d-&gt;eigr[i],d-&gt;eigi[i],&amp;rr[i-r_s],&amp;ri[i-r_s]);
+<a name="line328">328: </a>    }
+<a name="line329">329: </a>  }
+<a name="line330">330: </a>  <font color="#4169E1">if</font> (!d-&gt;eps-&gt;arbitrary) <font color="#4169E1">return</font>(0);
+
+<a name="line332">332: </a>  <a href="../../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a>(d-&gt;auxV,N,&amp;X);
+<a name="line333">333: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(d-&gt;eps-&gt;ds,&amp;ld);
+<a name="line334">334: </a>  <font color="#4169E1">for</font> (i=r_s;i&lt;r_e;i++) {
+<a name="line335">335: </a>    k = i;
+<a name="line336">336: </a>    <a href="../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;k,NULL);
+<a name="line337">337: </a>    <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line338">338: </a>    dvd_improvex_compute_X(d,i,k+1,X,pX,ld);
+<a name="line339">339: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line340">340: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line341">341: </a>    <font color="#4169E1">if</font> (d-&gt;nX[i] != 1.0) {
+<a name="line342">342: </a>      <font color="#4169E1">for</font> (j=i;j&lt;k+1;j++) {
+<a name="line343">343: </a>        VecScale(X[j-i],1.0/d-&gt;nX[i]);
+<a name="line344">344: </a>      }
+<a name="line345">345: </a>    }
+<a name="line346">346: </a>    xr = X[0];
+<a name="line347">347: </a>    xi = X[1];
+<a name="line348">348: </a>    <font color="#4169E1">if</font> (i == k) {
+<a name="line349">349: </a>      VecSet(xi,0.0);
+<a name="line350">350: </a>    }
+<a name="line351">351: </a><font color="#A020F0">#else</font>
+<a name="line352">352: </a>    xr = X[0];
+<a name="line353">353: </a>    xi = NULL;
+<a name="line354">354: </a>    <font color="#4169E1">if</font> (d-&gt;nX[i] != 1.0) {
+<a name="line355">355: </a>      VecScale(xr,1.0/d-&gt;nX[i]);
+<a name="line356">356: </a>    }
+<a name="line357">357: </a><font color="#A020F0">#endif</font>
+<a name="line358">358: </a>    (d-&gt;eps-&gt;arbitrary)(rr[i-r_s],ri[i-r_s],xr,xi,&amp;rr[i-r_s],&amp;ri[i-r_s],d-&gt;eps-&gt;arbitraryctx);
+<a name="line359">359: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line360">360: </a>    <font color="#4169E1">if</font> (i != k) {
+<a name="line361">361: </a>      rr[i+1-r_s] = rr[i-r_s];
+<a name="line362">362: </a>      ri[i+1-r_s] = ri[i-r_s];
+<a name="line363">363: </a>      i++;
+<a name="line364">364: </a>    }
+<a name="line365">365: </a><font color="#A020F0">#endif</font>
+<a name="line366">366: </a>  }
+<a name="line367">367: </a>  <a href="../../../../docs/manualpages/sys/SlepcVecPoolRestoreVecs.html#SlepcVecPoolRestoreVecs">SlepcVecPoolRestoreVecs</a>(d-&gt;auxV,N,&amp;X);
+<a name="line368">368: </a>  <font color="#4169E1">return</font>(0);
+<a name="line369">369: </a>}
+
+<a name="line371">371: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_selectPairs"></a>static PetscErrorCode dvd_calcpairs_selectPairs(dvdDashboard *d,PetscInt n)</font></strong>
+<a name="line372">372: </a>{
+<a name="line373">373: </a>  PetscInt       k,lV,kV,nV;
+<a name="line374">374: </a>  PetscScalar    *rr,*ri;
+
+<a name="line378">378: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;lV,&amp;kV);
+<a name="line379">379: </a>  nV = kV - lV;
+<a name="line380">380: </a>  n = PetscMin(n,nV);
+<a name="line381">381: </a>  <font color="#4169E1">if</font> (n &lt;= 0) <font color="#4169E1">return</font>(0);
+<a name="line382">382: </a>  <font color="#B22222">/* Put the best n pairs at the beginning. Useful for restarting */</font>
+<a name="line383">383: </a>  <font color="#4169E1">if</font> (d-&gt;eps-&gt;arbitrary || d-&gt;calcpairs_eig_backtrans) {
+<a name="line384">384: </a>    PetscMalloc1(nV,&amp;rr);
+<a name="line385">385: </a>    PetscMalloc1(nV,&amp;ri);
+<a name="line386">386: </a>    dvd_calcpairs_apply_arbitrary(d,0,nV,rr,ri);
+<a name="line387">387: </a>  } <font color="#4169E1">else</font> {
+<a name="line388">388: </a>    rr = d-&gt;eigr;
+<a name="line389">389: </a>    ri = d-&gt;eigi;
+<a name="line390">390: </a>  }
+<a name="line391">391: </a>  k = n;
+<a name="line392">392: </a>  <a href="../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(d-&gt;eps-&gt;ds,d-&gt;eigr,d-&gt;eigi,rr,ri,&amp;k);
+<a name="line393">393: </a>  <font color="#B22222">/* Put the best pair at the beginning. Useful to check its residual */</font>
+<a name="line394">394: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line395">395: </a>  <font color="#4169E1">if</font> (n != 1 &amp;&amp; (n != 2 || d-&gt;eigi[0] == 0.0))
+<a name="line396">396: </a><font color="#A020F0">#else</font>
+<a name="line397">397: </a>  <font color="#4169E1">if</font> (n != 1)
+<a name="line398">398: </a><font color="#A020F0">#endif</font>
+<a name="line399">399: </a>  {
+<a name="line400">400: </a>    dvd_calcpairs_apply_arbitrary(d,0,nV,rr,ri);
+<a name="line401">401: </a>    k = 1;
+<a name="line402">402: </a>    <a href="../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(d-&gt;eps-&gt;ds,d-&gt;eigr,d-&gt;eigi,rr,ri,&amp;k);
+<a name="line403">403: </a>  }
+<a name="line404">404: </a>  <a href="../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(d-&gt;eps-&gt;ds,d-&gt;eigr,d-&gt;eigi);
+
+<a name="line406">406: </a>  <font color="#4169E1">if</font> (d-&gt;calcpairs_eigs_trans) {
+<a name="line407">407: </a>    d-&gt;calcpairs_eigs_trans(d);
+<a name="line408">408: </a>  }
+<a name="line409">409: </a>  <font color="#4169E1">if</font> (d-&gt;eps-&gt;arbitrary || d-&gt;calcpairs_eig_backtrans) {
+<a name="line410">410: </a>    PetscFree(rr);
+<a name="line411">411: </a>    PetscFree(ri);
+<a name="line412">412: </a>  }
+<a name="line413">413: </a>  <font color="#4169E1">return</font>(0);
+<a name="line414">414: </a>}
+
+<a name="line416">416: </a><strong><font color="#4169E1"><a name="EPSXDComputeDSConv"></a>static PetscErrorCode EPSXDComputeDSConv(dvdDashboard *d)</font></strong>
+<a name="line417">417: </a>{
+<a name="line418">418: </a>  PetscErrorCode    ierr;
+<a name="line419">419: </a>  PetscInt          i,ld;
+<a name="line420">420: </a>  Vec               v;
+<a name="line421">421: </a>  PetscScalar       *pA;
+<a name="line422">422: </a>  const PetscScalar *pv;
+<a name="line423">423: </a>  PetscBool         symm;
+
+<a name="line426">426: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;eps-&gt;V,0,d-&gt;eps-&gt;nconv);
+<a name="line427">427: </a>  PetscObjectTypeCompareAny((PetscObject)d-&gt;eps-&gt;ds,&amp;symm,DSHEP,<font color="#666666">""</font>);
+<a name="line428">428: </a>  <font color="#4169E1">if</font> (symm) <font color="#4169E1">return</font>(0);
+<a name="line429">429: </a>  <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(d-&gt;eps-&gt;ds,d-&gt;eps-&gt;nconv,0,0,0);
+<a name="line430">430: </a>  <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,0,0,d-&gt;H,0,0,d-&gt;eps-&gt;nconv,d-&gt;eps-&gt;nconv,PETSC_FALSE);
+<a name="line431">431: </a>  <font color="#4169E1">if</font> (d-&gt;G) {
+<a name="line432">432: </a>    <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,0,0,d-&gt;G,0,0,d-&gt;eps-&gt;nconv,d-&gt;eps-&gt;nconv,PETSC_FALSE);
+<a name="line433">433: </a>  }
+<a name="line434">434: </a>  <font color="#B22222">/* Set the signature on projected matrix B */</font>
+<a name="line435">435: </a>  <font color="#4169E1">if</font> (DVD_IS(d-&gt;sEP,DVD_EP_INDEFINITE)) {
+<a name="line436">436: </a>    <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(d-&gt;eps-&gt;ds,&amp;ld);
+<a name="line437">437: </a>    <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,&amp;pA);
+<a name="line438">438: </a>    PetscArrayzero(pA,d-&gt;eps-&gt;nconv*ld);
+<a name="line439">439: </a>    VecCreateSeq(PETSC_COMM_SELF,d-&gt;eps-&gt;nconv,&amp;v);
+<a name="line440">440: </a>    <a href="../../../../docs/manualpages/BV/BVGetSignature.html#BVGetSignature">BVGetSignature</a>(d-&gt;eps-&gt;V,v);
+<a name="line441">441: </a>    VecGetArrayRead(v,&amp;pv);
+<a name="line442">442: </a>    <font color="#4169E1">for</font> (i=0;i&lt;d-&gt;eps-&gt;nconv;i++) pA[i+ld*i] = pv[i];
+<a name="line443">443: </a>    VecRestoreArrayRead(v,&amp;pv);
+<a name="line444">444: </a>    VecDestroy(&amp;v);
+<a name="line445">445: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,&amp;pA);
+<a name="line446">446: </a>  }
+<a name="line447">447: </a>  <a href="../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line448">448: </a>  <a href="../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(d-&gt;eps-&gt;ds,d-&gt;eps-&gt;eigr,d-&gt;eps-&gt;eigi);
+<a name="line449">449: </a>  <a href="../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(d-&gt;eps-&gt;ds,d-&gt;eps-&gt;eigr,d-&gt;eps-&gt;eigi);
+<a name="line450">450: </a>  <font color="#4169E1">if</font> (d-&gt;W) {
+<a name="line451">451: </a>    <font color="#4169E1">for</font> (i=0; i&lt;d-&gt;eps-&gt;nconv; i++) {
+<a name="line452">452: </a>      d-&gt;calcpairs_eig_backtrans(d,d-&gt;eps-&gt;eigr[i],d-&gt;eps-&gt;eigi[i],&amp;d-&gt;eps-&gt;eigr[i],&amp;d-&gt;eps-&gt;eigi[i]);
+<a name="line453">453: </a>    }
+<a name="line454">454: </a>  }
+<a name="line455">455: </a>  <font color="#4169E1">return</font>(0);
+<a name="line456">456: </a>}
+
+<a name="line458">458: </a><font color="#B22222">/*</font>
+<a name="line459">459: </a><font color="#B22222">   Compute the residual vectors R(i) &lt;- (AV - <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>*eigr(i))*pX(i), and also</font>
+<a name="line460">460: </a><font color="#B22222">   the norm associated to the Schur pair, where i = r_s..r_e</font>
+<a name="line461">461: </a><font color="#B22222">*/</font>
+<a name="line462">462: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_res_0"></a>static PetscErrorCode dvd_calcpairs_res_0(dvdDashboard *d,PetscInt r_s,PetscInt r_e)</font></strong>
+<a name="line463">463: </a>{
+<a name="line464">464: </a>  PetscInt       i,ldpX;
+<a name="line465">465: </a>  PetscScalar    *pX;
+<a name="line467">467: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>             BX = d-&gt;BX?d-&gt;BX:d-&gt;eps-&gt;V;
+<a name="line468">468: </a>  Vec            *R;
+
+<a name="line471">471: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(d-&gt;eps-&gt;ds,&amp;ldpX);
+<a name="line472">472: </a>  <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;pX);
+<a name="line473">473: </a>  <font color="#B22222">/* nX(i) &lt;- ||X(i)|| */</font>
+<a name="line474">474: </a>  dvd_improvex_compute_X(d,r_s,r_e,NULL,pX,ldpX);
+<a name="line475">475: </a>  <a href="../../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a>(d-&gt;auxV,r_e-r_s,&amp;R);
+<a name="line476">476: </a>  <font color="#4169E1">for</font> (i=r_s;i&lt;r_e;i++) {
+<a name="line477">477: </a>    <font color="#B22222">/* R(i-r_s) &lt;- AV*pX(i) */</font>
+<a name="line478">478: </a>    <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(d-&gt;AX,1.0,0.0,R[i-r_s],&amp;pX[ldpX*i]);
+<a name="line479">479: </a>    <font color="#B22222">/* R(i-r_s) &lt;- R(i-r_s) - eigr(i)*BX*pX(i) */</font>
+<a name="line480">480: </a>    <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(BX,-d-&gt;eigr[i],1.0,R[i-r_s],&amp;pX[ldpX*i]);
+<a name="line481">481: </a>  }
+<a name="line482">482: </a>  <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;pX);
+<a name="line483">483: </a>  d-&gt;calcpairs_proj_res(d,r_s,r_e,R);
+<a name="line484">484: </a>  <a href="../../../../docs/manualpages/sys/SlepcVecPoolRestoreVecs.html#SlepcVecPoolRestoreVecs">SlepcVecPoolRestoreVecs</a>(d-&gt;auxV,r_e-r_s,&amp;R);
+<a name="line485">485: </a>  <font color="#4169E1">return</font>(0);
+<a name="line486">486: </a>}
+
+<a name="line488">488: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_proj_res"></a>static PetscErrorCode dvd_calcpairs_proj_res(dvdDashboard *d,PetscInt r_s,PetscInt r_e,Vec *R)</font></strong>
+<a name="line489">489: </a>{
+<a name="line490">490: </a>  PetscInt       i,l,k;
+<a name="line492">492: </a>  PetscBool      lindep=PETSC_FALSE;
+<a name="line493">493: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>             cX;
+
+<a name="line496">496: </a>  <font color="#4169E1">if</font> (d-&gt;W) cX = d-&gt;W; <font color="#B22222">/* If left subspace exists, R &lt;- orth(cY, R), nR[i] &lt;- ||R[i]|| */</font>
+<a name="line497">497: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!(DVD_IS(d-&gt;sEP, DVD_EP_STD) &amp;&amp; DVD_IS(d-&gt;sEP, DVD_EP_HERMITIAN))) cX = d-&gt;eps-&gt;V; <font color="#B22222">/* If not HEP, R &lt;- orth(cX, R), nR[i] &lt;- ||R[i]|| */</font>
+<a name="line498">498: </a>  <font color="#4169E1">else</font> cX = NULL; <font color="#B22222">/* Otherwise, nR[i] &lt;- ||R[i]|| */</font>
+
+<a name="line500">500: </a>  <font color="#4169E1">if</font> (cX) {
+<a name="line501">501: </a>    <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(cX,&amp;l,&amp;k);
+<a name="line502">502: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(cX,0,l);
+<a name="line503">503: </a>    <font color="#4169E1">for</font> (i=0;i&lt;r_e-r_s;i++) {
+<a name="line504">504: </a>      <a href="../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(cX,R[i],NULL,&amp;d-&gt;nR[r_s+i],&amp;lindep);
+<a name="line505">505: </a>    }
+<a name="line506">506: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(cX,l,k);
+<a name="line507">507: </a>    <font color="#4169E1">if</font> (lindep || (PetscAbs(d-&gt;nR[r_s+i]) &lt; PETSC_MACHINE_EPSILON)) {
+<a name="line508">508: </a>      PetscInfo2(d-&gt;eps,<font color="#666666">"The computed eigenvector residual %D is too low, %g!\n"</font>,r_s+i,(double)(d-&gt;nR[r_s+i]));
+<a name="line509">509: </a>    }
+<a name="line510">510: </a>  } <font color="#4169E1">else</font> {
+<a name="line511">511: </a>    <font color="#4169E1">for</font> (i=0;i&lt;r_e-r_s;i++) {
+<a name="line512">512: </a>      VecNormBegin(R[i],NORM_2,&amp;d-&gt;nR[r_s+i]);
+<a name="line513">513: </a>    }
+<a name="line514">514: </a>    <font color="#4169E1">for</font> (i=0;i&lt;r_e-r_s;i++) {
+<a name="line515">515: </a>      VecNormEnd(R[i],NORM_2,&amp;d-&gt;nR[r_s+i]);
+<a name="line516">516: </a>    }
+<a name="line517">517: </a>  }
+<a name="line518">518: </a>  <font color="#4169E1">return</font>(0);
+<a name="line519">519: </a>}
+
+<a name="line521">521: </a><strong><font color="#4169E1"><a name="dvd_calcpairs_qz"></a>PetscErrorCode dvd_calcpairs_qz(dvdDashboard *d,dvdBlackboard *b,PetscBool borth,PetscBool harm)</font></strong>
+<a name="line522">522: </a>{
+<a name="line524">524: </a>  PetscBool      std_probl,her_probl,ind_probl;
+<a name="line525">525: </a>  <a href="../../../../docs/manualpages/DS/DSType.html#DSType">DSType</a>         dstype;
+<a name="line526">526: </a>  Vec            v1;
+
+<a name="line529">529: </a>  std_probl = DVD_IS(d-&gt;sEP,DVD_EP_STD)? PETSC_TRUE: PETSC_FALSE;
+<a name="line530">530: </a>  her_probl = DVD_IS(d-&gt;sEP,DVD_EP_HERMITIAN)? PETSC_TRUE: PETSC_FALSE;
+<a name="line531">531: </a>  ind_probl = DVD_IS(d-&gt;sEP,DVD_EP_INDEFINITE)? PETSC_TRUE: PETSC_FALSE;
+
+<a name="line533">533: </a>  <font color="#B22222">/* Setting configuration constrains */</font>
+<a name="line534">534: </a>  b-&gt;max_size_proj = PetscMax(b-&gt;max_size_proj,b-&gt;max_size_V);
+<a name="line535">535: </a>  d-&gt;W_shift = d-&gt;B? PETSC_TRUE: PETSC_FALSE;
+
+<a name="line537">537: </a>  <font color="#B22222">/* Setup the step */</font>
+<a name="line538">538: </a>  <font color="#4169E1">if</font> (b-&gt;state &gt;= DVD_STATE_CONF) {
+<a name="line539">539: </a>    d-&gt;max_size_P = b-&gt;max_size_P;
+<a name="line540">540: </a>    d-&gt;max_size_proj = b-&gt;max_size_proj;
+<a name="line541">541: </a>    <font color="#B22222">/* Create a <a href="../../../../docs/manualpages/DS/DS.html#DS">DS</a> if the method works with Schur decompositions */</font>
+<a name="line542">542: </a>    d-&gt;calcPairs = dvd_calcpairs_proj;
+<a name="line543">543: </a>    d-&gt;calcpairs_residual = dvd_calcpairs_res_0;
+<a name="line544">544: </a>    d-&gt;calcpairs_proj_res = dvd_calcpairs_proj_res;
+<a name="line545">545: </a>    d-&gt;calcpairs_selectPairs = dvd_calcpairs_selectPairs;
+<a name="line546">546: </a>    <font color="#B22222">/* Create and configure a <a href="../../../../docs/manualpages/DS/DS.html#DS">DS</a> for solving the projected problems */</font>
+<a name="line547">547: </a>    <font color="#4169E1">if</font> (d-&gt;W) dstype = DSGNHEP;    <font color="#B22222">/* If we use harmonics */</font>
+<a name="line548">548: </a>    <font color="#4169E1">else</font> {
+<a name="line549">549: </a>      <font color="#4169E1">if</font> (ind_probl) dstype = DSGHIEP;
+<a name="line550">550: </a>      <font color="#4169E1">else</font> <font color="#4169E1">if</font> (std_probl) dstype = her_probl? DSHEP : DSNHEP;
+<a name="line551">551: </a>      <font color="#4169E1">else</font> dstype = her_probl? DSGHEP : DSGNHEP;
+<a name="line552">552: </a>    }
+<a name="line553">553: </a>    <a href="../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(d-&gt;eps-&gt;ds,dstype);
+<a name="line554">554: </a>    <a href="../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(d-&gt;eps-&gt;ds,d-&gt;eps-&gt;ncv);
+<a name="line555">555: </a>    <font color="#B22222">/* Create various vector basis */</font>
+<a name="line556">556: </a>    <font color="#4169E1">if</font> (harm) {
+<a name="line557">557: </a>      <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(d-&gt;eps-&gt;V,d-&gt;eps-&gt;ncv,&amp;d-&gt;W);
+<a name="line558">558: </a>      <a href="../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>(d-&gt;W,NULL,PETSC_FALSE);
+<a name="line559">559: </a>    } <font color="#4169E1">else</font> d-&gt;W = NULL;
+<a name="line560">560: </a>    <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(d-&gt;eps-&gt;V,d-&gt;eps-&gt;ncv,&amp;d-&gt;AX);
+<a name="line561">561: </a>    <a href="../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>(d-&gt;AX,NULL,PETSC_FALSE);
+<a name="line562">562: </a>    <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(d-&gt;eps-&gt;V,d-&gt;eps-&gt;ncv,&amp;d-&gt;auxBV);
+<a name="line563">563: </a>    <a href="../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>(d-&gt;auxBV,NULL,PETSC_FALSE);
+<a name="line564">564: </a>    <font color="#4169E1">if</font> (d-&gt;B) {
+<a name="line565">565: </a>      <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(d-&gt;eps-&gt;V,d-&gt;eps-&gt;ncv,&amp;d-&gt;BX);
+<a name="line566">566: </a>      <a href="../../../../docs/manualpages/BV/BVSetMatrix.html#BVSetMatrix">BVSetMatrix</a>(d-&gt;BX,NULL,PETSC_FALSE);
+<a name="line567">567: </a>    } <font color="#4169E1">else</font> d-&gt;BX = NULL;
+<a name="line568">568: </a>    <a href="../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(d-&gt;A,&amp;v1,NULL);
+<a name="line569">569: </a>    <a href="../../../../docs/manualpages/sys/SlepcVecPoolCreate.html#SlepcVecPoolCreate">SlepcVecPoolCreate</a>(v1,0,&amp;d-&gt;auxV);
+<a name="line570">570: </a>    VecDestroy(&amp;v1);
+<a name="line571">571: </a>    <font color="#B22222">/* Create projected problem matrices */</font>
+<a name="line572">572: </a>    MatCreateSeqDense(PETSC_COMM_SELF,d-&gt;eps-&gt;ncv,d-&gt;eps-&gt;ncv,NULL,&amp;d-&gt;H);
+<a name="line573">573: </a>    <font color="#4169E1">if</font> (!std_probl) {
+<a name="line574">574: </a>      MatCreateSeqDense(PETSC_COMM_SELF,d-&gt;eps-&gt;ncv,d-&gt;eps-&gt;ncv,NULL,&amp;d-&gt;G);
+<a name="line575">575: </a>    } <font color="#4169E1">else</font> d-&gt;G = NULL;
+<a name="line576">576: </a>    <font color="#4169E1">if</font> (her_probl) {
+<a name="line577">577: </a>      MatSetOption(d-&gt;H,MAT_HERMITIAN,PETSC_TRUE);
+<a name="line578">578: </a>      <font color="#4169E1">if</font> (d-&gt;G) { MatSetOption(d-&gt;G,MAT_HERMITIAN,PETSC_TRUE); }
+<a name="line579">579: </a>    }
+
+<a name="line581">581: </a>    <font color="#4169E1">if</font> (ind_probl) {
+<a name="line582">582: </a>      PetscMalloc1(d-&gt;eps-&gt;ncv,&amp;d-&gt;nBds);
+<a name="line583">583: </a>    } <font color="#4169E1">else</font> d-&gt;nBds = NULL;
+<a name="line584">584: </a>    MatCreateSeqDense(PETSC_COMM_SELF,d-&gt;eps-&gt;ncv,d-&gt;eps-&gt;ncv,NULL,&amp;d-&gt;auxM);
+
+<a name="line586">586: </a>    EPSDavidsonFLAdd(&amp;d-&gt;startList,dvd_calcpairs_qz_start);
+<a name="line587">587: </a>    EPSDavidsonFLAdd(&amp;d-&gt;endList,EPSXDComputeDSConv);
+<a name="line588">588: </a>    EPSDavidsonFLAdd(&amp;d-&gt;destroyList,dvd_calcpairs_qz_d);
+<a name="line589">589: </a>  }
+<a name="line590">590: </a>  <font color="#4169E1">return</font>(0);
+<a name="line591">591: </a>}
+
+</pre>
+</body>
+
+</html>

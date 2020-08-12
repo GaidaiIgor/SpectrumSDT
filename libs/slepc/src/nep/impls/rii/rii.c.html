@@ -1,0 +1,779 @@
+<center><a href="rii.c">Actual source code: rii.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/nep/impls/rii/rii.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:09+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/nep/impls/rii/rii.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc nonlinear eigensolver: "rii"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Residual inverse iteration</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       Simple residual inverse iteration with varying shift.</font>
+
+<a name="line19"> 19: </a><font color="#B22222">   References:</font>
+
+<a name="line21"> 21: </a><font color="#B22222">       [1] A. Neumaier, "Residual inverse iteration for the nonlinear</font>
+<a name="line22"> 22: </a><font color="#B22222">           eigenvalue problem", SIAM J. Numer. Anal. 22(5):914-923, 1985.</font>
+<a name="line23"> 23: </a><font color="#B22222">*/</font>
+
+<a name="line25"> 25: </a> #include <A href="../../../../include/slepc/private/nepimpl.h.html">&lt;slepc/private/nepimpl.h&gt;</A>
+<a name="line26"> 26: </a> #include <A href="../nepdefl.h.html">&lt;../src/nep/impls/nepdefl.h&gt;</A>
+
+<a name="line28"> 28: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line29"> 29: </a>  PetscInt  max_inner_it;     <font color="#B22222">/* maximum number of Newton iterations */</font>
+<a name="line30"> 30: </a>  PetscInt  lag;              <font color="#B22222">/* interval to rebuild preconditioner */</font>
+<a name="line31"> 31: </a>  PetscBool cctol;            <font color="#B22222">/* constant correction tolerance */</font>
+<a name="line32"> 32: </a>  PetscBool herm;             <font color="#B22222">/* whether the Hermitian version of the scalar equation must be used */</font>
+<a name="line33"> 33: </a>  PetscReal deftol;           <font color="#B22222">/* tolerance for the deflation (threshold) */</font>
+<a name="line34"> 34: </a>  KSP       ksp;              <font color="#B22222">/* linear solver object */</font>
+<a name="line35"> 35: </a>} NEP_RII;
+
+<a name="line37"> 37: </a><strong><font color="#4169E1"><a name="NEPSetUp_RII"></a>PetscErrorCode NEPSetUp_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep)</font></strong>
+<a name="line38"> 38: </a>{
+<a name="line40"> 40: </a>  PetscBool      istrivial;
+
+<a name="line43"> 43: </a>  <font color="#4169E1">if</font> (nep-&gt;ncv!=PETSC_DEFAULT) { PetscInfo(nep,<font color="#666666">"Setting ncv = nev, ignoring user-provided value\n"</font>); }
+<a name="line44"> 44: </a>  nep-&gt;ncv = nep-&gt;nev;
+<a name="line45"> 45: </a>  <font color="#4169E1">if</font> (nep-&gt;mpd!=PETSC_DEFAULT) { PetscInfo(nep,<font color="#666666">"Setting mpd = nev, ignoring user-provided value\n"</font>); }
+<a name="line46"> 46: </a>  nep-&gt;mpd = nep-&gt;nev;
+<a name="line47"> 47: </a>  <font color="#4169E1">if</font> (nep-&gt;max_it==PETSC_DEFAULT) nep-&gt;max_it = PetscMax(5000,2*nep-&gt;n/nep-&gt;ncv);
+<a name="line48"> 48: </a>  <font color="#4169E1">if</font> (nep-&gt;which &amp;&amp; nep-&gt;which!=<a href="../../../../docs/manualpages/NEP/NEPWhich.html#NEPWhich">NEP_TARGET_MAGNITUDE</a>) SETERRQ(PetscObjectComm((PetscObject)nep),1,<font color="#666666">"Wrong value of which"</font>);
+
+<a name="line50"> 50: </a>  <a href="../../../../docs/manualpages/RG/RGIsTrivial.html#RGIsTrivial">RGIsTrivial</a>(nep-&gt;rg,&amp;istrivial);
+<a name="line51"> 51: </a>  <font color="#4169E1">if</font> (!istrivial) SETERRQ(PetscObjectComm((PetscObject)nep),PETSC_ERR_SUP,<font color="#666666">"This solver does not support region filtering"</font>);
+
+<a name="line53"> 53: </a>  <a href="../../../../docs/manualpages/NEP/NEPAllocateSolution.html#NEPAllocateSolution">NEPAllocateSolution</a>(nep,0);
+<a name="line54"> 54: </a>  <a href="../../../../docs/manualpages/NEP/NEPSetWorkVecs.html#NEPSetWorkVecs">NEPSetWorkVecs</a>(nep,2);
+<a name="line55"> 55: </a>  <font color="#4169E1">return</font>(0);
+<a name="line56"> 56: </a>}
+
+<a name="line58"> 58: </a><strong><font color="#4169E1"><a name="NEPSolve_RII"></a>PetscErrorCode NEPSolve_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep)</font></strong>
+<a name="line59"> 59: </a>{
+<a name="line60"> 60: </a>  PetscErrorCode     ierr;
+<a name="line61"> 61: </a>  NEP_RII            *ctx = (NEP_RII*)nep-&gt;data;
+<a name="line62"> 62: </a>  Mat                T,Tp,H;
+<a name="line63"> 63: </a>  Vec                uu,u,r,delta,t;
+<a name="line64"> 64: </a>  PetscScalar        lambda,lambda2,sigma,a1,a2,corr,*Hp,*Ap;
+<a name="line65"> 65: </a>  PetscReal          nrm,resnorm=1.0,ktol=0.1,perr,rtol;
+<a name="line66"> 66: </a>  PetscBool          skip=PETSC_FALSE,lock=PETSC_FALSE;
+<a name="line67"> 67: </a>  PetscInt           inner_its,its=0,ldh,ldds,i,j;
+<a name="line68"> 68: </a>  NEP_EXT_OP         extop=NULL;
+<a name="line69"> 69: </a>  KSPConvergedReason kspreason;
+
+<a name="line72"> 72: </a>  <font color="#B22222">/* get initial approximation of eigenvalue and eigenvector */</font>
+<a name="line73"> 73: </a>  NEPGetDefaultShift(nep,&amp;sigma);
+<a name="line74"> 74: </a>  lambda = sigma;
+<a name="line75"> 75: </a>  <font color="#4169E1">if</font> (!nep-&gt;nini) {
+<a name="line76"> 76: </a>    <a href="../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(nep-&gt;V,0);
+<a name="line77"> 77: </a>    <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(nep-&gt;V,0,NORM_2,&amp;nrm);
+<a name="line78"> 78: </a>    <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(nep-&gt;V,0,1.0/nrm);
+<a name="line79"> 79: </a>  }
+<a name="line80"> 80: </a>  <font color="#4169E1">if</font> (!ctx-&gt;ksp) { <a href="../../../../docs/manualpages/NEP/NEPRIIGetKSP.html#NEPRIIGetKSP">NEPRIIGetKSP</a>(nep,&amp;ctx-&gt;ksp); }
+<a name="line81"> 81: </a>  NEPDeflationInitialize(nep,nep-&gt;V,ctx-&gt;ksp,PETSC_FALSE,nep-&gt;nev,&amp;extop);
+<a name="line82"> 82: </a>  NEPDeflationCreateVec(extop,&amp;u);
+<a name="line83"> 83: </a>  VecDuplicate(u,&amp;r);
+<a name="line84"> 84: </a>  VecDuplicate(u,&amp;delta);
+<a name="line85"> 85: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(nep-&gt;V,0,&amp;uu);
+<a name="line86"> 86: </a>  NEPDeflationCopyToExtendedVec(extop,uu,NULL,u,PETSC_FALSE);
+<a name="line87"> 87: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(nep-&gt;V,0,&amp;uu);
+
+<a name="line89"> 89: </a>  <font color="#B22222">/* prepare linear solver */</font>
+<a name="line90"> 90: </a>  NEPDeflationSolveSetUp(extop,sigma);
+<a name="line91"> 91: </a>  KSPGetTolerances(ctx-&gt;ksp,&amp;rtol,NULL,NULL,NULL);
+
+<a name="line93"> 93: </a>  VecCopy(u,r);
+<a name="line94"> 94: </a>  NEPDeflationFunctionSolve(extop,r,u);
+<a name="line95"> 95: </a>  VecNorm(u,NORM_2,&amp;nrm);
+<a name="line96"> 96: </a>  VecScale(u,1.0/nrm);
+
+<a name="line98"> 98: </a>  <font color="#B22222">/* Restart loop */</font>
+<a name="line99"> 99: </a>  <font color="#4169E1">while</font> (nep-&gt;reason == <a href="../../../../docs/manualpages/NEP/NEPConvergedReason.html#NEPConvergedReason">NEP_CONVERGED_ITERATING</a>) {
+<a name="line100">100: </a>    its++;
+
+<a name="line102">102: </a>    <font color="#B22222">/* Use Newton's method to compute nonlinear Rayleigh functional. Current eigenvalue</font>
+<a name="line103">103: </a><font color="#B22222">       estimate as starting value. */</font>
+<a name="line104">104: </a>    inner_its=0;
+<a name="line105">105: </a>    lambda2 = lambda;
+<a name="line106">106: </a>    <font color="#4169E1">do</font> {
+<a name="line107">107: </a>      NEPDeflationComputeFunction(extop,lambda,&amp;T);
+<a name="line108">108: </a>      MatMult(T,u,r);
+<a name="line109">109: </a>      <font color="#4169E1">if</font> (!ctx-&gt;herm) {
+<a name="line110">110: </a>        NEPDeflationFunctionSolve(extop,r,delta);
+<a name="line111">111: </a>        KSPGetConvergedReason(ctx-&gt;ksp,&amp;kspreason);
+<a name="line112">112: </a>        <font color="#4169E1">if</font> (kspreason&lt;0) {
+<a name="line113">113: </a>          PetscInfo1(nep,<font color="#666666">"iter=%D, linear solve failed\n"</font>,nep-&gt;its);
+<a name="line114">114: </a>        }
+<a name="line115">115: </a>        t = delta;
+<a name="line116">116: </a>      } <font color="#4169E1">else</font> t = r;
+<a name="line117">117: </a>      VecDot(t,u,&amp;a1);
+<a name="line118">118: </a>      NEPDeflationComputeJacobian(extop,lambda,&amp;Tp);
+<a name="line119">119: </a>      MatMult(Tp,u,r);
+<a name="line120">120: </a>      <font color="#4169E1">if</font> (!ctx-&gt;herm) {
+<a name="line121">121: </a>        NEPDeflationFunctionSolve(extop,r,delta);
+<a name="line122">122: </a>        KSPGetConvergedReason(ctx-&gt;ksp,&amp;kspreason);
+<a name="line123">123: </a>        <font color="#4169E1">if</font> (kspreason&lt;0) {
+<a name="line124">124: </a>          PetscInfo1(nep,<font color="#666666">"iter=%D, linear solve failed\n"</font>,nep-&gt;its);
+<a name="line125">125: </a>        }
+<a name="line126">126: </a>        t = delta;
+<a name="line127">127: </a>      } <font color="#4169E1">else</font> t = r;
+<a name="line128">128: </a>      VecDot(t,u,&amp;a2);
+<a name="line129">129: </a>      corr = a1/a2;
+<a name="line130">130: </a>      lambda = lambda - corr;
+<a name="line131">131: </a>      inner_its++;
+<a name="line132">132: </a>    } <font color="#4169E1">while</font> (PetscAbsScalar(corr)/PetscAbsScalar(lambda)&gt;PETSC_SQRT_MACHINE_EPSILON &amp;&amp; inner_its&lt;ctx-&gt;max_inner_it);
+
+<a name="line134">134: </a>    <font color="#B22222">/* form residual,  r = T(lambda)*u */</font>
+<a name="line135">135: </a>    NEPDeflationComputeFunction(extop,lambda,&amp;T);
+<a name="line136">136: </a>    MatMult(T,u,r);
+
+<a name="line138">138: </a>    <font color="#B22222">/* convergence test */</font>
+<a name="line139">139: </a>    perr = nep-&gt;errest[nep-&gt;nconv];
+<a name="line140">140: </a>    VecNorm(r,NORM_2,&amp;resnorm);
+<a name="line141">141: </a>    (*nep-&gt;converged)(nep,lambda,0,resnorm,&amp;nep-&gt;errest[nep-&gt;nconv],nep-&gt;convergedctx);
+<a name="line142">142: </a>    nep-&gt;eigr[nep-&gt;nconv] = lambda;
+<a name="line143">143: </a>    <font color="#4169E1">if</font> (its&gt;1 &amp;&amp; (nep-&gt;errest[nep-&gt;nconv]&lt;=nep-&gt;tol || nep-&gt;errest[nep-&gt;nconv]&lt;=ctx-&gt;deftol)) {
+<a name="line144">144: </a>      <font color="#4169E1">if</font> (nep-&gt;errest[nep-&gt;nconv]&lt;=ctx-&gt;deftol &amp;&amp; !extop-&gt;ref &amp;&amp; nep-&gt;nconv) {
+<a name="line145">145: </a>        NEPDeflationExtractEigenpair(extop,nep-&gt;nconv,u,lambda,nep-&gt;ds);
+<a name="line146">146: </a>        NEPDeflationSetRefine(extop,PETSC_TRUE);
+<a name="line147">147: </a>        MatMult(T,u,r);
+<a name="line148">148: </a>        VecNorm(r,NORM_2,&amp;resnorm);
+<a name="line149">149: </a>        (*nep-&gt;converged)(nep,lambda,0,resnorm,&amp;nep-&gt;errest[nep-&gt;nconv],nep-&gt;convergedctx);
+<a name="line150">150: </a>        <font color="#4169E1">if</font> (nep-&gt;errest[nep-&gt;nconv]&lt;=nep-&gt;tol) lock = PETSC_TRUE;
+<a name="line151">151: </a>      } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (nep-&gt;errest[nep-&gt;nconv]&lt;=nep-&gt;tol) lock = PETSC_TRUE;
+<a name="line152">152: </a>    }
+<a name="line153">153: </a>    <font color="#4169E1">if</font> (lock) {
+<a name="line154">154: </a>      NEPDeflationSetRefine(extop,PETSC_FALSE);
+<a name="line155">155: </a>      nep-&gt;nconv = nep-&gt;nconv + 1;
+<a name="line156">156: </a>      NEPDeflationLocking(extop,u,lambda);
+<a name="line157">157: </a>      nep-&gt;its += its;
+<a name="line158">158: </a>      skip = PETSC_TRUE;
+<a name="line159">159: </a>      lock = PETSC_FALSE;
+<a name="line160">160: </a>    }
+<a name="line161">161: </a>    (*nep-&gt;stopping)(nep,nep-&gt;its+its,nep-&gt;max_it,nep-&gt;nconv,nep-&gt;nev,&amp;nep-&gt;reason,nep-&gt;stoppingctx);
+<a name="line162">162: </a>    <font color="#4169E1">if</font> (!skip || nep-&gt;reason&gt;0) {
+<a name="line163">163: </a>      NEPMonitor(nep,nep-&gt;its+its,nep-&gt;nconv,nep-&gt;eigr,nep-&gt;eigi,nep-&gt;errest,(nep-&gt;reason&gt;0)?nep-&gt;nconv:nep-&gt;nconv+1);
+<a name="line164">164: </a>    }
+
+<a name="line166">166: </a>    <font color="#4169E1">if</font> (nep-&gt;reason == <a href="../../../../docs/manualpages/NEP/NEPConvergedReason.html#NEPConvergedReason">NEP_CONVERGED_ITERATING</a>) {
+<a name="line167">167: </a>      <font color="#4169E1">if</font> (!skip) {
+<a name="line168">168: </a>        <font color="#B22222">/* update preconditioner and set adaptive tolerance */</font>
+<a name="line169">169: </a>        <font color="#4169E1">if</font> (ctx-&gt;lag &amp;&amp; !(its%ctx-&gt;lag) &amp;&amp; its&gt;=2*ctx-&gt;lag &amp;&amp; perr &amp;&amp; nep-&gt;errest[nep-&gt;nconv]&gt;.5*perr) {
+<a name="line170">170: </a>          NEPDeflationSolveSetUp(extop,lambda2);
+<a name="line171">171: </a>        }
+<a name="line172">172: </a>        <font color="#4169E1">if</font> (!ctx-&gt;cctol) {
+<a name="line173">173: </a>          ktol = PetscMax(ktol/2.0,rtol);
+<a name="line174">174: </a>          KSPSetTolerances(ctx-&gt;ksp,ktol,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
+<a name="line175">175: </a>        }
+
+<a name="line177">177: </a>        <font color="#B22222">/* eigenvector correction: delta = T(sigma)\r */</font>
+<a name="line178">178: </a>        NEPDeflationFunctionSolve(extop,r,delta);
+<a name="line179">179: </a>        KSPGetConvergedReason(ctx-&gt;ksp,&amp;kspreason);
+<a name="line180">180: </a>        <font color="#4169E1">if</font> (kspreason&lt;0) {
+<a name="line181">181: </a>          PetscInfo1(nep,<font color="#666666">"iter=%D, linear solve failed, stopping solve\n"</font>,nep-&gt;its);
+<a name="line182">182: </a>          nep-&gt;reason = <a href="../../../../docs/manualpages/NEP/NEPConvergedReason.html#NEPConvergedReason">NEP_DIVERGED_LINEAR_SOLVE</a>;
+<a name="line183">183: </a>          <font color="#4169E1">break</font>;
+<a name="line184">184: </a>        }
+
+<a name="line186">186: </a>        <font color="#B22222">/* update eigenvector: u = u - delta */</font>
+<a name="line187">187: </a>        VecAXPY(u,-1.0,delta);
+
+<a name="line189">189: </a>        <font color="#B22222">/* normalize eigenvector */</font>
+<a name="line190">190: </a>        VecNormalize(u,NULL);
+<a name="line191">191: </a>      } <font color="#4169E1">else</font> {
+<a name="line192">192: </a>        its = -1;
+<a name="line193">193: </a>        NEPDeflationSetRandomVec(extop,u);
+<a name="line194">194: </a>        NEPDeflationSolveSetUp(extop,sigma);
+<a name="line195">195: </a>        VecCopy(u,r);
+<a name="line196">196: </a>        NEPDeflationFunctionSolve(extop,r,u);
+<a name="line197">197: </a>        VecNorm(u,NORM_2,&amp;nrm);
+<a name="line198">198: </a>        VecScale(u,1.0/nrm);
+<a name="line199">199: </a>        lambda = sigma;
+<a name="line200">200: </a>        skip = PETSC_FALSE;
+<a name="line201">201: </a>      }
+<a name="line202">202: </a>    }
+<a name="line203">203: </a>  }
+<a name="line204">204: </a>  NEPDeflationGetInvariantPair(extop,NULL,&amp;H);
+<a name="line205">205: </a>  MatGetSize(H,NULL,&amp;ldh);
+<a name="line206">206: </a>  <a href="../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(nep-&gt;ds,DSNHEP);
+<a name="line207">207: </a>  <a href="../../../../docs/manualpages/DS/DSReset.html#DSReset">DSReset</a>(nep-&gt;ds);
+<a name="line208">208: </a>  <a href="../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(nep-&gt;ds,PetscMax(nep-&gt;nconv,1));
+<a name="line209">209: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(nep-&gt;ds,&amp;ldds);
+<a name="line210">210: </a>  MatDenseGetArray(H,&amp;Hp);
+<a name="line211">211: </a>  <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(nep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;Ap);
+<a name="line212">212: </a>  <font color="#4169E1">for</font> (j=0;j&lt;nep-&gt;nconv;j++)
+<a name="line213">213: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nep-&gt;nconv;i++) Ap[j*ldds+i] = Hp[j*ldh+i];
+<a name="line214">214: </a>  <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(nep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;Ap);
+<a name="line215">215: </a>  MatDenseRestoreArray(H,&amp;Hp);
+<a name="line216">216: </a>  MatDestroy(&amp;H);
+<a name="line217">217: </a>  <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(nep-&gt;ds,nep-&gt;nconv,0,0,nep-&gt;nconv);
+<a name="line218">218: </a>  <a href="../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(nep-&gt;ds,nep-&gt;eigr,nep-&gt;eigi);
+<a name="line219">219: </a>  NEPDeflationReset(extop);
+<a name="line220">220: </a>  VecDestroy(&amp;u);
+<a name="line221">221: </a>  VecDestroy(&amp;r);
+<a name="line222">222: </a>  VecDestroy(&amp;delta);
+<a name="line223">223: </a>  <font color="#4169E1">return</font>(0);
+<a name="line224">224: </a>}
+
+<a name="line226">226: </a><strong><font color="#4169E1"><a name="NEPSetFromOptions_RII"></a>PetscErrorCode NEPSetFromOptions_RII(PetscOptionItems *PetscOptionsObject,<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep)</font></strong>
+<a name="line227">227: </a>{
+<a name="line229">229: </a>  NEP_RII        *ctx = (NEP_RII*)nep-&gt;data;
+<a name="line230">230: </a>  PetscBool      flg;
+<a name="line231">231: </a>  PetscInt       i;
+<a name="line232">232: </a>  PetscReal      r;
+
+<a name="line235">235: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> RII Options"</font>);
+
+<a name="line237">237: </a>    i = 0;
+<a name="line238">238: </a>    PetscOptionsInt(<font color="#666666">"-nep_rii_max_it"</font>,<font color="#666666">"Maximum number of Newton iterations for updating Rayleigh functional"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/NEP/NEPRIISetMaximumIterations.html#NEPRIISetMaximumIterations">NEPRIISetMaximumIterations</a>"</font>,ctx-&gt;max_inner_it,&amp;i,&amp;flg);
+<a name="line239">239: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/NEP/NEPRIISetMaximumIterations.html#NEPRIISetMaximumIterations">NEPRIISetMaximumIterations</a>(nep,i); }
+
+<a name="line241">241: </a>    PetscOptionsBool(<font color="#666666">"-nep_rii_const_correction_tol"</font>,<font color="#666666">"Constant correction tolerance for the linear solver"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/NEP/NEPRIISetConstCorrectionTol.html#NEPRIISetConstCorrectionTol">NEPRIISetConstCorrectionTol</a>"</font>,ctx-&gt;cctol,&amp;ctx-&gt;cctol,NULL);
+
+<a name="line243">243: </a>    PetscOptionsBool(<font color="#666666">"-nep_rii_hermitian"</font>,<font color="#666666">"Use Hermitian version of the scalar nonlinear equation"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/NEP/NEPRIISetHermitian.html#NEPRIISetHermitian">NEPRIISetHermitian</a>"</font>,ctx-&gt;herm,&amp;ctx-&gt;herm,NULL);
+
+<a name="line245">245: </a>    i = 0;
+<a name="line246">246: </a>    PetscOptionsInt(<font color="#666666">"-nep_rii_lag_preconditioner"</font>,<font color="#666666">"Interval to rebuild preconditioner"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/NEP/NEPRIISetLagPreconditioner.html#NEPRIISetLagPreconditioner">NEPRIISetLagPreconditioner</a>"</font>,ctx-&gt;lag,&amp;i,&amp;flg);
+<a name="line247">247: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/NEP/NEPRIISetLagPreconditioner.html#NEPRIISetLagPreconditioner">NEPRIISetLagPreconditioner</a>(nep,i); }
+
+<a name="line249">249: </a>    r = 0.0;
+<a name="line250">250: </a>    PetscOptionsReal(<font color="#666666">"-nep_rii_deflation_threshold"</font>,<font color="#666666">"Tolerance used as a threshold for including deflated eigenpairs"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/NEP/NEPRIISetDeflationThreshold.html#NEPRIISetDeflationThreshold">NEPRIISetDeflationThreshold</a>"</font>,ctx-&gt;deftol,&amp;r,&amp;flg);
+<a name="line251">251: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/NEP/NEPRIISetDeflationThreshold.html#NEPRIISetDeflationThreshold">NEPRIISetDeflationThreshold</a>(nep,r); }
+
+<a name="line253">253: </a>  PetscOptionsTail();
+
+<a name="line255">255: </a>  <font color="#4169E1">if</font> (!ctx-&gt;ksp) { <a href="../../../../docs/manualpages/NEP/NEPRIIGetKSP.html#NEPRIIGetKSP">NEPRIIGetKSP</a>(nep,&amp;ctx-&gt;ksp); }
+<a name="line256">256: </a>  KSPSetFromOptions(ctx-&gt;ksp);
+<a name="line257">257: </a>  <font color="#4169E1">return</font>(0);
+<a name="line258">258: </a>}
+
+<a name="line260">260: </a><strong><font color="#4169E1"><a name="NEPRIISetMaximumIterations_RII"></a>static PetscErrorCode NEPRIISetMaximumIterations_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt its)</font></strong>
+<a name="line261">261: </a>{
+<a name="line262">262: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line265">265: </a>  <font color="#4169E1">if</font> (its==PETSC_DEFAULT) ctx-&gt;max_inner_it = 10;
+<a name="line266">266: </a>  <font color="#4169E1">else</font> {
+<a name="line267">267: </a>    <font color="#4169E1">if</font> (its&lt;=0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Number of iterations must be &gt;0"</font>);
+<a name="line268">268: </a>    ctx-&gt;max_inner_it = its;
+<a name="line269">269: </a>  }
+<a name="line270">270: </a>  <font color="#4169E1">return</font>(0);
+<a name="line271">271: </a>}
+
+<a name="line273">273: </a><font color="#B22222">/*@</font>
+<a name="line274">274: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIISetMaximumIterations.html#NEPRIISetMaximumIterations">NEPRIISetMaximumIterations</a> - Sets the maximum number of inner iterations to be</font>
+<a name="line275">275: </a><font color="#B22222">   used in the RII solver. These are the Newton iterations related to the computation</font>
+<a name="line276">276: </a><font color="#B22222">   of the nonlinear Rayleigh functional.</font>
+
+<a name="line278">278: </a><font color="#B22222">   Logically Collective on nep</font>
+
+<a name="line280">280: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line281">281: </a><font color="#B22222">+  nep - nonlinear eigenvalue solver</font>
+<a name="line282">282: </a><font color="#B22222">-  its - maximum inner iterations</font>
+
+<a name="line284">284: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line286">286: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIIGetMaximumIterations.html#NEPRIIGetMaximumIterations">NEPRIIGetMaximumIterations</a>()</font>
+<a name="line287">287: </a><font color="#B22222">@*/</font>
+<a name="line288">288: </a><strong><font color="#4169E1"><a name="NEPRIISetMaximumIterations"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIISetMaximumIterations.html#NEPRIISetMaximumIterations">NEPRIISetMaximumIterations</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt its)</font></strong>
+<a name="line289">289: </a>{
+
+<a name="line295">295: </a>  PetscTryMethod(nep,<font color="#666666">"NEPRIISetMaximumIterations_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscInt),(nep,its));
+<a name="line296">296: </a>  <font color="#4169E1">return</font>(0);
+<a name="line297">297: </a>}
+
+<a name="line299">299: </a><strong><font color="#4169E1"><a name="NEPRIIGetMaximumIterations_RII"></a>static PetscErrorCode NEPRIIGetMaximumIterations_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt *its)</font></strong>
+<a name="line300">300: </a>{
+<a name="line301">301: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line304">304: </a>  *its = ctx-&gt;max_inner_it;
+<a name="line305">305: </a>  <font color="#4169E1">return</font>(0);
+<a name="line306">306: </a>}
+
+<a name="line308">308: </a><font color="#B22222">/*@</font>
+<a name="line309">309: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIIGetMaximumIterations.html#NEPRIIGetMaximumIterations">NEPRIIGetMaximumIterations</a> - Gets the maximum number of inner iterations of RII.</font>
+
+<a name="line311">311: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line313">313: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line314">314: </a><font color="#B22222">.  nep - nonlinear eigenvalue solver</font>
+
+<a name="line316">316: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line317">317: </a><font color="#B22222">.  its - maximum inner iterations</font>
+
+<a name="line319">319: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line321">321: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIISetMaximumIterations.html#NEPRIISetMaximumIterations">NEPRIISetMaximumIterations</a>()</font>
+<a name="line322">322: </a><font color="#B22222">@*/</font>
+<a name="line323">323: </a><strong><font color="#4169E1"><a name="NEPRIIGetMaximumIterations"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIIGetMaximumIterations.html#NEPRIIGetMaximumIterations">NEPRIIGetMaximumIterations</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt *its)</font></strong>
+<a name="line324">324: </a>{
+
+<a name="line330">330: </a>  PetscUseMethod(nep,<font color="#666666">"NEPRIIGetMaximumIterations_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscInt*),(nep,its));
+<a name="line331">331: </a>  <font color="#4169E1">return</font>(0);
+<a name="line332">332: </a>}
+
+<a name="line334">334: </a><strong><font color="#4169E1"><a name="NEPRIISetLagPreconditioner_RII"></a>static PetscErrorCode NEPRIISetLagPreconditioner_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt lag)</font></strong>
+<a name="line335">335: </a>{
+<a name="line336">336: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line339">339: </a>  <font color="#4169E1">if</font> (lag&lt;0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Lag must be non-negative"</font>);
+<a name="line340">340: </a>  ctx-&gt;lag = lag;
+<a name="line341">341: </a>  <font color="#4169E1">return</font>(0);
+<a name="line342">342: </a>}
+
+<a name="line344">344: </a><font color="#B22222">/*@</font>
+<a name="line345">345: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIISetLagPreconditioner.html#NEPRIISetLagPreconditioner">NEPRIISetLagPreconditioner</a> - Determines when the preconditioner is rebuilt in the</font>
+<a name="line346">346: </a><font color="#B22222">   nonlinear solve.</font>
+
+<a name="line348">348: </a><font color="#B22222">   Logically Collective on nep</font>
+
+<a name="line350">350: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line351">351: </a><font color="#B22222">+  nep - nonlinear eigenvalue solver</font>
+<a name="line352">352: </a><font color="#B22222">-  lag - 0 indicates NEVER rebuild, 1 means rebuild every time the Jacobian is</font>
+<a name="line353">353: </a><font color="#B22222">          computed within the nonlinear iteration, 2 means every second time</font>
+<a name="line354">354: </a><font color="#B22222">          the Jacobian is built, etc.</font>
+
+<a name="line356">356: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line357">357: </a><font color="#B22222">.  -nep_rii_lag_preconditioner &lt;lag&gt;</font>
+
+<a name="line359">359: </a><font color="#B22222">   Notes:</font>
+<a name="line360">360: </a><font color="#B22222">   The default is 1.</font>
+<a name="line361">361: </a><font color="#B22222">   The preconditioner is ALWAYS built in the first iteration of a nonlinear solve.</font>
+
+<a name="line363">363: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line365">365: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIIGetLagPreconditioner.html#NEPRIIGetLagPreconditioner">NEPRIIGetLagPreconditioner</a>()</font>
+<a name="line366">366: </a><font color="#B22222">@*/</font>
+<a name="line367">367: </a><strong><font color="#4169E1"><a name="NEPRIISetLagPreconditioner"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIISetLagPreconditioner.html#NEPRIISetLagPreconditioner">NEPRIISetLagPreconditioner</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt lag)</font></strong>
+<a name="line368">368: </a>{
+
+<a name="line374">374: </a>  PetscTryMethod(nep,<font color="#666666">"NEPRIISetLagPreconditioner_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscInt),(nep,lag));
+<a name="line375">375: </a>  <font color="#4169E1">return</font>(0);
+<a name="line376">376: </a>}
+
+<a name="line378">378: </a><strong><font color="#4169E1"><a name="NEPRIIGetLagPreconditioner_RII"></a>static PetscErrorCode NEPRIIGetLagPreconditioner_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt *lag)</font></strong>
+<a name="line379">379: </a>{
+<a name="line380">380: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line383">383: </a>  *lag = ctx-&gt;lag;
+<a name="line384">384: </a>  <font color="#4169E1">return</font>(0);
+<a name="line385">385: </a>}
+
+<a name="line387">387: </a><font color="#B22222">/*@</font>
+<a name="line388">388: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIIGetLagPreconditioner.html#NEPRIIGetLagPreconditioner">NEPRIIGetLagPreconditioner</a> - Indicates how often the preconditioner is rebuilt.</font>
+
+<a name="line390">390: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line392">392: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line393">393: </a><font color="#B22222">.  nep - nonlinear eigenvalue solver</font>
+
+<a name="line395">395: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line396">396: </a><font color="#B22222">.  lag - the lag parameter</font>
+
+<a name="line398">398: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line400">400: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIISetLagPreconditioner.html#NEPRIISetLagPreconditioner">NEPRIISetLagPreconditioner</a>()</font>
+<a name="line401">401: </a><font color="#B22222">@*/</font>
+<a name="line402">402: </a><strong><font color="#4169E1"><a name="NEPRIIGetLagPreconditioner"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIIGetLagPreconditioner.html#NEPRIIGetLagPreconditioner">NEPRIIGetLagPreconditioner</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscInt *lag)</font></strong>
+<a name="line403">403: </a>{
+
+<a name="line409">409: </a>  PetscUseMethod(nep,<font color="#666666">"NEPRIIGetLagPreconditioner_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscInt*),(nep,lag));
+<a name="line410">410: </a>  <font color="#4169E1">return</font>(0);
+<a name="line411">411: </a>}
+
+<a name="line413">413: </a><strong><font color="#4169E1"><a name="NEPRIISetConstCorrectionTol_RII"></a>static PetscErrorCode NEPRIISetConstCorrectionTol_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool cct)</font></strong>
+<a name="line414">414: </a>{
+<a name="line415">415: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line418">418: </a>  ctx-&gt;cctol = cct;
+<a name="line419">419: </a>  <font color="#4169E1">return</font>(0);
+<a name="line420">420: </a>}
+
+<a name="line422">422: </a><font color="#B22222">/*@</font>
+<a name="line423">423: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIISetConstCorrectionTol.html#NEPRIISetConstCorrectionTol">NEPRIISetConstCorrectionTol</a> - Sets a flag to keep the tolerance used</font>
+<a name="line424">424: </a><font color="#B22222">   in the linear solver constant.</font>
+
+<a name="line426">426: </a><font color="#B22222">   Logically Collective on nep</font>
+
+<a name="line428">428: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line429">429: </a><font color="#B22222">+  nep - nonlinear eigenvalue solver</font>
+<a name="line430">430: </a><font color="#B22222">-  cct - a boolean value</font>
+
+<a name="line432">432: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line433">433: </a><font color="#B22222">.  -nep_rii_const_correction_tol &lt;bool&gt; - set the boolean flag</font>
+
+<a name="line435">435: </a><font color="#B22222">   Notes:</font>
+<a name="line436">436: </a><font color="#B22222">   By default, an exponentially decreasing tolerance is set in the KSP used</font>
+<a name="line437">437: </a><font color="#B22222">   within the nonlinear iteration, so that each Newton iteration requests</font>
+<a name="line438">438: </a><font color="#B22222">   better accuracy than the previous one. The constant correction tolerance</font>
+<a name="line439">439: </a><font color="#B22222">   flag stops this behaviour.</font>
+
+<a name="line441">441: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line443">443: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIIGetConstCorrectionTol.html#NEPRIIGetConstCorrectionTol">NEPRIIGetConstCorrectionTol</a>()</font>
+<a name="line444">444: </a><font color="#B22222">@*/</font>
+<a name="line445">445: </a><strong><font color="#4169E1"><a name="NEPRIISetConstCorrectionTol"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIISetConstCorrectionTol.html#NEPRIISetConstCorrectionTol">NEPRIISetConstCorrectionTol</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool cct)</font></strong>
+<a name="line446">446: </a>{
+
+<a name="line452">452: </a>  PetscTryMethod(nep,<font color="#666666">"NEPRIISetConstCorrectionTol_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscBool),(nep,cct));
+<a name="line453">453: </a>  <font color="#4169E1">return</font>(0);
+<a name="line454">454: </a>}
+
+<a name="line456">456: </a><strong><font color="#4169E1"><a name="NEPRIIGetConstCorrectionTol_RII"></a>static PetscErrorCode NEPRIIGetConstCorrectionTol_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool *cct)</font></strong>
+<a name="line457">457: </a>{
+<a name="line458">458: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line461">461: </a>  *cct = ctx-&gt;cctol;
+<a name="line462">462: </a>  <font color="#4169E1">return</font>(0);
+<a name="line463">463: </a>}
+
+<a name="line465">465: </a><font color="#B22222">/*@</font>
+<a name="line466">466: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIIGetConstCorrectionTol.html#NEPRIIGetConstCorrectionTol">NEPRIIGetConstCorrectionTol</a> - Returns the constant tolerance flag.</font>
+
+<a name="line468">468: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line470">470: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line471">471: </a><font color="#B22222">.  nep - nonlinear eigenvalue solver</font>
+
+<a name="line473">473: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line474">474: </a><font color="#B22222">.  cct - the value of the constant tolerance flag</font>
+
+<a name="line476">476: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line478">478: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIISetConstCorrectionTol.html#NEPRIISetConstCorrectionTol">NEPRIISetConstCorrectionTol</a>()</font>
+<a name="line479">479: </a><font color="#B22222">@*/</font>
+<a name="line480">480: </a><strong><font color="#4169E1"><a name="NEPRIIGetConstCorrectionTol"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIIGetConstCorrectionTol.html#NEPRIIGetConstCorrectionTol">NEPRIIGetConstCorrectionTol</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool *cct)</font></strong>
+<a name="line481">481: </a>{
+
+<a name="line487">487: </a>  PetscUseMethod(nep,<font color="#666666">"NEPRIIGetConstCorrectionTol_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscBool*),(nep,cct));
+<a name="line488">488: </a>  <font color="#4169E1">return</font>(0);
+<a name="line489">489: </a>}
+
+<a name="line491">491: </a><strong><font color="#4169E1"><a name="NEPRIISetHermitian_RII"></a>static PetscErrorCode NEPRIISetHermitian_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool herm)</font></strong>
+<a name="line492">492: </a>{
+<a name="line493">493: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line496">496: </a>  ctx-&gt;herm = herm;
+<a name="line497">497: </a>  <font color="#4169E1">return</font>(0);
+<a name="line498">498: </a>}
+
+<a name="line500">500: </a><font color="#B22222">/*@</font>
+<a name="line501">501: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIISetHermitian.html#NEPRIISetHermitian">NEPRIISetHermitian</a> - Sets a flag to indicate if the Hermitian version of the</font>
+<a name="line502">502: </a><font color="#B22222">   scalar nonlinear equation must be used by the solver.</font>
+
+<a name="line504">504: </a><font color="#B22222">   Logically Collective on nep</font>
+
+<a name="line506">506: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line507">507: </a><font color="#B22222">+  nep  - nonlinear eigenvalue solver</font>
+<a name="line508">508: </a><font color="#B22222">-  herm - a boolean value</font>
+
+<a name="line510">510: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line511">511: </a><font color="#B22222">.  -nep_rii_hermitian &lt;bool&gt; - set the boolean flag</font>
+
+<a name="line513">513: </a><font color="#B22222">   Notes:</font>
+<a name="line514">514: </a><font color="#B22222">   By default, the scalar nonlinear equation x'*inv(T(sigma))*T(z)*x=0 is solved</font>
+<a name="line515">515: </a><font color="#B22222">   at each step of the nonlinear iteration. When this flag is set the simpler</font>
+<a name="line516">516: </a><font color="#B22222">   form x'*T(z)*x=0 is used, which is supposed to be valid only for Hermitian</font>
+<a name="line517">517: </a><font color="#B22222">   problems.</font>
+
+<a name="line519">519: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line521">521: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIIGetHermitian.html#NEPRIIGetHermitian">NEPRIIGetHermitian</a>()</font>
+<a name="line522">522: </a><font color="#B22222">@*/</font>
+<a name="line523">523: </a><strong><font color="#4169E1"><a name="NEPRIISetHermitian"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIISetHermitian.html#NEPRIISetHermitian">NEPRIISetHermitian</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool herm)</font></strong>
+<a name="line524">524: </a>{
+
+<a name="line530">530: </a>  PetscTryMethod(nep,<font color="#666666">"NEPRIISetHermitian_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscBool),(nep,herm));
+<a name="line531">531: </a>  <font color="#4169E1">return</font>(0);
+<a name="line532">532: </a>}
+
+<a name="line534">534: </a><strong><font color="#4169E1"><a name="NEPRIIGetHermitian_RII"></a>static PetscErrorCode NEPRIIGetHermitian_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool *herm)</font></strong>
+<a name="line535">535: </a>{
+<a name="line536">536: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line539">539: </a>  *herm = ctx-&gt;herm;
+<a name="line540">540: </a>  <font color="#4169E1">return</font>(0);
+<a name="line541">541: </a>}
+
+<a name="line543">543: </a><font color="#B22222">/*@</font>
+<a name="line544">544: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIIGetHermitian.html#NEPRIIGetHermitian">NEPRIIGetHermitian</a> - Returns the flag about using the Hermitian version of</font>
+<a name="line545">545: </a><font color="#B22222">   the scalar nonlinear equation.</font>
+
+<a name="line547">547: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line549">549: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line550">550: </a><font color="#B22222">.  nep - nonlinear eigenvalue solver</font>
+
+<a name="line552">552: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line553">553: </a><font color="#B22222">.  herm - the value of the hermitian flag</font>
+
+<a name="line555">555: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line557">557: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIISetHermitian.html#NEPRIISetHermitian">NEPRIISetHermitian</a>()</font>
+<a name="line558">558: </a><font color="#B22222">@*/</font>
+<a name="line559">559: </a><strong><font color="#4169E1"><a name="NEPRIIGetHermitian"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIIGetHermitian.html#NEPRIIGetHermitian">NEPRIIGetHermitian</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscBool *herm)</font></strong>
+<a name="line560">560: </a>{
+
+<a name="line566">566: </a>  PetscUseMethod(nep,<font color="#666666">"NEPRIIGetHermitian_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscBool*),(nep,herm));
+<a name="line567">567: </a>  <font color="#4169E1">return</font>(0);
+<a name="line568">568: </a>}
+
+<a name="line570">570: </a><strong><font color="#4169E1"><a name="NEPRIISetDeflationThreshold_RII"></a>static PetscErrorCode NEPRIISetDeflationThreshold_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscReal deftol)</font></strong>
+<a name="line571">571: </a>{
+<a name="line572">572: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line575">575: </a>  ctx-&gt;deftol = deftol;
+<a name="line576">576: </a>  <font color="#4169E1">return</font>(0);
+<a name="line577">577: </a>}
+
+<a name="line579">579: </a><font color="#B22222">/*@</font>
+<a name="line580">580: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIISetDeflationThreshold.html#NEPRIISetDeflationThreshold">NEPRIISetDeflationThreshold</a> - Sets the threshold value used to switch between</font>
+<a name="line581">581: </a><font color="#B22222">   deflated and non-deflated iteration.</font>
+
+<a name="line583">583: </a><font color="#B22222">   Logically Collective on nep</font>
+
+<a name="line585">585: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line586">586: </a><font color="#B22222">+  nep    - nonlinear eigenvalue solver</font>
+<a name="line587">587: </a><font color="#B22222">-  deftol - the threshold value</font>
+
+<a name="line589">589: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line590">590: </a><font color="#B22222">.  -nep_rii_deflation_threshold &lt;deftol&gt; - set the threshold</font>
+
+<a name="line592">592: </a><font color="#B22222">   Notes:</font>
+<a name="line593">593: </a><font color="#B22222">   Normally, the solver iterates on the extended problem in order to deflate</font>
+<a name="line594">594: </a><font color="#B22222">   previously converged eigenpairs. If this threshold is set to a nonzero value,</font>
+<a name="line595">595: </a><font color="#B22222">   then once the residual error is below this threshold the solver will</font>
+<a name="line596">596: </a><font color="#B22222">   continue the iteration without deflation. The intention is to be able to</font>
+<a name="line597">597: </a><font color="#B22222">   improve the current eigenpair further, despite having previous eigenpairs</font>
+<a name="line598">598: </a><font color="#B22222">   with somewhat bad precision.</font>
+
+<a name="line600">600: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line602">602: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIIGetDeflationThreshold.html#NEPRIIGetDeflationThreshold">NEPRIIGetDeflationThreshold</a>()</font>
+<a name="line603">603: </a><font color="#B22222">@*/</font>
+<a name="line604">604: </a><strong><font color="#4169E1"><a name="NEPRIISetDeflationThreshold"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIISetDeflationThreshold.html#NEPRIISetDeflationThreshold">NEPRIISetDeflationThreshold</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscReal deftol)</font></strong>
+<a name="line605">605: </a>{
+
+<a name="line611">611: </a>  PetscTryMethod(nep,<font color="#666666">"NEPRIISetDeflationThreshold_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscReal),(nep,deftol));
+<a name="line612">612: </a>  <font color="#4169E1">return</font>(0);
+<a name="line613">613: </a>}
+
+<a name="line615">615: </a><strong><font color="#4169E1"><a name="NEPRIIGetDeflationThreshold_RII"></a>static PetscErrorCode NEPRIIGetDeflationThreshold_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscReal *deftol)</font></strong>
+<a name="line616">616: </a>{
+<a name="line617">617: </a>  NEP_RII *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line620">620: </a>  *deftol = ctx-&gt;deftol;
+<a name="line621">621: </a>  <font color="#4169E1">return</font>(0);
+<a name="line622">622: </a>}
+
+<a name="line624">624: </a><font color="#B22222">/*@</font>
+<a name="line625">625: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIIGetDeflationThreshold.html#NEPRIIGetDeflationThreshold">NEPRIIGetDeflationThreshold</a> - Returns the threshold value that controls deflation.</font>
+
+<a name="line627">627: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line629">629: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line630">630: </a><font color="#B22222">.  nep - nonlinear eigenvalue solver</font>
+
+<a name="line632">632: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line633">633: </a><font color="#B22222">.  deftol - the threshold</font>
+
+<a name="line635">635: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line637">637: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIISetDeflationThreshold.html#NEPRIISetDeflationThreshold">NEPRIISetDeflationThreshold</a>()</font>
+<a name="line638">638: </a><font color="#B22222">@*/</font>
+<a name="line639">639: </a><strong><font color="#4169E1"><a name="NEPRIIGetDeflationThreshold"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIIGetDeflationThreshold.html#NEPRIIGetDeflationThreshold">NEPRIIGetDeflationThreshold</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscReal *deftol)</font></strong>
+<a name="line640">640: </a>{
+
+<a name="line646">646: </a>  PetscUseMethod(nep,<font color="#666666">"NEPRIIGetDeflationThreshold_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscReal*),(nep,deftol));
+<a name="line647">647: </a>  <font color="#4169E1">return</font>(0);
+<a name="line648">648: </a>}
+
+<a name="line650">650: </a><strong><font color="#4169E1"><a name="NEPRIISetKSP_RII"></a>static PetscErrorCode NEPRIISetKSP_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,KSP ksp)</font></strong>
+<a name="line651">651: </a>{
+<a name="line653">653: </a>  NEP_RII        *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line656">656: </a>  PetscObjectReference((PetscObject)ksp);
+<a name="line657">657: </a>  KSPDestroy(&amp;ctx-&gt;ksp);
+<a name="line658">658: </a>  ctx-&gt;ksp = ksp;
+<a name="line659">659: </a>  PetscLogObjectParent((PetscObject)nep,(PetscObject)ctx-&gt;ksp);
+<a name="line660">660: </a>  nep-&gt;state = NEP_STATE_INITIAL;
+<a name="line661">661: </a>  <font color="#4169E1">return</font>(0);
+<a name="line662">662: </a>}
+
+<a name="line664">664: </a><font color="#B22222">/*@</font>
+<a name="line665">665: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIISetKSP.html#NEPRIISetKSP">NEPRIISetKSP</a> - Associate a linear solver object (KSP) to the nonlinear</font>
+<a name="line666">666: </a><font color="#B22222">   eigenvalue solver.</font>
+
+<a name="line668">668: </a><font color="#B22222">   Collective on nep</font>
+
+<a name="line670">670: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line671">671: </a><font color="#B22222">+  nep - eigenvalue solver</font>
+<a name="line672">672: </a><font color="#B22222">-  ksp - the linear solver object</font>
+
+<a name="line674">674: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line676">676: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIIGetKSP.html#NEPRIIGetKSP">NEPRIIGetKSP</a>()</font>
+<a name="line677">677: </a><font color="#B22222">@*/</font>
+<a name="line678">678: </a><strong><font color="#4169E1"><a name="NEPRIISetKSP"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIISetKSP.html#NEPRIISetKSP">NEPRIISetKSP</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,KSP ksp)</font></strong>
+<a name="line679">679: </a>{
+
+<a name="line686">686: </a>  PetscTryMethod(nep,<font color="#666666">"NEPRIISetKSP_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,KSP),(nep,ksp));
+<a name="line687">687: </a>  <font color="#4169E1">return</font>(0);
+<a name="line688">688: </a>}
+
+<a name="line690">690: </a><strong><font color="#4169E1"><a name="NEPRIIGetKSP_RII"></a>static PetscErrorCode NEPRIIGetKSP_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,KSP *ksp)</font></strong>
+<a name="line691">691: </a>{
+<a name="line693">693: </a>  NEP_RII        *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line696">696: </a>  <font color="#4169E1">if</font> (!ctx-&gt;ksp) {
+<a name="line697">697: </a>    KSPCreate(PetscObjectComm((PetscObject)nep),&amp;ctx-&gt;ksp);
+<a name="line698">698: </a>    PetscObjectIncrementTabLevel((PetscObject)ctx-&gt;ksp,(PetscObject)nep,1);
+<a name="line699">699: </a>    KSPSetOptionsPrefix(ctx-&gt;ksp,((PetscObject)nep)-&gt;prefix);
+<a name="line700">700: </a>    KSPAppendOptionsPrefix(ctx-&gt;ksp,<font color="#666666">"nep_rii_"</font>);
+<a name="line701">701: </a>    PetscLogObjectParent((PetscObject)nep,(PetscObject)ctx-&gt;ksp);
+<a name="line702">702: </a>    PetscObjectSetOptions((PetscObject)ctx-&gt;ksp,((PetscObject)nep)-&gt;options);
+<a name="line703">703: </a>    KSPSetErrorIfNotConverged(ctx-&gt;ksp,PETSC_TRUE);
+<a name="line704">704: </a>    KSPSetTolerances(ctx-&gt;ksp,SLEPC_DEFAULT_TOL,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
+<a name="line705">705: </a>  }
+<a name="line706">706: </a>  *ksp = ctx-&gt;ksp;
+<a name="line707">707: </a>  <font color="#4169E1">return</font>(0);
+<a name="line708">708: </a>}
+
+<a name="line710">710: </a><font color="#B22222">/*@</font>
+<a name="line711">711: </a><font color="#B22222">   <a href="../../../../docs/manualpages/NEP/NEPRIIGetKSP.html#NEPRIIGetKSP">NEPRIIGetKSP</a> - Retrieve the linear solver object (KSP) associated with</font>
+<a name="line712">712: </a><font color="#B22222">   the nonlinear eigenvalue solver.</font>
+
+<a name="line714">714: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line716">716: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line717">717: </a><font color="#B22222">.  nep - nonlinear eigenvalue solver</font>
+
+<a name="line719">719: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line720">720: </a><font color="#B22222">.  ksp - the linear solver object</font>
+
+<a name="line722">722: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line724">724: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/NEP/NEPRIISetKSP.html#NEPRIISetKSP">NEPRIISetKSP</a>()</font>
+<a name="line725">725: </a><font color="#B22222">@*/</font>
+<a name="line726">726: </a><strong><font color="#4169E1"><a name="NEPRIIGetKSP"></a>PetscErrorCode <a href="../../../../docs/manualpages/NEP/NEPRIIGetKSP.html#NEPRIIGetKSP">NEPRIIGetKSP</a>(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,KSP *ksp)</font></strong>
+<a name="line727">727: </a>{
+
+<a name="line733">733: </a>  PetscUseMethod(nep,<font color="#666666">"NEPRIIGetKSP_C"</font>,(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,KSP*),(nep,ksp));
+<a name="line734">734: </a>  <font color="#4169E1">return</font>(0);
+<a name="line735">735: </a>}
+
+<a name="line737">737: </a><strong><font color="#4169E1"><a name="NEPView_RII"></a>PetscErrorCode NEPView_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,PetscViewer viewer)</font></strong>
+<a name="line738">738: </a>{
+<a name="line740">740: </a>  NEP_RII        *ctx = (NEP_RII*)nep-&gt;data;
+<a name="line741">741: </a>  PetscBool      isascii;
+
+<a name="line744">744: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line745">745: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line746">746: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  maximum number of inner iterations: %D\n"</font>,ctx-&gt;max_inner_it);
+<a name="line747">747: </a>    <font color="#4169E1">if</font> (ctx-&gt;cctol) {
+<a name="line748">748: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  using a constant tolerance for the linear solver\n"</font>);
+<a name="line749">749: </a>    }
+<a name="line750">750: </a>    <font color="#4169E1">if</font> (ctx-&gt;herm) {
+<a name="line751">751: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  using the Hermitian version of the scalar nonlinear equation\n"</font>);
+<a name="line752">752: </a>    }
+<a name="line753">753: </a>    <font color="#4169E1">if</font> (ctx-&gt;lag) {
+<a name="line754">754: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  updating the preconditioner every %D iterations\n"</font>,ctx-&gt;lag);
+<a name="line755">755: </a>    }
+<a name="line756">756: </a>    <font color="#4169E1">if</font> (ctx-&gt;deftol) {
+<a name="line757">757: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  deflation threshold: %g\n"</font>,(double)ctx-&gt;deftol);
+<a name="line758">758: </a>    }
+<a name="line759">759: </a>    <font color="#4169E1">if</font> (!ctx-&gt;ksp) { <a href="../../../../docs/manualpages/NEP/NEPRIIGetKSP.html#NEPRIIGetKSP">NEPRIIGetKSP</a>(nep,&amp;ctx-&gt;ksp); }
+<a name="line760">760: </a>    PetscViewerASCIIPushTab(viewer);
+<a name="line761">761: </a>    KSPView(ctx-&gt;ksp,viewer);
+<a name="line762">762: </a>    PetscViewerASCIIPopTab(viewer);
+<a name="line763">763: </a>  }
+<a name="line764">764: </a>  <font color="#4169E1">return</font>(0);
+<a name="line765">765: </a>}
+
+<a name="line767">767: </a><strong><font color="#4169E1"><a name="NEPReset_RII"></a>PetscErrorCode NEPReset_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep)</font></strong>
+<a name="line768">768: </a>{
+<a name="line770">770: </a>  NEP_RII        *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line773">773: </a>  KSPReset(ctx-&gt;ksp);
+<a name="line774">774: </a>  <font color="#4169E1">return</font>(0);
+<a name="line775">775: </a>}
+
+<a name="line777">777: </a><strong><font color="#4169E1"><a name="NEPDestroy_RII"></a>PetscErrorCode NEPDestroy_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep)</font></strong>
+<a name="line778">778: </a>{
+<a name="line780">780: </a>  NEP_RII        *ctx = (NEP_RII*)nep-&gt;data;
+
+<a name="line783">783: </a>  KSPDestroy(&amp;ctx-&gt;ksp);
+<a name="line784">784: </a>  PetscFree(nep-&gt;data);
+<a name="line785">785: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetMaximumIterations_C"</font>,NULL);
+<a name="line786">786: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetMaximumIterations_C"</font>,NULL);
+<a name="line787">787: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetLagPreconditioner_C"</font>,NULL);
+<a name="line788">788: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetLagPreconditioner_C"</font>,NULL);
+<a name="line789">789: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetConstCorrectionTol_C"</font>,NULL);
+<a name="line790">790: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetConstCorrectionTol_C"</font>,NULL);
+<a name="line791">791: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetHermitian_C"</font>,NULL);
+<a name="line792">792: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetHermitian_C"</font>,NULL);
+<a name="line793">793: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetDeflationThreshold_C"</font>,NULL);
+<a name="line794">794: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetDeflationThreshold_C"</font>,NULL);
+<a name="line795">795: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetKSP_C"</font>,NULL);
+<a name="line796">796: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetKSP_C"</font>,NULL);
+<a name="line797">797: </a>  <font color="#4169E1">return</font>(0);
+<a name="line798">798: </a>}
+
+<a name="line800">800: </a><strong><font color="#4169E1"><a name="NEPCreate_RII"></a>SLEPC_EXTERN PetscErrorCode NEPCreate_RII(<a href="../../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep)</font></strong>
+<a name="line801">801: </a>{
+<a name="line803">803: </a>  NEP_RII        *ctx;
+
+<a name="line806">806: </a>  PetscNewLog(nep,&amp;ctx);
+<a name="line807">807: </a>  nep-&gt;data = (void*)ctx;
+<a name="line808">808: </a>  ctx-&gt;max_inner_it = 10;
+<a name="line809">809: </a>  ctx-&gt;lag          = 1;
+<a name="line810">810: </a>  ctx-&gt;cctol        = PETSC_FALSE;
+<a name="line811">811: </a>  ctx-&gt;herm         = PETSC_FALSE;
+<a name="line812">812: </a>  ctx-&gt;deftol       = 0.0;
+
+<a name="line814">814: </a>  nep-&gt;useds = PETSC_TRUE;
+
+<a name="line816">816: </a>  nep-&gt;ops-&gt;solve          = NEPSolve_RII;
+<a name="line817">817: </a>  nep-&gt;ops-&gt;setup          = NEPSetUp_RII;
+<a name="line818">818: </a>  nep-&gt;ops-&gt;setfromoptions = NEPSetFromOptions_RII;
+<a name="line819">819: </a>  nep-&gt;ops-&gt;reset          = NEPReset_RII;
+<a name="line820">820: </a>  nep-&gt;ops-&gt;destroy        = NEPDestroy_RII;
+<a name="line821">821: </a>  nep-&gt;ops-&gt;view           = NEPView_RII;
+<a name="line822">822: </a>  nep-&gt;ops-&gt;computevectors = NEPComputeVectors_Schur;
+
+<a name="line824">824: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetMaximumIterations_C"</font>,NEPRIISetMaximumIterations_RII);
+<a name="line825">825: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetMaximumIterations_C"</font>,NEPRIIGetMaximumIterations_RII);
+<a name="line826">826: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetLagPreconditioner_C"</font>,NEPRIISetLagPreconditioner_RII);
+<a name="line827">827: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetLagPreconditioner_C"</font>,NEPRIIGetLagPreconditioner_RII);
+<a name="line828">828: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetConstCorrectionTol_C"</font>,NEPRIISetConstCorrectionTol_RII);
+<a name="line829">829: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetConstCorrectionTol_C"</font>,NEPRIIGetConstCorrectionTol_RII);
+<a name="line830">830: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetHermitian_C"</font>,NEPRIISetHermitian_RII);
+<a name="line831">831: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetHermitian_C"</font>,NEPRIIGetHermitian_RII);
+<a name="line832">832: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetDeflationThreshold_C"</font>,NEPRIISetDeflationThreshold_RII);
+<a name="line833">833: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetDeflationThreshold_C"</font>,NEPRIIGetDeflationThreshold_RII);
+<a name="line834">834: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIISetKSP_C"</font>,NEPRIISetKSP_RII);
+<a name="line835">835: </a>  PetscObjectComposeFunction((PetscObject)nep,<font color="#666666">"NEPRIIGetKSP_C"</font>,NEPRIIGetKSP_RII);
+<a name="line836">836: </a>  <font color="#4169E1">return</font>(0);
+<a name="line837">837: </a>}
+
+</pre>
+</body>
+
+</html>

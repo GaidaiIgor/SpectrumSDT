@@ -1,0 +1,308 @@
+<center><a href="shell.c">Actual source code: shell.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/st/impls/shell/shell.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:47+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/st/impls/shell/shell.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This provides a simple shell interface for programmers to create</font>
+<a name="line12"> 12: </a><font color="#B22222">   their own spectral transformations without writing much interface code</font>
+<a name="line13"> 13: </a><font color="#B22222">*/</font>
+
+<a name="line15"> 15: </a> #include <A href="../../../../../../include/slepc/private/stimpl.h.html">&lt;slepc/private/stimpl.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line18"> 18: </a>  void           *ctx;                       <font color="#B22222">/* user provided context */</font>
+<a name="line19"> 19: </a>  PetscErrorCode (*apply)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec);
+<a name="line20"> 20: </a>  PetscErrorCode (*applytrans)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec);
+<a name="line21"> 21: </a>  PetscErrorCode (*backtransform)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt n,PetscScalar*,PetscScalar*);
+<a name="line22"> 22: </a>} ST_SHELL;
+
+<a name="line24"> 24: </a><font color="#B22222">/*@C</font>
+<a name="line25"> 25: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a> - Returns the user-provided context associated with a shell <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a></font>
+
+<a name="line27"> 27: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line29"> 29: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line30"> 30: </a><font color="#B22222">.  st - spectral transformation context</font>
+
+<a name="line32"> 32: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line33"> 33: </a><font color="#B22222">.  ctx - the user provided context</font>
+
+<a name="line35"> 35: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line37"> 37: </a><font color="#B22222">   Notes:</font>
+<a name="line38"> 38: </a><font color="#B22222">   This routine is intended for use within various shell routines</font>
+
+<a name="line40"> 40: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STShellSetContext.html#STShellSetContext">STShellSetContext</a>()</font>
+<a name="line41"> 41: </a><font color="#B22222">@*/</font>
+<a name="line42"> 42: </a><strong><font color="#4169E1"><a name="STShellGetContext"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,void **ctx)</font></strong>
+<a name="line43"> 43: </a>{
+<a name="line45"> 45: </a>  PetscBool      flg;
+
+<a name="line50"> 50: </a>  PetscObjectTypeCompare((PetscObject)st,<a href="../../../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>,&amp;flg);
+<a name="line51"> 51: </a>  <font color="#4169E1">if</font> (!flg) *ctx = 0;
+<a name="line52"> 52: </a>  <font color="#4169E1">else</font>      *ctx = ((ST_SHELL*)(st-&gt;data))-&gt;ctx;
+<a name="line53"> 53: </a>  <font color="#4169E1">return</font>(0);
+<a name="line54"> 54: </a>}
+
+<a name="line56"> 56: </a><font color="#B22222">/*@</font>
+<a name="line57"> 57: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STShellSetContext.html#STShellSetContext">STShellSetContext</a> - Sets the context for a shell <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a></font>
+
+<a name="line59"> 59: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line61"> 61: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line62"> 62: </a><font color="#B22222">+  st - the shell <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a></font>
+<a name="line63"> 63: </a><font color="#B22222">-  ctx - the context</font>
+
+<a name="line65"> 65: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line67"> 67: </a><font color="#B22222">   Fortran Notes:</font>
+<a name="line68"> 68: </a><font color="#B22222">   To use this from Fortran you must write a Fortran interface definition</font>
+<a name="line69"> 69: </a><font color="#B22222">   for this function that tells Fortran the Fortran derived data type that</font>
+<a name="line70"> 70: </a><font color="#B22222">   you are passing in as the ctx argument.</font>
+
+<a name="line72"> 72: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>()</font>
+<a name="line73"> 73: </a><font color="#B22222">@*/</font>
+<a name="line74"> 74: </a><strong><font color="#4169E1"><a name="STShellSetContext"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STShellSetContext.html#STShellSetContext">STShellSetContext</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,void *ctx)</font></strong>
+<a name="line75"> 75: </a>{
+<a name="line76"> 76: </a>  ST_SHELL       *shell = (ST_SHELL*)st-&gt;data;
+<a name="line78"> 78: </a>  PetscBool      flg;
+
+<a name="line82"> 82: </a>  PetscObjectTypeCompare((PetscObject)st,<a href="../../../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>,&amp;flg);
+<a name="line83"> 83: </a>  <font color="#4169E1">if</font> (flg) shell-&gt;ctx = ctx;
+<a name="line84"> 84: </a>  <font color="#4169E1">return</font>(0);
+<a name="line85"> 85: </a>}
+
+<a name="line87"> 87: </a><strong><font color="#4169E1"><a name="STApply_Shell"></a>PetscErrorCode STApply_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec x,Vec y)</font></strong>
+<a name="line88"> 88: </a>{
+<a name="line89"> 89: </a>  PetscErrorCode   ierr;
+<a name="line90"> 90: </a>  ST_SHELL         *shell = (ST_SHELL*)st-&gt;data;
+<a name="line91"> 91: </a>  PetscObjectState instate,outstate;
+
+<a name="line94"> 94: </a>  <font color="#4169E1">if</font> (!shell-&gt;apply) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_USER,<font color="#666666">"No apply() routine provided to Shell <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>"</font>);
+<a name="line95"> 95: </a>  PetscObjectStateGet((PetscObject)y,&amp;instate);
+<a name="line96"> 96: </a>  PetscStackCall(<font color="#666666">"<a href="../../../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a> user function apply()"</font>,(*shell-&gt;apply)(st,x,y);CHKERRQ(ierr));
+<a name="line97"> 97: </a>  PetscObjectStateGet((PetscObject)y,&amp;outstate);
+<a name="line98"> 98: </a>  <font color="#4169E1">if</font> (instate == outstate) {
+<a name="line99"> 99: </a>    <font color="#B22222">/* user forgot to increase the state of the output vector */</font>
+<a name="line100">100: </a>    PetscObjectStateIncrease((PetscObject)y);
+<a name="line101">101: </a>  }
+<a name="line102">102: </a>  <font color="#4169E1">return</font>(0);
+<a name="line103">103: </a>}
+
+<a name="line105">105: </a><strong><font color="#4169E1"><a name="STApplyTranspose_Shell"></a>PetscErrorCode STApplyTranspose_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec x,Vec y)</font></strong>
+<a name="line106">106: </a>{
+<a name="line108">108: </a>  ST_SHELL       *shell = (ST_SHELL*)st-&gt;data;
+<a name="line109">109: </a>  PetscObjectState instate,outstate;
+
+<a name="line112">112: </a>  <font color="#4169E1">if</font> (!shell-&gt;applytrans) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_USER,<font color="#666666">"No applytranspose() routine provided to Shell <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>"</font>);
+<a name="line113">113: </a>  PetscObjectStateGet((PetscObject)y,&amp;instate);
+<a name="line114">114: </a>  PetscStackCall(<font color="#666666">"<a href="../../../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a> user function applytrans()"</font>,(*shell-&gt;applytrans)(st,x,y);CHKERRQ(ierr));
+<a name="line115">115: </a>  PetscObjectStateGet((PetscObject)y,&amp;outstate);
+<a name="line116">116: </a>  <font color="#4169E1">if</font> (instate == outstate) {
+<a name="line117">117: </a>    <font color="#B22222">/* user forgot to increase the state of the output vector */</font>
+<a name="line118">118: </a>    PetscObjectStateIncrease((PetscObject)y);
+<a name="line119">119: </a>  }
+<a name="line120">120: </a>  <font color="#4169E1">return</font>(0);
+<a name="line121">121: </a>}
+
+<a name="line123">123: </a><strong><font color="#4169E1"><a name="STBackTransform_Shell"></a>PetscErrorCode STBackTransform_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt n,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line124">124: </a>{
+<a name="line126">126: </a>  ST_SHELL       *shell = (ST_SHELL*)st-&gt;data;
+
+<a name="line129">129: </a>  <font color="#4169E1">if</font> (shell-&gt;backtransform) PetscStackCall(<font color="#666666">"<a href="../../../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a> user function backtransform()"</font>,(*shell-&gt;backtransform)(st,n,eigr,eigi);CHKERRQ(ierr));
+<a name="line130">130: </a>  <font color="#4169E1">return</font>(0);
+<a name="line131">131: </a>}
+
+<a name="line133">133: </a><font color="#B22222">/*</font>
+<a name="line134">134: </a><font color="#B22222">   STIsInjective_Shell - Check if the user has provided the backtransform operation.</font>
+<a name="line135">135: </a><font color="#B22222">*/</font>
+<a name="line136">136: </a><strong><font color="#4169E1"><a name="STIsInjective_Shell"></a>PetscErrorCode STIsInjective_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscBool* is)</font></strong>
+<a name="line137">137: </a>{
+<a name="line138">138: </a>  ST_SHELL *shell = (ST_SHELL*)st-&gt;data;
+
+<a name="line141">141: </a>  *is = shell-&gt;backtransform? PETSC_TRUE: PETSC_FALSE;
+<a name="line142">142: </a>  <font color="#4169E1">return</font>(0);
+<a name="line143">143: </a>}
+
+<a name="line145">145: </a><strong><font color="#4169E1"><a name="STDestroy_Shell"></a>PetscErrorCode STDestroy_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line146">146: </a>{
+
+<a name="line150">150: </a>  PetscFree(st-&gt;data);
+<a name="line151">151: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STShellSetApply_C"</font>,NULL);
+<a name="line152">152: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STShellSetApplyTranspose_C"</font>,NULL);
+<a name="line153">153: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STShellSetBackTransform_C"</font>,NULL);
+<a name="line154">154: </a>  <font color="#4169E1">return</font>(0);
+<a name="line155">155: </a>}
+
+<a name="line157">157: </a><strong><font color="#4169E1"><a name="STShellSetApply_Shell"></a>static PetscErrorCode STShellSetApply_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscErrorCode (*apply)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec))</font></strong>
+<a name="line158">158: </a>{
+<a name="line159">159: </a>  ST_SHELL *shell = (ST_SHELL*)st-&gt;data;
+
+<a name="line162">162: </a>  shell-&gt;apply = apply;
+<a name="line163">163: </a>  <font color="#4169E1">return</font>(0);
+<a name="line164">164: </a>}
+
+<a name="line166">166: </a><font color="#B22222">/*@C</font>
+<a name="line167">167: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a> - Sets routine to use as the application of the</font>
+<a name="line168">168: </a><font color="#B22222">   operator to a vector in the user-defined spectral transformation.</font>
+
+<a name="line170">170: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line172">172: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line173">173: </a><font color="#B22222">+  st    - the spectral transformation context</font>
+<a name="line174">174: </a><font color="#B22222">-  apply - the application-provided transformation routine</font>
+
+<a name="line176">176: </a><font color="#B22222">   Calling sequence of apply:</font>
+<a name="line177">177: </a><font color="#B22222">$  PetscErrorCode apply(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec xin,Vec xout)</font>
+
+<a name="line179">179: </a><font color="#B22222">+  st   - the spectral transformation context</font>
+<a name="line180">180: </a><font color="#B22222">.  xin  - input vector</font>
+<a name="line181">181: </a><font color="#B22222">-  xout - output vector</font>
+
+<a name="line183">183: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line185">185: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>(), <a href="../../../../../../docs/manualpages/ST/STShellSetApplyTranspose.html#STShellSetApplyTranspose">STShellSetApplyTranspose</a>()</font>
+<a name="line186">186: </a><font color="#B22222">@*/</font>
+<a name="line187">187: </a><strong><font color="#4169E1"><a name="STShellSetApply"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscErrorCode (*apply)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec))</font></strong>
+<a name="line188">188: </a>{
+
+<a name="line193">193: </a>  PetscTryMethod(st,<font color="#666666">"STShellSetApply_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscErrorCode (*)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec)),(st,apply));
+<a name="line194">194: </a>  <font color="#4169E1">return</font>(0);
+<a name="line195">195: </a>}
+
+<a name="line197">197: </a><strong><font color="#4169E1"><a name="STShellSetApplyTranspose_Shell"></a>static PetscErrorCode STShellSetApplyTranspose_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscErrorCode (*applytrans)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec))</font></strong>
+<a name="line198">198: </a>{
+<a name="line199">199: </a>  ST_SHELL *shell = (ST_SHELL*)st-&gt;data;
+
+<a name="line202">202: </a>  shell-&gt;applytrans = applytrans;
+<a name="line203">203: </a>  <font color="#4169E1">return</font>(0);
+<a name="line204">204: </a>}
+
+<a name="line206">206: </a><font color="#B22222">/*@C</font>
+<a name="line207">207: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STShellSetApplyTranspose.html#STShellSetApplyTranspose">STShellSetApplyTranspose</a> - Sets routine to use as the application of the</font>
+<a name="line208">208: </a><font color="#B22222">   transposed operator to a vector in the user-defined spectral transformation.</font>
+
+<a name="line210">210: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line212">212: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line213">213: </a><font color="#B22222">+  st    - the spectral transformation context</font>
+<a name="line214">214: </a><font color="#B22222">-  applytrans - the application-provided transformation routine</font>
+
+<a name="line216">216: </a><font color="#B22222">   Calling sequence of applytrans:</font>
+<a name="line217">217: </a><font color="#B22222">$  PetscErrorCode applytrans(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec xin,Vec xout)</font>
+
+<a name="line219">219: </a><font color="#B22222">+  st   - the spectral transformation context</font>
+<a name="line220">220: </a><font color="#B22222">.  xin  - input vector</font>
+<a name="line221">221: </a><font color="#B22222">-  xout - output vector</font>
+
+<a name="line223">223: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line225">225: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a>(), <a href="../../../../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>()</font>
+<a name="line226">226: </a><font color="#B22222">@*/</font>
+<a name="line227">227: </a><strong><font color="#4169E1"><a name="STShellSetApplyTranspose"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STShellSetApplyTranspose.html#STShellSetApplyTranspose">STShellSetApplyTranspose</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscErrorCode (*applytrans)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec))</font></strong>
+<a name="line228">228: </a>{
+
+<a name="line233">233: </a>  PetscTryMethod(st,<font color="#666666">"STShellSetApplyTranspose_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscErrorCode (*)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec)),(st,applytrans));
+<a name="line234">234: </a>  <font color="#4169E1">return</font>(0);
+<a name="line235">235: </a>}
+
+<a name="line237">237: </a><strong><font color="#4169E1"><a name="STShellSetBackTransform_Shell"></a>static PetscErrorCode STShellSetBackTransform_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscErrorCode (*backtr)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt,PetscScalar*,PetscScalar*))</font></strong>
+<a name="line238">238: </a>{
+<a name="line239">239: </a>  ST_SHELL *shell = (ST_SHELL*)st-&gt;data;
+
+<a name="line242">242: </a>  shell-&gt;backtransform = backtr;
+<a name="line243">243: </a>  <font color="#4169E1">return</font>(0);
+<a name="line244">244: </a>}
+
+<a name="line246">246: </a><font color="#B22222">/*@C</font>
+<a name="line247">247: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a> - Sets the routine to be called after the</font>
+<a name="line248">248: </a><font color="#B22222">   eigensolution process has finished in order to transform back the</font>
+<a name="line249">249: </a><font color="#B22222">   computed eigenvalues.</font>
+
+<a name="line251">251: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line253">253: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line254">254: </a><font color="#B22222">+  st     - the spectral transformation context</font>
+<a name="line255">255: </a><font color="#B22222">-  backtr - the application-provided backtransform routine</font>
+
+<a name="line257">257: </a><font color="#B22222">   Calling sequence of backtr:</font>
+<a name="line258">258: </a><font color="#B22222">$  PetscErrorCode backtr(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscScalar *eigr,PetscScalar *eigi)</font>
+
+<a name="line260">260: </a><font color="#B22222">+  st   - the spectral transformation context</font>
+<a name="line261">261: </a><font color="#B22222">.  eigr - pointer ot the real part of the eigenvalue to transform back</font>
+<a name="line262">262: </a><font color="#B22222">-  eigi - pointer ot the imaginary part</font>
+
+<a name="line264">264: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line266">266: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a>(), <a href="../../../../../../docs/manualpages/ST/STShellSetApplyTranspose.html#STShellSetApplyTranspose">STShellSetApplyTranspose</a>()</font>
+<a name="line267">267: </a><font color="#B22222">@*/</font>
+<a name="line268">268: </a><strong><font color="#4169E1"><a name="STShellSetBackTransform"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscErrorCode (*backtr)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt,PetscScalar*,PetscScalar*))</font></strong>
+<a name="line269">269: </a>{
+
+<a name="line274">274: </a>  PetscTryMethod(st,<font color="#666666">"STShellSetBackTransform_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscErrorCode (*)(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt,PetscScalar*,PetscScalar*)),(st,backtr));
+<a name="line275">275: </a>  <font color="#4169E1">return</font>(0);
+<a name="line276">276: </a>}
+
+<a name="line278">278: </a><font color="#B22222">/*MC</font>
+<a name="line279">279: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a> - Creates a new spectral transformation class.</font>
+<a name="line280">280: </a><font color="#B22222">          This is intended to provide a simple class to use with <a href="../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>.</font>
+<a name="line281">281: </a><font color="#B22222">          You should not use this if you plan to make a complete class.</font>
+
+<a name="line283">283: </a><font color="#B22222">  Level: advanced</font>
+
+<a name="line285">285: </a><font color="#B22222">  Usage:</font>
+<a name="line286">286: </a><font color="#B22222">$             extern PetscErrorCode (*apply)(void*,Vec,Vec);</font>
+<a name="line287">287: </a><font color="#B22222">$             extern PetscErrorCode (*applytrans)(void*,Vec,Vec);</font>
+<a name="line288">288: </a><font color="#B22222">$             extern PetscErrorCode (*backtr)(void*,PetscScalar*,PetscScalar*);</font>
+<a name="line289">289: </a><font color="#B22222">$</font>
+<a name="line290">290: </a><font color="#B22222">$             <a href="../../../../../../docs/manualpages/ST/STCreate.html#STCreate">STCreate</a>(comm,&amp;st);</font>
+<a name="line291">291: </a><font color="#B22222">$             <a href="../../../../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,<a href="../../../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>);</font>
+<a name="line292">292: </a><font color="#B22222">$             <a href="../../../../../../docs/manualpages/ST/STShellSetContext.html#STShellSetContext">STShellSetContext</a>(st,ctx);</font>
+<a name="line293">293: </a><font color="#B22222">$             <a href="../../../../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a>(st,apply);</font>
+<a name="line294">294: </a><font color="#B22222">$             <a href="../../../../../../docs/manualpages/ST/STShellSetApplyTranspose.html#STShellSetApplyTranspose">STShellSetApplyTranspose</a>(st,applytrans);  (optional)</font>
+<a name="line295">295: </a><font color="#B22222">$             <a href="../../../../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>(st,backtr);       (optional)</font>
+
+<a name="line297">297: </a><font color="#B22222">M*/</font>
+
+<a name="line299">299: </a><strong><font color="#4169E1"><a name="STCreate_Shell"></a>SLEPC_EXTERN PetscErrorCode STCreate_Shell(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line300">300: </a>{
+<a name="line302">302: </a>  ST_SHELL       *ctx;
+
+<a name="line305">305: </a>  PetscNewLog(st,&amp;ctx);
+<a name="line306">306: </a>  st-&gt;data = (void*)ctx;
+
+<a name="line308">308: </a>  st-&gt;usesksp = PETSC_FALSE;
+
+<a name="line310">310: </a>  st-&gt;ops-&gt;apply           = STApply_Shell;
+<a name="line311">311: </a>  st-&gt;ops-&gt;applytrans      = STApplyTranspose_Shell;
+<a name="line312">312: </a>  st-&gt;ops-&gt;backtransform   = STBackTransform_Shell;
+<a name="line313">313: </a>  st-&gt;ops-&gt;destroy         = STDestroy_Shell;
+
+<a name="line315">315: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STShellSetApply_C"</font>,STShellSetApply_Shell);
+<a name="line316">316: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STShellSetApplyTranspose_C"</font>,STShellSetApplyTranspose_Shell);
+<a name="line317">317: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STShellSetBackTransform_C"</font>,STShellSetBackTransform_Shell);
+<a name="line318">318: </a>  <font color="#4169E1">return</font>(0);
+<a name="line319">319: </a>}
+
+</pre>
+</body>
+
+</html>

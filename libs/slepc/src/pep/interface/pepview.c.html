@@ -1,0 +1,727 @@
+<center><a href="pepview.c">Actual source code: pepview.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/interface/pepview.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:04+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/interface/pepview.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   The <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> routines related to various viewers</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/pepimpl.h.html">&lt;slepc/private/pepimpl.h&gt;</A>
+<a name="line15"> 15: </a><font color="#A020F0">#include &lt;petscdraw.h&gt;</font>
+
+<a name="line17"> 17: </a><font color="#B22222">/*@C</font>
+<a name="line18"> 18: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPView.html#PEPView">PEPView</a> - Prints the <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> data structure.</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line22"> 22: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line23"> 23: </a><font color="#B22222">+  pep - the polynomial eigenproblem solver context</font>
+<a name="line24"> 24: </a><font color="#B22222">-  viewer - optional visualization context</font>
+
+<a name="line26"> 26: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line27"> 27: </a><font color="#B22222">.  -pep_view -  Calls <a href="../../../docs/manualpages/PEP/PEPView.html#PEPView">PEPView</a>() at end of <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>()</font>
+
+<a name="line29"> 29: </a><font color="#B22222">   Note:</font>
+<a name="line30"> 30: </a><font color="#B22222">   The available visualization contexts include</font>
+<a name="line31"> 31: </a><font color="#B22222">+     PETSC_VIEWER_STDOUT_SELF - standard output (default)</font>
+<a name="line32"> 32: </a><font color="#B22222">-     PETSC_VIEWER_STDOUT_WORLD - synchronized standard</font>
+<a name="line33"> 33: </a><font color="#B22222">         output where only the first processor opens</font>
+<a name="line34"> 34: </a><font color="#B22222">         the file.  All other processors send their</font>
+<a name="line35"> 35: </a><font color="#B22222">         data to the first processor to print.</font>
+
+<a name="line37"> 37: </a><font color="#B22222">   The user can open an alternative visualization context with</font>
+<a name="line38"> 38: </a><font color="#B22222">   PetscViewerASCIIOpen() - output to a specified file.</font>
+
+<a name="line40"> 40: </a><font color="#B22222">   Level: beginner</font>
+<a name="line41"> 41: </a><font color="#B22222">@*/</font>
+<a name="line42"> 42: </a><strong><font color="#4169E1"><a name="PEPView"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPView.html#PEPView">PEPView</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line43"> 43: </a>{
+<a name="line45"> 45: </a>  const char     *type=NULL;
+<a name="line46"> 46: </a>  char           str[50];
+<a name="line47"> 47: </a>  PetscBool      isascii,islinear,istrivial;
+<a name="line48"> 48: </a>  PetscInt       i;
+<a name="line49"> 49: </a>  PetscViewer    sviewer;
+
+<a name="line53"> 53: </a>  <font color="#4169E1">if</font> (!viewer) {
+<a name="line54"> 54: </a>    PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)pep),&amp;viewer);
+<a name="line55"> 55: </a>  }
+
+<a name="line59"> 59: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line60"> 60: </a><strong><font color="#228B22">#define HERM </font><font color="#666666">"hermitian"</font><font color="#228B22"></font></strong>
+<a name="line61"> 61: </a><font color="#A020F0">#else</font>
+<a name="line62"> 62: </a><strong><font color="#228B22">#define HERM </font><font color="#666666">"symmetric"</font><font color="#228B22"></font></strong>
+<a name="line63"> 63: </a><font color="#A020F0">#endif</font>
+<a name="line64"> 64: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line65"> 65: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line66"> 66: </a>    PetscObjectPrintClassNamePrefixType((PetscObject)pep,viewer);
+<a name="line67"> 67: </a>    <font color="#4169E1">if</font> (pep-&gt;ops-&gt;view) {
+<a name="line68"> 68: </a>      PetscViewerASCIIPushTab(viewer);
+<a name="line69"> 69: </a>      (*pep-&gt;ops-&gt;view)(pep,viewer);
+<a name="line70"> 70: </a>      PetscViewerASCIIPopTab(viewer);
+<a name="line71"> 71: </a>    }
+<a name="line72"> 72: </a>    <font color="#4169E1">if</font> (pep-&gt;problem_type) {
+<a name="line73"> 73: </a>      <font color="#4169E1">switch</font> (pep-&gt;problem_type) {
+<a name="line74"> 74: </a>        <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GENERAL</a>:    type = <font color="#666666">"general polynomial eigenvalue problem"</font>; <font color="#4169E1">break</font>;
+<a name="line75"> 75: </a>        <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_HERMITIAN</a>:  type = HERM <font color="#666666">" polynomial eigenvalue problem"</font>; <font color="#4169E1">break</font>;
+<a name="line76"> 76: </a>        <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_HYPERBOLIC</a>: type = <font color="#666666">"hyperbolic polynomial eigenvalue problem"</font>; <font color="#4169E1">break</font>;
+<a name="line77"> 77: </a>        <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GYROSCOPIC</a>: type = <font color="#666666">"gyroscopic polynomial eigenvalue problem"</font>; <font color="#4169E1">break</font>;
+<a name="line78"> 78: </a>      }
+<a name="line79"> 79: </a>    } <font color="#4169E1">else</font> type = <font color="#666666">"not yet set"</font>;
+<a name="line80"> 80: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  problem type: %s\n"</font>,type);
+<a name="line81"> 81: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  polynomial represented in %s basis\n"</font>,PEPBasisTypes[pep-&gt;basis]);
+<a name="line82"> 82: </a>    <font color="#4169E1">switch</font> (pep-&gt;scale) {
+<a name="line83"> 83: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPScale.html#PEPScale">PEP_SCALE_NONE</a>:
+<a name="line84"> 84: </a>        <font color="#4169E1">break</font>;
+<a name="line85"> 85: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPScale.html#PEPScale">PEP_SCALE_SCALAR</a>:
+<a name="line86"> 86: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  parameter scaling enabled, with scaling factor=%g\n"</font>,(double)pep-&gt;sfactor);
+<a name="line87"> 87: </a>        <font color="#4169E1">break</font>;
+<a name="line88"> 88: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPScale.html#PEPScale">PEP_SCALE_DIAGONAL</a>:
+<a name="line89"> 89: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  diagonal balancing enabled, with its=%D and lambda=%g\n"</font>,pep-&gt;sits,(double)pep-&gt;slambda);
+<a name="line90"> 90: </a>        <font color="#4169E1">break</font>;
+<a name="line91"> 91: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPScale.html#PEPScale">PEP_SCALE_BOTH</a>:
+<a name="line92"> 92: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  parameter scaling &amp; diagonal balancing enabled, with scaling factor=%g, its=%D and lambda=%g\n"</font>,(double)pep-&gt;sfactor,pep-&gt;sits,(double)pep-&gt;slambda);
+<a name="line93"> 93: </a>        <font color="#4169E1">break</font>;
+<a name="line94"> 94: </a>    }
+<a name="line95"> 95: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  selected portion of the spectrum: "</font>);
+<a name="line96"> 96: </a>    PetscViewerASCIIUseTabs(viewer,PETSC_FALSE);
+<a name="line97"> 97: </a>    <a href="../../../docs/manualpages/sys/SlepcSNPrintfScalar.html#SlepcSNPrintfScalar">SlepcSNPrintfScalar</a>(str,50,pep-&gt;target,PETSC_FALSE);
+<a name="line98"> 98: </a>    <font color="#4169E1">if</font> (!pep-&gt;which) {
+<a name="line99"> 99: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"not yet set\n"</font>);
+<a name="line100">100: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">switch</font> (pep-&gt;which) {
+<a name="line101">101: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_WHICH_USER</a>:
+<a name="line102">102: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"user defined\n"</font>);
+<a name="line103">103: </a>        <font color="#4169E1">break</font>;
+<a name="line104">104: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_MAGNITUDE</a>:
+<a name="line105">105: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"closest to target: %s (in magnitude)\n"</font>,str);
+<a name="line106">106: </a>        <font color="#4169E1">break</font>;
+<a name="line107">107: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_REAL</a>:
+<a name="line108">108: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"closest to target: %s (along the real axis)\n"</font>,str);
+<a name="line109">109: </a>        <font color="#4169E1">break</font>;
+<a name="line110">110: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_IMAGINARY</a>:
+<a name="line111">111: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"closest to target: %s (along the imaginary axis)\n"</font>,str);
+<a name="line112">112: </a>        <font color="#4169E1">break</font>;
+<a name="line113">113: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_MAGNITUDE</a>:
+<a name="line114">114: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"largest eigenvalues in magnitude\n"</font>);
+<a name="line115">115: </a>        <font color="#4169E1">break</font>;
+<a name="line116">116: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_SMALLEST_MAGNITUDE</a>:
+<a name="line117">117: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"smallest eigenvalues in magnitude\n"</font>);
+<a name="line118">118: </a>        <font color="#4169E1">break</font>;
+<a name="line119">119: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_REAL</a>:
+<a name="line120">120: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"largest real parts\n"</font>);
+<a name="line121">121: </a>        <font color="#4169E1">break</font>;
+<a name="line122">122: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_SMALLEST_REAL</a>:
+<a name="line123">123: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"smallest real parts\n"</font>);
+<a name="line124">124: </a>        <font color="#4169E1">break</font>;
+<a name="line125">125: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_IMAGINARY</a>:
+<a name="line126">126: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"largest imaginary parts\n"</font>);
+<a name="line127">127: </a>        <font color="#4169E1">break</font>;
+<a name="line128">128: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_SMALLEST_IMAGINARY</a>:
+<a name="line129">129: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"smallest imaginary parts\n"</font>);
+<a name="line130">130: </a>        <font color="#4169E1">break</font>;
+<a name="line131">131: </a>      <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_ALL</a>:
+<a name="line132">132: </a>        <font color="#4169E1">if</font> (pep-&gt;inta || pep-&gt;intb) {
+<a name="line133">133: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"all eigenvalues in interval [%g,%g]\n"</font>,(double)pep-&gt;inta,(double)pep-&gt;intb);
+<a name="line134">134: </a>        } <font color="#4169E1">else</font> {
+<a name="line135">135: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">"all eigenvalues in the region\n"</font>);
+<a name="line136">136: </a>        }
+<a name="line137">137: </a>        <font color="#4169E1">break</font>;
+<a name="line138">138: </a>    }
+<a name="line139">139: </a>    PetscViewerASCIIUseTabs(viewer,PETSC_TRUE);
+<a name="line140">140: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  number of eigenvalues (nev): %D\n"</font>,pep-&gt;nev);
+<a name="line141">141: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  number of column vectors (ncv): %D\n"</font>,pep-&gt;ncv);
+<a name="line142">142: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  maximum dimension of projected problem (mpd): %D\n"</font>,pep-&gt;mpd);
+<a name="line143">143: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  maximum number of iterations: %D\n"</font>,pep-&gt;max_it);
+<a name="line144">144: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  tolerance: %g\n"</font>,(double)pep-&gt;tol);
+<a name="line145">145: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  convergence test: "</font>);
+<a name="line146">146: </a>    PetscViewerASCIIUseTabs(viewer,PETSC_FALSE);
+<a name="line147">147: </a>    <font color="#4169E1">switch</font> (pep-&gt;conv) {
+<a name="line148">148: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPConv.html#PEPConv">PEP_CONV_ABS</a>:
+<a name="line149">149: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"absolute\n"</font>);<font color="#4169E1">break</font>;
+<a name="line150">150: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPConv.html#PEPConv">PEP_CONV_REL</a>:
+<a name="line151">151: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"relative to the eigenvalue\n"</font>);<font color="#4169E1">break</font>;
+<a name="line152">152: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPConv.html#PEPConv">PEP_CONV_NORM</a>:
+<a name="line153">153: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"relative to the matrix norms\n"</font>);
+<a name="line154">154: </a>      <font color="#4169E1">if</font> (pep-&gt;nrma) {
+<a name="line155">155: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  computed matrix norms: %g"</font>,(double)pep-&gt;nrma[0]);
+<a name="line156">156: </a>        <font color="#4169E1">for</font> (i=1;i&lt;pep-&gt;nmat;i++) {
+<a name="line157">157: </a>          PetscViewerASCIIPrintf(viewer,<font color="#666666">", %g"</font>,(double)pep-&gt;nrma[i]);
+<a name="line158">158: </a>        }
+<a name="line159">159: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"\n"</font>);
+<a name="line160">160: </a>      }
+<a name="line161">161: </a>      <font color="#4169E1">break</font>;
+<a name="line162">162: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPConv.html#PEPConv">PEP_CONV_USER</a>:
+<a name="line163">163: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"user-defined\n"</font>);<font color="#4169E1">break</font>;
+<a name="line164">164: </a>    }
+<a name="line165">165: </a>    PetscViewerASCIIUseTabs(viewer,PETSC_TRUE);
+<a name="line166">166: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  extraction type: %s\n"</font>,PEPExtractTypes[pep-&gt;extract]);
+<a name="line167">167: </a>    <font color="#4169E1">if</font> (pep-&gt;refine) {
+<a name="line168">168: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  iterative refinement: %s, with %s scheme\n"</font>,PEPRefineTypes[pep-&gt;refine],PEPRefineSchemes[pep-&gt;scheme]);
+<a name="line169">169: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  refinement stopping criterion: tol=%g, its=%D\n"</font>,(double)pep-&gt;rtol,pep-&gt;rits);
+<a name="line170">170: </a>      <font color="#4169E1">if</font> (pep-&gt;npart&gt;1) {
+<a name="line171">171: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  splitting communicator in %D partitions for refinement\n"</font>,pep-&gt;npart);
+<a name="line172">172: </a>      }
+<a name="line173">173: </a>    }
+<a name="line174">174: </a>    <font color="#4169E1">if</font> (pep-&gt;nini) {
+<a name="line175">175: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  dimension of user-provided initial space: %D\n"</font>,PetscAbs(pep-&gt;nini));
+<a name="line176">176: </a>    }
+<a name="line177">177: </a>  } <font color="#4169E1">else</font> {
+<a name="line178">178: </a>    <font color="#4169E1">if</font> (pep-&gt;ops-&gt;view) {
+<a name="line179">179: </a>      (*pep-&gt;ops-&gt;view)(pep,viewer);
+<a name="line180">180: </a>    }
+<a name="line181">181: </a>  }
+<a name="line182">182: </a>  PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_INFO);
+<a name="line183">183: </a>  <font color="#4169E1">if</font> (!pep-&gt;V) { <a href="../../../docs/manualpages/PEP/PEPGetBV.html#PEPGetBV">PEPGetBV</a>(pep,&amp;pep-&gt;V); }
+<a name="line184">184: </a>  <a href="../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(pep-&gt;V,viewer);
+<a name="line185">185: </a>  <font color="#4169E1">if</font> (!pep-&gt;rg) { <a href="../../../docs/manualpages/PEP/PEPGetRG.html#PEPGetRG">PEPGetRG</a>(pep,&amp;pep-&gt;rg); }
+<a name="line186">186: </a>  <a href="../../../docs/manualpages/RG/RGIsTrivial.html#RGIsTrivial">RGIsTrivial</a>(pep-&gt;rg,&amp;istrivial);
+<a name="line187">187: </a>  <font color="#4169E1">if</font> (!istrivial) { <a href="../../../docs/manualpages/RG/RGView.html#RGView">RGView</a>(pep-&gt;rg,viewer); }
+<a name="line188">188: </a>  PetscObjectTypeCompare((PetscObject)pep,PEPLINEAR,&amp;islinear);
+<a name="line189">189: </a>  <font color="#4169E1">if</font> (!islinear) {
+<a name="line190">190: </a>    <font color="#4169E1">if</font> (!pep-&gt;ds) { <a href="../../../docs/manualpages/PEP/PEPGetDS.html#PEPGetDS">PEPGetDS</a>(pep,&amp;pep-&gt;ds); }
+<a name="line191">191: </a>    <a href="../../../docs/manualpages/DS/DSView.html#DSView">DSView</a>(pep-&gt;ds,viewer);
+<a name="line192">192: </a>  }
+<a name="line193">193: </a>  PetscViewerPopFormat(viewer);
+<a name="line194">194: </a>  <font color="#4169E1">if</font> (!pep-&gt;st) { <a href="../../../docs/manualpages/PEP/PEPGetST.html#PEPGetST">PEPGetST</a>(pep,&amp;pep-&gt;st); }
+<a name="line195">195: </a>  <a href="../../../docs/manualpages/ST/STView.html#STView">STView</a>(pep-&gt;st,viewer);
+<a name="line196">196: </a>  <font color="#4169E1">if</font> (pep-&gt;refine!=<a href="../../../docs/manualpages/PEP/PEPRefine.html#PEPRefine">PEP_REFINE_NONE</a>) {
+<a name="line197">197: </a>    PetscViewerASCIIPushTab(viewer);
+<a name="line198">198: </a>    <font color="#4169E1">if</font> (pep-&gt;npart&gt;1) {
+<a name="line199">199: </a>      <font color="#4169E1">if</font> (pep-&gt;refinesubc-&gt;color==0) {
+<a name="line200">200: </a>        PetscViewerASCIIGetStdout(PetscSubcommChild(pep-&gt;refinesubc),&amp;sviewer);
+<a name="line201">201: </a>        KSPView(pep-&gt;refineksp,sviewer);
+<a name="line202">202: </a>      }
+<a name="line203">203: </a>    } <font color="#4169E1">else</font> {
+<a name="line204">204: </a>      KSPView(pep-&gt;refineksp,viewer);
+<a name="line205">205: </a>    }
+<a name="line206">206: </a>    PetscViewerASCIIPopTab(viewer);
+<a name="line207">207: </a>  }
+<a name="line208">208: </a>  <font color="#4169E1">return</font>(0);
+<a name="line209">209: </a>}
+
+<a name="line211">211: </a><font color="#B22222">/*@C</font>
+<a name="line212">212: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPViewFromOptions.html#PEPViewFromOptions">PEPViewFromOptions</a> - View from options</font>
+
+<a name="line214">214: </a><font color="#B22222">   Collective on <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a></font>
+
+<a name="line216">216: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line217">217: </a><font color="#B22222">+  pep  - the eigensolver context</font>
+<a name="line218">218: </a><font color="#B22222">.  obj  - optional object</font>
+<a name="line219">219: </a><font color="#B22222">-  name - command line option</font>
+
+<a name="line221">221: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line223">223: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/PEP/PEPView.html#PEPView">PEPView</a>(), <a href="../../../docs/manualpages/PEP/PEPCreate.html#PEPCreate">PEPCreate</a>()</font>
+<a name="line224">224: </a><font color="#B22222">@*/</font>
+<a name="line225">225: </a><strong><font color="#4169E1"><a name="PEPViewFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPViewFromOptions.html#PEPViewFromOptions">PEPViewFromOptions</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscObject obj,const char name[])</font></strong>
+<a name="line226">226: </a>{
+
+<a name="line231">231: </a>  PetscObjectViewFromOptions((PetscObject)pep,obj,name);
+<a name="line232">232: </a>  <font color="#4169E1">return</font>(0);
+<a name="line233">233: </a>}
+
+<a name="line235">235: </a><font color="#B22222">/*@C</font>
+<a name="line236">236: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPReasonView.html#PEPReasonView">PEPReasonView</a> - Displays the reason a <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> solve converged or diverged.</font>
+
+<a name="line238">238: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line240">240: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line241">241: </a><font color="#B22222">+  pep - the eigensolver context</font>
+<a name="line242">242: </a><font color="#B22222">-  viewer - the viewer to display the reason</font>
+
+<a name="line244">244: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line245">245: </a><font color="#B22222">.  -pep_converged_reason - print reason for convergence, and number of iterations</font>
+
+<a name="line247">247: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line249">249: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/PEP/PEPSetConvergenceTest.html#PEPSetConvergenceTest">PEPSetConvergenceTest</a>(), <a href="../../../docs/manualpages/PEP/PEPSetTolerances.html#PEPSetTolerances">PEPSetTolerances</a>(), <a href="../../../docs/manualpages/PEP/PEPGetIterationNumber.html#PEPGetIterationNumber">PEPGetIterationNumber</a>()</font>
+<a name="line250">250: </a><font color="#B22222">@*/</font>
+<a name="line251">251: </a><strong><font color="#4169E1"><a name="PEPReasonView"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPReasonView.html#PEPReasonView">PEPReasonView</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line252">252: </a>{
+<a name="line254">254: </a>  PetscBool      isAscii;
+
+<a name="line257">257: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isAscii);
+<a name="line258">258: </a>  <font color="#4169E1">if</font> (isAscii) {
+<a name="line259">259: </a>    PetscViewerASCIIAddTab(viewer,((PetscObject)pep)-&gt;tablevel);
+<a name="line260">260: </a>    <font color="#4169E1">if</font> (pep-&gt;reason &gt; 0) {
+<a name="line261">261: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s Polynomial eigensolve converged (%D eigenpair%s) due to %s; iterations %D\n"</font>,((PetscObject)pep)-&gt;prefix?((PetscObject)pep)-&gt;prefix:<font color="#666666">""</font>,pep-&gt;nconv,(pep-&gt;nconv&gt;1)?<font color="#666666">"s"</font>:<font color="#666666">""</font>,PEPConvergedReasons[pep-&gt;reason],pep-&gt;its);
+<a name="line262">262: </a>    } <font color="#4169E1">else</font> {
+<a name="line263">263: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s Polynomial eigensolve did not converge due to %s; iterations %D\n"</font>,((PetscObject)pep)-&gt;prefix?((PetscObject)pep)-&gt;prefix:<font color="#666666">""</font>,PEPConvergedReasons[pep-&gt;reason],pep-&gt;its);
+<a name="line264">264: </a>    }
+<a name="line265">265: </a>    PetscViewerASCIISubtractTab(viewer,((PetscObject)pep)-&gt;tablevel);
+<a name="line266">266: </a>  }
+<a name="line267">267: </a>  <font color="#4169E1">return</font>(0);
+<a name="line268">268: </a>}
+
+<a name="line270">270: </a><font color="#B22222">/*@</font>
+<a name="line271">271: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPReasonViewFromOptions.html#PEPReasonViewFromOptions">PEPReasonViewFromOptions</a> - Processes command line options to determine if/how</font>
+<a name="line272">272: </a><font color="#B22222">   the <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> converged reason is to be viewed.</font>
+
+<a name="line274">274: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line276">276: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line277">277: </a><font color="#B22222">.  pep - the eigensolver context</font>
+
+<a name="line279">279: </a><font color="#B22222">   Level: developer</font>
+<a name="line280">280: </a><font color="#B22222">@*/</font>
+<a name="line281">281: </a><strong><font color="#4169E1"><a name="PEPReasonViewFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPReasonViewFromOptions.html#PEPReasonViewFromOptions">PEPReasonViewFromOptions</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line282">282: </a>{
+<a name="line283">283: </a>  PetscErrorCode    ierr;
+<a name="line284">284: </a>  PetscViewer       viewer;
+<a name="line285">285: </a>  PetscBool         flg;
+<a name="line286">286: </a>  static PetscBool  incall = PETSC_FALSE;
+<a name="line287">287: </a>  PetscViewerFormat format;
+
+<a name="line290">290: </a>  <font color="#4169E1">if</font> (incall) <font color="#4169E1">return</font>(0);
+<a name="line291">291: </a>  incall = PETSC_TRUE;
+<a name="line292">292: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)pep),((PetscObject)pep)-&gt;options,((PetscObject)pep)-&gt;prefix,<font color="#666666">"-pep_converged_reason"</font>,&amp;viewer,&amp;format,&amp;flg);
+<a name="line293">293: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line294">294: </a>    PetscViewerPushFormat(viewer,format);
+<a name="line295">295: </a>    <a href="../../../docs/manualpages/PEP/PEPReasonView.html#PEPReasonView">PEPReasonView</a>(pep,viewer);
+<a name="line296">296: </a>    PetscViewerPopFormat(viewer);
+<a name="line297">297: </a>    PetscViewerDestroy(&amp;viewer);
+<a name="line298">298: </a>  }
+<a name="line299">299: </a>  incall = PETSC_FALSE;
+<a name="line300">300: </a>  <font color="#4169E1">return</font>(0);
+<a name="line301">301: </a>}
+
+<a name="line303">303: </a><strong><font color="#4169E1"><a name="PEPErrorView_ASCII"></a>static PetscErrorCode PEPErrorView_ASCII(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEPErrorType</a> etype,PetscViewer viewer)</font></strong>
+<a name="line304">304: </a>{
+<a name="line305">305: </a>  PetscReal      error;
+<a name="line306">306: </a>  PetscInt       i,j,k;
+
+<a name="line310">310: </a>  <font color="#4169E1">if</font> (pep-&gt;nconv&lt;pep-&gt;nev) {
+<a name="line311">311: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">" Problem: less than %D eigenvalues converged\n\n"</font>,pep-&gt;nev);
+<a name="line312">312: </a>    <font color="#4169E1">return</font>(0);
+<a name="line313">313: </a>  }
+<a name="line314">314: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nev;i++) {
+<a name="line315">315: </a>    <a href="../../../docs/manualpages/PEP/PEPComputeError.html#PEPComputeError">PEPComputeError</a>(pep,i,etype,&amp;error);
+<a name="line316">316: </a>    <font color="#4169E1">if</font> (error&gt;=5.0*pep-&gt;tol) {
+<a name="line317">317: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">" Problem: some of the first %D relative errors are higher than the tolerance\n\n"</font>,pep-&gt;nev);
+<a name="line318">318: </a>      <font color="#4169E1">return</font>(0);
+<a name="line319">319: </a>    }
+<a name="line320">320: </a>  }
+<a name="line321">321: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">" All requested eigenvalues computed up to the required tolerance:"</font>);
+<a name="line322">322: </a>  <font color="#4169E1">for</font> (i=0;i&lt;=(pep-&gt;nev-1)/8;i++) {
+<a name="line323">323: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"\n     "</font>);
+<a name="line324">324: </a>    <font color="#4169E1">for</font> (j=0;j&lt;PetscMin(8,pep-&gt;nev-8*i);j++) {
+<a name="line325">325: </a>      k = pep-&gt;perm[8*i+j];
+<a name="line326">326: </a>      SlepcPrintEigenvalueASCII(viewer,pep-&gt;eigr[k],pep-&gt;eigi[k]);
+<a name="line327">327: </a>      <font color="#4169E1">if</font> (8*i+j+1&lt;pep-&gt;nev) { PetscViewerASCIIPrintf(viewer,<font color="#666666">", "</font>); }
+<a name="line328">328: </a>    }
+<a name="line329">329: </a>  }
+<a name="line330">330: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"\n\n"</font>);
+<a name="line331">331: </a>  <font color="#4169E1">return</font>(0);
+<a name="line332">332: </a>}
+
+<a name="line334">334: </a><strong><font color="#4169E1"><a name="PEPErrorView_DETAIL"></a>static PetscErrorCode PEPErrorView_DETAIL(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEPErrorType</a> etype,PetscViewer viewer)</font></strong>
+<a name="line335">335: </a>{
+<a name="line337">337: </a>  PetscReal      error,re,im;
+<a name="line338">338: </a>  PetscScalar    kr,ki;
+<a name="line339">339: </a>  PetscInt       i;
+<a name="line340">340: </a><strong><font color="#228B22">#define EXLEN 30</font></strong>
+<a name="line341">341: </a>  char           ex[EXLEN],sep[]=<font color="#666666">" ---------------------- --------------------\n"</font>;
+
+<a name="line344">344: </a>  <font color="#4169E1">if</font> (!pep-&gt;nconv) <font color="#4169E1">return</font>(0);
+<a name="line345">345: </a>  <font color="#4169E1">switch</font> (etype) {
+<a name="line346">346: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_ABSOLUTE</a>:
+<a name="line347">347: </a>      PetscSNPrintf(ex,EXLEN,<font color="#666666">"   ||P(k)x||"</font>);
+<a name="line348">348: </a>      <font color="#4169E1">break</font>;
+<a name="line349">349: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_RELATIVE</a>:
+<a name="line350">350: </a>      PetscSNPrintf(ex,EXLEN,<font color="#666666">"||P(k)x||/||kx||"</font>);
+<a name="line351">351: </a>      <font color="#4169E1">break</font>;
+<a name="line352">352: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>:
+<a name="line353">353: </a>      PetscSNPrintf(ex,EXLEN,<font color="#666666">"    eta(x,k)"</font>);
+<a name="line354">354: </a>      <font color="#4169E1">break</font>;
+<a name="line355">355: </a>  }
+<a name="line356">356: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s            k             %s\n%s"</font>,sep,ex,sep);
+<a name="line357">357: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line358">358: </a>    <a href="../../../docs/manualpages/PEP/PEPGetEigenpair.html#PEPGetEigenpair">PEPGetEigenpair</a>(pep,i,&amp;kr,&amp;ki,NULL,NULL);
+<a name="line359">359: </a>    <a href="../../../docs/manualpages/PEP/PEPComputeError.html#PEPComputeError">PEPComputeError</a>(pep,i,etype,&amp;error);
+<a name="line360">360: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line361">361: </a>    re = PetscRealPart(kr);
+<a name="line362">362: </a>    im = PetscImaginaryPart(kr);
+<a name="line363">363: </a><font color="#A020F0">#else</font>
+<a name="line364">364: </a>    re = kr;
+<a name="line365">365: </a>    im = ki;
+<a name="line366">366: </a><font color="#A020F0">#endif</font>
+<a name="line367">367: </a>    <font color="#4169E1">if</font> (im!=0.0) {
+<a name="line368">368: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  % 9f%+9fi      %12g\n"</font>,(double)re,(double)im,(double)error);
+<a name="line369">369: </a>    } <font color="#4169E1">else</font> {
+<a name="line370">370: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"    % 12f           %12g\n"</font>,(double)re,(double)error);
+<a name="line371">371: </a>    }
+<a name="line372">372: </a>  }
+<a name="line373">373: </a>  PetscViewerASCIIPrintf(viewer,sep);
+<a name="line374">374: </a>  <font color="#4169E1">return</font>(0);
+<a name="line375">375: </a>}
+
+<a name="line377">377: </a><strong><font color="#4169E1"><a name="PEPErrorView_MATLAB"></a>static PetscErrorCode PEPErrorView_MATLAB(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEPErrorType</a> etype,PetscViewer viewer)</font></strong>
+<a name="line378">378: </a>{
+<a name="line380">380: </a>  PetscReal      error;
+<a name="line381">381: </a>  PetscInt       i;
+<a name="line382">382: </a>  const char     *name;
+
+<a name="line385">385: </a>  PetscObjectGetName((PetscObject)pep,&amp;name);
+<a name="line386">386: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"Error_%s = [\n"</font>,name);
+<a name="line387">387: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line388">388: </a>    <a href="../../../docs/manualpages/PEP/PEPComputeError.html#PEPComputeError">PEPComputeError</a>(pep,i,etype,&amp;error);
+<a name="line389">389: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"%18.16e\n"</font>,(double)error);
+<a name="line390">390: </a>  }
+<a name="line391">391: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"];\n"</font>);
+<a name="line392">392: </a>  <font color="#4169E1">return</font>(0);
+<a name="line393">393: </a>}
+
+<a name="line395">395: </a><font color="#B22222">/*@C</font>
+<a name="line396">396: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a> - Displays the errors associated with the computed solution</font>
+<a name="line397">397: </a><font color="#B22222">   (as well as the eigenvalues).</font>
+
+<a name="line399">399: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line401">401: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line402">402: </a><font color="#B22222">+  pep    - the eigensolver context</font>
+<a name="line403">403: </a><font color="#B22222">.  etype  - error type</font>
+<a name="line404">404: </a><font color="#B22222">-  viewer - optional visualization context</font>
+
+<a name="line406">406: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line407">407: </a><font color="#B22222">+  -pep_error_absolute - print absolute errors of each eigenpair</font>
+<a name="line408">408: </a><font color="#B22222">.  -pep_error_relative - print relative errors of each eigenpair</font>
+<a name="line409">409: </a><font color="#B22222">-  -pep_error_backward - print backward errors of each eigenpair</font>
+
+<a name="line411">411: </a><font color="#B22222">   Notes:</font>
+<a name="line412">412: </a><font color="#B22222">   By default, this function checks the error of all eigenpairs and prints</font>
+<a name="line413">413: </a><font color="#B22222">   the eigenvalues if all of them are below the requested tolerance.</font>
+<a name="line414">414: </a><font color="#B22222">   If the viewer has format=PETSC_VIEWER_ASCII_INFO_DETAIL then a table with</font>
+<a name="line415">415: </a><font color="#B22222">   eigenvalues and corresponding errors is printed.</font>
+
+<a name="line417">417: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line419">419: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(), <a href="../../../docs/manualpages/PEP/PEPValuesView.html#PEPValuesView">PEPValuesView</a>(), <a href="../../../docs/manualpages/PEP/PEPVectorsView.html#PEPVectorsView">PEPVectorsView</a>()</font>
+<a name="line420">420: </a><font color="#B22222">@*/</font>
+<a name="line421">421: </a><strong><font color="#4169E1"><a name="PEPErrorView"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEPErrorType</a> etype,PetscViewer viewer)</font></strong>
+<a name="line422">422: </a>{
+<a name="line423">423: </a>  PetscBool         isascii;
+<a name="line424">424: </a>  PetscViewerFormat format;
+<a name="line425">425: </a>  PetscErrorCode    ierr;
+
+<a name="line429">429: </a>  <font color="#4169E1">if</font> (!viewer) {
+<a name="line430">430: </a>    PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)pep),&amp;viewer);
+<a name="line431">431: </a>  }
+<a name="line434">434: </a>  PEPCheckSolved(pep,1);
+<a name="line435">435: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line436">436: </a>  <font color="#4169E1">if</font> (!isascii) <font color="#4169E1">return</font>(0);
+
+<a name="line438">438: </a>  PetscViewerGetFormat(viewer,&amp;format);
+<a name="line439">439: </a>  <font color="#4169E1">switch</font> (format) {
+<a name="line440">440: </a>    <font color="#4169E1">case</font> PETSC_VIEWER_DEFAULT:
+<a name="line441">441: </a>    <font color="#4169E1">case</font> PETSC_VIEWER_ASCII_INFO:
+<a name="line442">442: </a>      PEPErrorView_ASCII(pep,etype,viewer);
+<a name="line443">443: </a>      <font color="#4169E1">break</font>;
+<a name="line444">444: </a>    <font color="#4169E1">case</font> PETSC_VIEWER_ASCII_INFO_DETAIL:
+<a name="line445">445: </a>      PEPErrorView_DETAIL(pep,etype,viewer);
+<a name="line446">446: </a>      <font color="#4169E1">break</font>;
+<a name="line447">447: </a>    <font color="#4169E1">case</font> PETSC_VIEWER_ASCII_MATLAB:
+<a name="line448">448: </a>      PEPErrorView_MATLAB(pep,etype,viewer);
+<a name="line449">449: </a>      <font color="#4169E1">break</font>;
+<a name="line450">450: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line451">451: </a>      PetscInfo1(pep,<font color="#666666">"Unsupported viewer format %s\n"</font>,PetscViewerFormats[format]);
+<a name="line452">452: </a>  }
+<a name="line453">453: </a>  <font color="#4169E1">return</font>(0);
+<a name="line454">454: </a>}
+
+<a name="line456">456: </a><font color="#B22222">/*@</font>
+<a name="line457">457: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPErrorViewFromOptions.html#PEPErrorViewFromOptions">PEPErrorViewFromOptions</a> - Processes command line options to determine if/how</font>
+<a name="line458">458: </a><font color="#B22222">   the errors of the computed solution are to be viewed.</font>
+
+<a name="line460">460: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line462">462: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line463">463: </a><font color="#B22222">.  pep - the eigensolver context</font>
+
+<a name="line465">465: </a><font color="#B22222">   Level: developer</font>
+<a name="line466">466: </a><font color="#B22222">@*/</font>
+<a name="line467">467: </a><strong><font color="#4169E1"><a name="PEPErrorViewFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPErrorViewFromOptions.html#PEPErrorViewFromOptions">PEPErrorViewFromOptions</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line468">468: </a>{
+<a name="line469">469: </a>  PetscErrorCode    ierr;
+<a name="line470">470: </a>  PetscViewer       viewer;
+<a name="line471">471: </a>  PetscBool         flg;
+<a name="line472">472: </a>  static PetscBool  incall = PETSC_FALSE;
+<a name="line473">473: </a>  PetscViewerFormat format;
+
+<a name="line476">476: </a>  <font color="#4169E1">if</font> (incall) <font color="#4169E1">return</font>(0);
+<a name="line477">477: </a>  incall = PETSC_TRUE;
+<a name="line478">478: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)pep),((PetscObject)pep)-&gt;options,((PetscObject)pep)-&gt;prefix,<font color="#666666">"-pep_error_absolute"</font>,&amp;viewer,&amp;format,&amp;flg);
+<a name="line479">479: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line480">480: </a>    PetscViewerPushFormat(viewer,format);
+<a name="line481">481: </a>    <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_ABSOLUTE</a>,viewer);
+<a name="line482">482: </a>    PetscViewerPopFormat(viewer);
+<a name="line483">483: </a>    PetscViewerDestroy(&amp;viewer);
+<a name="line484">484: </a>  }
+<a name="line485">485: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)pep),((PetscObject)pep)-&gt;options,((PetscObject)pep)-&gt;prefix,<font color="#666666">"-pep_error_relative"</font>,&amp;viewer,&amp;format,&amp;flg);
+<a name="line486">486: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line487">487: </a>    PetscViewerPushFormat(viewer,format);
+<a name="line488">488: </a>    <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_RELATIVE</a>,viewer);
+<a name="line489">489: </a>    PetscViewerPopFormat(viewer);
+<a name="line490">490: </a>    PetscViewerDestroy(&amp;viewer);
+<a name="line491">491: </a>  }
+<a name="line492">492: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)pep),((PetscObject)pep)-&gt;options,((PetscObject)pep)-&gt;prefix,<font color="#666666">"-pep_error_backward"</font>,&amp;viewer,&amp;format,&amp;flg);
+<a name="line493">493: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line494">494: </a>    PetscViewerPushFormat(viewer,format);
+<a name="line495">495: </a>    <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,viewer);
+<a name="line496">496: </a>    PetscViewerPopFormat(viewer);
+<a name="line497">497: </a>    PetscViewerDestroy(&amp;viewer);
+<a name="line498">498: </a>  }
+<a name="line499">499: </a>  incall = PETSC_FALSE;
+<a name="line500">500: </a>  <font color="#4169E1">return</font>(0);
+<a name="line501">501: </a>}
+
+<a name="line503">503: </a><strong><font color="#4169E1"><a name="PEPValuesView_DRAW"></a>static PetscErrorCode PEPValuesView_DRAW(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line504">504: </a>{
+<a name="line506">506: </a>  PetscDraw      draw;
+<a name="line507">507: </a>  PetscDrawSP    drawsp;
+<a name="line508">508: </a>  PetscReal      re,im;
+<a name="line509">509: </a>  PetscInt       i,k;
+
+<a name="line512">512: </a>  <font color="#4169E1">if</font> (!pep-&gt;nconv) <font color="#4169E1">return</font>(0);
+<a name="line513">513: </a>  PetscViewerDrawGetDraw(viewer,0,&amp;draw);
+<a name="line514">514: </a>  PetscDrawSetTitle(draw,<font color="#666666">"Computed Eigenvalues"</font>);
+<a name="line515">515: </a>  PetscDrawSPCreate(draw,1,&amp;drawsp);
+<a name="line516">516: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line517">517: </a>    k = pep-&gt;perm[i];
+<a name="line518">518: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line519">519: </a>    re = PetscRealPart(pep-&gt;eigr[k]);
+<a name="line520">520: </a>    im = PetscImaginaryPart(pep-&gt;eigr[k]);
+<a name="line521">521: </a><font color="#A020F0">#else</font>
+<a name="line522">522: </a>    re = pep-&gt;eigr[k];
+<a name="line523">523: </a>    im = pep-&gt;eigi[k];
+<a name="line524">524: </a><font color="#A020F0">#endif</font>
+<a name="line525">525: </a>    PetscDrawSPAddPoint(drawsp,&amp;re,&amp;im);
+<a name="line526">526: </a>  }
+<a name="line527">527: </a>  PetscDrawSPDraw(drawsp,PETSC_TRUE);
+<a name="line528">528: </a>  PetscDrawSPSave(drawsp);
+<a name="line529">529: </a>  PetscDrawSPDestroy(&amp;drawsp);
+<a name="line530">530: </a>  <font color="#4169E1">return</font>(0);
+<a name="line531">531: </a>}
+
+<a name="line533">533: </a><strong><font color="#4169E1"><a name="PEPValuesView_ASCII"></a>static PetscErrorCode PEPValuesView_ASCII(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line534">534: </a>{
+<a name="line535">535: </a>  PetscInt       i,k;
+
+<a name="line539">539: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"Eigenvalues = \n"</font>);
+<a name="line540">540: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line541">541: </a>    k = pep-&gt;perm[i];
+<a name="line542">542: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"   "</font>);
+<a name="line543">543: </a>    SlepcPrintEigenvalueASCII(viewer,pep-&gt;eigr[k],pep-&gt;eigi[k]);
+<a name="line544">544: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"\n"</font>);
+<a name="line545">545: </a>  }
+<a name="line546">546: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"\n"</font>);
+<a name="line547">547: </a>  <font color="#4169E1">return</font>(0);
+<a name="line548">548: </a>}
+
+<a name="line550">550: </a><strong><font color="#4169E1"><a name="PEPValuesView_MATLAB"></a>static PetscErrorCode PEPValuesView_MATLAB(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line551">551: </a>{
+<a name="line553">553: </a>  PetscInt       i,k;
+<a name="line554">554: </a>  PetscReal      re,im;
+<a name="line555">555: </a>  const char     *name;
+
+<a name="line558">558: </a>  PetscObjectGetName((PetscObject)pep,&amp;name);
+<a name="line559">559: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"Lambda_%s = [\n"</font>,name);
+<a name="line560">560: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line561">561: </a>    k = pep-&gt;perm[i];
+<a name="line562">562: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line563">563: </a>    re = PetscRealPart(pep-&gt;eigr[k]);
+<a name="line564">564: </a>    im = PetscImaginaryPart(pep-&gt;eigr[k]);
+<a name="line565">565: </a><font color="#A020F0">#else</font>
+<a name="line566">566: </a>    re = pep-&gt;eigr[k];
+<a name="line567">567: </a>    im = pep-&gt;eigi[k];
+<a name="line568">568: </a><font color="#A020F0">#endif</font>
+<a name="line569">569: </a>    <font color="#4169E1">if</font> (im!=0.0) {
+<a name="line570">570: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%18.16e%+18.16ei\n"</font>,(double)re,(double)im);
+<a name="line571">571: </a>    } <font color="#4169E1">else</font> {
+<a name="line572">572: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%18.16e\n"</font>,(double)re);
+<a name="line573">573: </a>    }
+<a name="line574">574: </a>  }
+<a name="line575">575: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"];\n"</font>);
+<a name="line576">576: </a>  <font color="#4169E1">return</font>(0);
+<a name="line577">577: </a>}
+
+<a name="line579">579: </a><font color="#B22222">/*@C</font>
+<a name="line580">580: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPValuesView.html#PEPValuesView">PEPValuesView</a> - Displays the computed eigenvalues in a viewer.</font>
+
+<a name="line582">582: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line584">584: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line585">585: </a><font color="#B22222">+  pep    - the eigensolver context</font>
+<a name="line586">586: </a><font color="#B22222">-  viewer - the viewer</font>
+
+<a name="line588">588: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line589">589: </a><font color="#B22222">.  -pep_view_values - print computed eigenvalues</font>
+
+<a name="line591">591: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line593">593: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(), <a href="../../../docs/manualpages/PEP/PEPVectorsView.html#PEPVectorsView">PEPVectorsView</a>(), <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>()</font>
+<a name="line594">594: </a><font color="#B22222">@*/</font>
+<a name="line595">595: </a><strong><font color="#4169E1"><a name="PEPValuesView"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPValuesView.html#PEPValuesView">PEPValuesView</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line596">596: </a>{
+<a name="line597">597: </a>  PetscBool         isascii,isdraw;
+<a name="line598">598: </a>  PetscViewerFormat format;
+<a name="line599">599: </a>  PetscErrorCode    ierr;
+
+<a name="line603">603: </a>  <font color="#4169E1">if</font> (!viewer) {
+<a name="line604">604: </a>    PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)pep),&amp;viewer);
+<a name="line605">605: </a>  }
+<a name="line608">608: </a>  PEPCheckSolved(pep,1);
+<a name="line609">609: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERDRAW,&amp;isdraw);
+<a name="line610">610: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line611">611: </a>  <font color="#4169E1">if</font> (isdraw) {
+<a name="line612">612: </a>    PEPValuesView_DRAW(pep,viewer);
+<a name="line613">613: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (isascii) {
+<a name="line614">614: </a>    PetscViewerGetFormat(viewer,&amp;format);
+<a name="line615">615: </a>    <font color="#4169E1">switch</font> (format) {
+<a name="line616">616: </a>      <font color="#4169E1">case</font> PETSC_VIEWER_DEFAULT:
+<a name="line617">617: </a>      <font color="#4169E1">case</font> PETSC_VIEWER_ASCII_INFO:
+<a name="line618">618: </a>      <font color="#4169E1">case</font> PETSC_VIEWER_ASCII_INFO_DETAIL:
+<a name="line619">619: </a>        PEPValuesView_ASCII(pep,viewer);
+<a name="line620">620: </a>        <font color="#4169E1">break</font>;
+<a name="line621">621: </a>      <font color="#4169E1">case</font> PETSC_VIEWER_ASCII_MATLAB:
+<a name="line622">622: </a>        PEPValuesView_MATLAB(pep,viewer);
+<a name="line623">623: </a>        <font color="#4169E1">break</font>;
+<a name="line624">624: </a><strong><font color="#FF0000">      default:</font></strong>
+<a name="line625">625: </a>        PetscInfo1(pep,<font color="#666666">"Unsupported viewer format %s\n"</font>,PetscViewerFormats[format]);
+<a name="line626">626: </a>    }
+<a name="line627">627: </a>  }
+<a name="line628">628: </a>  <font color="#4169E1">return</font>(0);
+<a name="line629">629: </a>}
+
+<a name="line631">631: </a><font color="#B22222">/*@</font>
+<a name="line632">632: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPValuesViewFromOptions.html#PEPValuesViewFromOptions">PEPValuesViewFromOptions</a> - Processes command line options to determine if/how</font>
+<a name="line633">633: </a><font color="#B22222">   the computed eigenvalues are to be viewed.</font>
+
+<a name="line635">635: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line637">637: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line638">638: </a><font color="#B22222">.  pep - the eigensolver context</font>
+
+<a name="line640">640: </a><font color="#B22222">   Level: developer</font>
+<a name="line641">641: </a><font color="#B22222">@*/</font>
+<a name="line642">642: </a><strong><font color="#4169E1"><a name="PEPValuesViewFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPValuesViewFromOptions.html#PEPValuesViewFromOptions">PEPValuesViewFromOptions</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line643">643: </a>{
+<a name="line644">644: </a>  PetscErrorCode    ierr;
+<a name="line645">645: </a>  PetscViewer       viewer;
+<a name="line646">646: </a>  PetscBool         flg;
+<a name="line647">647: </a>  static PetscBool  incall = PETSC_FALSE;
+<a name="line648">648: </a>  PetscViewerFormat format;
+
+<a name="line651">651: </a>  <font color="#4169E1">if</font> (incall) <font color="#4169E1">return</font>(0);
+<a name="line652">652: </a>  incall = PETSC_TRUE;
+<a name="line653">653: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)pep),((PetscObject)pep)-&gt;options,((PetscObject)pep)-&gt;prefix,<font color="#666666">"-pep_view_values"</font>,&amp;viewer,&amp;format,&amp;flg);
+<a name="line654">654: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line655">655: </a>    PetscViewerPushFormat(viewer,format);
+<a name="line656">656: </a>    <a href="../../../docs/manualpages/PEP/PEPValuesView.html#PEPValuesView">PEPValuesView</a>(pep,viewer);
+<a name="line657">657: </a>    PetscViewerPopFormat(viewer);
+<a name="line658">658: </a>    PetscViewerDestroy(&amp;viewer);
+<a name="line659">659: </a>  }
+<a name="line660">660: </a>  incall = PETSC_FALSE;
+<a name="line661">661: </a>  <font color="#4169E1">return</font>(0);
+<a name="line662">662: </a>}
+
+<a name="line664">664: </a><font color="#B22222">/*@C</font>
+<a name="line665">665: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPVectorsView.html#PEPVectorsView">PEPVectorsView</a> - Outputs computed eigenvectors to a viewer.</font>
+
+<a name="line667">667: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line669">669: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line670">670: </a><font color="#B22222">+  pep    - the eigensolver context</font>
+<a name="line671">671: </a><font color="#B22222">-  viewer - the viewer</font>
+
+<a name="line673">673: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line674">674: </a><font color="#B22222">.  -pep_view_vectors - output eigenvectors.</font>
+
+<a name="line676">676: </a><font color="#B22222">   Note:</font>
+<a name="line677">677: </a><font color="#B22222">   If PETSc was configured with real scalars, complex conjugate eigenvectors</font>
+<a name="line678">678: </a><font color="#B22222">   will be viewed as two separate real vectors, one containing the real part</font>
+<a name="line679">679: </a><font color="#B22222">   and another one containing the imaginary part.</font>
+
+<a name="line681">681: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line683">683: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(), <a href="../../../docs/manualpages/PEP/PEPValuesView.html#PEPValuesView">PEPValuesView</a>(), <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>()</font>
+<a name="line684">684: </a><font color="#B22222">@*/</font>
+<a name="line685">685: </a><strong><font color="#4169E1"><a name="PEPVectorsView"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPVectorsView.html#PEPVectorsView">PEPVectorsView</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line686">686: </a>{
+<a name="line688">688: </a>  PetscInt       i,k;
+<a name="line689">689: </a>  Vec            x;
+<a name="line690">690: </a><strong><font color="#228B22">#define NMLEN 30</font></strong>
+<a name="line691">691: </a>  char           vname[NMLEN];
+<a name="line692">692: </a>  const char     *ename;
+
+<a name="line696">696: </a>  <font color="#4169E1">if</font> (!viewer) {
+<a name="line697">697: </a>    PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)pep),&amp;viewer);
+<a name="line698">698: </a>  }
+<a name="line701">701: </a>  PEPCheckSolved(pep,1);
+<a name="line702">702: </a>  <font color="#4169E1">if</font> (pep-&gt;nconv) {
+<a name="line703">703: </a>    PetscObjectGetName((PetscObject)pep,&amp;ename);
+<a name="line704">704: </a>    PEPComputeVectors(pep);
+<a name="line705">705: </a>    <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line706">706: </a>      k = pep-&gt;perm[i];
+<a name="line707">707: </a>      PetscSNPrintf(vname,NMLEN,<font color="#666666">"V%d_%s"</font>,(int)i,ename);
+<a name="line708">708: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pep-&gt;V,k,&amp;x);
+<a name="line709">709: </a>      PetscObjectSetName((PetscObject)x,vname);
+<a name="line710">710: </a>      VecView(x,viewer);
+<a name="line711">711: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pep-&gt;V,k,&amp;x);
+<a name="line712">712: </a>    }
+<a name="line713">713: </a>  }
+<a name="line714">714: </a>  <font color="#4169E1">return</font>(0);
+<a name="line715">715: </a>}
+
+<a name="line717">717: </a><font color="#B22222">/*@</font>
+<a name="line718">718: </a><font color="#B22222">   <a href="../../../docs/manualpages/PEP/PEPVectorsViewFromOptions.html#PEPVectorsViewFromOptions">PEPVectorsViewFromOptions</a> - Processes command line options to determine if/how</font>
+<a name="line719">719: </a><font color="#B22222">   the computed eigenvectors are to be viewed.</font>
+
+<a name="line721">721: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line723">723: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line724">724: </a><font color="#B22222">.  pep - the eigensolver context</font>
+
+<a name="line726">726: </a><font color="#B22222">   Level: developer</font>
+<a name="line727">727: </a><font color="#B22222">@*/</font>
+<a name="line728">728: </a><strong><font color="#4169E1"><a name="PEPVectorsViewFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/PEP/PEPVectorsViewFromOptions.html#PEPVectorsViewFromOptions">PEPVectorsViewFromOptions</a>(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line729">729: </a>{
+<a name="line730">730: </a>  PetscErrorCode    ierr;
+<a name="line731">731: </a>  PetscViewer       viewer;
+<a name="line732">732: </a>  PetscBool         flg = PETSC_FALSE;
+<a name="line733">733: </a>  static PetscBool  incall = PETSC_FALSE;
+<a name="line734">734: </a>  PetscViewerFormat format;
+
+<a name="line737">737: </a>  <font color="#4169E1">if</font> (incall) <font color="#4169E1">return</font>(0);
+<a name="line738">738: </a>  incall = PETSC_TRUE;
+<a name="line739">739: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)pep),((PetscObject)pep)-&gt;options,((PetscObject)pep)-&gt;prefix,<font color="#666666">"-pep_view_vectors"</font>,&amp;viewer,&amp;format,&amp;flg);
+<a name="line740">740: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line741">741: </a>    PetscViewerPushFormat(viewer,format);
+<a name="line742">742: </a>    <a href="../../../docs/manualpages/PEP/PEPVectorsView.html#PEPVectorsView">PEPVectorsView</a>(pep,viewer);
+<a name="line743">743: </a>    PetscViewerPopFormat(viewer);
+<a name="line744">744: </a>    PetscViewerDestroy(&amp;viewer);
+<a name="line745">745: </a>  }
+<a name="line746">746: </a>  incall = PETSC_FALSE;
+<a name="line747">747: </a>  <font color="#4169E1">return</font>(0);
+<a name="line748">748: </a>}
+
+</pre>
+</body>
+
+</html>

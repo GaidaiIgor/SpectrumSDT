@@ -1,0 +1,201 @@
+<center><a href="bvkrylov.c">Actual source code: bvkrylov.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/interface/bvkrylov.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:43+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/interface/bvkrylov.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> routines related to Krylov decompositions</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#B22222">/*@</font>
+<a name="line17"> 17: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatArnoldi.html#BVMatArnoldi">BVMatArnoldi</a> - Computes an Arnoldi factorization associated with a matrix.</font>
+
+<a name="line19"> 19: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line21"> 21: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line22"> 22: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line23"> 23: </a><font color="#B22222">.  A - the matrix</font>
+<a name="line24"> 24: </a><font color="#B22222">.  H - the upper Hessenberg matrix</font>
+<a name="line25"> 25: </a><font color="#B22222">.  ldh - leading dimension of H</font>
+<a name="line26"> 26: </a><font color="#B22222">.  k - number of locked columns</font>
+<a name="line27"> 27: </a><font color="#B22222">-  m - dimension of the Arnoldi basis</font>
+
+<a name="line29"> 29: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line30"> 30: </a><font color="#B22222">+  m - the modified dimension</font>
+<a name="line31"> 31: </a><font color="#B22222">.  beta - (optional) norm of last vector before normalization</font>
+<a name="line32"> 32: </a><font color="#B22222">-  breakdown - (optional) flag indicating that breakdown occurred</font>
+
+<a name="line34"> 34: </a><font color="#B22222">   Notes:</font>
+<a name="line35"> 35: </a><font color="#B22222">   Computes an m-step Arnoldi factorization for matrix A. The first k columns</font>
+<a name="line36"> 36: </a><font color="#B22222">   are assumed to be locked and therefore they are not modified. On exit, the</font>
+<a name="line37"> 37: </a><font color="#B22222">   following relation is satisfied:</font>
+
+<a name="line39"> 39: </a><font color="#B22222">                    A * V - V * H = beta*v_m * e_m^T</font>
+
+<a name="line41"> 41: </a><font color="#B22222">   where the columns of V are the Arnoldi vectors (which are orthonormal), H is</font>
+<a name="line42"> 42: </a><font color="#B22222">   an upper Hessenberg matrix, e_m is the m-th vector of the canonical basis.</font>
+<a name="line43"> 43: </a><font color="#B22222">   On exit, beta contains the norm of V[m] before normalization.</font>
+
+<a name="line45"> 45: </a><font color="#B22222">   The breakdown flag indicates that orthogonalization failed, see</font>
+<a name="line46"> 46: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>(). In that case, on exit m contains the index of</font>
+<a name="line47"> 47: </a><font color="#B22222">   the column that failed.</font>
+
+<a name="line49"> 49: </a><font color="#B22222">   The values of k and m are not restricted to the active columns of V.</font>
+
+<a name="line51"> 51: </a><font color="#B22222">   To create an Arnoldi factorization from scratch, set k=0 and make sure the</font>
+<a name="line52"> 52: </a><font color="#B22222">   first column contains the normalized initial vector.</font>
+
+<a name="line54"> 54: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line56"> 56: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMatLanczos.html#BVMatLanczos">BVMatLanczos</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>()</font>
+<a name="line57"> 57: </a><font color="#B22222">@*/</font>
+<a name="line58"> 58: </a><strong><font color="#4169E1"><a name="BVMatArnoldi"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatArnoldi.html#BVMatArnoldi">BVMatArnoldi</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,PetscScalar *H,PetscInt ldh,PetscInt k,PetscInt *m,PetscReal *beta,PetscBool *breakdown)</font></strong>
+<a name="line59"> 59: </a>{
+<a name="line61"> 61: </a>  PetscScalar    *a;
+<a name="line62"> 62: </a>  PetscInt       j;
+<a name="line63"> 63: </a>  PetscBool      lindep=PETSC_FALSE;
+<a name="line64"> 64: </a>  Vec            buf;
+
+<a name="line73"> 73: </a>  BVCheckSizes(V,1);
+
+<a name="line77"> 77: </a>  <font color="#4169E1">if</font> (k&lt;0 || k&gt;V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument k has wrong value %D, should be between 0 and %D"</font>,k,V-&gt;m);
+<a name="line78"> 78: </a>  <font color="#4169E1">if</font> (*m&lt;1 || *m&gt;V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument m has wrong value %D, should be between 1 and %D"</font>,*m,V-&gt;m);
+<a name="line79"> 79: </a>  <font color="#4169E1">if</font> (*m&lt;=k) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument m should be at least equal to k+1"</font>);
+
+<a name="line81"> 81: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,0,*m);
+<a name="line82"> 82: </a>  <font color="#4169E1">for</font> (j=k;j&lt;*m;j++) {
+<a name="line83"> 83: </a>    <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(V,A,j);
+<a name="line84"> 84: </a>    <font color="#4169E1">if</font> (PetscUnlikely(j==V-&gt;N-1)) {   <font color="#B22222">/* safeguard in case the full basis is requested */</font>
+<a name="line85"> 85: </a>      BV_OrthogonalizeColumn_Safe(V,j+1,NULL,beta,&amp;lindep);
+<a name="line86"> 86: </a>    } <font color="#4169E1">else</font> {
+<a name="line87"> 87: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>(V,j+1,PETSC_FALSE,beta,&amp;lindep);
+<a name="line88"> 88: </a>    }
+<a name="line89"> 89: </a>    <font color="#4169E1">if</font> (lindep) {
+<a name="line90"> 90: </a>      *m = j+1;
+<a name="line91"> 91: </a>      <font color="#4169E1">break</font>;
+<a name="line92"> 92: </a>    }
+<a name="line93"> 93: </a>  }
+<a name="line94"> 94: </a>  <font color="#4169E1">if</font> (breakdown) *breakdown = lindep;
+<a name="line95"> 95: </a>  <font color="#B22222">/* extract Hessenberg matrix from the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> object */</font>
+<a name="line96"> 96: </a>  <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>(V,&amp;buf);
+<a name="line97"> 97: </a>  VecGetArray(buf,&amp;a);
+<a name="line98"> 98: </a>  <font color="#4169E1">for</font> (j=k;j&lt;*m;j++) {
+<a name="line99"> 99: </a>    PetscArraycpy(H+j*ldh,a+V-&gt;nc+(j+1)*(V-&gt;nc+V-&gt;m),j+2);
+<a name="line100">100: </a>  }
+<a name="line101">101: </a>  VecRestoreArray(buf,&amp;a);
+
+<a name="line103">103: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line104">104: </a>  <font color="#4169E1">return</font>(0);
+<a name="line105">105: </a>}
+
+<a name="line107">107: </a><font color="#B22222">/*@C</font>
+<a name="line108">108: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatLanczos.html#BVMatLanczos">BVMatLanczos</a> - Computes a Lanczos factorization associated with a matrix.</font>
+
+<a name="line110">110: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line112">112: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line113">113: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line114">114: </a><font color="#B22222">.  A - the matrix</font>
+<a name="line115">115: </a><font color="#B22222">.  alpha - diagonal entries of tridiagonal matrix</font>
+<a name="line116">116: </a><font color="#B22222">.  beta - subdiagonal entries of tridiagonal matrix</font>
+<a name="line117">117: </a><font color="#B22222">.  k - number of locked columns</font>
+<a name="line118">118: </a><font color="#B22222">-  m - dimension of the Lanczos basis</font>
+
+<a name="line120">120: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line121">121: </a><font color="#B22222">+  m - the modified dimension</font>
+<a name="line122">122: </a><font color="#B22222">-  breakdown - (optional) flag indicating that breakdown occurred</font>
+
+<a name="line124">124: </a><font color="#B22222">   Notes:</font>
+<a name="line125">125: </a><font color="#B22222">   Computes an m-step Lanczos factorization for matrix A, with full</font>
+<a name="line126">126: </a><font color="#B22222">   reorthogonalization. At each Lanczos step, the corresponding Lanczos</font>
+<a name="line127">127: </a><font color="#B22222">   vector is orthogonalized with respect to all previous Lanczos vectors.</font>
+<a name="line128">128: </a><font color="#B22222">   This is equivalent to computing an m-step Arnoldi factorization and</font>
+<a name="line129">129: </a><font color="#B22222">   exploting symmetry of the operator.</font>
+
+<a name="line131">131: </a><font color="#B22222">   The first k columns are assumed to be locked and therefore they are</font>
+<a name="line132">132: </a><font color="#B22222">   not modified. On exit, the following relation is satisfied:</font>
+
+<a name="line134">134: </a><font color="#B22222">                    A * V - V * T = beta_m*v_m * e_m^T</font>
+
+<a name="line136">136: </a><font color="#B22222">   where the columns of V are the Lanczos vectors (which are B-orthonormal),</font>
+<a name="line137">137: </a><font color="#B22222">   T is a real symmetric tridiagonal matrix, and e_m is the m-th vector of</font>
+<a name="line138">138: </a><font color="#B22222">   the canonical basis. The tridiagonal is stored as two arrays: alpha</font>
+<a name="line139">139: </a><font color="#B22222">   contains the diagonal elements, beta the off-diagonal. On exit, the last</font>
+<a name="line140">140: </a><font color="#B22222">   element of beta contains the B-norm of V[m] before normalization.</font>
+<a name="line141">141: </a><font color="#B22222">   The basis V must have at least m+1 columns, while the arrays alpha and</font>
+<a name="line142">142: </a><font color="#B22222">   beta must have space for at least m elements.</font>
+
+<a name="line144">144: </a><font color="#B22222">   The breakdown flag indicates that orthogonalization failed, see</font>
+<a name="line145">145: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>(). In that case, on exit m contains the index of</font>
+<a name="line146">146: </a><font color="#B22222">   the column that failed.</font>
+
+<a name="line148">148: </a><font color="#B22222">   The values of k and m are not restricted to the active columns of V.</font>
+
+<a name="line150">150: </a><font color="#B22222">   To create a Lanczos factorization from scratch, set k=0 and make sure the</font>
+<a name="line151">151: </a><font color="#B22222">   first column contains the normalized initial vector.</font>
+
+<a name="line153">153: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line155">155: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMatArnoldi.html#BVMatArnoldi">BVMatArnoldi</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(), <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>()</font>
+<a name="line156">156: </a><font color="#B22222">@*/</font>
+<a name="line157">157: </a><strong><font color="#4169E1"><a name="BVMatLanczos"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatLanczos.html#BVMatLanczos">BVMatLanczos</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,PetscReal *alpha,PetscReal *beta,PetscInt k,PetscInt *m,PetscBool *breakdown)</font></strong>
+<a name="line158">158: </a>{
+<a name="line160">160: </a>  PetscScalar    *a;
+<a name="line161">161: </a>  PetscInt       j;
+<a name="line162">162: </a>  PetscBool      lindep=PETSC_FALSE;
+<a name="line163">163: </a>  Vec            buf;
+
+<a name="line174">174: </a>  BVCheckSizes(V,1);
+
+<a name="line178">178: </a>  <font color="#4169E1">if</font> (k&lt;0 || k&gt;V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument k has wrong value %D, should be between 0 and %D"</font>,k,V-&gt;m);
+<a name="line179">179: </a>  <font color="#4169E1">if</font> (*m&lt;1 || *m&gt;V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument m has wrong value %D, should be between 1 and %D"</font>,*m,V-&gt;m);
+<a name="line180">180: </a>  <font color="#4169E1">if</font> (*m&lt;=k) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument m should be at least equal to k+1"</font>);
+
+<a name="line182">182: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,0,*m);
+<a name="line183">183: </a>  <font color="#4169E1">for</font> (j=k;j&lt;*m;j++) {
+<a name="line184">184: </a>    <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(V,A,j);
+<a name="line185">185: </a>    <font color="#4169E1">if</font> (PetscUnlikely(j==V-&gt;N-1)) {   <font color="#B22222">/* safeguard in case the full basis is requested */</font>
+<a name="line186">186: </a>      BV_OrthogonalizeColumn_Safe(V,j+1,NULL,beta+j,&amp;lindep);
+<a name="line187">187: </a>    } <font color="#4169E1">else</font> {
+<a name="line188">188: </a>      <a href="../../../../../docs/manualpages/BV/BVOrthonormalizeColumn.html#BVOrthonormalizeColumn">BVOrthonormalizeColumn</a>(V,j+1,PETSC_FALSE,beta+j,&amp;lindep);
+<a name="line189">189: </a>    }
+<a name="line190">190: </a>    <font color="#4169E1">if</font> (lindep) {
+<a name="line191">191: </a>      *m = j+1;
+<a name="line192">192: </a>      <font color="#4169E1">break</font>;
+<a name="line193">193: </a>    }
+<a name="line194">194: </a>  }
+<a name="line195">195: </a>  <font color="#4169E1">if</font> (breakdown) *breakdown = lindep;
+
+<a name="line197">197: </a>  <font color="#B22222">/* extract Hessenberg matrix from the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> buffer */</font>
+<a name="line198">198: </a>  <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>(V,&amp;buf);
+<a name="line199">199: </a>  VecGetArray(buf,&amp;a);
+<a name="line200">200: </a>  <font color="#4169E1">for</font> (j=k;j&lt;*m;j++) alpha[j] = PetscRealPart(a[V-&gt;nc+j+(j+1)*(V-&gt;nc+V-&gt;m)]);
+<a name="line201">201: </a>  VecRestoreArray(buf,&amp;a);
+
+<a name="line203">203: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line204">204: </a>  <font color="#4169E1">return</font>(0);
+<a name="line205">205: </a>}
+
+</pre>
+</body>
+
+</html>

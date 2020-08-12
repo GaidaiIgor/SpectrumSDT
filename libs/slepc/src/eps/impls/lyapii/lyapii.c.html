@@ -1,0 +1,809 @@
+<center><a href="lyapii.c">Actual source code: lyapii.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/lyapii/lyapii.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:53+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/lyapii/lyapii.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "lyapii"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Lyapunov inverse iteration</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       Lyapunov inverse iteration using <a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a> solvers</font>
+
+<a name="line19"> 19: </a><font color="#B22222">   References:</font>
+
+<a name="line21"> 21: </a><font color="#B22222">       [1] H.C. Elman and M. Wu, "Lyapunov inverse iteration for computing a</font>
+<a name="line22"> 22: </a><font color="#B22222">           few rightmost eigenvalues of large generalized eigenvalue problems",</font>
+<a name="line23"> 23: </a><font color="#B22222">           SIAM J. Matrix Anal. Appl. 34(4):1685-1707, 2013.</font>
+
+<a name="line25"> 25: </a><font color="#B22222">       [2] K. Meerbergen and A. Spence, "Inverse iteration for purely imaginary</font>
+<a name="line26"> 26: </a><font color="#B22222">           eigenvalues with application to the detection of Hopf bifurcations in</font>
+<a name="line27"> 27: </a><font color="#B22222">           large-scale problems", SIAM J. Matrix Anal. Appl. 31:1982-1999, 2010.</font>
+<a name="line28"> 28: </a><font color="#B22222">*/</font>
+
+<a name="line30"> 30: </a> #include <A href="../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line31"> 31: </a> #include <A href="../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line33"> 33: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line34"> 34: </a>  <a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a>      lme;      <font color="#B22222">/* Lyapunov solver */</font>
+<a name="line35"> 35: </a>  <a href="../../../../docs/manualpages/DS/DS.html#DS">DS</a>       ds;       <font color="#B22222">/* used to compute the <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> for compression */</font>
+<a name="line36"> 36: </a>  PetscInt rkl;      <font color="#B22222">/* prescribed rank for the Lyapunov solver */</font>
+<a name="line37"> 37: </a>  PetscInt rkc;      <font color="#B22222">/* the compressed rank, cannot be larger than rkl */</font>
+<a name="line38"> 38: </a>} EPS_LYAPII;
+
+<a name="line40"> 40: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line41"> 41: </a>  Mat      S;        <font color="#B22222">/* the operator matrix, S=A^{-1}*B */</font>
+<a name="line42"> 42: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>       Q;        <font color="#B22222">/* orthogonal basis of converged eigenvectors */</font>
+<a name="line43"> 43: </a>} EPS_LYAPII_MATSHELL;
+
+<a name="line45"> 45: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line46"> 46: </a>  Mat      S;        <font color="#B22222">/* the matrix from which the implicit operator is built */</font>
+<a name="line47"> 47: </a>  PetscInt n;        <font color="#B22222">/* the size of matrix S, the operator is nxn */</font>
+<a name="line48"> 48: </a>  <a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a>      lme;      <font color="#B22222">/* dummy <a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a> object */</font>
+<a name="line49"> 49: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line50"> 50: </a>  Mat      A,B,F;
+<a name="line51"> 51: </a>  Vec      w;
+<a name="line52"> 52: </a><font color="#A020F0">#endif</font>
+<a name="line53"> 53: </a>} EPS_EIG_MATSHELL;
+
+<a name="line55"> 55: </a><strong><font color="#4169E1"><a name="EPSSetUp_LyapII"></a>PetscErrorCode EPSSetUp_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line56"> 56: </a>{
+<a name="line58"> 58: </a>  EPS_LYAPII     *ctx = (EPS_LYAPII*)eps-&gt;data;
+<a name="line59"> 59: </a>  PetscBool      istrivial,issinv;
+
+<a name="line62"> 62: </a>  <font color="#4169E1">if</font> (eps-&gt;ncv!=PETSC_DEFAULT) {
+<a name="line63"> 63: </a>    <font color="#4169E1">if</font> (eps-&gt;ncv&lt;eps-&gt;nev+1) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"The value of ncv must be at least nev+1"</font>);
+<a name="line64"> 64: </a>  } <font color="#4169E1">else</font> eps-&gt;ncv = eps-&gt;nev+1;
+<a name="line65"> 65: </a>  <font color="#4169E1">if</font> (eps-&gt;mpd!=PETSC_DEFAULT) { PetscInfo(eps,<font color="#666666">"Warning: parameter mpd ignored\n"</font>); }
+<a name="line66"> 66: </a>  <font color="#4169E1">if</font> (!ctx-&gt;rkc) ctx-&gt;rkc = 10;
+<a name="line67"> 67: </a>  <font color="#4169E1">if</font> (!ctx-&gt;rkl) ctx-&gt;rkl = 3*ctx-&gt;rkc;
+<a name="line68"> 68: </a>  <font color="#4169E1">if</font> (eps-&gt;max_it==PETSC_DEFAULT) eps-&gt;max_it = PetscMax(1000*eps-&gt;nev,100*eps-&gt;n);
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (!eps-&gt;which) eps-&gt;which=<a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>;
+<a name="line70"> 70: </a>  <font color="#4169E1">if</font> (eps-&gt;which!=<a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"Wrong value of eps-&gt;which"</font>);
+<a name="line71"> 71: </a>  <font color="#4169E1">if</font> (eps-&gt;extraction) { PetscInfo(eps,<font color="#666666">"Warning: extraction type ignored\n"</font>); }
+<a name="line72"> 72: </a>  <font color="#4169E1">if</font> (eps-&gt;balance!=<a href="../../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a>) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Balancing not supported in this solver"</font>);
+<a name="line73"> 73: </a>  <font color="#4169E1">if</font> (eps-&gt;arbitrary) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Arbitrary selection of eigenpairs not supported in this solver"</font>);
+<a name="line74"> 74: </a>  <a href="../../../../docs/manualpages/RG/RGIsTrivial.html#RGIsTrivial">RGIsTrivial</a>(eps-&gt;rg,&amp;istrivial);
+<a name="line75"> 75: </a>  <font color="#4169E1">if</font> (!istrivial) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"This solver does not support region filtering"</font>);
+
+<a name="line77"> 77: </a>  PetscObjectTypeCompare((PetscObject)eps-&gt;st,STSINVERT,&amp;issinv);
+<a name="line78"> 78: </a>  <font color="#4169E1">if</font> (!issinv) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Must use STSINVERT spectral transformation"</font>);
+
+<a name="line80"> 80: </a>  <font color="#4169E1">if</font> (!ctx-&gt;lme) { <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetLME.html#EPSLyapIIGetLME">EPSLyapIIGetLME</a>(eps,&amp;ctx-&gt;lme); }
+<a name="line81"> 81: </a>  <a href="../../../../docs/manualpages/LME/LMESetProblemType.html#LMESetProblemType">LMESetProblemType</a>(ctx-&gt;lme,<a href="../../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_LYAPUNOV</a>);
+<a name="line82"> 82: </a>  <a href="../../../../docs/manualpages/LME/LMESetErrorIfNotConverged.html#LMESetErrorIfNotConverged">LMESetErrorIfNotConverged</a>(ctx-&gt;lme,PETSC_TRUE);
+
+<a name="line84"> 84: </a>  <font color="#4169E1">if</font> (!ctx-&gt;ds) {
+<a name="line85"> 85: </a>    <a href="../../../../docs/manualpages/DS/DSCreate.html#DSCreate">DSCreate</a>(PetscObjectComm((PetscObject)eps),&amp;ctx-&gt;ds);
+<a name="line86"> 86: </a>    PetscLogObjectParent((PetscObject)eps,(PetscObject)ctx-&gt;ds);
+<a name="line87"> 87: </a>    <a href="../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(ctx-&gt;ds,DSSVD);
+<a name="line88"> 88: </a>  }
+<a name="line89"> 89: </a>  <a href="../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(ctx-&gt;ds,ctx-&gt;rkl);
+
+<a name="line91"> 91: </a>  <a href="../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(eps-&gt;ds,DSNHEP);
+<a name="line92"> 92: </a>  <a href="../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(eps-&gt;ds,eps-&gt;ncv);
+
+<a name="line94"> 94: </a>  <a href="../../../../docs/manualpages/EPS/EPSAllocateSolution.html#EPSAllocateSolution">EPSAllocateSolution</a>(eps,0);
+<a name="line95"> 95: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(eps,3);
+<a name="line96"> 96: </a>  <font color="#4169E1">return</font>(0);
+<a name="line97"> 97: </a>}
+
+<a name="line99"> 99: </a><strong><font color="#4169E1"><a name="MatMult_EPSLyapIIOperator"></a>static PetscErrorCode MatMult_EPSLyapIIOperator(Mat M,Vec x,Vec r)</font></strong>
+<a name="line100">100: </a>{
+<a name="line101">101: </a>  PetscErrorCode      ierr;
+<a name="line102">102: </a>  EPS_LYAPII_MATSHELL *matctx;
+
+<a name="line105">105: </a>  MatShellGetContext(M,(void**)&amp;matctx);
+<a name="line106">106: </a>  MatMult(matctx-&gt;S,x,r);
+<a name="line107">107: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogonalizeVec.html#BVOrthogonalizeVec">BVOrthogonalizeVec</a>(matctx-&gt;Q,r,NULL,NULL,NULL);
+<a name="line108">108: </a>  <font color="#4169E1">return</font>(0);
+<a name="line109">109: </a>}
+
+<a name="line111">111: </a><strong><font color="#4169E1"><a name="MatDestroy_EPSLyapIIOperator"></a>static PetscErrorCode MatDestroy_EPSLyapIIOperator(Mat M)</font></strong>
+<a name="line112">112: </a>{
+<a name="line113">113: </a>  PetscErrorCode      ierr;
+<a name="line114">114: </a>  EPS_LYAPII_MATSHELL *matctx;
+
+<a name="line117">117: </a>  MatShellGetContext(M,(void**)&amp;matctx);
+<a name="line118">118: </a>  MatDestroy(&amp;matctx-&gt;S);
+<a name="line119">119: </a>  PetscFree(matctx);
+<a name="line120">120: </a>  <font color="#4169E1">return</font>(0);
+<a name="line121">121: </a>}
+
+<a name="line123">123: </a><strong><font color="#4169E1"><a name="MatMult_EigOperator"></a>static PetscErrorCode MatMult_EigOperator(Mat M,Vec x,Vec y)</font></strong>
+<a name="line124">124: </a>{
+<a name="line125">125: </a>  PetscErrorCode    ierr;
+<a name="line126">126: </a>  EPS_EIG_MATSHELL  *matctx;
+<a name="line127">127: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line128">128: </a>  PetscInt          n;
+<a name="line129">129: </a>  PetscScalar       *S,*Y,*C,zero=0.0,done=1.0,dtwo=2.0;
+<a name="line130">130: </a>  const PetscScalar *X;
+<a name="line131">131: </a>  PetscBLASInt      n_;
+<a name="line132">132: </a><font color="#A020F0">#endif</font>
+
+<a name="line135">135: </a>  MatShellGetContext(M,(void**)&amp;matctx);
+
+<a name="line137">137: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line138">138: </a>  MatMult(matctx-&gt;B,x,matctx-&gt;w);
+<a name="line139">139: </a>  MatSolve(matctx-&gt;F,matctx-&gt;w,y);
+<a name="line140">140: </a><font color="#A020F0">#else</font>
+<a name="line141">141: </a>  VecGetArrayRead(x,&amp;X);
+<a name="line142">142: </a>  VecGetArray(y,&amp;Y);
+<a name="line143">143: </a>  MatDenseGetArray(matctx-&gt;S,&amp;S);
+
+<a name="line145">145: </a>  n = matctx-&gt;n;
+<a name="line146">146: </a>  PetscCalloc1(n*n,&amp;C);
+<a name="line147">147: </a>  PetscBLASIntCast(n,&amp;n_);
+
+<a name="line149">149: </a>  <font color="#B22222">/* C = 2*S*X*S.' */</font>
+<a name="line150">150: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;dtwo,S,&amp;n_,X,&amp;n_,&amp;zero,Y,&amp;n_));
+<a name="line151">151: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"T"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;done,Y,&amp;n_,S,&amp;n_,&amp;zero,C,&amp;n_));
+
+<a name="line153">153: </a>  <font color="#B22222">/* Solve S*Y + Y*S' = -C */</font>
+<a name="line154">154: </a>  <a href="../../../../docs/manualpages/LME/LMEDenseLyapunov.html#LMEDenseLyapunov">LMEDenseLyapunov</a>(matctx-&gt;lme,n,S,n,C,n,Y,n);
+
+<a name="line156">156: </a>  PetscFree(C);
+<a name="line157">157: </a>  VecRestoreArrayRead(x,&amp;X);
+<a name="line158">158: </a>  VecRestoreArray(y,&amp;Y);
+<a name="line159">159: </a>  MatDenseRestoreArray(matctx-&gt;S,&amp;S);
+<a name="line160">160: </a><font color="#A020F0">#endif</font>
+<a name="line161">161: </a>  <font color="#4169E1">return</font>(0);
+<a name="line162">162: </a>}
+
+<a name="line164">164: </a><strong><font color="#4169E1"><a name="MatDestroy_EigOperator"></a>static PetscErrorCode MatDestroy_EigOperator(Mat M)</font></strong>
+<a name="line165">165: </a>{
+<a name="line166">166: </a>  PetscErrorCode   ierr;
+<a name="line167">167: </a>  EPS_EIG_MATSHELL *matctx;
+
+<a name="line170">170: </a>  MatShellGetContext(M,(void**)&amp;matctx);
+<a name="line171">171: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line172">172: </a>  MatDestroy(&amp;matctx-&gt;A);
+<a name="line173">173: </a>  MatDestroy(&amp;matctx-&gt;B);
+<a name="line174">174: </a>  MatDestroy(&amp;matctx-&gt;F);
+<a name="line175">175: </a>  VecDestroy(&amp;matctx-&gt;w);
+<a name="line176">176: </a><font color="#A020F0">#endif</font>
+<a name="line177">177: </a>  PetscFree(matctx);
+<a name="line178">178: </a>  <font color="#4169E1">return</font>(0);
+<a name="line179">179: </a>}
+
+<a name="line181">181: </a><font color="#B22222">/*</font>
+<a name="line182">182: </a><font color="#B22222">   EV2x2: solve the eigenproblem for a 2x2 matrix M</font>
+<a name="line183">183: </a><font color="#B22222"> */</font>
+<a name="line184">184: </a><strong><font color="#4169E1"><a name="EV2x2"></a>static PetscErrorCode EV2x2(PetscScalar *M,PetscInt ld,PetscScalar *wr,PetscScalar *wi,PetscScalar *vec)</font></strong>
+<a name="line185">185: </a>{
+<a name="line187">187: </a>  PetscScalar    work[10];
+<a name="line188">188: </a>  PetscBLASInt   lwork=10,ld_;
+<a name="line189">189: </a><font color="#A020F0">#if !defined(PETSC_HAVE_ESSL)</font>
+<a name="line190">190: </a>  PetscBLASInt   two=2,info;
+<a name="line191">191: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line192">192: </a>  PetscReal      rwork[4];
+<a name="line193">193: </a><font color="#A020F0">#endif</font>
+<a name="line194">194: </a><font color="#A020F0">#else</font>
+<a name="line195">195: </a>  PetscInt       i;
+<a name="line196">196: </a>  PetscBLASInt   idummy,io=1;
+<a name="line197">197: </a>  PetscScalar    wri[4];
+<a name="line198">198: </a><font color="#A020F0">#endif</font>
+
+<a name="line201">201: </a>  PetscBLASIntCast(ld,&amp;ld_);
+<a name="line202">202: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line203">203: </a><font color="#A020F0">#if !defined(PETSC_HAVE_ESSL)</font>
+<a name="line204">204: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line205">205: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgeev"</font>,LAPACKgeev_(<font color="#666666">"N"</font>,<font color="#666666">"V"</font>,&amp;two,M,&amp;ld_,wr,wi,NULL,&amp;ld_,vec,&amp;ld_,work,&amp;lwork,&amp;info));
+<a name="line206">206: </a><font color="#A020F0">#else</font>
+<a name="line207">207: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgeev"</font>,LAPACKgeev_(<font color="#666666">"N"</font>,<font color="#666666">"V"</font>,&amp;two,M,&amp;ld_,wr,NULL,&amp;ld_,vec,&amp;ld_,work,&amp;lwork,rwork,&amp;info));
+<a name="line208">208: </a><font color="#A020F0">#endif</font>
+<a name="line209">209: </a>  SlepcCheckLapackInfo(<font color="#666666">"geev"</font>,info);
+<a name="line210">210: </a><font color="#A020F0">#else </font><font color="#B22222">/* defined(PETSC_HAVE_ESSL) */</font><font color="#A020F0"></font>
+<a name="line211">211: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgeev"</font>,LAPACKgeev_(&amp;io,M,&amp;ld_,wri,vec,ld_,&amp;idummy,&amp;ld_,work,&amp;lwork));
+<a name="line212">212: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line213">213: </a>  <font color="#4169E1">for</font> (i=0;i&lt;2;i++) {
+<a name="line214">214: </a>    wr[i] = wri[2*i];
+<a name="line215">215: </a>    wi[i] = wri[2*i+1];
+<a name="line216">216: </a>  }
+<a name="line217">217: </a><font color="#A020F0">#else</font>
+<a name="line218">218: </a>  <font color="#4169E1">for</font> (i=0;i&lt;2;i++) wr[i] = wri[i];
+<a name="line219">219: </a><font color="#A020F0">#endif</font>
+<a name="line220">220: </a><font color="#A020F0">#endif</font>
+<a name="line221">221: </a>  PetscFPTrapPop();
+<a name="line222">222: </a>  <font color="#4169E1">return</font>(0);
+<a name="line223">223: </a>}
+
+<a name="line225">225: </a><font color="#B22222">/*</font>
+<a name="line226">226: </a><font color="#B22222">   LyapIIBuildRHS: prepare the right-hand side of the Lyapunov equation SY + YS' = -2*S*Z*S'</font>
+<a name="line227">227: </a><font color="#B22222">   in factored form:</font>
+<a name="line228">228: </a><font color="#B22222">      if (V)  U=sqrt(2)*S*V    (uses 1 work vector)</font>
+<a name="line229">229: </a><font color="#B22222">      else    U=sqrt(2)*S*U    (uses 2 work vectors)</font>
+<a name="line230">230: </a><font color="#B22222">   where U,V are assumed to have rk columns.</font>
+<a name="line231">231: </a><font color="#B22222"> */</font>
+<a name="line232">232: </a><strong><font color="#4169E1"><a name="LyapIIBuildRHS"></a>static PetscErrorCode LyapIIBuildRHS(Mat S,PetscInt rk,Mat U,<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Vec *work)</font></strong>
+<a name="line233">233: </a>{
+<a name="line235">235: </a>  PetscScalar    *array,*uu;
+<a name="line236">236: </a>  PetscInt       i,nloc;
+<a name="line237">237: </a>  Vec            v,u=work[0];
+
+<a name="line240">240: </a>  MatGetLocalSize(U,&amp;nloc,NULL);
+<a name="line241">241: </a>  <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) {
+<a name="line242">242: </a>    MatDenseGetColumn(U,i,&amp;array);
+<a name="line243">243: </a>    <font color="#4169E1">if</font> (V) {
+<a name="line244">244: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,i,&amp;v);
+<a name="line245">245: </a>    } <font color="#4169E1">else</font> {
+<a name="line246">246: </a>      v = work[1];
+<a name="line247">247: </a>      VecPlaceArray(v,array);
+<a name="line248">248: </a>    }
+<a name="line249">249: </a>    MatMult(S,v,u);
+<a name="line250">250: </a>    <font color="#4169E1">if</font> (V) {
+<a name="line251">251: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,i,&amp;v);
+<a name="line252">252: </a>    } <font color="#4169E1">else</font> {
+<a name="line253">253: </a>      VecResetArray(v);
+<a name="line254">254: </a>    }
+<a name="line255">255: </a>    VecScale(u,PetscSqrtReal(2.0));
+<a name="line256">256: </a>    VecGetArray(u,&amp;uu);
+<a name="line257">257: </a>    PetscMemcpy(array,uu,nloc*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line258">258: </a>    VecRestoreArray(u,&amp;uu);
+<a name="line259">259: </a>    MatDenseRestoreColumn(U,&amp;array);
+<a name="line260">260: </a>  }
+<a name="line261">261: </a>  <font color="#4169E1">return</font>(0);
+<a name="line262">262: </a>}
+
+<a name="line264">264: </a><font color="#B22222">/*</font>
+<a name="line265">265: </a><font color="#B22222">   LyapIIBuildEigenMat: create shell matrix Op=A\B with A = kron(I,S)+kron(S,I), B = -2*kron(S,S)</font>
+<a name="line266">266: </a><font color="#B22222">   where S is a sequential square dense matrix of order n.</font>
+<a name="line267">267: </a><font color="#B22222">   v0 is the initial vector, should have the form v0 = w*w' (for instance 1*1')</font>
+<a name="line268">268: </a><font color="#B22222"> */</font>
+<a name="line269">269: </a><strong><font color="#4169E1"><a name="LyapIIBuildEigenMat"></a>static PetscErrorCode LyapIIBuildEigenMat(<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,Mat S,Mat *Op,Vec *v0)</font></strong>
+<a name="line270">270: </a>{
+<a name="line271">271: </a>  PetscErrorCode   ierr;
+<a name="line272">272: </a>  PetscInt         n,m;
+<a name="line273">273: </a>  PetscBool        create=PETSC_FALSE;
+<a name="line274">274: </a>  EPS_EIG_MATSHELL *matctx;
+<a name="line275">275: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line276">276: </a>  PetscScalar      theta,*aa,*bb,*ss;
+<a name="line277">277: </a>  PetscInt         i,j,f,c,off,ld;
+<a name="line278">278: </a>  IS               perm;
+<a name="line279">279: </a><font color="#A020F0">#endif</font>
+
+<a name="line282">282: </a>  MatGetSize(S,&amp;n,NULL);
+<a name="line283">283: </a>  <font color="#4169E1">if</font> (!*Op) create=PETSC_TRUE;
+<a name="line284">284: </a>  <font color="#4169E1">else</font> {
+<a name="line285">285: </a>    MatGetSize(*Op,&amp;m,NULL);
+<a name="line286">286: </a>    <font color="#4169E1">if</font> (m!=n*n) create=PETSC_TRUE;
+<a name="line287">287: </a>  }
+<a name="line288">288: </a>  <font color="#4169E1">if</font> (create) {
+<a name="line289">289: </a>    MatDestroy(Op);
+<a name="line290">290: </a>    VecDestroy(v0);
+<a name="line291">291: </a>    PetscNew(&amp;matctx);
+<a name="line292">292: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line293">293: </a>    MatCreateSeqDense(PETSC_COMM_SELF,n*n,n*n,NULL,&amp;matctx-&gt;A);
+<a name="line294">294: </a>    MatCreateSeqDense(PETSC_COMM_SELF,n*n,n*n,NULL,&amp;matctx-&gt;B);
+<a name="line295">295: </a>    MatCreateVecs(matctx-&gt;A,NULL,&amp;matctx-&gt;w);
+<a name="line296">296: </a><font color="#A020F0">#endif</font>
+<a name="line297">297: </a>    MatCreateShell(PETSC_COMM_SELF,n*n,n*n,PETSC_DETERMINE,PETSC_DETERMINE,matctx,Op);
+<a name="line298">298: </a>    MatShellSetOperation(*Op,MATOP_MULT,(void(*)(void))MatMult_EigOperator);
+<a name="line299">299: </a>    MatShellSetOperation(*Op,MATOP_DESTROY,(void(*)(void))MatDestroy_EigOperator);
+<a name="line300">300: </a>    MatCreateVecs(*Op,NULL,v0);
+<a name="line301">301: </a>  } <font color="#4169E1">else</font> {
+<a name="line302">302: </a>    MatShellGetContext(*Op,(void**)&amp;matctx);
+<a name="line303">303: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line304">304: </a>    MatZeroEntries(matctx-&gt;A);
+<a name="line305">305: </a><font color="#A020F0">#endif</font>
+<a name="line306">306: </a>  }
+<a name="line307">307: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line308">308: </a>  MatDenseGetArray(matctx-&gt;A,&amp;aa);
+<a name="line309">309: </a>  MatDenseGetArray(matctx-&gt;B,&amp;bb);
+<a name="line310">310: </a>  MatDenseGetArray(S,&amp;ss);
+<a name="line311">311: </a>  ld = n*n;
+<a name="line312">312: </a>  <font color="#4169E1">for</font> (f=0;f&lt;n;f++) {
+<a name="line313">313: </a>    off = f*n+f*n*ld;
+<a name="line314">314: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) <font color="#4169E1">for</font> (j=0;j&lt;n;j++) aa[off+i+j*ld] = ss[i+j*n];
+<a name="line315">315: </a>    <font color="#4169E1">for</font> (c=0;c&lt;n;c++) {
+<a name="line316">316: </a>      off = f*n+c*n*ld;
+<a name="line317">317: </a>      theta = ss[f+c*n];
+<a name="line318">318: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) aa[off+i+i*ld] += theta;
+<a name="line319">319: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) <font color="#4169E1">for</font> (j=0;j&lt;n;j++) bb[off+i+j*ld] = -2*theta*ss[i+j*n];
+<a name="line320">320: </a>    }
+<a name="line321">321: </a>  }
+<a name="line322">322: </a>  MatDenseRestoreArray(matctx-&gt;A,&amp;aa);
+<a name="line323">323: </a>  MatDenseRestoreArray(matctx-&gt;B,&amp;bb);
+<a name="line324">324: </a>  MatDenseRestoreArray(S,&amp;ss);
+<a name="line325">325: </a>  ISCreateStride(PETSC_COMM_SELF,n*n,0,1,&amp;perm);
+<a name="line326">326: </a>  MatDestroy(&amp;matctx-&gt;F);
+<a name="line327">327: </a>  MatDuplicate(matctx-&gt;A,MAT_COPY_VALUES,&amp;matctx-&gt;F);
+<a name="line328">328: </a>  MatLUFactor(matctx-&gt;F,perm,perm,0);
+<a name="line329">329: </a>  ISDestroy(&amp;perm);
+<a name="line330">330: </a><font color="#A020F0">#endif</font>
+<a name="line331">331: </a>  matctx-&gt;lme = lme;
+<a name="line332">332: </a>  matctx-&gt;S = S;
+<a name="line333">333: </a>  matctx-&gt;n = n;
+<a name="line334">334: </a>  VecSet(*v0,1.0);
+<a name="line335">335: </a>  <font color="#4169E1">return</font>(0);
+<a name="line336">336: </a>}
+
+<a name="line338">338: </a><strong><font color="#4169E1"><a name="EPSSolve_LyapII"></a>PetscErrorCode EPSSolve_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line339">339: </a>{
+<a name="line340">340: </a>  PetscErrorCode      ierr;
+<a name="line341">341: </a>  EPS_LYAPII          *ctx = (EPS_LYAPII*)eps-&gt;data;
+<a name="line342">342: </a>  PetscInt            i,ldds,rk,nloc,mloc,nv,idx,k;
+<a name="line343">343: </a>  Vec                 v,w,z=eps-&gt;work[0],v0=NULL;
+<a name="line344">344: </a>  Mat                 S,C,Ux[2],Y,Y1,R,U,W,X,Op=NULL;
+<a name="line345">345: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>                  V;
+<a name="line346">346: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BVOrthogType</a>        type;
+<a name="line347">347: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BVOrthogRefineType</a>  refine;
+<a name="line348">348: </a>  PetscScalar         eigr[2],eigi[2],*array,er,ei,*uu,*s,*xx,*aa,pM[4],vec[4];
+<a name="line349">349: </a>  PetscReal           eta;
+<a name="line350">350: </a>  <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>                 epsrr;
+<a name="line351">351: </a>  PetscReal           norm;
+<a name="line352">352: </a>  EPS_LYAPII_MATSHELL *matctx;
+
+<a name="line355">355: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(ctx-&gt;ds,&amp;ldds);
+
+<a name="line357">357: </a>  <font color="#B22222">/* Operator for the Lyapunov equation */</font>
+<a name="line358">358: </a>  PetscNew(&amp;matctx);
+<a name="line359">359: </a>  <a href="../../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(eps-&gt;st,&amp;matctx-&gt;S);
+<a name="line360">360: </a>  MatGetLocalSize(matctx-&gt;S,&amp;mloc,&amp;nloc);
+<a name="line361">361: </a>  MatCreateShell(PetscObjectComm((PetscObject)eps),mloc,nloc,PETSC_DETERMINE,PETSC_DETERMINE,matctx,&amp;S);
+<a name="line362">362: </a>  matctx-&gt;Q = eps-&gt;V;
+<a name="line363">363: </a>  MatShellSetOperation(S,MATOP_MULT,(void(*)(void))MatMult_EPSLyapIIOperator);
+<a name="line364">364: </a>  MatShellSetOperation(S,MATOP_DESTROY,(void(*)(void))MatDestroy_EPSLyapIIOperator);
+<a name="line365">365: </a>  <a href="../../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a>(ctx-&gt;lme,S,NULL,NULL,NULL);
+
+<a name="line367">367: </a>  <font color="#B22222">/* Right-hand side */</font>
+<a name="line368">368: </a>  <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,ctx-&gt;rkl,&amp;V);
+<a name="line369">369: </a>  <a href="../../../../docs/manualpages/BV/BVGetOrthogonalization.html#BVGetOrthogonalization">BVGetOrthogonalization</a>(V,&amp;type,&amp;refine,&amp;eta,NULL);
+<a name="line370">370: </a>  <a href="../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>(V,type,refine,eta,<a href="../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BV_ORTHOG_BLOCK_TSQR</a>);
+<a name="line371">371: </a>  MatCreateDense(PetscObjectComm((PetscObject)eps),eps-&gt;nloc,PETSC_DECIDE,PETSC_DECIDE,1,NULL,&amp;Ux[0]);
+<a name="line372">372: </a>  MatCreateDense(PetscObjectComm((PetscObject)eps),eps-&gt;nloc,PETSC_DECIDE,PETSC_DECIDE,2,NULL,&amp;Ux[1]);
+<a name="line373">373: </a>  nv = ctx-&gt;rkl;
+<a name="line374">374: </a>  PetscMalloc1(nv,&amp;s);
+
+<a name="line376">376: </a>  <font color="#B22222">/* Initialize first column */</font>
+<a name="line377">377: </a>  EPSGetStartVector(eps,0,NULL);
+<a name="line378">378: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,0,&amp;v);
+<a name="line379">379: </a>  <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(V,0,v);
+<a name="line380">380: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,0,&amp;v);
+<a name="line381">381: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,0);  <font color="#B22222">/* no deflation at the beginning */</font>
+<a name="line382">382: </a>  LyapIIBuildRHS(S,1,Ux[0],V,eps-&gt;work);
+<a name="line383">383: </a>  idx = 0;
+
+<a name="line385">385: </a>  <font color="#B22222">/* <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> for rank reduction */</font>
+<a name="line386">386: </a>  <a href="../../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_SELF,&amp;epsrr);
+<a name="line387">387: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(epsrr,((PetscObject)eps)-&gt;prefix);
+<a name="line388">388: </a>  <a href="../../../../docs/manualpages/EPS/EPSAppendOptionsPrefix.html#EPSAppendOptionsPrefix">EPSAppendOptionsPrefix</a>(epsrr,<font color="#666666">"eps_lyapii_"</font>);
+<a name="line389">389: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(epsrr,1,PETSC_DEFAULT,PETSC_DEFAULT);
+<a name="line390">390: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(epsrr,PETSC_MACHINE_EPSILON*100,PETSC_DEFAULT);
+
+<a name="line392">392: </a>  <font color="#4169E1">while</font> (eps-&gt;reason == <a href="../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+<a name="line393">393: </a>    eps-&gt;its++;
+
+<a name="line395">395: </a>    <font color="#B22222">/* Matrix for placing the solution of the Lyapunov equation (an alias of V) */</font>
+<a name="line396">396: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,0,nv);
+<a name="line397">397: </a>    <a href="../../../../docs/manualpages/BV/BVGetMat.html#BVGetMat">BVGetMat</a>(V,&amp;Y1);
+<a name="line398">398: </a>    MatZeroEntries(Y1);
+<a name="line399">399: </a>    MatCreateLRC(NULL,Y1,NULL,NULL,&amp;Y);
+<a name="line400">400: </a>    <a href="../../../../docs/manualpages/LME/LMESetSolution.html#LMESetSolution">LMESetSolution</a>(ctx-&gt;lme,Y);
+
+<a name="line402">402: </a>    <font color="#B22222">/* Solve the Lyapunov equation SY + YS' = -2*S*Z*S' */</font>
+<a name="line403">403: </a>    MatCreateLRC(NULL,Ux[idx],NULL,NULL,&amp;C);
+<a name="line404">404: </a>    <a href="../../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>(ctx-&gt;lme,C);
+<a name="line405">405: </a>    MatDestroy(&amp;C);
+<a name="line406">406: </a>    <a href="../../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(ctx-&gt;lme);
+<a name="line407">407: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreMat.html#BVRestoreMat">BVRestoreMat</a>(V,&amp;Y1);
+<a name="line408">408: </a>    MatDestroy(&amp;Y);
+
+<a name="line410">410: </a>    <font color="#B22222">/* <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> of the solution: [Q,R]=qr(V); [U,Sigma,~]=svd(R) */</font>
+<a name="line411">411: </a>    <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(ctx-&gt;ds,nv,nv,0,0);
+<a name="line412">412: </a>    <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;R);
+<a name="line413">413: </a>    <a href="../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(V,R);
+<a name="line414">414: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;R);
+<a name="line415">415: </a>    <a href="../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line416">416: </a>    <a href="../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(ctx-&gt;ds,s,NULL);
+
+<a name="line418">418: </a>    <font color="#B22222">/* Determine rank */</font>
+<a name="line419">419: </a>    rk = nv;
+<a name="line420">420: </a>    <font color="#4169E1">for</font> (i=1;i&lt;nv;i++) <font color="#4169E1">if</font> (PetscAbsScalar(s[i]/s[0])&lt;PETSC_SQRT_MACHINE_EPSILON) {rk=i; <font color="#4169E1">break</font>;}
+<a name="line421">421: </a>    PetscInfo1(eps,<font color="#666666">"The computed solution of the Lyapunov equation has rank %D\n"</font>,rk);
+<a name="line422">422: </a>    rk = PetscMin(rk,ctx-&gt;rkc);
+<a name="line423">423: </a>    <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_U</a>,&amp;U);
+<a name="line424">424: </a>    <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(V,U,0,rk);
+<a name="line425">425: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,0,rk);
+<a name="line426">426: </a>    MatDestroy(&amp;U);
+
+<a name="line428">428: </a>    <font color="#B22222">/* Rank reduction */</font>
+<a name="line429">429: </a>    <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(ctx-&gt;ds,rk,rk,0,0);
+<a name="line430">430: </a>    <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;W);
+<a name="line431">431: </a>    <a href="../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(V,S,V,W);
+<a name="line432">432: </a>    LyapIIBuildEigenMat(ctx-&gt;lme,W,&amp;Op,&amp;v0); <font color="#B22222">/* Op=A\B, A=kron(I,S)+kron(S,I), B=-2*kron(S,S) */</font>
+<a name="line433">433: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(epsrr,Op,NULL);
+<a name="line434">434: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetInitialSpace.html#EPSSetInitialSpace">EPSSetInitialSpace</a>(epsrr,1,&amp;v0);
+<a name="line435">435: </a>    <a href="../../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(epsrr);
+<a name="line436">436: </a>    MatDestroy(&amp;W);
+<a name="line437">437: </a>    EPSComputeVectors(epsrr);
+<a name="line438">438: </a>    <font color="#B22222">/* Copy first eigenvector, vec(A)=x */</font>
+<a name="line439">439: </a>    <a href="../../../../docs/manualpages/BV/BVGetArray.html#BVGetArray">BVGetArray</a>(epsrr-&gt;V,&amp;xx);
+<a name="line440">440: </a>    <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;aa);
+<a name="line441">441: </a>    <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) {
+<a name="line442">442: </a>      PetscMemcpy(aa+i*ldds,xx+i*rk,rk*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line443">443: </a>    }
+<a name="line444">444: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;aa);
+<a name="line445">445: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreArray.html#BVRestoreArray">BVRestoreArray</a>(epsrr-&gt;V,&amp;xx);
+<a name="line446">446: </a>    <a href="../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line447">447: </a>    <font color="#B22222">/* Compute [U,Sigma,~] = svd(A), its rank should be 1 or 2 */</font>
+<a name="line448">448: </a>    <a href="../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(ctx-&gt;ds,s,NULL);
+<a name="line449">449: </a>    <font color="#4169E1">if</font> (PetscAbsScalar(s[1]/s[0])&lt;PETSC_SQRT_MACHINE_EPSILON) rk=1;
+<a name="line450">450: </a>    <font color="#4169E1">else</font> rk = 2;
+<a name="line451">451: </a>    PetscInfo1(eps,<font color="#666666">"The eigenvector has rank %D\n"</font>,rk);
+<a name="line452">452: </a>    <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(ctx-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_U</a>,&amp;U);
+<a name="line453">453: </a>    <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(V,U,0,rk);
+<a name="line454">454: </a>    MatDestroy(&amp;U);
+
+<a name="line456">456: </a>    <font color="#B22222">/* Save V in Ux */</font>
+<a name="line457">457: </a>    idx = (rk==2)?1:0;
+<a name="line458">458: </a>    <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) {
+<a name="line459">459: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,i,&amp;v);
+<a name="line460">460: </a>      VecGetArray(v,&amp;uu);
+<a name="line461">461: </a>      MatDenseGetColumn(Ux[idx],i,&amp;array);
+<a name="line462">462: </a>      PetscMemcpy(array,uu,eps-&gt;nloc*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line463">463: </a>      MatDenseRestoreColumn(Ux[idx],&amp;array);
+<a name="line464">464: </a>      VecRestoreArray(v,&amp;uu);
+<a name="line465">465: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,i,&amp;v);
+<a name="line466">466: </a>    }
+
+<a name="line468">468: </a>    <font color="#B22222">/* Eigenpair approximation */</font>
+<a name="line469">469: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,0,&amp;v);
+<a name="line470">470: </a>    MatMult(S,v,z);
+<a name="line471">471: </a>    VecDot(z,v,pM);
+<a name="line472">472: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,0,&amp;v);
+<a name="line473">473: </a>    <font color="#4169E1">if</font> (rk&gt;1) {
+<a name="line474">474: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,1,&amp;w);
+<a name="line475">475: </a>      VecDot(z,w,pM+1);
+<a name="line476">476: </a>      MatMult(S,w,z);
+<a name="line477">477: </a>      VecDot(z,w,pM+3);
+<a name="line478">478: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,0,&amp;v);
+<a name="line479">479: </a>      VecDot(z,v,pM+2);
+<a name="line480">480: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,0,&amp;v);
+<a name="line481">481: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,1,&amp;w);
+<a name="line482">482: </a>      EV2x2(pM,2,eigr,eigi,vec);
+<a name="line483">483: </a>      MatCreateSeqDense(PETSC_COMM_SELF,2,2,vec,&amp;X);
+<a name="line484">484: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,0,rk);
+<a name="line485">485: </a>      <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(V,X,0,rk);
+<a name="line486">486: </a>      MatDestroy(&amp;X);
+<a name="line487">487: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line488">488: </a>      norm = eigr[0]*eigr[0]+eigi[0]*eigi[0];
+<a name="line489">489: </a>      er = eigr[0]/norm; ei = -eigi[0]/norm;
+<a name="line490">490: </a><font color="#A020F0">#else</font>
+<a name="line491">491: </a>      er =1.0/eigr[0]; ei = 0.0;
+<a name="line492">492: </a><font color="#A020F0">#endif</font>
+<a name="line493">493: </a>    } <font color="#4169E1">else</font> {
+<a name="line494">494: </a>      eigr[0] = pM[0]; eigi[0] = 0.0;
+<a name="line495">495: </a>      er = 1.0/eigr[0]; ei = 0.0;
+<a name="line496">496: </a>    }
+<a name="line497">497: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,0,&amp;v);
+<a name="line498">498: </a>    <font color="#4169E1">if</font> (eigi[0]!=0.0) {
+<a name="line499">499: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,1,&amp;w);
+<a name="line500">500: </a>    } <font color="#4169E1">else</font> w = NULL;
+<a name="line501">501: </a>    eps-&gt;eigr[eps-&gt;nconv] = eigr[0]; eps-&gt;eigi[eps-&gt;nconv] = eigi[0];
+<a name="line502">502: </a>    EPSComputeResidualNorm_Private(eps,PETSC_FALSE,er,ei,v,w,eps-&gt;work,&amp;norm);
+<a name="line503">503: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,0,&amp;v);
+<a name="line504">504: </a>    <font color="#4169E1">if</font> (w) {
+<a name="line505">505: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,1,&amp;w);
+<a name="line506">506: </a>    }
+<a name="line507">507: </a>    (*eps-&gt;converged)(eps,er,ei,norm,&amp;eps-&gt;errest[eps-&gt;nconv],eps-&gt;convergedctx);
+<a name="line508">508: </a>    k = 0;
+<a name="line509">509: </a>    <font color="#4169E1">if</font> (eps-&gt;errest[eps-&gt;nconv]&lt;eps-&gt;tol) {
+<a name="line510">510: </a>      k++;
+<a name="line511">511: </a>      <font color="#4169E1">if</font> (rk==2) {
+<a name="line512">512: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line513">513: </a>        eps-&gt;eigr[eps-&gt;nconv+k] = eigr[0]; eps-&gt;eigi[eps-&gt;nconv+k] = -eigi[0];
+<a name="line514">514: </a><font color="#A020F0">#else</font>
+<a name="line515">515: </a>        eps-&gt;eigr[eps-&gt;nconv+k] = PetscConj(eps-&gt;eigr[eps-&gt;nconv]);
+<a name="line516">516: </a><font color="#A020F0">#endif</font>
+<a name="line517">517: </a>        k++;
+<a name="line518">518: </a>      }
+<a name="line519">519: </a>      <font color="#B22222">/* Store converged eigenpairs and vectors for deflation */</font>
+<a name="line520">520: </a>      <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line521">521: </a>        <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,i,&amp;v);
+<a name="line522">522: </a>        <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(eps-&gt;V,eps-&gt;nconv+i,v);
+<a name="line523">523: </a>        <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,i,&amp;v);
+<a name="line524">524: </a>      }
+<a name="line525">525: </a>      eps-&gt;nconv += k;
+<a name="line526">526: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,eps-&gt;nconv-rk,eps-&gt;nconv);
+<a name="line527">527: </a>      <a href="../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(eps-&gt;V,NULL);
+<a name="line528">528: </a>      <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,eps-&gt;nconv,0,0,0);
+<a name="line529">529: </a>      <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;W);
+<a name="line530">530: </a>      <a href="../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(eps-&gt;V,matctx-&gt;S,eps-&gt;V,W);
+<a name="line531">531: </a>      <a href="../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;W);
+<a name="line532">532: </a>      <font color="#4169E1">if</font> (eps-&gt;nconv&lt;eps-&gt;nev) {
+<a name="line533">533: </a>        idx = 0;
+<a name="line534">534: </a>        <a href="../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(V,0);
+<a name="line535">535: </a>        <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(V,0,NORM_2,&amp;norm);
+<a name="line536">536: </a>        <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(V,0,1.0/norm);
+<a name="line537">537: </a>        LyapIIBuildRHS(S,1,Ux[idx],V,eps-&gt;work);
+<a name="line538">538: </a>      }
+<a name="line539">539: </a>    } <font color="#4169E1">else</font> {
+<a name="line540">540: </a>      <font color="#B22222">/* Prepare right-hand side */</font>
+<a name="line541">541: </a>      LyapIIBuildRHS(S,rk,Ux[idx],NULL,eps-&gt;work);
+<a name="line542">542: </a>    }
+<a name="line543">543: </a>    (*eps-&gt;stopping)(eps,eps-&gt;its,eps-&gt;max_it,eps-&gt;nconv,eps-&gt;nev,&amp;eps-&gt;reason,eps-&gt;stoppingctx);
+<a name="line544">544: </a>    EPSMonitor(eps,eps-&gt;its,eps-&gt;nconv,eps-&gt;eigr,eps-&gt;eigi,eps-&gt;errest,eps-&gt;nconv+1);
+<a name="line545">545: </a>  }
+<a name="line546">546: </a>  <a href="../../../../docs/manualpages/ST/STRestoreOperator.html#STRestoreOperator">STRestoreOperator</a>(eps-&gt;st,&amp;matctx-&gt;S);
+<a name="line547">547: </a>  MatDestroy(&amp;S);
+<a name="line548">548: </a>  MatDestroy(&amp;Ux[0]);
+<a name="line549">549: </a>  MatDestroy(&amp;Ux[1]);
+<a name="line550">550: </a>  MatDestroy(&amp;Op);
+<a name="line551">551: </a>  VecDestroy(&amp;v0);
+<a name="line552">552: </a>  <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;V);
+<a name="line553">553: </a>  <a href="../../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;epsrr);
+<a name="line554">554: </a>  PetscFree(s);
+<a name="line555">555: </a>  <font color="#4169E1">return</font>(0);
+<a name="line556">556: </a>}
+
+<a name="line558">558: </a><strong><font color="#4169E1"><a name="EPSSetFromOptions_LyapII"></a>PetscErrorCode EPSSetFromOptions_LyapII(PetscOptionItems *PetscOptionsObject,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line559">559: </a>{
+<a name="line561">561: </a>  EPS_LYAPII     *ctx = (EPS_LYAPII*)eps-&gt;data;
+<a name="line562">562: </a>  PetscInt       k,array[2]={PETSC_DEFAULT,PETSC_DEFAULT};
+<a name="line563">563: </a>  PetscBool      flg;
+
+<a name="line566">566: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> Lyapunov Inverse Iteration Options"</font>);
+
+<a name="line568">568: </a>    k = 2;
+<a name="line569">569: </a>    PetscOptionsIntArray(<font color="#666666">"-eps_lyapii_ranks"</font>,<font color="#666666">"Ranks for Lyapunov equation (one or two comma-separated integers)"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/EPS/EPSLyapIISetRanks.html#EPSLyapIISetRanks">EPSLyapIISetRanks</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line570">570: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line571">571: </a>      <a href="../../../../docs/manualpages/EPS/EPSLyapIISetRanks.html#EPSLyapIISetRanks">EPSLyapIISetRanks</a>(eps,array[0],array[1]);
+<a name="line572">572: </a>    }
+
+<a name="line574">574: </a>  PetscOptionsTail();
+
+<a name="line576">576: </a>  <font color="#4169E1">if</font> (!ctx-&gt;lme) { <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetLME.html#EPSLyapIIGetLME">EPSLyapIIGetLME</a>(eps,&amp;ctx-&gt;lme); }
+<a name="line577">577: </a>  <a href="../../../../docs/manualpages/LME/LMESetFromOptions.html#LMESetFromOptions">LMESetFromOptions</a>(ctx-&gt;lme);
+<a name="line578">578: </a>  <font color="#4169E1">return</font>(0);
+<a name="line579">579: </a>}
+
+<a name="line581">581: </a><strong><font color="#4169E1"><a name="EPSLyapIISetRanks_LyapII"></a>static PetscErrorCode EPSLyapIISetRanks_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt rkc,PetscInt rkl)</font></strong>
+<a name="line582">582: </a>{
+<a name="line583">583: </a>  EPS_LYAPII *ctx = (EPS_LYAPII*)eps-&gt;data;
+
+<a name="line586">586: </a>  <font color="#4169E1">if</font> (rkc==PETSC_DEFAULT) rkc = 10;
+<a name="line587">587: </a>  <font color="#4169E1">if</font> (rkc&lt;2) SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The compressed rank %D must be larger than 1"</font>,rkc);
+<a name="line588">588: </a>  <font color="#4169E1">if</font> (rkl==PETSC_DEFAULT) rkl = 3*rkc;
+<a name="line589">589: </a>  <font color="#4169E1">if</font> (rkl&lt;rkc) SETERRQ2(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The Lyapunov rank %D cannot be smaller than the compressed rank %D"</font>,rkl,rkc);
+<a name="line590">590: </a>  <font color="#4169E1">if</font> (rkc != ctx-&gt;rkc) {
+<a name="line591">591: </a>    ctx-&gt;rkc   = rkc;
+<a name="line592">592: </a>    eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line593">593: </a>  }
+<a name="line594">594: </a>  <font color="#4169E1">if</font> (rkl != ctx-&gt;rkl) {
+<a name="line595">595: </a>    ctx-&gt;rkl   = rkl;
+<a name="line596">596: </a>    eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line597">597: </a>  }
+<a name="line598">598: </a>  <font color="#4169E1">return</font>(0);
+<a name="line599">599: </a>}
+
+<a name="line601">601: </a><font color="#B22222">/*@</font>
+<a name="line602">602: </a><font color="#B22222">   <a href="../../../../docs/manualpages/EPS/EPSLyapIISetRanks.html#EPSLyapIISetRanks">EPSLyapIISetRanks</a> - Set the ranks used in the solution of the Lyapunov equation.</font>
+
+<a name="line604">604: </a><font color="#B22222">   Collective on <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a></font>
+
+<a name="line606">606: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line607">607: </a><font color="#B22222">+  eps - the eigenproblem solver context</font>
+<a name="line608">608: </a><font color="#B22222">.  rkc - the compressed rank</font>
+<a name="line609">609: </a><font color="#B22222">-  rkl - the Lyapunov rank</font>
+
+<a name="line611">611: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line612">612: </a><font color="#B22222">.  -eps_lyapii_ranks &lt;rkc,rkl&gt; - Sets the rank parameters</font>
+
+<a name="line614">614: </a><font color="#B22222">   Notes:</font>
+<a name="line615">615: </a><font color="#B22222">   Lyapunov inverse iteration needs to solve a large-scale Lyapunov equation</font>
+<a name="line616">616: </a><font color="#B22222">   at each iteration of the eigensolver. For this, an iterative solver (<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a>)</font>
+<a name="line617">617: </a><font color="#B22222">   is used, which requires to prescribe the rank of the solution matrix X. This</font>
+<a name="line618">618: </a><font color="#B22222">   is the meaning of parameter rkl. Later, this matrix is compressed into</font>
+<a name="line619">619: </a><font color="#B22222">   another matrix of rank rkc. If not provided, rkl is a small multiple of rkc.</font>
+
+<a name="line621">621: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line623">623: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetRanks.html#EPSLyapIIGetRanks">EPSLyapIIGetRanks</a>()</font>
+<a name="line624">624: </a><font color="#B22222">@*/</font>
+<a name="line625">625: </a><strong><font color="#4169E1"><a name="EPSLyapIISetRanks"></a>PetscErrorCode <a href="../../../../docs/manualpages/EPS/EPSLyapIISetRanks.html#EPSLyapIISetRanks">EPSLyapIISetRanks</a>(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt rkc,PetscInt rkl)</font></strong>
+<a name="line626">626: </a>{
+
+<a name="line633">633: </a>  PetscTryMethod(eps,<font color="#666666">"EPSLyapIISetRanks_C"</font>,(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt,PetscInt),(eps,rkc,rkl));
+<a name="line634">634: </a>  <font color="#4169E1">return</font>(0);
+<a name="line635">635: </a>}
+
+<a name="line637">637: </a><strong><font color="#4169E1"><a name="EPSLyapIIGetRanks_LyapII"></a>static PetscErrorCode EPSLyapIIGetRanks_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *rkc,PetscInt *rkl)</font></strong>
+<a name="line638">638: </a>{
+<a name="line639">639: </a>  EPS_LYAPII *ctx = (EPS_LYAPII*)eps-&gt;data;
+
+<a name="line642">642: </a>  <font color="#4169E1">if</font> (rkc) *rkc = ctx-&gt;rkc;
+<a name="line643">643: </a>  <font color="#4169E1">if</font> (rkl) *rkl = ctx-&gt;rkl;
+<a name="line644">644: </a>  <font color="#4169E1">return</font>(0);
+<a name="line645">645: </a>}
+
+<a name="line647">647: </a><font color="#B22222">/*@</font>
+<a name="line648">648: </a><font color="#B22222">   <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetRanks.html#EPSLyapIIGetRanks">EPSLyapIIGetRanks</a> - Return the rank values used for the Lyapunov step.</font>
+
+<a name="line650">650: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line652">652: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line653">653: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line655">655: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line656">656: </a><font color="#B22222">+  rkc - the compressed rank</font>
+<a name="line657">657: </a><font color="#B22222">-  rkl - the Lyapunov rank</font>
+
+<a name="line659">659: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line661">661: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/EPS/EPSLyapIISetRanks.html#EPSLyapIISetRanks">EPSLyapIISetRanks</a>()</font>
+<a name="line662">662: </a><font color="#B22222">@*/</font>
+<a name="line663">663: </a><strong><font color="#4169E1"><a name="EPSLyapIIGetRanks"></a>PetscErrorCode <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetRanks.html#EPSLyapIIGetRanks">EPSLyapIIGetRanks</a>(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *rkc,PetscInt *rkl)</font></strong>
+<a name="line664">664: </a>{
+
+<a name="line669">669: </a>  PetscUseMethod(eps,<font color="#666666">"EPSLyapIIGetRanks_C"</font>,(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt*,PetscInt*),(eps,rkc,rkl));
+<a name="line670">670: </a>  <font color="#4169E1">return</font>(0);
+<a name="line671">671: </a>}
+
+<a name="line673">673: </a><strong><font color="#4169E1"><a name="EPSLyapIISetLME_LyapII"></a>static PetscErrorCode EPSLyapIISetLME_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a> lme)</font></strong>
+<a name="line674">674: </a>{
+<a name="line676">676: </a>  EPS_LYAPII     *ctx = (EPS_LYAPII*)eps-&gt;data;
+
+<a name="line679">679: </a>  PetscObjectReference((PetscObject)lme);
+<a name="line680">680: </a>  <a href="../../../../docs/manualpages/LME/LMEDestroy.html#LMEDestroy">LMEDestroy</a>(&amp;ctx-&gt;lme);
+<a name="line681">681: </a>  ctx-&gt;lme = lme;
+<a name="line682">682: </a>  PetscLogObjectParent((PetscObject)eps,(PetscObject)ctx-&gt;lme);
+<a name="line683">683: </a>  eps-&gt;state = EPS_STATE_INITIAL;
+<a name="line684">684: </a>  <font color="#4169E1">return</font>(0);
+<a name="line685">685: </a>}
+
+<a name="line687">687: </a><font color="#B22222">/*@</font>
+<a name="line688">688: </a><font color="#B22222">   <a href="../../../../docs/manualpages/EPS/EPSLyapIISetLME.html#EPSLyapIISetLME">EPSLyapIISetLME</a> - Associate a linear matrix equation solver object (<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a>) to the</font>
+<a name="line689">689: </a><font color="#B22222">   eigenvalue solver.</font>
+
+<a name="line691">691: </a><font color="#B22222">   Collective on <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a></font>
+
+<a name="line693">693: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line694">694: </a><font color="#B22222">+  eps - the eigenproblem solver context</font>
+<a name="line695">695: </a><font color="#B22222">-  lme - the linear matrix equation solver object</font>
+
+<a name="line697">697: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line699">699: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetLME.html#EPSLyapIIGetLME">EPSLyapIIGetLME</a>()</font>
+<a name="line700">700: </a><font color="#B22222">@*/</font>
+<a name="line701">701: </a><strong><font color="#4169E1"><a name="EPSLyapIISetLME"></a>PetscErrorCode <a href="../../../../docs/manualpages/EPS/EPSLyapIISetLME.html#EPSLyapIISetLME">EPSLyapIISetLME</a>(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a> lme)</font></strong>
+<a name="line702">702: </a>{
+
+<a name="line709">709: </a>  PetscTryMethod(eps,<font color="#666666">"EPSLyapIISetLME_C"</font>,(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a>),(eps,lme));
+<a name="line710">710: </a>  <font color="#4169E1">return</font>(0);
+<a name="line711">711: </a>}
+
+<a name="line713">713: </a><strong><font color="#4169E1"><a name="EPSLyapIIGetLME_LyapII"></a>static PetscErrorCode EPSLyapIIGetLME_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a> *lme)</font></strong>
+<a name="line714">714: </a>{
+<a name="line716">716: </a>  EPS_LYAPII     *ctx = (EPS_LYAPII*)eps-&gt;data;
+
+<a name="line719">719: </a>  <font color="#4169E1">if</font> (!ctx-&gt;lme) {
+<a name="line720">720: </a>    <a href="../../../../docs/manualpages/LME/LMECreate.html#LMECreate">LMECreate</a>(PetscObjectComm((PetscObject)eps),&amp;ctx-&gt;lme);
+<a name="line721">721: </a>    <a href="../../../../docs/manualpages/LME/LMESetOptionsPrefix.html#LMESetOptionsPrefix">LMESetOptionsPrefix</a>(ctx-&gt;lme,((PetscObject)eps)-&gt;prefix);
+<a name="line722">722: </a>    <a href="../../../../docs/manualpages/LME/LMEAppendOptionsPrefix.html#LMEAppendOptionsPrefix">LMEAppendOptionsPrefix</a>(ctx-&gt;lme,<font color="#666666">"eps_lyapii_"</font>);
+<a name="line723">723: </a>    PetscObjectIncrementTabLevel((PetscObject)ctx-&gt;lme,(PetscObject)eps,1);
+<a name="line724">724: </a>    PetscLogObjectParent((PetscObject)eps,(PetscObject)ctx-&gt;lme);
+<a name="line725">725: </a>  }
+<a name="line726">726: </a>  *lme = ctx-&gt;lme;
+<a name="line727">727: </a>  <font color="#4169E1">return</font>(0);
+<a name="line728">728: </a>}
+
+<a name="line730">730: </a><font color="#B22222">/*@</font>
+<a name="line731">731: </a><font color="#B22222">   <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetLME.html#EPSLyapIIGetLME">EPSLyapIIGetLME</a> - Retrieve the linear matrix equation solver object (<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a>)</font>
+<a name="line732">732: </a><font color="#B22222">   associated with the eigenvalue solver.</font>
+
+<a name="line734">734: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line736">736: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line737">737: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line739">739: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line740">740: </a><font color="#B22222">.  lme - the linear matrix equation solver object</font>
+
+<a name="line742">742: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line744">744: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/EPS/EPSLyapIISetLME.html#EPSLyapIISetLME">EPSLyapIISetLME</a>()</font>
+<a name="line745">745: </a><font color="#B22222">@*/</font>
+<a name="line746">746: </a><strong><font color="#4169E1"><a name="EPSLyapIIGetLME"></a>PetscErrorCode <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetLME.html#EPSLyapIIGetLME">EPSLyapIIGetLME</a>(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a> *lme)</font></strong>
+<a name="line747">747: </a>{
+
+<a name="line753">753: </a>  PetscUseMethod(eps,<font color="#666666">"EPSLyapIIGetLME_C"</font>,(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,<a href="../../../../docs/manualpages/LME/LME.html#LME">LME</a>*),(eps,lme));
+<a name="line754">754: </a>  <font color="#4169E1">return</font>(0);
+<a name="line755">755: </a>}
+
+<a name="line757">757: </a><strong><font color="#4169E1"><a name="EPSView_LyapII"></a>PetscErrorCode EPSView_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscViewer viewer)</font></strong>
+<a name="line758">758: </a>{
+<a name="line760">760: </a>  EPS_LYAPII     *ctx = (EPS_LYAPII*)eps-&gt;data;
+<a name="line761">761: </a>  PetscBool      isascii;
+
+<a name="line764">764: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line765">765: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line766">766: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  ranks: for Lyapunov solver=%D, after compression=%D\n"</font>,ctx-&gt;rkl,ctx-&gt;rkc);
+<a name="line767">767: </a>    <font color="#4169E1">if</font> (!ctx-&gt;lme) { <a href="../../../../docs/manualpages/EPS/EPSLyapIIGetLME.html#EPSLyapIIGetLME">EPSLyapIIGetLME</a>(eps,&amp;ctx-&gt;lme); }
+<a name="line768">768: </a>    PetscViewerASCIIPushTab(viewer);
+<a name="line769">769: </a>    <a href="../../../../docs/manualpages/LME/LMEView.html#LMEView">LMEView</a>(ctx-&gt;lme,viewer);
+<a name="line770">770: </a>    PetscViewerASCIIPopTab(viewer);
+<a name="line771">771: </a>  }
+<a name="line772">772: </a>  <font color="#4169E1">return</font>(0);
+<a name="line773">773: </a>}
+
+<a name="line775">775: </a><strong><font color="#4169E1"><a name="EPSReset_LyapII"></a>PetscErrorCode EPSReset_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line776">776: </a>{
+<a name="line778">778: </a>  EPS_LYAPII     *ctx = (EPS_LYAPII*)eps-&gt;data;
+
+<a name="line781">781: </a>  <font color="#4169E1">if</font> (!ctx-&gt;lme) { <a href="../../../../docs/manualpages/LME/LMEReset.html#LMEReset">LMEReset</a>(ctx-&gt;lme); }
+<a name="line782">782: </a>  <font color="#4169E1">return</font>(0);
+<a name="line783">783: </a>}
+
+<a name="line785">785: </a><strong><font color="#4169E1"><a name="EPSDestroy_LyapII"></a>PetscErrorCode EPSDestroy_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line786">786: </a>{
+<a name="line788">788: </a>  EPS_LYAPII     *ctx = (EPS_LYAPII*)eps-&gt;data;
+
+<a name="line791">791: </a>  <a href="../../../../docs/manualpages/LME/LMEDestroy.html#LMEDestroy">LMEDestroy</a>(&amp;ctx-&gt;lme);
+<a name="line792">792: </a>  <a href="../../../../docs/manualpages/DS/DSDestroy.html#DSDestroy">DSDestroy</a>(&amp;ctx-&gt;ds);
+<a name="line793">793: </a>  PetscFree(eps-&gt;data);
+<a name="line794">794: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIISetLME_C"</font>,NULL);
+<a name="line795">795: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIIGetLME_C"</font>,NULL);
+<a name="line796">796: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIISetRanks_C"</font>,NULL);
+<a name="line797">797: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIIGetRanks_C"</font>,NULL);
+<a name="line798">798: </a>  <font color="#4169E1">return</font>(0);
+<a name="line799">799: </a>}
+
+<a name="line801">801: </a><strong><font color="#4169E1"><a name="EPSSetDefaultST_LyapII"></a>PetscErrorCode EPSSetDefaultST_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line802">802: </a>{
+
+<a name="line806">806: </a>  <font color="#4169E1">if</font> (!((PetscObject)eps-&gt;st)-&gt;type_name) {
+<a name="line807">807: </a>    <a href="../../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(eps-&gt;st,STSINVERT);
+<a name="line808">808: </a>  }
+<a name="line809">809: </a>  <font color="#4169E1">return</font>(0);
+<a name="line810">810: </a>}
+
+<a name="line812">812: </a><strong><font color="#4169E1"><a name="EPSCreate_LyapII"></a>SLEPC_EXTERN PetscErrorCode EPSCreate_LyapII(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line813">813: </a>{
+<a name="line814">814: </a>  EPS_LYAPII     *ctx;
+
+<a name="line818">818: </a>  PetscNewLog(eps,&amp;ctx);
+<a name="line819">819: </a>  eps-&gt;data = (void*)ctx;
+
+<a name="line821">821: </a>  eps-&gt;useds = PETSC_TRUE;
+
+<a name="line823">823: </a>  eps-&gt;ops-&gt;solve          = EPSSolve_LyapII;
+<a name="line824">824: </a>  eps-&gt;ops-&gt;setup          = EPSSetUp_LyapII;
+<a name="line825">825: </a>  eps-&gt;ops-&gt;setfromoptions = EPSSetFromOptions_LyapII;
+<a name="line826">826: </a>  eps-&gt;ops-&gt;reset          = EPSReset_LyapII;
+<a name="line827">827: </a>  eps-&gt;ops-&gt;destroy        = EPSDestroy_LyapII;
+<a name="line828">828: </a>  eps-&gt;ops-&gt;view           = EPSView_LyapII;
+<a name="line829">829: </a>  eps-&gt;ops-&gt;setdefaultst   = EPSSetDefaultST_LyapII;
+<a name="line830">830: </a>  eps-&gt;ops-&gt;backtransform  = EPSBackTransform_Default;
+<a name="line831">831: </a>  eps-&gt;ops-&gt;computevectors = EPSComputeVectors_Schur;
+
+<a name="line833">833: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIISetLME_C"</font>,EPSLyapIISetLME_LyapII);
+<a name="line834">834: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIIGetLME_C"</font>,EPSLyapIIGetLME_LyapII);
+<a name="line835">835: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIISetRanks_C"</font>,EPSLyapIISetRanks_LyapII);
+<a name="line836">836: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSLyapIIGetRanks_C"</font>,EPSLyapIIGetRanks_LyapII);
+<a name="line837">837: </a>  <font color="#4169E1">return</font>(0);
+<a name="line838">838: </a>}
+
+</pre>
+</body>
+
+</html>

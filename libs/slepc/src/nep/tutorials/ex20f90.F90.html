@@ -1,0 +1,346 @@
+<center><a href="ex20f90.F90">Actual source code: ex20f90.F90</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/nep/tutorials/ex20f90.F90.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:12+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/nep/tutorials/ex20f90.F90.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a>!
+<a name="line2">  2: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line3">  3: </a>!  SLEPc - Scalable Library <font color="#4169E1">for</font> Eigenvalue Problem Computations
+<a name="line4">  4: </a>!  Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain
+<a name="line5">  5: </a>!
+<a name="line6">  6: </a>!  This file is part of SLEPc.
+<a name="line7">  7: </a>!  SLEPc is distributed under a 2-clause BSD license (see LICENSE).
+<a name="line8">  8: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line9">  9: </a>!
+<a name="line10"> 10: </a>!  Program usage: mpiexec -n &lt;np&gt; ./ex20f90 [-n &lt;n&gt;] [SLEPc opts]
+<a name="line11"> 11: </a>!
+<a name="line12"> 12: </a>!  Description: Simple 1-D nonlinear eigenproblem. Fortran90 equivalent of ex20.c
+<a name="line13"> 13: </a>!
+<a name="line14"> 14: </a>!  The command line options are:
+<a name="line15"> 15: </a>!    -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions
+<a name="line16"> 16: </a>!
+<a name="line17"> 17: </a>! ----------------------------------------------------------------------
+<a name="line18"> 18: </a>!  Solve 1-D PDE
+<a name="line19"> 19: </a>!           -u'' = lambda*u
+<a name="line20"> 20: </a>!  on [0,1] subject to
+<a name="line21"> 21: </a>!           u(0)=0, u'(1)=u(1)*lambda*kappa/(kappa-lambda)
+<a name="line22"> 22: </a>! ----------------------------------------------------------------------
+<a name="line23"> 23: </a>!
+
+<a name="line25"> 25: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line26"> 26: </a>!     User-defined application context
+<a name="line27"> 27: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line28"> 28: </a>      module UserModule
+<a name="line29"> 29: </a> #include <A href="../../../include/slepc/finclude/slepcnep.h.html">&lt;slepc/finclude/slepcnep.h&gt;</A>
+<a name="line30"> 30: </a>      use slepcnep
+<a name="line31"> 31: </a>      type User
+<a name="line32"> 32: </a>        PetscScalar kappa
+<a name="line33"> 33: </a>        PetscReal   h
+<a name="line34"> 34: </a>      end type User
+<a name="line35"> 35: </a>      end module
+
+<a name="line37"> 37: </a>      program main
+<a name="line38"> 38: </a> #include <A href="../../../include/slepc/finclude/slepcnep.h.html">&lt;slepc/finclude/slepcnep.h&gt;</A>
+<a name="line39"> 39: </a>      use UserModule
+<a name="line40"> 40: </a>      implicit none
+
+<a name="line42"> 42: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line43"> 43: </a>!     Declarations
+<a name="line44"> 44: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line45"> 45: </a>!
+<a name="line46"> 46: </a>!  Variables:
+<a name="line47"> 47: </a>!     nep       nonlinear eigensolver context
+<a name="line48"> 48: </a>!     x         eigenvector
+<a name="line49"> 49: </a>!     lambda    eigenvalue
+<a name="line50"> 50: </a>!     F,J       Function and Jacobian matrices
+<a name="line51"> 51: </a>!     ctx       user-defined context
+
+<a name="line53"> 53: </a>      <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>            nep
+<a name="line54"> 54: </a>      Vec            x, v(1)
+<a name="line55"> 55: </a>      PetscScalar    lambda
+<a name="line56"> 56: </a>      Mat            F, J
+<a name="line57"> 57: </a>      type(User)     ctx
+<a name="line58"> 58: </a>      <a href="../../../docs/manualpages/NEP/NEPType.html#NEPType">NEPType</a>        tname
+<a name="line59"> 59: </a>      PetscInt       n, i, k, nev, its, maxit, nconv, three, one
+<a name="line60"> 60: </a>      PetscReal      tol, norm
+<a name="line61"> 61: </a>      PetscScalar    alpha
+<a name="line62"> 62: </a>      PetscMPIInt    rank
+<a name="line63"> 63: </a>      PetscBool      flg
+<a name="line64"> 64: </a>      PetscErrorCode ierr
+<a name="line65"> 65: </a>!  Note: Any user-defined Fortran routines (such as FormJacobian)
+<a name="line66"> 66: </a>!  MUST be declared as external.
+<a name="line67"> 67: </a>      external       FormFunction, FormJacobian
+
+<a name="line69"> 69: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line70"> 70: </a>!     Beginning of program
+<a name="line71"> 71: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line73"> 73: </a>      call <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(PETSC_NULL_CHARACTER,ierr)
+<a name="line74"> 74: </a>      <font color="#4169E1">if</font> (ierr .ne. 0) then
+<a name="line75"> 75: </a>        print*,'<a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a> failed'
+<a name="line76"> 76: </a>        stop
+<a name="line77"> 77: </a>      endif
+<a name="line78"> 78: </a>      call <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PETSC_COMM_WORLD,rank,ierr);CHKERRA(ierr)
+<a name="line79"> 79: </a>      n = 128
+<a name="line80"> 80: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-n',n,flg,ierr);CHKERRA(ierr)
+<a name="line81"> 81: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line82"> 82: </a>        write(*,'(/A,I4)') 'Nonlinear Eigenproblem, n =',n
+<a name="line83"> 83: </a>      endif
+
+<a name="line85"> 85: </a>      ctx%h = 1.0/real(n)
+<a name="line86"> 86: </a>      ctx%kappa = 1.0
+
+<a name="line88"> 88: </a>      three = 3
+<a name="line89"> 89: </a>      one = 1
+
+<a name="line91"> 91: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line92"> 92: </a>!     Create matrix data structure to hold the Function and the Jacobian
+<a name="line93"> 93: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line95"> 95: </a>      call MatCreate(PETSC_COMM_WORLD,F,ierr);CHKERRA(ierr)
+<a name="line96"> 96: </a>      call MatSetSizes(F,PETSC_DECIDE,PETSC_DECIDE,n,n,ierr);CHKERRA(ierr)
+<a name="line97"> 97: </a>      call MatSetFromOptions(F,ierr);CHKERRA(ierr)
+<a name="line98"> 98: </a>      call MatSeqAIJSetPreallocation(F,three,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line99"> 99: </a>      call MatMPIAIJSetPreallocation(F,three,PETSC_NULL_INTEGER,one,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line100">100: </a>      call MatSetUp(F,ierr);CHKERRA(ierr)
+
+<a name="line102">102: </a>      call MatCreate(PETSC_COMM_WORLD,J,ierr);CHKERRA(ierr)
+<a name="line103">103: </a>      call MatSetSizes(J,PETSC_DECIDE,PETSC_DECIDE,n,n,ierr);CHKERRA(ierr)
+<a name="line104">104: </a>      call MatSetFromOptions(J,ierr);CHKERRA(ierr)
+<a name="line105">105: </a>      call MatSeqAIJSetPreallocation(J,three,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line106">106: </a>      call MatMPIAIJSetPreallocation(J,three,PETSC_NULL_INTEGER,one,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line107">107: </a>      call MatSetUp(J,ierr);CHKERRA(ierr)
+
+<a name="line109">109: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line110">110: </a>!     Create the eigensolver and set various options
+<a name="line111">111: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line113">113: </a>!     ** Create eigensolver context
+<a name="line114">114: </a>      call <a href="../../../docs/manualpages/NEP/NEPCreate.html#NEPCreate">NEPCreate</a>(PETSC_COMM_WORLD,nep,ierr);CHKERRA(ierr)
+
+<a name="line116">116: </a>!     ** Set routines <font color="#4169E1">for</font> evaluation of Function and Jacobian
+<a name="line117">117: </a>      call <a href="../../../docs/manualpages/NEP/NEPSetFunction.html#NEPSetFunction">NEPSetFunction</a>(nep,F,F,FormFunction,ctx,ierr);CHKERRA(ierr)
+<a name="line118">118: </a>      call <a href="../../../docs/manualpages/NEP/NEPSetJacobian.html#NEPSetJacobian">NEPSetJacobian</a>(nep,J,FormJacobian,ctx,ierr);CHKERRA(ierr)
+
+<a name="line120">120: </a>!     ** Customize nonlinear solver
+<a name="line121">121: </a>      tol = 1e-9
+<a name="line122">122: </a>      call <a href="../../../docs/manualpages/NEP/NEPSetTolerances.html#NEPSetTolerances">NEPSetTolerances</a>(nep,tol,PETSC_DEFAULT_INTEGER,ierr);CHKERRA(ierr)
+<a name="line123">123: </a>      k = 1
+<a name="line124">124: </a>      call <a href="../../../docs/manualpages/NEP/NEPSetDimensions.html#NEPSetDimensions">NEPSetDimensions</a>(nep,k,PETSC_DEFAULT_INTEGER,PETSC_DEFAULT_INTEGER,ierr);CHKERRA(ierr)
+
+<a name="line126">126: </a>!     ** Set solver parameters at runtime
+<a name="line127">127: </a>      call <a href="../../../docs/manualpages/NEP/NEPSetFromOptions.html#NEPSetFromOptions">NEPSetFromOptions</a>(nep,ierr);CHKERRA(ierr)
+
+<a name="line129">129: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line130">130: </a>!     Solve the eigensystem
+<a name="line131">131: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line133">133: </a>!     ** Evaluate initial guess
+<a name="line134">134: </a>      call MatCreateVecs(F,x,PETSC_NULL_VEC,ierr);CHKERRA(ierr)
+<a name="line135">135: </a>      call VecDuplicate(x,v(1),ierr);CHKERRA(ierr)
+<a name="line136">136: </a>      alpha = 1.0
+<a name="line137">137: </a>      call VecSet(v(1),alpha,ierr);CHKERRA(ierr)
+<a name="line138">138: </a>      k = 1
+<a name="line139">139: </a>      call <a href="../../../docs/manualpages/NEP/NEPSetInitialSpace.html#NEPSetInitialSpace">NEPSetInitialSpace</a>(nep,k,v,ierr);CHKERRA(ierr)
+<a name="line140">140: </a>      call VecDestroy(v(1),ierr);CHKERRA(ierr)
+
+<a name="line142">142: </a>!     ** Call the solver
+<a name="line143">143: </a>      call <a href="../../../docs/manualpages/NEP/NEPSolve.html#NEPSolve">NEPSolve</a>(nep,ierr);CHKERRA(ierr)
+<a name="line144">144: </a>      call <a href="../../../docs/manualpages/NEP/NEPGetIterationNumber.html#NEPGetIterationNumber">NEPGetIterationNumber</a>(nep,its,ierr);CHKERRA(ierr)
+<a name="line145">145: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line146">146: </a>        write(*,'(A,I3)') ' Number of <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> iterations =',its
+<a name="line147">147: </a>      endif
+
+<a name="line149">149: </a>!     ** Optional: Get some information from the solver and display it
+<a name="line150">150: </a>      call <a href="../../../docs/manualpages/NEP/NEPGetType.html#NEPGetType">NEPGetType</a>(nep,tname,ierr);CHKERRA(ierr)
+<a name="line151">151: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line152">152: </a>        write(*,'(A,A10)') ' Solution method: ',tname
+<a name="line153">153: </a>      endif
+<a name="line154">154: </a>      call <a href="../../../docs/manualpages/NEP/NEPGetDimensions.html#NEPGetDimensions">NEPGetDimensions</a>(nep,nev,PETSC_NULL_INTEGER,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line155">155: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line156">156: </a>        write(*,'(A,I4)') ' Number of requested eigenvalues:',nev
+<a name="line157">157: </a>      endif
+<a name="line158">158: </a>      call <a href="../../../docs/manualpages/NEP/NEPGetTolerances.html#NEPGetTolerances">NEPGetTolerances</a>(nep,tol,maxit,ierr);CHKERRA(ierr)
+<a name="line159">159: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line160">160: </a>        write(*,'(A,F12.9,A,I5)') ' Stopping condition: tol=',tol,', maxit=',maxit
+<a name="line161">161: </a>      endif
+
+<a name="line163">163: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line164">164: </a>!     Display solution and clean up
+<a name="line165">165: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line167">167: </a>      call <a href="../../../docs/manualpages/NEP/NEPGetConverged.html#NEPGetConverged">NEPGetConverged</a>(nep,nconv,ierr);CHKERRA(ierr)
+<a name="line168">168: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line169">169: </a>        write(*,'(A,I2/)') ' Number of converged approximate eigenpairs:',nconv
+<a name="line170">170: </a>      endif
+
+<a name="line172">172: </a>!     ** Display eigenvalues and relative errors
+<a name="line173">173: </a>      <font color="#4169E1">if</font> (nconv .gt. 0) then
+<a name="line174">174: </a>        <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line175">175: </a>          write(*,*) '        k              ||T(k)x||'
+<a name="line176">176: </a>          write(*,*) '----------------- ------------------'
+<a name="line177">177: </a>        endif
+<a name="line178">178: </a>        <font color="#4169E1">do</font> i=0,nconv-1
+<a name="line179">179: </a>!         ** Get converged eigenpairs: (in this example they are always real)
+<a name="line180">180: </a>          call <a href="../../../docs/manualpages/NEP/NEPGetEigenpair.html#NEPGetEigenpair">NEPGetEigenpair</a>(nep,i,lambda,PETSC_NULL_SCALAR,x,PETSC_NULL_VEC,ierr);CHKERRA(ierr)
+
+<a name="line182">182: </a>!         ** Compute residual norm and error
+<a name="line183">183: </a>          call <a href="../../../docs/manualpages/NEP/NEPComputeError.html#NEPComputeError">NEPComputeError</a>(nep,i,<a href="../../../docs/manualpages/NEP/NEPErrorType.html#NEPErrorType">NEP_ERROR_RELATIVE</a>,norm,ierr);CHKERRA(ierr)
+<a name="line184">184: </a>          <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line185">185: </a>            write(*,'(1P,E15.4,E18.4)') PetscRealPart(lambda), norm
+<a name="line186">186: </a>          endif
+<a name="line187">187: </a>        enddo
+<a name="line188">188: </a>        <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line189">189: </a>          write(*,*)
+<a name="line190">190: </a>        endif
+<a name="line191">191: </a>      endif
+
+<a name="line193">193: </a>      call <a href="../../../docs/manualpages/NEP/NEPDestroy.html#NEPDestroy">NEPDestroy</a>(nep,ierr);CHKERRA(ierr)
+<a name="line194">194: </a>      call MatDestroy(F,ierr);CHKERRA(ierr)
+<a name="line195">195: </a>      call MatDestroy(J,ierr);CHKERRA(ierr)
+<a name="line196">196: </a>      call VecDestroy(x,ierr);CHKERRA(ierr)
+<a name="line197">197: </a>      call <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>(ierr)
+<a name="line198">198: </a>      end
+
+<a name="line200">200: </a>! ---------------  Evaluate Function matrix  T(lambda)  ----------------
+
+<a name="line202">202: </a>      subroutine FormFunction(nep,lambda,fun,B,ctx,ierr)
+<a name="line203">203: </a>      use UserModule
+<a name="line204">204: </a>      implicit none
+<a name="line205">205: </a>      <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>            nep
+<a name="line206">206: </a>      PetscScalar    lambda, A(3), c, d
+<a name="line207">207: </a>      Mat            fun,B
+<a name="line208">208: </a>      type(User)     ctx
+<a name="line209">209: </a>      PetscReal      h
+<a name="line210">210: </a>      PetscInt       i, n, j(3), Istart, Iend, one, two, three
+<a name="line211">211: </a>      PetscErrorCode ierr
+
+<a name="line213">213: </a>!     ** Compute Function entries and insert into matrix
+<a name="line214">214: </a>      call MatGetSize(fun,n,PETSC_NULL_INTEGER,ierr);CHKERRQ(ierr)
+<a name="line215">215: </a>      call MatGetOwnershipRange(fun,Istart,Iend,ierr);CHKERRQ(ierr)
+<a name="line216">216: </a>      h = ctx%h
+<a name="line217">217: </a>      c = ctx%kappa/(lambda-ctx%kappa)
+<a name="line218">218: </a>      d = n
+<a name="line219">219: </a>      one = 1
+<a name="line220">220: </a>      two = 2
+<a name="line221">221: </a>      three = 3
+
+<a name="line223">223: </a>!     ** Boundary points
+<a name="line224">224: </a>      <font color="#4169E1">if</font> (Istart .eq. 0) then
+<a name="line225">225: </a>        i = 0
+<a name="line226">226: </a>        j(1) = 0
+<a name="line227">227: </a>        j(2) = 1
+<a name="line228">228: </a>        A(1) = 2.0*(d-lambda*h/3.0)
+<a name="line229">229: </a>        A(2) = -d-lambda*h/6.0
+<a name="line230">230: </a>        call MatSetValues(fun,one,i,two,j,A,INSERT_VALUES,ierr);CHKERRQ(ierr)
+<a name="line231">231: </a>        Istart = Istart + 1
+<a name="line232">232: </a>      endif
+
+<a name="line234">234: </a>      <font color="#4169E1">if</font> (Iend .eq. n) then
+<a name="line235">235: </a>        i = n-1
+<a name="line236">236: </a>        j(1) = n-2
+<a name="line237">237: </a>        j(2) = n-1
+<a name="line238">238: </a>        A(1) = -d-lambda*h/6.0
+<a name="line239">239: </a>        A(2) = d-lambda*h/3.0+lambda*c
+<a name="line240">240: </a>        call MatSetValues(fun,one,i,two,j,A,INSERT_VALUES,ierr);CHKERRQ(ierr)
+<a name="line241">241: </a>        Iend = Iend - 1
+<a name="line242">242: </a>      endif
+
+<a name="line244">244: </a>!     ** Interior grid points
+<a name="line245">245: </a>      <font color="#4169E1">do</font> i=Istart,Iend-1
+<a name="line246">246: </a>        j(1) = i-1
+<a name="line247">247: </a>        j(2) = i
+<a name="line248">248: </a>        j(3) = i+1
+<a name="line249">249: </a>        A(1) = -d-lambda*h/6.0
+<a name="line250">250: </a>        A(2) = 2.0*(d-lambda*h/3.0)
+<a name="line251">251: </a>        A(3) = -d-lambda*h/6.0
+<a name="line252">252: </a>        call MatSetValues(fun,one,i,three,j,A,INSERT_VALUES,ierr);CHKERRQ(ierr)
+<a name="line253">253: </a>      enddo
+
+<a name="line255">255: </a>!     ** Assemble matrix
+<a name="line256">256: </a>      call MatAssemblyBegin(fun,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+<a name="line257">257: </a>      call MatAssemblyEnd(fun,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+<a name="line258">258: </a>      <font color="#4169E1">return</font>
+<a name="line259">259: </a>      end
+
+<a name="line261">261: </a>! ---------------  Evaluate Jacobian matrix  T'(lambda)  ---------------
+
+<a name="line263">263: </a>      subroutine FormJacobian(nep,lambda,jac,ctx,ierr)
+<a name="line264">264: </a>      use UserModule
+<a name="line265">265: </a>      implicit none
+<a name="line266">266: </a>      <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>            nep
+<a name="line267">267: </a>      PetscScalar    lambda, A(3), c
+<a name="line268">268: </a>      Mat            jac
+<a name="line269">269: </a>      type(User)     ctx
+<a name="line270">270: </a>      PetscReal      h
+<a name="line271">271: </a>      PetscInt       i, n, j(3), Istart, Iend, one, two, three
+<a name="line272">272: </a>      PetscErrorCode ierr
+
+<a name="line274">274: </a>!     ** Compute Jacobian entries and insert into matrix
+<a name="line275">275: </a>      call MatGetSize(jac,n,PETSC_NULL_INTEGER,ierr);CHKERRQ(ierr)
+<a name="line276">276: </a>      call MatGetOwnershipRange(jac,Istart,Iend,ierr);CHKERRQ(ierr)
+<a name="line277">277: </a>      h = ctx%h
+<a name="line278">278: </a>      c = ctx%kappa/(lambda-ctx%kappa)
+<a name="line279">279: </a>      one = 1
+<a name="line280">280: </a>      two = 2
+<a name="line281">281: </a>      three = 3
+
+<a name="line283">283: </a>!     ** Boundary points
+<a name="line284">284: </a>      <font color="#4169E1">if</font> (Istart .eq. 0) then
+<a name="line285">285: </a>        i = 0
+<a name="line286">286: </a>        j(1) = 0
+<a name="line287">287: </a>        j(2) = 1
+<a name="line288">288: </a>        A(1) = -2.0*h/3.0
+<a name="line289">289: </a>        A(2) = -h/6.0
+<a name="line290">290: </a>        call MatSetValues(jac,one,i,two,j,A,INSERT_VALUES,ierr);CHKERRQ(ierr)
+<a name="line291">291: </a>        Istart = Istart + 1
+<a name="line292">292: </a>      endif
+
+<a name="line294">294: </a>      <font color="#4169E1">if</font> (Iend .eq. n) then
+<a name="line295">295: </a>        i = n-1
+<a name="line296">296: </a>        j(1) = n-2
+<a name="line297">297: </a>        j(2) = n-1
+<a name="line298">298: </a>        A(1) = -h/6.0
+<a name="line299">299: </a>        A(2) = -h/3.0-c*c
+<a name="line300">300: </a>        call MatSetValues(jac,one,i,two,j,A,INSERT_VALUES,ierr);CHKERRQ(ierr)
+<a name="line301">301: </a>        Iend = Iend - 1
+<a name="line302">302: </a>      endif
+
+<a name="line304">304: </a>!     ** Interior grid points
+<a name="line305">305: </a>      <font color="#4169E1">do</font> i=Istart,Iend-1
+<a name="line306">306: </a>        j(1) = i-1
+<a name="line307">307: </a>        j(2) = i
+<a name="line308">308: </a>        j(3) = i+1
+<a name="line309">309: </a>        A(1) = -h/6.0
+<a name="line310">310: </a>        A(2) = -2.0*h/3.0
+<a name="line311">311: </a>        A(3) = -h/6.0
+<a name="line312">312: </a>        call MatSetValues(jac,one,i,three,j,A,INSERT_VALUES,ierr);CHKERRQ(ierr)
+<a name="line313">313: </a>      enddo
+
+<a name="line315">315: </a>!     ** Assemble matrix
+<a name="line316">316: </a>      call MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+<a name="line317">317: </a>      call MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+<a name="line318">318: </a>      <font color="#4169E1">return</font>
+<a name="line319">319: </a>      end
+
+<a name="line321">321: </a>!<font color="#B22222">/*TEST</font>
+<a name="line322">322: </a><font color="#B22222">!</font>
+<a name="line323">323: </a><font color="#B22222">!   test:</font>
+<a name="line324">324: </a><font color="#B22222">!      suffix: 1</font>
+<a name="line325">325: </a><font color="#B22222">!      args: -nep_target 4</font>
+<a name="line326">326: </a><font color="#B22222">!      filter: sed -e "s/[0-9]\.[0-9]*E-[0-9]*/</font>removed/g<font color="#666666">" -e "</font>s/ Number of <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> iterations = [ 0-9]*/ Number of <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> iterations = /<font color="#666666">"</font>
+<a name="line327">327: </a><font color="#666666">!      requires: !single</font>
+<a name="line328">328: </a><font color="#666666">!</font>
+<a name="line329">329: </a><font color="#666666">!TEST*/</font>
+</pre>
+</body>
+
+</html>

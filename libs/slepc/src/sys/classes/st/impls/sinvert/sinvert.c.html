@@ -1,0 +1,187 @@
+<center><a href="sinvert.c">Actual source code: sinvert.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/st/impls/sinvert/sinvert.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:47+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/st/impls/sinvert/sinvert.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Implements the shift-and-invert technique for eigenvalue problems</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/stimpl.h.html">&lt;slepc/private/stimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><strong><font color="#4169E1"><a name="STBackTransform_Sinvert"></a>PetscErrorCode STBackTransform_Sinvert(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt n,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line17"> 17: </a>{
+<a name="line18"> 18: </a>  PetscInt    j;
+<a name="line19"> 19: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line20"> 20: </a>  PetscScalar t;
+<a name="line21"> 21: </a><font color="#A020F0">#endif</font>
+
+<a name="line24"> 24: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line25"> 25: </a>  <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line26"> 26: </a>    <font color="#4169E1">if</font> (eigi[j] == 0) eigr[j] = 1.0 / eigr[j] + st-&gt;sigma;
+<a name="line27"> 27: </a>    <font color="#4169E1">else</font> {
+<a name="line28"> 28: </a>      t = eigr[j] * eigr[j] + eigi[j] * eigi[j];
+<a name="line29"> 29: </a>      eigr[j] = eigr[j] / t + st-&gt;sigma;
+<a name="line30"> 30: </a>      eigi[j] = - eigi[j] / t;
+<a name="line31"> 31: </a>    }
+<a name="line32"> 32: </a>  }
+<a name="line33"> 33: </a><font color="#A020F0">#else</font>
+<a name="line34"> 34: </a>  <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line35"> 35: </a>    eigr[j] = 1.0 / eigr[j] + st-&gt;sigma;
+<a name="line36"> 36: </a>  }
+<a name="line37"> 37: </a><font color="#A020F0">#endif</font>
+<a name="line38"> 38: </a>  <font color="#4169E1">return</font>(0);
+<a name="line39"> 39: </a>}
+
+<a name="line41"> 41: </a><strong><font color="#4169E1"><a name="STPostSolve_Sinvert"></a>PetscErrorCode STPostSolve_Sinvert(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line42"> 42: </a>{
+
+<a name="line46"> 46: </a>  <font color="#4169E1">if</font> (st-&gt;matmode == <a href="../../../../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_INPLACE</a>) {
+<a name="line47"> 47: </a>    <font color="#4169E1">if</font> (st-&gt;nmat&gt;1) {
+<a name="line48"> 48: </a>      MatAXPY(st-&gt;A[0],st-&gt;sigma,st-&gt;A[1],st-&gt;str);
+<a name="line49"> 49: </a>    } <font color="#4169E1">else</font> {
+<a name="line50"> 50: </a>      MatShift(st-&gt;A[0],st-&gt;sigma);
+<a name="line51"> 51: </a>    }
+<a name="line52"> 52: </a>    st-&gt;Astate[0] = ((PetscObject)st-&gt;A[0])-&gt;state;
+<a name="line53"> 53: </a>    st-&gt;state   = ST_STATE_INITIAL;
+<a name="line54"> 54: </a>    st-&gt;opready = PETSC_FALSE;
+<a name="line55"> 55: </a>  }
+<a name="line56"> 56: </a>  <font color="#4169E1">return</font>(0);
+<a name="line57"> 57: </a>}
+
+<a name="line59"> 59: </a><font color="#B22222">/*</font>
+<a name="line60"> 60: </a><font color="#B22222">   Operator (sinvert):</font>
+<a name="line61"> 61: </a><font color="#B22222">               Op               P         M</font>
+<a name="line62"> 62: </a><font color="#B22222">   if nmat=1:  (A-sI)^-1        A-sI      NULL</font>
+<a name="line63"> 63: </a><font color="#B22222">   if nmat=2:  (A-sB)^-1 B      A-sB      B</font>
+<a name="line64"> 64: </a><font color="#B22222">*/</font>
+<a name="line65"> 65: </a><strong><font color="#4169E1"><a name="STComputeOperator_Sinvert"></a>PetscErrorCode STComputeOperator_Sinvert(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line66"> 66: </a>{
+
+<a name="line70"> 70: </a>  <font color="#B22222">/* if the user did not set the shift, use the target value */</font>
+<a name="line71"> 71: </a>  <font color="#4169E1">if</font> (!st-&gt;sigma_set) st-&gt;sigma = st-&gt;defsigma;
+<a name="line72"> 72: </a>  PetscObjectReference((PetscObject)st-&gt;A[1]);
+<a name="line73"> 73: </a>  MatDestroy(&amp;st-&gt;T[0]);
+<a name="line74"> 74: </a>  st-&gt;T[0] = st-&gt;A[1];
+<a name="line75"> 75: </a>  STMatMAXPY_Private(st,-st-&gt;sigma,0.0,0,NULL,PetscNot(st-&gt;state==ST_STATE_UPDATED),&amp;st-&gt;T[1]);
+<a name="line76"> 76: </a>  PetscObjectReference((PetscObject)st-&gt;T[1]);
+<a name="line77"> 77: </a>  MatDestroy(&amp;st-&gt;P);
+<a name="line78"> 78: </a>  st-&gt;P = st-&gt;T[1];
+<a name="line79"> 79: </a>  st-&gt;M = (st-&gt;nmat&gt;1)? st-&gt;T[0]: NULL;
+<a name="line80"> 80: </a>  <font color="#4169E1">return</font>(0);
+<a name="line81"> 81: </a>}
+
+<a name="line83"> 83: </a><strong><font color="#4169E1"><a name="STSetUp_Sinvert"></a>PetscErrorCode STSetUp_Sinvert(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line84"> 84: </a>{
+<a name="line86"> 86: </a>  PetscInt       k,nc,nmat=st-&gt;nmat;
+<a name="line87"> 87: </a>  PetscScalar    *coeffs=NULL;
+
+<a name="line90"> 90: </a>  <font color="#4169E1">if</font> (nmat&gt;1) {
+<a name="line91"> 91: </a>    <a href="../../../../../../docs/manualpages/ST/STSetWorkVecs.html#STSetWorkVecs">STSetWorkVecs</a>(st,1);
+<a name="line92"> 92: </a>  }
+<a name="line93"> 93: </a>  <font color="#B22222">/* if the user did not set the shift, use the target value */</font>
+<a name="line94"> 94: </a>  <font color="#4169E1">if</font> (!st-&gt;sigma_set) st-&gt;sigma = st-&gt;defsigma;
+<a name="line95"> 95: </a>  <font color="#4169E1">if</font> (nmat&gt;2) {  <font color="#B22222">/* set-up matrices for polynomial eigenproblems */</font>
+<a name="line96"> 96: </a>    <font color="#4169E1">if</font> (st-&gt;transform) {
+<a name="line97"> 97: </a>      nc = (nmat*(nmat+1))/2;
+<a name="line98"> 98: </a>      PetscMalloc1(nc,&amp;coeffs);
+<a name="line99"> 99: </a>      <font color="#B22222">/* Compute coeffs */</font>
+<a name="line100">100: </a>      STCoeffs_Monomial(st,coeffs);
+<a name="line101">101: </a>      <font color="#B22222">/* T[0] = A_n */</font>
+<a name="line102">102: </a>      k = nmat-1;
+<a name="line103">103: </a>      PetscObjectReference((PetscObject)st-&gt;A[k]);
+<a name="line104">104: </a>      MatDestroy(&amp;st-&gt;T[0]);
+<a name="line105">105: </a>      st-&gt;T[0] = st-&gt;A[k];
+<a name="line106">106: </a>      <font color="#4169E1">for</font> (k=1;k&lt;nmat;k++) {
+<a name="line107">107: </a>        STMatMAXPY_Private(st,nmat&gt;2?st-&gt;sigma:-st-&gt;sigma,0.0,nmat-k-1,coeffs?coeffs+(k*(k+1))/2:NULL,PetscNot(st-&gt;state==ST_STATE_UPDATED),&amp;st-&gt;T[k]);
+<a name="line108">108: </a>      }
+<a name="line109">109: </a>      PetscFree(coeffs);
+<a name="line110">110: </a>      PetscObjectReference((PetscObject)st-&gt;T[nmat-1]);
+<a name="line111">111: </a>      MatDestroy(&amp;st-&gt;P);
+<a name="line112">112: </a>      st-&gt;P = st-&gt;T[nmat-1];
+<a name="line113">113: </a>      <font color="#4169E1">if</font> (!st-&gt;ksp) { <a href="../../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;st-&gt;ksp); }
+<a name="line114">114: </a>      STCheckFactorPackage(st);
+<a name="line115">115: </a>      KSPSetOperators(st-&gt;ksp,st-&gt;P,st-&gt;P);
+<a name="line116">116: </a>    } <font color="#4169E1">else</font> {
+<a name="line117">117: </a>      <font color="#4169E1">for</font> (k=0;k&lt;nmat;k++) {
+<a name="line118">118: </a>        PetscObjectReference((PetscObject)st-&gt;A[k]);
+<a name="line119">119: </a>        MatDestroy(&amp;st-&gt;T[k]);
+<a name="line120">120: </a>        st-&gt;T[k] = st-&gt;A[k];
+<a name="line121">121: </a>      }
+<a name="line122">122: </a>    }
+<a name="line123">123: </a>  }
+<a name="line124">124: </a>  <font color="#4169E1">if</font> (st-&gt;P) {
+<a name="line125">125: </a>    KSPSetUp(st-&gt;ksp);
+<a name="line126">126: </a>  }
+<a name="line127">127: </a>  <font color="#4169E1">return</font>(0);
+<a name="line128">128: </a>}
+
+<a name="line130">130: </a><strong><font color="#4169E1"><a name="STSetShift_Sinvert"></a>PetscErrorCode STSetShift_Sinvert(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscScalar newshift)</font></strong>
+<a name="line131">131: </a>{
+<a name="line133">133: </a>  PetscInt       nmat=PetscMax(st-&gt;nmat,2),k,nc;
+<a name="line134">134: </a>  PetscScalar    *coeffs=NULL;
+
+<a name="line137">137: </a>  <font color="#4169E1">if</font> (st-&gt;transform) {
+<a name="line138">138: </a>    <font color="#4169E1">if</font> (st-&gt;matmode == <a href="../../../../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_COPY</a> &amp;&amp; nmat&gt;2) {
+<a name="line139">139: </a>      nc = (nmat*(nmat+1))/2;
+<a name="line140">140: </a>      PetscMalloc1(nc,&amp;coeffs);
+<a name="line141">141: </a>      <font color="#B22222">/* Compute coeffs */</font>
+<a name="line142">142: </a>      STCoeffs_Monomial(st,coeffs);
+<a name="line143">143: </a>    }
+<a name="line144">144: </a>    <font color="#4169E1">for</font> (k=1;k&lt;nmat;k++) {
+<a name="line145">145: </a>      STMatMAXPY_Private(st,nmat&gt;2?newshift:-newshift,nmat&gt;2?st-&gt;sigma:-st-&gt;sigma,nmat-k-1,coeffs?coeffs+(k*(k+1))/2:NULL,PETSC_FALSE,&amp;st-&gt;T[k]);
+<a name="line146">146: </a>    }
+<a name="line147">147: </a>    <font color="#4169E1">if</font> (st-&gt;matmode == <a href="../../../../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_COPY</a> &amp;&amp; nmat&gt;2) {
+<a name="line148">148: </a>      PetscFree(coeffs);
+<a name="line149">149: </a>    }
+<a name="line150">150: </a>    <font color="#4169E1">if</font> (st-&gt;P!=st-&gt;T[nmat-1]) {
+<a name="line151">151: </a>      PetscObjectReference((PetscObject)st-&gt;T[nmat-1]);
+<a name="line152">152: </a>      MatDestroy(&amp;st-&gt;P);
+<a name="line153">153: </a>      st-&gt;P = st-&gt;T[nmat-1];
+<a name="line154">154: </a>    }
+<a name="line155">155: </a>  }
+<a name="line156">156: </a>  <font color="#4169E1">if</font> (st-&gt;P) {
+<a name="line157">157: </a>    <font color="#4169E1">if</font> (!st-&gt;ksp) { <a href="../../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;st-&gt;ksp); }
+<a name="line158">158: </a>    KSPSetOperators(st-&gt;ksp,st-&gt;P,st-&gt;P);
+<a name="line159">159: </a>    KSPSetUp(st-&gt;ksp);
+<a name="line160">160: </a>  }
+<a name="line161">161: </a>  <font color="#4169E1">return</font>(0);
+<a name="line162">162: </a>}
+
+<a name="line164">164: </a><strong><font color="#4169E1"><a name="STCreate_Sinvert"></a>SLEPC_EXTERN PetscErrorCode STCreate_Sinvert(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line165">165: </a>{
+<a name="line167">167: </a>  st-&gt;usesksp = PETSC_TRUE;
+
+<a name="line169">169: </a>  st-&gt;ops-&gt;apply           = STApply_Generic;
+<a name="line170">170: </a>  st-&gt;ops-&gt;applytrans      = STApplyTranspose_Generic;
+<a name="line171">171: </a>  st-&gt;ops-&gt;backtransform   = STBackTransform_Sinvert;
+<a name="line172">172: </a>  st-&gt;ops-&gt;setshift        = STSetShift_Sinvert;
+<a name="line173">173: </a>  st-&gt;ops-&gt;getbilinearform = STGetBilinearForm_Default;
+<a name="line174">174: </a>  st-&gt;ops-&gt;setup           = STSetUp_Sinvert;
+<a name="line175">175: </a>  st-&gt;ops-&gt;computeoperator = STComputeOperator_Sinvert;
+<a name="line176">176: </a>  st-&gt;ops-&gt;postsolve       = STPostSolve_Sinvert;
+<a name="line177">177: </a>  st-&gt;ops-&gt;checknullspace  = STCheckNullSpace_Default;
+<a name="line178">178: </a>  st-&gt;ops-&gt;setdefaultksp   = STSetDefaultKSP_Default;
+<a name="line179">179: </a>  <font color="#4169E1">return</font>(0);
+<a name="line180">180: </a>}
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,405 @@
+<center><a href="gklanczos.c">Actual source code: gklanczos.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/svd/impls/lanczos/gklanczos.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:01+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/svd/impls/lanczos/gklanczos.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc singular value solver: "lanczos"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Explicitly restarted Lanczos</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       Golub-Kahan-Lanczos bidiagonalization with explicit restart.</font>
+
+<a name="line19"> 19: </a><font color="#B22222">   References:</font>
+
+<a name="line21"> 21: </a><font color="#B22222">       [1] G.H. Golub and W. Kahan, "Calculating the singular values</font>
+<a name="line22"> 22: </a><font color="#B22222">           and pseudo-inverse of a matrix", SIAM J. Numer. Anal. Ser.</font>
+<a name="line23"> 23: </a><font color="#B22222">           B 2:205-224, 1965.</font>
+
+<a name="line25"> 25: </a><font color="#B22222">       [2] V. Hernandez, J.E. Roman, and A. Tomas, "A robust and</font>
+<a name="line26"> 26: </a><font color="#B22222">           efficient parallel <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> solver based on restarted Lanczos</font>
+<a name="line27"> 27: </a><font color="#B22222">           bidiagonalization", Elec. Trans. Numer. Anal. 31:68-85,</font>
+<a name="line28"> 28: </a><font color="#B22222">           2008.</font>
+<a name="line29"> 29: </a><font color="#B22222">*/</font>
+
+<a name="line31"> 31: </a> #include <A href="../../../../include/slepc/private/svdimpl.h.html">&lt;slepc/private/svdimpl.h&gt;</A>
+
+<a name="line33"> 33: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line34"> 34: </a>  PetscBool oneside;
+<a name="line35"> 35: </a>} SVD_LANCZOS;
+
+<a name="line37"> 37: </a><strong><font color="#4169E1"><a name="SVDSetUp_Lanczos"></a>PetscErrorCode SVDSetUp_Lanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line38"> 38: </a>{
+<a name="line40"> 40: </a>  SVD_LANCZOS    *lanczos = (SVD_LANCZOS*)svd-&gt;data;
+<a name="line41"> 41: </a>  PetscInt       N;
+
+<a name="line44"> 44: </a>  SVDMatGetSize(svd,NULL,&amp;N);
+<a name="line45"> 45: </a>  SVDSetDimensions_Default(svd);
+<a name="line46"> 46: </a>  <font color="#4169E1">if</font> (svd-&gt;ncv&gt;svd-&gt;nsv+svd-&gt;mpd) SETERRQ(PetscObjectComm((PetscObject)svd),1,<font color="#666666">"The value of ncv must not be larger than nev+mpd"</font>);
+<a name="line47"> 47: </a>  <font color="#4169E1">if</font> (svd-&gt;max_it==PETSC_DEFAULT) svd-&gt;max_it = PetscMax(N/svd-&gt;ncv,100);
+<a name="line48"> 48: </a>  svd-&gt;leftbasis = PetscNot(lanczos-&gt;oneside);
+<a name="line49"> 49: </a>  <a href="../../../../docs/manualpages/SVD/SVDAllocateSolution.html#SVDAllocateSolution">SVDAllocateSolution</a>(svd,1);
+<a name="line50"> 50: </a>  <a href="../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(svd-&gt;ds,DSSVD);
+<a name="line51"> 51: </a>  <a href="../../../../docs/manualpages/DS/DSSetCompact.html#DSSetCompact">DSSetCompact</a>(svd-&gt;ds,PETSC_TRUE);
+<a name="line52"> 52: </a>  <a href="../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(svd-&gt;ds,svd-&gt;ncv);
+<a name="line53"> 53: </a>  <font color="#4169E1">return</font>(0);
+<a name="line54"> 54: </a>}
+
+<a name="line56"> 56: </a><strong><font color="#4169E1"><a name="SVDTwoSideLanczos"></a>PetscErrorCode SVDTwoSideLanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscReal *alpha,PetscReal *beta,<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> U,PetscInt k,PetscInt n)</font></strong>
+<a name="line57"> 57: </a>{
+<a name="line59"> 59: </a>  PetscInt       i;
+<a name="line60"> 60: </a>  Vec            u,v;
+
+<a name="line63"> 63: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;V,k,&amp;v);
+<a name="line64"> 64: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;U,k,&amp;u);
+<a name="line65"> 65: </a>  SVDMatMult(svd,PETSC_FALSE,v,u);
+<a name="line66"> 66: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;V,k,&amp;v);
+<a name="line67"> 67: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;U,k,&amp;u);
+<a name="line68"> 68: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(svd-&gt;U,k,NULL,alpha+k,NULL);
+<a name="line69"> 69: </a>  <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(U,k,1.0/alpha[k]);
+
+<a name="line71"> 71: </a>  <font color="#4169E1">for</font> (i=k+1;i&lt;n;i++) {
+<a name="line72"> 72: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;V,i,&amp;v);
+<a name="line73"> 73: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;U,i-1,&amp;u);
+<a name="line74"> 74: </a>    SVDMatMult(svd,PETSC_TRUE,u,v);
+<a name="line75"> 75: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;V,i,&amp;v);
+<a name="line76"> 76: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;U,i-1,&amp;u);
+<a name="line77"> 77: </a>    <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(svd-&gt;V,i,NULL,beta+i-1,NULL);
+<a name="line78"> 78: </a>    <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(V,i,1.0/beta[i-1]);
+
+<a name="line80"> 80: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;V,i,&amp;v);
+<a name="line81"> 81: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;U,i,&amp;u);
+<a name="line82"> 82: </a>    SVDMatMult(svd,PETSC_FALSE,v,u);
+<a name="line83"> 83: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;V,i,&amp;v);
+<a name="line84"> 84: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;U,i,&amp;u);
+<a name="line85"> 85: </a>    <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(svd-&gt;U,i,NULL,alpha+i,NULL);
+<a name="line86"> 86: </a>    <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(U,i,1.0/alpha[i]);
+<a name="line87"> 87: </a>  }
+
+<a name="line89"> 89: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;V,n,&amp;v);
+<a name="line90"> 90: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;U,n-1,&amp;u);
+<a name="line91"> 91: </a>  SVDMatMult(svd,PETSC_TRUE,u,v);
+<a name="line92"> 92: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;V,n,&amp;v);
+<a name="line93"> 93: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;U,n-1,&amp;u);
+<a name="line94"> 94: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(svd-&gt;V,n,NULL,beta+n-1,NULL);
+<a name="line95"> 95: </a>  <font color="#4169E1">return</font>(0);
+<a name="line96"> 96: </a>}
+
+<a name="line98"> 98: </a><strong><font color="#4169E1"><a name="SVDOneSideLanczos"></a>static PetscErrorCode SVDOneSideLanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscReal *alpha,PetscReal *beta,<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Vec u,Vec u_1,PetscInt k,PetscInt n,PetscScalar* work)</font></strong>
+<a name="line99"> 99: </a>{
+<a name="line101">101: </a>  PetscInt       i,bvl,bvk;
+<a name="line102">102: </a>  PetscReal      a,b;
+<a name="line103">103: </a>  Vec            z,temp;
+
+<a name="line106">106: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(V,&amp;bvl,&amp;bvk);
+<a name="line107">107: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,k,&amp;z);
+<a name="line108">108: </a>  SVDMatMult(svd,PETSC_FALSE,z,u);
+<a name="line109">109: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,k,&amp;z);
+
+<a name="line111">111: </a>  <font color="#4169E1">for</font> (i=k+1;i&lt;n;i++) {
+<a name="line112">112: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,i,&amp;z);
+<a name="line113">113: </a>    SVDMatMult(svd,PETSC_TRUE,u,z);
+<a name="line114">114: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,i,&amp;z);
+<a name="line115">115: </a>    VecNormBegin(u,NORM_2,&amp;a);
+<a name="line116">116: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,0,i);
+<a name="line117">117: </a>    <a href="../../../../docs/manualpages/BV/BVDotColumnBegin.html#BVDotColumnBegin">BVDotColumnBegin</a>(V,i,work);
+<a name="line118">118: </a>    VecNormEnd(u,NORM_2,&amp;a);
+<a name="line119">119: </a>    <a href="../../../../docs/manualpages/BV/BVDotColumnEnd.html#BVDotColumnEnd">BVDotColumnEnd</a>(V,i,work);
+<a name="line120">120: </a>    VecScale(u,1.0/a);
+<a name="line121">121: </a>    <a href="../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(V,-1.0/a,1.0/a,i,work);
+
+<a name="line123">123: </a>    <font color="#B22222">/* h = V^* z, z = z - V h  */</font>
+<a name="line124">124: </a>    <a href="../../../../docs/manualpages/BV/BVDotColumn.html#BVDotColumn">BVDotColumn</a>(V,i,work);
+<a name="line125">125: </a>    <a href="../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(V,-1.0,1.0,i,work);
+<a name="line126">126: </a>    <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(V,i,NORM_2,&amp;b);
+<a name="line127">127: </a>    <font color="#4169E1">if</font> (PetscAbsReal(b)&lt;10*PETSC_MACHINE_EPSILON) SETERRQ(PetscObjectComm((PetscObject)svd),1,<font color="#666666">"Recurrence generated a zero vector; use a two-sided variant"</font>);
+<a name="line128">128: </a>    <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(V,i,1.0/b);
+
+<a name="line130">130: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,i,&amp;z);
+<a name="line131">131: </a>    SVDMatMult(svd,PETSC_FALSE,z,u_1);
+<a name="line132">132: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,i,&amp;z);
+<a name="line133">133: </a>    VecAXPY(u_1,-b,u);
+<a name="line134">134: </a>    alpha[i-1] = a;
+<a name="line135">135: </a>    beta[i-1] = b;
+<a name="line136">136: </a>    temp = u;
+<a name="line137">137: </a>    u = u_1;
+<a name="line138">138: </a>    u_1 = temp;
+<a name="line139">139: </a>  }
+
+<a name="line141">141: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,n,&amp;z);
+<a name="line142">142: </a>  SVDMatMult(svd,PETSC_TRUE,u,z);
+<a name="line143">143: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,n,&amp;z);
+<a name="line144">144: </a>  VecNormBegin(u,NORM_2,&amp;a);
+<a name="line145">145: </a>  <a href="../../../../docs/manualpages/BV/BVDotColumnBegin.html#BVDotColumnBegin">BVDotColumnBegin</a>(V,n,work);
+<a name="line146">146: </a>  VecNormEnd(u,NORM_2,&amp;a);
+<a name="line147">147: </a>  <a href="../../../../docs/manualpages/BV/BVDotColumnEnd.html#BVDotColumnEnd">BVDotColumnEnd</a>(V,n,work);
+<a name="line148">148: </a>  VecScale(u,1.0/a);
+<a name="line149">149: </a>  <a href="../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(V,-1.0/a,1.0/a,n,work);
+
+<a name="line151">151: </a>  <font color="#B22222">/* h = V^* z, z = z - V h  */</font>
+<a name="line152">152: </a>  <a href="../../../../docs/manualpages/BV/BVDotColumn.html#BVDotColumn">BVDotColumn</a>(V,n,work);
+<a name="line153">153: </a>  <a href="../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(V,-1.0,1.0,n,work);
+<a name="line154">154: </a>  <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(V,i,NORM_2,&amp;b);
+
+<a name="line156">156: </a>  alpha[n-1] = a;
+<a name="line157">157: </a>  beta[n-1] = b;
+<a name="line158">158: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,bvl,bvk);
+<a name="line159">159: </a>  <font color="#4169E1">return</font>(0);
+<a name="line160">160: </a>}
+
+<a name="line162">162: </a><strong><font color="#4169E1"><a name="SVDSolve_Lanczos"></a>PetscErrorCode SVDSolve_Lanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line163">163: </a>{
+<a name="line165">165: </a>  SVD_LANCZOS    *lanczos = (SVD_LANCZOS*)svd-&gt;data;
+<a name="line166">166: </a>  PetscReal      *alpha,*beta,lastbeta,norm,resnorm;
+<a name="line167">167: </a>  PetscScalar    *swork,*w,*Q,*PT;
+<a name="line168">168: </a>  PetscInt       i,k,j,nv,ld;
+<a name="line169">169: </a>  Vec            u=0,u_1=0;
+<a name="line170">170: </a>  Mat            U,VT;
+<a name="line171">171: </a>  PetscBool      conv;
+
+<a name="line174">174: </a>  <font color="#B22222">/* allocate working space */</font>
+<a name="line175">175: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(svd-&gt;ds,&amp;ld);
+<a name="line176">176: </a>  PetscMalloc2(ld,&amp;w,svd-&gt;ncv,&amp;swork);
+
+<a name="line178">178: </a>  <font color="#4169E1">if</font> (lanczos-&gt;oneside) {
+<a name="line179">179: </a>    SVDMatCreateVecs(svd,NULL,&amp;u);
+<a name="line180">180: </a>    SVDMatCreateVecs(svd,NULL,&amp;u_1);
+<a name="line181">181: </a>  }
+
+<a name="line183">183: </a>  <font color="#B22222">/* normalize start vector */</font>
+<a name="line184">184: </a>  <font color="#4169E1">if</font> (!svd-&gt;nini) {
+<a name="line185">185: </a>    <a href="../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(svd-&gt;V,0);
+<a name="line186">186: </a>    <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(svd-&gt;V,0,NORM_2,&amp;norm);
+<a name="line187">187: </a>    <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(svd-&gt;V,0,1.0/norm);
+<a name="line188">188: </a>  }
+
+<a name="line190">190: </a>  <font color="#4169E1">while</font> (svd-&gt;reason == <a href="../../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVD_CONVERGED_ITERATING</a>) {
+<a name="line191">191: </a>    svd-&gt;its++;
+
+<a name="line193">193: </a>    <font color="#B22222">/* inner loop */</font>
+<a name="line194">194: </a>    nv = PetscMin(svd-&gt;nconv+svd-&gt;mpd,svd-&gt;ncv);
+<a name="line195">195: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(svd-&gt;V,svd-&gt;nconv,nv);
+<a name="line196">196: </a>    <a href="../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>,&amp;alpha);
+<a name="line197">197: </a>    beta = alpha + ld;
+<a name="line198">198: </a>    <font color="#4169E1">if</font> (lanczos-&gt;oneside) {
+<a name="line199">199: </a>      SVDOneSideLanczos(svd,alpha,beta,svd-&gt;V,u,u_1,svd-&gt;nconv,nv,swork);
+<a name="line200">200: </a>    } <font color="#4169E1">else</font> {
+<a name="line201">201: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(svd-&gt;U,svd-&gt;nconv,nv);
+<a name="line202">202: </a>      SVDTwoSideLanczos(svd,alpha,beta,svd-&gt;V,svd-&gt;U,svd-&gt;nconv,nv);
+<a name="line203">203: </a>    }
+<a name="line204">204: </a>    lastbeta = beta[nv-1];
+<a name="line205">205: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>,&amp;alpha);
+
+<a name="line207">207: </a>    <font color="#B22222">/* compute <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> of bidiagonal matrix */</font>
+<a name="line208">208: </a>    <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(svd-&gt;ds,nv,nv,svd-&gt;nconv,0);
+<a name="line209">209: </a>    <a href="../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>);
+<a name="line210">210: </a>    <a href="../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(svd-&gt;ds,w,NULL);
+<a name="line211">211: </a>    <a href="../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(svd-&gt;ds,w,NULL,NULL,NULL,NULL);
+<a name="line212">212: </a>    <a href="../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(svd-&gt;ds,w,NULL);
+
+<a name="line214">214: </a>    <font color="#B22222">/* compute error estimates */</font>
+<a name="line215">215: </a>    k = 0;
+<a name="line216">216: </a>    conv = PETSC_TRUE;
+<a name="line217">217: </a>    <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_U</a>,&amp;Q);
+<a name="line218">218: </a>    <font color="#4169E1">for</font> (i=svd-&gt;nconv;i&lt;nv;i++) {
+<a name="line219">219: </a>      svd-&gt;sigma[i] = PetscRealPart(w[i]);
+<a name="line220">220: </a>      resnorm = PetscAbsScalar(Q[nv-1+i*ld])*lastbeta;
+<a name="line221">221: </a>      (*svd-&gt;converged)(svd,svd-&gt;sigma[i],resnorm,&amp;svd-&gt;errest[i],svd-&gt;convergedctx);
+<a name="line222">222: </a>      <font color="#4169E1">if</font> (conv) {
+<a name="line223">223: </a>        <font color="#4169E1">if</font> (svd-&gt;errest[i] &lt; svd-&gt;tol) k++;
+<a name="line224">224: </a>        <font color="#4169E1">else</font> conv = PETSC_FALSE;
+<a name="line225">225: </a>      }
+<a name="line226">226: </a>    }
+<a name="line227">227: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_U</a>,&amp;Q);
+
+<a name="line229">229: </a>    <font color="#B22222">/* check convergence */</font>
+<a name="line230">230: </a>    (*svd-&gt;stopping)(svd,svd-&gt;its,svd-&gt;max_it,svd-&gt;nconv+k,svd-&gt;nsv,&amp;svd-&gt;reason,svd-&gt;stoppingctx);
+
+<a name="line232">232: </a>    <font color="#B22222">/* compute restart vector */</font>
+<a name="line233">233: </a>    <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_VT</a>,&amp;PT);
+<a name="line234">234: </a>    <font color="#4169E1">if</font> (svd-&gt;reason == <a href="../../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVD_CONVERGED_ITERATING</a>) {
+<a name="line235">235: </a>      <font color="#4169E1">if</font> (k&lt;nv-svd-&gt;nconv) {
+<a name="line236">236: </a>        <font color="#4169E1">for</font> (j=svd-&gt;nconv;j&lt;nv;j++) swork[j-svd-&gt;nconv] = PT[k+svd-&gt;nconv+j*ld];
+<a name="line237">237: </a>        <a href="../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(svd-&gt;V,1.0,0.0,nv,swork);
+<a name="line238">238: </a>      } <font color="#4169E1">else</font> {
+<a name="line239">239: </a>        <font color="#B22222">/* all approximations have converged, generate a new initial vector */</font>
+<a name="line240">240: </a>        <a href="../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(svd-&gt;V,nv);
+<a name="line241">241: </a>        <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(svd-&gt;V,nv,NULL,&amp;norm,NULL);
+<a name="line242">242: </a>        <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(svd-&gt;V,nv,1.0/norm);
+<a name="line243">243: </a>      }
+<a name="line244">244: </a>    }
+<a name="line245">245: </a>    <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_VT</a>,&amp;PT);
+
+<a name="line247">247: </a>    <font color="#B22222">/* compute converged singular vectors */</font>
+<a name="line248">248: </a>    <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_VT</a>,&amp;VT);
+<a name="line249">249: </a>    <a href="../../../../docs/manualpages/BV/BVMultInPlaceTranspose.html#BVMultInPlaceTranspose">BVMultInPlaceTranspose</a>(svd-&gt;V,VT,svd-&gt;nconv,svd-&gt;nconv+k);
+<a name="line250">250: </a>    MatDestroy(&amp;VT);
+<a name="line251">251: </a>    <font color="#4169E1">if</font> (!lanczos-&gt;oneside) {
+<a name="line252">252: </a>      <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(svd-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_U</a>,&amp;U);
+<a name="line253">253: </a>      <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(svd-&gt;U,U,svd-&gt;nconv,svd-&gt;nconv+k);
+<a name="line254">254: </a>      MatDestroy(&amp;U);
+<a name="line255">255: </a>    }
+
+<a name="line257">257: </a>    <font color="#B22222">/* copy restart vector from the last column */</font>
+<a name="line258">258: </a>    <font color="#4169E1">if</font> (svd-&gt;reason == <a href="../../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVD_CONVERGED_ITERATING</a>) {
+<a name="line259">259: </a>      <a href="../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(svd-&gt;V,nv,svd-&gt;nconv+k);
+<a name="line260">260: </a>    }
+
+<a name="line262">262: </a>    svd-&gt;nconv += k;
+<a name="line263">263: </a>    SVDMonitor(svd,svd-&gt;its,svd-&gt;nconv,svd-&gt;sigma,svd-&gt;errest,nv);
+<a name="line264">264: </a>  }
+
+<a name="line266">266: </a>  <font color="#B22222">/* free working space */</font>
+<a name="line267">267: </a>  VecDestroy(&amp;u);
+<a name="line268">268: </a>  VecDestroy(&amp;u_1);
+<a name="line269">269: </a>  PetscFree2(w,swork);
+<a name="line270">270: </a>  <font color="#4169E1">return</font>(0);
+<a name="line271">271: </a>}
+
+<a name="line273">273: </a><strong><font color="#4169E1"><a name="SVDSetFromOptions_Lanczos"></a>PetscErrorCode SVDSetFromOptions_Lanczos(PetscOptionItems *PetscOptionsObject,<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line274">274: </a>{
+<a name="line276">276: </a>  PetscBool      set,val;
+<a name="line277">277: </a>  SVD_LANCZOS    *lanczos = (SVD_LANCZOS*)svd-&gt;data;
+
+<a name="line280">280: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> Lanczos Options"</font>);
+
+<a name="line282">282: </a>    PetscOptionsBool(<font color="#666666">"-svd_lanczos_oneside"</font>,<font color="#666666">"Use one-side reorthogonalization"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/SVD/SVDLanczosSetOneSide.html#SVDLanczosSetOneSide">SVDLanczosSetOneSide</a>"</font>,lanczos-&gt;oneside,&amp;val,&amp;set);
+<a name="line283">283: </a>    <font color="#4169E1">if</font> (set) { <a href="../../../../docs/manualpages/SVD/SVDLanczosSetOneSide.html#SVDLanczosSetOneSide">SVDLanczosSetOneSide</a>(svd,val); }
+
+<a name="line285">285: </a>  PetscOptionsTail();
+<a name="line286">286: </a>  <font color="#4169E1">return</font>(0);
+<a name="line287">287: </a>}
+
+<a name="line289">289: </a><strong><font color="#4169E1"><a name="SVDLanczosSetOneSide_Lanczos"></a>static PetscErrorCode SVDLanczosSetOneSide_Lanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool oneside)</font></strong>
+<a name="line290">290: </a>{
+<a name="line291">291: </a>  SVD_LANCZOS *lanczos = (SVD_LANCZOS*)svd-&gt;data;
+
+<a name="line294">294: </a>  <font color="#4169E1">if</font> (lanczos-&gt;oneside != oneside) {
+<a name="line295">295: </a>    lanczos-&gt;oneside = oneside;
+<a name="line296">296: </a>    svd-&gt;state = SVD_STATE_INITIAL;
+<a name="line297">297: </a>  }
+<a name="line298">298: </a>  <font color="#4169E1">return</font>(0);
+<a name="line299">299: </a>}
+
+<a name="line301">301: </a><font color="#B22222">/*@</font>
+<a name="line302">302: </a><font color="#B22222">   <a href="../../../../docs/manualpages/SVD/SVDLanczosSetOneSide.html#SVDLanczosSetOneSide">SVDLanczosSetOneSide</a> - Indicate if the variant of the Lanczos method</font>
+<a name="line303">303: </a><font color="#B22222">   to be used is one-sided or two-sided.</font>
+
+<a name="line305">305: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line307">307: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line308">308: </a><font color="#B22222">+  svd     - singular value solver</font>
+<a name="line309">309: </a><font color="#B22222">-  oneside - boolean flag indicating if the method is one-sided or not</font>
+
+<a name="line311">311: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line312">312: </a><font color="#B22222">.  -svd_lanczos_oneside &lt;boolean&gt; - Indicates the boolean flag</font>
+
+<a name="line314">314: </a><font color="#B22222">   Note:</font>
+<a name="line315">315: </a><font color="#B22222">   By default, a two-sided variant is selected, which is sometimes slightly</font>
+<a name="line316">316: </a><font color="#B22222">   more robust. However, the one-sided variant is faster because it avoids</font>
+<a name="line317">317: </a><font color="#B22222">   the orthogonalization associated to left singular vectors. It also saves</font>
+<a name="line318">318: </a><font color="#B22222">   the memory required for storing such vectors.</font>
+
+<a name="line320">320: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line322">322: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/SVD/SVDTRLanczosSetOneSide.html#SVDTRLanczosSetOneSide">SVDTRLanczosSetOneSide</a>()</font>
+<a name="line323">323: </a><font color="#B22222">@*/</font>
+<a name="line324">324: </a><strong><font color="#4169E1"><a name="SVDLanczosSetOneSide"></a>PetscErrorCode <a href="../../../../docs/manualpages/SVD/SVDLanczosSetOneSide.html#SVDLanczosSetOneSide">SVDLanczosSetOneSide</a>(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool oneside)</font></strong>
+<a name="line325">325: </a>{
+
+<a name="line331">331: </a>  PetscTryMethod(svd,<font color="#666666">"SVDLanczosSetOneSide_C"</font>,(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscBool),(svd,oneside));
+<a name="line332">332: </a>  <font color="#4169E1">return</font>(0);
+<a name="line333">333: </a>}
+
+<a name="line335">335: </a><strong><font color="#4169E1"><a name="SVDLanczosGetOneSide_Lanczos"></a>static PetscErrorCode SVDLanczosGetOneSide_Lanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool *oneside)</font></strong>
+<a name="line336">336: </a>{
+<a name="line337">337: </a>  SVD_LANCZOS *lanczos = (SVD_LANCZOS*)svd-&gt;data;
+
+<a name="line340">340: </a>  *oneside = lanczos-&gt;oneside;
+<a name="line341">341: </a>  <font color="#4169E1">return</font>(0);
+<a name="line342">342: </a>}
+
+<a name="line344">344: </a><font color="#B22222">/*@</font>
+<a name="line345">345: </a><font color="#B22222">   <a href="../../../../docs/manualpages/SVD/SVDLanczosGetOneSide.html#SVDLanczosGetOneSide">SVDLanczosGetOneSide</a> - Gets if the variant of the Lanczos method</font>
+<a name="line346">346: </a><font color="#B22222">   to be used is one-sided or two-sided.</font>
+
+<a name="line348">348: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line350">350: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line351">351: </a><font color="#B22222">.  svd     - singular value solver</font>
+
+<a name="line353">353: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line354">354: </a><font color="#B22222">.  oneside - boolean flag indicating if the method is one-sided or not</font>
+
+<a name="line356">356: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line358">358: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/SVD/SVDLanczosSetOneSide.html#SVDLanczosSetOneSide">SVDLanczosSetOneSide</a>()</font>
+<a name="line359">359: </a><font color="#B22222">@*/</font>
+<a name="line360">360: </a><strong><font color="#4169E1"><a name="SVDLanczosGetOneSide"></a>PetscErrorCode <a href="../../../../docs/manualpages/SVD/SVDLanczosGetOneSide.html#SVDLanczosGetOneSide">SVDLanczosGetOneSide</a>(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool *oneside)</font></strong>
+<a name="line361">361: </a>{
+
+<a name="line367">367: </a>  PetscUseMethod(svd,<font color="#666666">"SVDLanczosGetOneSide_C"</font>,(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscBool*),(svd,oneside));
+<a name="line368">368: </a>  <font color="#4169E1">return</font>(0);
+<a name="line369">369: </a>}
+
+<a name="line371">371: </a><strong><font color="#4169E1"><a name="SVDDestroy_Lanczos"></a>PetscErrorCode SVDDestroy_Lanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line372">372: </a>{
+
+<a name="line376">376: </a>  PetscFree(svd-&gt;data);
+<a name="line377">377: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDLanczosSetOneSide_C"</font>,NULL);
+<a name="line378">378: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDLanczosGetOneSide_C"</font>,NULL);
+<a name="line379">379: </a>  <font color="#4169E1">return</font>(0);
+<a name="line380">380: </a>}
+
+<a name="line382">382: </a><strong><font color="#4169E1"><a name="SVDView_Lanczos"></a>PetscErrorCode SVDView_Lanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscViewer viewer)</font></strong>
+<a name="line383">383: </a>{
+<a name="line385">385: </a>  SVD_LANCZOS    *lanczos = (SVD_LANCZOS*)svd-&gt;data;
+<a name="line386">386: </a>  PetscBool      isascii;
+
+<a name="line389">389: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line390">390: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line391">391: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  %s-sided reorthogonalization\n"</font>,lanczos-&gt;oneside? <font color="#666666">"one"</font>: <font color="#666666">"two"</font>);
+<a name="line392">392: </a>  }
+<a name="line393">393: </a>  <font color="#4169E1">return</font>(0);
+<a name="line394">394: </a>}
+
+<a name="line396">396: </a><strong><font color="#4169E1"><a name="SVDCreate_Lanczos"></a>SLEPC_EXTERN PetscErrorCode SVDCreate_Lanczos(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line397">397: </a>{
+<a name="line399">399: </a>  SVD_LANCZOS    *ctx;
+
+<a name="line402">402: </a>  PetscNewLog(svd,&amp;ctx);
+<a name="line403">403: </a>  svd-&gt;data = (void*)ctx;
+
+<a name="line405">405: </a>  svd-&gt;ops-&gt;setup          = SVDSetUp_Lanczos;
+<a name="line406">406: </a>  svd-&gt;ops-&gt;solve          = SVDSolve_Lanczos;
+<a name="line407">407: </a>  svd-&gt;ops-&gt;destroy        = SVDDestroy_Lanczos;
+<a name="line408">408: </a>  svd-&gt;ops-&gt;setfromoptions = SVDSetFromOptions_Lanczos;
+<a name="line409">409: </a>  svd-&gt;ops-&gt;view           = SVDView_Lanczos;
+<a name="line410">410: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDLanczosSetOneSide_C"</font>,SVDLanczosSetOneSide_Lanczos);
+<a name="line411">411: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDLanczosGetOneSide_C"</font>,SVDLanczosGetOneSide_Lanczos);
+<a name="line412">412: </a>  <font color="#4169E1">return</font>(0);
+<a name="line413">413: </a>}
+
+</pre>
+</body>
+
+</html>

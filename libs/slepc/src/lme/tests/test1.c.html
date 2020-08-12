@@ -1,0 +1,187 @@
+<center><a href="test1.c">Actual source code: test1.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/lme/tests/test1.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:15+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/lme/tests/test1.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Test <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> interface functions, based on ex32.c.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x dimension.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in y dimension.\n\n"</font>;
+
+<a name="line16"> 16: </a> #include <A href="../../../include/slepclme.h.html">&lt;slepclme.h&gt;</A>
+
+<a name="line18"> 18: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line19"> 19: </a>{
+<a name="line20"> 20: </a>  Mat                  A,B,C,C1,D;
+<a name="line21"> 21: </a>  <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a>                  lme;
+<a name="line22"> 22: </a>  PetscReal            tol,errest,error;
+<a name="line23"> 23: </a>  PetscScalar          *u;
+<a name="line24"> 24: </a>  PetscInt             N,n=10,m,Istart,Iend,II,maxit,ncv,i,j;
+<a name="line25"> 25: </a>  PetscErrorCode       ierr;
+<a name="line26"> 26: </a>  PetscBool            flg,testprefix=PETSC_FALSE,viewmatrices=PETSC_FALSE;
+<a name="line27"> 27: </a>  const char           *prefix;
+<a name="line28"> 28: </a>  <a href="../../../docs/manualpages/LME/LMEType.html#LMEType">LMEType</a>              type;
+<a name="line29"> 29: </a>  <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LMEProblemType</a>       ptype;
+<a name="line30"> 30: </a>  PetscViewerAndFormat *vf;
+
+<a name="line32"> 32: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line34"> 34: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line35"> 35: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,&amp;flg);
+<a name="line36"> 36: </a>  <font color="#4169E1">if</font> (!flg) m=n;
+<a name="line37"> 37: </a>  N = n*m;
+<a name="line38"> 38: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nLyapunov equation, N=%D (%Dx%D grid)\n\n"</font>,N,n,m);
+<a name="line39"> 39: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-test_prefix"</font>,&amp;testprefix,NULL);
+<a name="line40"> 40: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-view_matrices"</font>,&amp;viewmatrices,NULL);
+
+<a name="line42"> 42: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line43"> 43: </a><font color="#B22222">                       Create the 2-D Laplacian, A</font>
+<a name="line44"> 44: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line46"> 46: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line47"> 47: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line48"> 48: </a>  MatSetFromOptions(A);
+<a name="line49"> 49: </a>  MatSetUp(A);
+<a name="line50"> 50: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line51"> 51: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line52"> 52: </a>    i = II/n; j = II-i*n;
+<a name="line53"> 53: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,II,II-n,1.0,INSERT_VALUES); }
+<a name="line54"> 54: </a>    <font color="#4169E1">if</font> (i&lt;m-1) { MatSetValue(A,II,II+n,1.0,INSERT_VALUES); }
+<a name="line55"> 55: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(A,II,II-1,1.0,INSERT_VALUES); }
+<a name="line56"> 56: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(A,II,II+1,1.0,INSERT_VALUES); }
+<a name="line57"> 57: </a>    MatSetValue(A,II,II,-4.0,INSERT_VALUES);
+<a name="line58"> 58: </a>  }
+<a name="line59"> 59: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line60"> 60: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line62"> 62: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line63"> 63: </a><font color="#B22222">       Create a low-rank Mat to store the right-hand side C = C1*C1'</font>
+<a name="line64"> 64: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line66"> 66: </a>  MatCreate(PETSC_COMM_WORLD,&amp;C1);
+<a name="line67"> 67: </a>  MatSetSizes(C1,PETSC_DECIDE,PETSC_DECIDE,N,2);
+<a name="line68"> 68: </a>  MatSetType(C1,MATDENSE);
+<a name="line69"> 69: </a>  MatSetUp(C1);
+<a name="line70"> 70: </a>  MatGetOwnershipRange(C1,&amp;Istart,&amp;Iend);
+<a name="line71"> 71: </a>  MatDenseGetArray(C1,&amp;u);
+<a name="line72"> 72: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line73"> 73: </a>    <font color="#4169E1">if</font> (i&lt;N/2) u[i-Istart] = 1.0;
+<a name="line74"> 74: </a>    <font color="#4169E1">if</font> (i==0) u[i+Iend-2*Istart] = -2.0;
+<a name="line75"> 75: </a>    <font color="#4169E1">if</font> (i==1) u[i+Iend-2*Istart] = -1.0;
+<a name="line76"> 76: </a>    <font color="#4169E1">if</font> (i==2) u[i+Iend-2*Istart] = -1.0;
+<a name="line77"> 77: </a>  }
+<a name="line78"> 78: </a>  MatDenseRestoreArray(C1,&amp;u);
+<a name="line79"> 79: </a>  MatAssemblyBegin(C1,MAT_FINAL_ASSEMBLY);
+<a name="line80"> 80: </a>  MatAssemblyEnd(C1,MAT_FINAL_ASSEMBLY);
+<a name="line81"> 81: </a>  MatCreateLRC(NULL,C1,NULL,NULL,&amp;C);
+<a name="line82"> 82: </a>  MatDestroy(&amp;C1);
+
+<a name="line84"> 84: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line85"> 85: </a><font color="#B22222">                Create the solver and set various options</font>
+<a name="line86"> 86: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line87"> 87: </a>  <a href="../../../docs/manualpages/LME/LMECreate.html#LMECreate">LMECreate</a>(PETSC_COMM_WORLD,&amp;lme);
+<a name="line88"> 88: </a>  <a href="../../../docs/manualpages/LME/LMESetProblemType.html#LMESetProblemType">LMESetProblemType</a>(lme,<a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_SYLVESTER</a>);
+<a name="line89"> 89: </a>  <a href="../../../docs/manualpages/LME/LMEGetProblemType.html#LMEGetProblemType">LMEGetProblemType</a>(lme,&amp;ptype);
+<a name="line90"> 90: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Equation type set to %D\n"</font>,ptype);
+<a name="line91"> 91: </a>  <a href="../../../docs/manualpages/LME/LMESetProblemType.html#LMESetProblemType">LMESetProblemType</a>(lme,<a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_LYAPUNOV</a>);
+<a name="line92"> 92: </a>  <a href="../../../docs/manualpages/LME/LMEGetProblemType.html#LMEGetProblemType">LMEGetProblemType</a>(lme,&amp;ptype);
+<a name="line93"> 93: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Equation type changed to %D\n"</font>,ptype);
+<a name="line94"> 94: </a>  <a href="../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a>(lme,A,NULL,NULL,NULL);
+<a name="line95"> 95: </a>  <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>(lme,C);
+
+<a name="line97"> 97: </a>  <font color="#B22222">/* test prefix usage */</font>
+<a name="line98"> 98: </a>  <font color="#4169E1">if</font> (testprefix) {
+<a name="line99"> 99: </a>    <a href="../../../docs/manualpages/LME/LMESetOptionsPrefix.html#LMESetOptionsPrefix">LMESetOptionsPrefix</a>(lme,<font color="#666666">"check_"</font>);
+<a name="line100">100: </a>    <a href="../../../docs/manualpages/LME/LMEAppendOptionsPrefix.html#LMEAppendOptionsPrefix">LMEAppendOptionsPrefix</a>(lme,<font color="#666666">"myprefix_"</font>);
+<a name="line101">101: </a>    <a href="../../../docs/manualpages/LME/LMEGetOptionsPrefix.html#LMEGetOptionsPrefix">LMEGetOptionsPrefix</a>(lme,&amp;prefix);
+<a name="line102">102: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> prefix is currently: %s\n"</font>,prefix);
+<a name="line103">103: </a>  }
+
+<a name="line105">105: </a>  <font color="#B22222">/* test some interface functions */</font>
+<a name="line106">106: </a>  <a href="../../../docs/manualpages/LME/LMEGetCoefficients.html#LMEGetCoefficients">LMEGetCoefficients</a>(lme,&amp;B,NULL,NULL,NULL);
+<a name="line107">107: </a>  <font color="#4169E1">if</font> (viewmatrices) { MatView(B,PETSC_VIEWER_STDOUT_WORLD); }
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/LME/LMEGetRHS.html#LMEGetRHS">LMEGetRHS</a>(lme,&amp;D);
+<a name="line109">109: </a>  <font color="#4169E1">if</font> (viewmatrices) { MatView(D,PETSC_VIEWER_STDOUT_WORLD); }
+<a name="line110">110: </a>  <a href="../../../docs/manualpages/LME/LMESetTolerances.html#LMESetTolerances">LMESetTolerances</a>(lme,PETSC_DEFAULT,100);
+<a name="line111">111: </a>  <a href="../../../docs/manualpages/LME/LMESetDimensions.html#LMESetDimensions">LMESetDimensions</a>(lme,21);
+<a name="line112">112: </a>  <a href="../../../docs/manualpages/LME/LMESetErrorIfNotConverged.html#LMESetErrorIfNotConverged">LMESetErrorIfNotConverged</a>(lme,PETSC_TRUE);
+<a name="line113">113: </a>  <font color="#B22222">/* test monitors */</font>
+<a name="line114">114: </a>  PetscViewerAndFormatCreate(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_DEFAULT,&amp;vf);
+<a name="line115">115: </a>  <a href="../../../docs/manualpages/LME/LMEMonitorSet.html#LMEMonitorSet">LMEMonitorSet</a>(lme,(PetscErrorCode (*)(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a>,PetscInt,PetscReal,void*))<a href="../../../docs/manualpages/LME/LMEMonitorDefault.html#LMEMonitorDefault">LMEMonitorDefault</a>,vf,(PetscErrorCode (*)(void**))PetscViewerAndFormatDestroy);
+<a name="line116">116: </a>  <font color="#B22222">/* <a href="../../../docs/manualpages/LME/LMEMonitorCancel.html#LMEMonitorCancel">LMEMonitorCancel</a>(lme); */</font>
+<a name="line117">117: </a>  <a href="../../../docs/manualpages/LME/LMESetFromOptions.html#LMESetFromOptions">LMESetFromOptions</a>(lme);
+
+<a name="line119">119: </a>  <a href="../../../docs/manualpages/LME/LMEGetType.html#LMEGetType">LMEGetType</a>(lme,&amp;type);
+<a name="line120">120: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solver being used: %s\n"</font>,type);
+
+<a name="line122">122: </a>  <font color="#B22222">/* query properties and print them */</font>
+<a name="line123">123: </a>  <a href="../../../docs/manualpages/LME/LMEGetTolerances.html#LMEGetTolerances">LMEGetTolerances</a>(lme,&amp;tol,&amp;maxit);
+<a name="line124">124: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Tolerance: %g, max iterations: %D\n"</font>,(double)tol,maxit);
+<a name="line125">125: </a>  <a href="../../../docs/manualpages/LME/LMEGetDimensions.html#LMEGetDimensions">LMEGetDimensions</a>(lme,&amp;ncv);
+<a name="line126">126: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Subspace dimension: %D\n"</font>,ncv);
+<a name="line127">127: </a>  <a href="../../../docs/manualpages/LME/LMEGetErrorIfNotConverged.html#LMEGetErrorIfNotConverged">LMEGetErrorIfNotConverged</a>(lme,&amp;flg);
+<a name="line128">128: </a>  <font color="#4169E1">if</font> (flg) { PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Erroring out if convergence fails\n"</font>); }
+
+<a name="line130">130: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line131">131: </a><font color="#B22222">                Solve the matrix equation and compute residual error</font>
+<a name="line132">132: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line134">134: </a>  <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(lme);
+<a name="line135">135: </a>  <a href="../../../docs/manualpages/LME/LMEGetErrorEstimate.html#LMEGetErrorEstimate">LMEGetErrorEstimate</a>(lme,&amp;errest);
+<a name="line136">136: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Error estimate reported by the solver: %.4g\n"</font>,(double)errest);
+<a name="line137">137: </a>  <a href="../../../docs/manualpages/LME/LMEComputeError.html#LMEComputeError">LMEComputeError</a>(lme,&amp;error);
+<a name="line138">138: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Computed residual norm: %.4g\n\n"</font>,(double)error);
+
+<a name="line140">140: </a>  <font color="#B22222">/*</font>
+<a name="line141">141: </a><font color="#B22222">     Free work space</font>
+<a name="line142">142: </a><font color="#B22222">  */</font>
+<a name="line143">143: </a>  <a href="../../../docs/manualpages/LME/LMEDestroy.html#LMEDestroy">LMEDestroy</a>(&amp;lme);
+<a name="line144">144: </a>  MatDestroy(&amp;A);
+<a name="line145">145: </a>  MatDestroy(&amp;C);
+<a name="line146">146: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line147">147: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line148">148: </a>}
+
+<a name="line150">150: </a><font color="#B22222">/*TEST</font>
+
+<a name="line152">152: </a><font color="#B22222">   test:</font>
+<a name="line153">153: </a><font color="#B22222">      suffix: 1</font>
+<a name="line154">154: </a><font color="#B22222">      args: -lme_monitor_cancel -lme_converged_reason -lme_view -view_matrices -log_exclude lme,bv</font>
+<a name="line155">155: </a><font color="#B22222">      requires: double</font>
+<a name="line156">156: </a><font color="#B22222">      filter: sed -e "s/4.0[0-9]*e-10/4.03e-10/"</font>
+
+<a name="line158">158: </a><font color="#B22222">   test:</font>
+<a name="line159">159: </a><font color="#B22222">      suffix: 2</font>
+<a name="line160">160: </a><font color="#B22222">      args: -test_prefix -check_myprefix_lme_monitor</font>
+<a name="line161">161: </a><font color="#B22222">      requires: double</font>
+<a name="line162">162: </a><font color="#B22222">      filter: sed -e "s/estimate [0-9]\.[0-9]*e[+-]\([0-9]*\)/estimate (removed)/g" | sed -e "s/4.0[0-9]*e-10/4.03e-10/"</font>
+
+<a name="line164">164: </a><font color="#B22222">   test:</font>
+<a name="line165">165: </a><font color="#B22222">      suffix: 3</font>
+<a name="line166">166: </a><font color="#B22222">      args: -lme_monitor_cancel -info</font>
+<a name="line167">167: </a><font color="#B22222">      requires: double</font>
+<a name="line168">168: </a><font color="#B22222">      filter: sed -e "s/equation = [0-9]\.[0-9]*e[+-]\([0-9]*\)/equation = (removed)/g" | sed -e "s/4.0[0-9]*e-10/4.03e-10/" | grep -v Comm | grep -v machine | grep -v PetscGetHostName | grep -v OpenMP | grep -v "Rank of the Cholesky factor" | grep -v "potrf failed"</font>
+
+<a name="line170">170: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,269 @@
+<center><a href="rgellipse.c">Actual source code: rgellipse.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/rg/impls/ellipse/rgellipse.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:49+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/rg/impls/ellipse/rgellipse.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Region enclosed in an ellipse (aligned with the coordinate axes)</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/rgimpl.h.html">&lt;slepc/private/rgimpl.h&gt;</A>
+<a name="line15"> 15: </a><font color="#A020F0">#include &lt;petscdraw.h&gt;</font>
+
+<a name="line17"> 17: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line18"> 18: </a>  PetscScalar center;     <font color="#B22222">/* center of the ellipse */</font>
+<a name="line19"> 19: </a>  PetscReal   radius;     <font color="#B22222">/* radius of the ellipse */</font>
+<a name="line20"> 20: </a>  PetscReal   vscale;     <font color="#B22222">/* vertical scale of the ellipse */</font>
+<a name="line21"> 21: </a>} RG_ELLIPSE;
+
+<a name="line23"> 23: </a><strong><font color="#4169E1"><a name="RGEllipseSetParameters_Ellipse"></a>static PetscErrorCode RGEllipseSetParameters_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscScalar center,PetscReal radius,PetscReal vscale)</font></strong>
+<a name="line24"> 24: </a>{
+<a name="line25"> 25: </a>  RG_ELLIPSE *ctx = (RG_ELLIPSE*)rg-&gt;data;
+
+<a name="line28"> 28: </a>  ctx-&gt;center = center;
+<a name="line29"> 29: </a>  <font color="#4169E1">if</font> (radius == PETSC_DEFAULT) {
+<a name="line30"> 30: </a>    ctx-&gt;radius = 1.0;
+<a name="line31"> 31: </a>  } <font color="#4169E1">else</font> {
+<a name="line32"> 32: </a>    <font color="#4169E1">if</font> (radius&lt;=0.0) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The radius argument must be &gt; 0.0"</font>);
+<a name="line33"> 33: </a>    ctx-&gt;radius = radius;
+<a name="line34"> 34: </a>  }
+<a name="line35"> 35: </a>  <font color="#4169E1">if</font> (vscale&lt;=0.0) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The vscale argument must be &gt; 0.0"</font>);
+<a name="line36"> 36: </a>  ctx-&gt;vscale = vscale;
+<a name="line37"> 37: </a>  <font color="#4169E1">return</font>(0);
+<a name="line38"> 38: </a>}
+
+<a name="line40"> 40: </a><font color="#B22222">/*@</font>
+<a name="line41"> 41: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/RG/RGEllipseSetParameters.html#RGEllipseSetParameters">RGEllipseSetParameters</a> - Sets the parameters defining the ellipse region.</font>
+
+<a name="line43"> 43: </a><font color="#B22222">   Logically Collective on rg</font>
+
+<a name="line45"> 45: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line46"> 46: </a><font color="#B22222">+  rg     - the region context</font>
+<a name="line47"> 47: </a><font color="#B22222">.  center - center of the ellipse</font>
+<a name="line48"> 48: </a><font color="#B22222">.  radius - radius of the ellipse</font>
+<a name="line49"> 49: </a><font color="#B22222">-  vscale - vertical scale of the ellipse</font>
+
+<a name="line51"> 51: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line52"> 52: </a><font color="#B22222">+  -rg_ellipse_center - Sets the center</font>
+<a name="line53"> 53: </a><font color="#B22222">.  -rg_ellipse_radius - Sets the radius</font>
+<a name="line54"> 54: </a><font color="#B22222">-  -rg_ellipse_vscale - Sets the vertical scale</font>
+
+<a name="line56"> 56: </a><font color="#B22222">   Notes:</font>
+<a name="line57"> 57: </a><font color="#B22222">   In the case of complex scalars, a complex center can be provided in the</font>
+<a name="line58"> 58: </a><font color="#B22222">   command line with [+/-][realnumber][+/-]realnumberi with no spaces, e.g.</font>
+<a name="line59"> 59: </a><font color="#B22222">   -rg_ellipse_center 1.0+2.0i</font>
+
+<a name="line61"> 61: </a><font color="#B22222">   When PETSc is built with real scalars, the center is restricted to a real value.</font>
+
+<a name="line63"> 63: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line65"> 65: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/RG/RGEllipseGetParameters.html#RGEllipseGetParameters">RGEllipseGetParameters</a>()</font>
+<a name="line66"> 66: </a><font color="#B22222">@*/</font>
+<a name="line67"> 67: </a><strong><font color="#4169E1"><a name="RGEllipseSetParameters"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/RG/RGEllipseSetParameters.html#RGEllipseSetParameters">RGEllipseSetParameters</a>(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscScalar center,PetscReal radius,PetscReal vscale)</font></strong>
+<a name="line68"> 68: </a>{
+
+<a name="line76"> 76: </a>  PetscTryMethod(rg,<font color="#666666">"RGEllipseSetParameters_C"</font>,(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a>,PetscScalar,PetscReal,PetscReal),(rg,center,radius,vscale));
+<a name="line77"> 77: </a>  <font color="#4169E1">return</font>(0);
+<a name="line78"> 78: </a>}
+
+<a name="line80"> 80: </a><strong><font color="#4169E1"><a name="RGEllipseGetParameters_Ellipse"></a>static PetscErrorCode RGEllipseGetParameters_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscScalar *center,PetscReal *radius,PetscReal *vscale)</font></strong>
+<a name="line81"> 81: </a>{
+<a name="line82"> 82: </a>  RG_ELLIPSE *ctx = (RG_ELLIPSE*)rg-&gt;data;
+
+<a name="line85"> 85: </a>  <font color="#4169E1">if</font> (center) *center = ctx-&gt;center;
+<a name="line86"> 86: </a>  <font color="#4169E1">if</font> (radius) *radius = ctx-&gt;radius;
+<a name="line87"> 87: </a>  <font color="#4169E1">if</font> (vscale) *vscale = ctx-&gt;vscale;
+<a name="line88"> 88: </a>  <font color="#4169E1">return</font>(0);
+<a name="line89"> 89: </a>}
+
+<a name="line91"> 91: </a><font color="#B22222">/*@C</font>
+<a name="line92"> 92: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/RG/RGEllipseGetParameters.html#RGEllipseGetParameters">RGEllipseGetParameters</a> - Gets the parameters that define the ellipse region.</font>
+
+<a name="line94"> 94: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line96"> 96: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line97"> 97: </a><font color="#B22222">.  rg     - the region context</font>
+
+<a name="line99"> 99: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line100">100: </a><font color="#B22222">+  center - center of the region</font>
+<a name="line101">101: </a><font color="#B22222">.  radius - radius of the region</font>
+<a name="line102">102: </a><font color="#B22222">-  vscale - vertical scale of the region</font>
+
+<a name="line104">104: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line106">106: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/RG/RGEllipseSetParameters.html#RGEllipseSetParameters">RGEllipseSetParameters</a>()</font>
+<a name="line107">107: </a><font color="#B22222">@*/</font>
+<a name="line108">108: </a><strong><font color="#4169E1"><a name="RGEllipseGetParameters"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/RG/RGEllipseGetParameters.html#RGEllipseGetParameters">RGEllipseGetParameters</a>(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscScalar *center,PetscReal *radius,PetscReal *vscale)</font></strong>
+<a name="line109">109: </a>{
+
+<a name="line114">114: </a>  PetscUseMethod(rg,<font color="#666666">"RGEllipseGetParameters_C"</font>,(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a>,PetscScalar*,PetscReal*,PetscReal*),(rg,center,radius,vscale));
+<a name="line115">115: </a>  <font color="#4169E1">return</font>(0);
+<a name="line116">116: </a>}
+
+<a name="line118">118: </a><strong><font color="#4169E1"><a name="RGView_Ellipse"></a>PetscErrorCode RGView_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscViewer viewer)</font></strong>
+<a name="line119">119: </a>{
+<a name="line121">121: </a>  RG_ELLIPSE     *ctx = (RG_ELLIPSE*)rg-&gt;data;
+<a name="line122">122: </a>  PetscBool      isdraw,isascii;
+<a name="line123">123: </a>  int            winw,winh;
+<a name="line124">124: </a>  PetscDraw      draw;
+<a name="line125">125: </a>  PetscDrawAxis  axis;
+<a name="line126">126: </a>  PetscReal      cx,cy,r,ab,cd,lx,ly,w,scale=1.2;
+<a name="line127">127: </a>  char           str[50];
+
+<a name="line130">130: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERDRAW,&amp;isdraw);
+<a name="line131">131: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line132">132: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line133">133: </a>    <a href="../../../../../../docs/manualpages/sys/SlepcSNPrintfScalar.html#SlepcSNPrintfScalar">SlepcSNPrintfScalar</a>(str,50,ctx-&gt;center,PETSC_FALSE);
+<a name="line134">134: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  center: %s, radius: %g, vscale: %g\n"</font>,str,RGShowReal(ctx-&gt;radius),RGShowReal(ctx-&gt;vscale));
+<a name="line135">135: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (isdraw) {
+<a name="line136">136: </a>    PetscViewerDrawGetDraw(viewer,0,&amp;draw);
+<a name="line137">137: </a>    PetscDrawCheckResizedWindow(draw);
+<a name="line138">138: </a>    PetscDrawGetWindowSize(draw,&amp;winw,&amp;winh);
+<a name="line139">139: </a>    winw = PetscMax(winw,1); winh = PetscMax(winh,1);
+<a name="line140">140: </a>    PetscDrawClear(draw);
+<a name="line141">141: </a>    PetscDrawSetTitle(draw,<font color="#666666">"Ellipse region"</font>);
+<a name="line142">142: </a>    PetscDrawAxisCreate(draw,&amp;axis);
+<a name="line143">143: </a>    cx = PetscRealPart(ctx-&gt;center)*rg-&gt;sfactor;
+<a name="line144">144: </a>    cy = PetscImaginaryPart(ctx-&gt;center)*rg-&gt;sfactor;
+<a name="line145">145: </a>    r  = ctx-&gt;radius*rg-&gt;sfactor;
+<a name="line146">146: </a>    lx = 2*r;
+<a name="line147">147: </a>    ly = 2*r*ctx-&gt;vscale;
+<a name="line148">148: </a>    ab = cx;
+<a name="line149">149: </a>    cd = cy;
+<a name="line150">150: </a>    w  = scale*PetscMax(lx/winw,ly/winh)/2;
+<a name="line151">151: </a>    PetscDrawAxisSetLimits(axis,ab-w*winw,ab+w*winw,cd-w*winh,cd+w*winh);
+<a name="line152">152: </a>    PetscDrawAxisDraw(axis);
+<a name="line153">153: </a>    PetscDrawAxisDestroy(&amp;axis);
+<a name="line154">154: </a>    PetscDrawEllipse(draw,cx,cy,2*r,2*r*ctx-&gt;vscale,PETSC_DRAW_RED);
+<a name="line155">155: </a>    PetscDrawFlush(draw);
+<a name="line156">156: </a>    PetscDrawSave(draw);
+<a name="line157">157: </a>    PetscDrawPause(draw);
+<a name="line158">158: </a>  }
+<a name="line159">159: </a>  <font color="#4169E1">return</font>(0);
+<a name="line160">160: </a>}
+
+<a name="line162">162: </a><strong><font color="#4169E1"><a name="RGIsTrivial_Ellipse"></a>PetscErrorCode RGIsTrivial_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscBool *trivial)</font></strong>
+<a name="line163">163: </a>{
+<a name="line164">164: </a>  RG_ELLIPSE *ctx = (RG_ELLIPSE*)rg-&gt;data;
+
+<a name="line167">167: </a>  <font color="#4169E1">if</font> (rg-&gt;complement) *trivial = PetscNot(ctx-&gt;radius);
+<a name="line168">168: </a>  <font color="#4169E1">else</font> *trivial = PetscNot(ctx-&gt;radius&lt;PETSC_MAX_REAL);
+<a name="line169">169: </a>  <font color="#4169E1">return</font>(0);
+<a name="line170">170: </a>}
+
+<a name="line172">172: </a><strong><font color="#4169E1"><a name="RGComputeContour_Ellipse"></a>PetscErrorCode RGComputeContour_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscInt n,PetscScalar *cr,PetscScalar *ci)</font></strong>
+<a name="line173">173: </a>{
+<a name="line174">174: </a>  RG_ELLIPSE *ctx = (RG_ELLIPSE*)rg-&gt;data;
+<a name="line175">175: </a>  PetscReal  theta;
+<a name="line176">176: </a>  PetscInt   i;
+
+<a name="line179">179: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line180">180: </a>    theta = 2.0*PETSC_PI*(i+0.5)/n;
+<a name="line181">181: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line182">182: </a>    cr[i] = ctx-&gt;center + ctx-&gt;radius*PetscCMPLX(PetscCosReal(theta),ctx-&gt;vscale*PetscSinReal(theta));
+<a name="line183">183: </a><font color="#A020F0">#else</font>
+<a name="line184">184: </a>    cr[i] = ctx-&gt;center + ctx-&gt;radius*PetscCosReal(theta);
+<a name="line185">185: </a>    ci[i] = ctx-&gt;radius*ctx-&gt;vscale*PetscSinReal(theta);
+<a name="line186">186: </a><font color="#A020F0">#endif</font>
+<a name="line187">187: </a>  }
+<a name="line188">188: </a>  <font color="#4169E1">return</font>(0);
+<a name="line189">189: </a>}
+
+<a name="line191">191: </a><strong><font color="#4169E1"><a name="RGComputeBoundingBox_Ellipse"></a>PetscErrorCode RGComputeBoundingBox_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal *a,PetscReal *b,PetscReal *c,PetscReal *d)</font></strong>
+<a name="line192">192: </a>{
+<a name="line193">193: </a>  RG_ELLIPSE *ctx = (RG_ELLIPSE*)rg-&gt;data;
+
+<a name="line196">196: </a>  <font color="#4169E1">if</font> (a) *a = PetscRealPart(ctx-&gt;center) - ctx-&gt;radius;
+<a name="line197">197: </a>  <font color="#4169E1">if</font> (b) *b = PetscRealPart(ctx-&gt;center) + ctx-&gt;radius;
+<a name="line198">198: </a>  <font color="#4169E1">if</font> (c) *c = PetscImaginaryPart(ctx-&gt;center) - ctx-&gt;radius*ctx-&gt;vscale;
+<a name="line199">199: </a>  <font color="#4169E1">if</font> (d) *d = PetscImaginaryPart(ctx-&gt;center) + ctx-&gt;radius*ctx-&gt;vscale;
+<a name="line200">200: </a>  <font color="#4169E1">return</font>(0);
+<a name="line201">201: </a>}
+
+<a name="line203">203: </a><strong><font color="#4169E1"><a name="RGCheckInside_Ellipse"></a>PetscErrorCode RGCheckInside_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal px,PetscReal py,PetscInt *inside)</font></strong>
+<a name="line204">204: </a>{
+<a name="line205">205: </a>  RG_ELLIPSE *ctx = (RG_ELLIPSE*)rg-&gt;data;
+<a name="line206">206: </a>  PetscReal  dx,dy,r;
+
+<a name="line209">209: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line210">210: </a>  dx = (px-PetscRealPart(ctx-&gt;center))/ctx-&gt;radius;
+<a name="line211">211: </a>  dy = (py-PetscImaginaryPart(ctx-&gt;center))/ctx-&gt;radius;
+<a name="line212">212: </a><font color="#A020F0">#else</font>
+<a name="line213">213: </a>  dx = (px-ctx-&gt;center)/ctx-&gt;radius;
+<a name="line214">214: </a>  dy = py/ctx-&gt;radius;
+<a name="line215">215: </a><font color="#A020F0">#endif</font>
+<a name="line216">216: </a>  r = 1.0-dx*dx-(dy*dy)/(ctx-&gt;vscale*ctx-&gt;vscale);
+<a name="line217">217: </a>  *inside = PetscSign(r);
+<a name="line218">218: </a>  <font color="#4169E1">return</font>(0);
+<a name="line219">219: </a>}
+
+<a name="line221">221: </a><strong><font color="#4169E1"><a name="RGSetFromOptions_Ellipse"></a>PetscErrorCode RGSetFromOptions_Ellipse(PetscOptionItems *PetscOptionsObject,<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line222">222: </a>{
+<a name="line224">224: </a>  PetscScalar    s;
+<a name="line225">225: </a>  PetscReal      r1,r2;
+<a name="line226">226: </a>  PetscBool      flg1,flg2,flg3;
+
+<a name="line229">229: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> Ellipse Options"</font>);
+
+<a name="line231">231: </a>    <a href="../../../../../../docs/manualpages/RG/RGEllipseGetParameters.html#RGEllipseGetParameters">RGEllipseGetParameters</a>(rg,&amp;s,&amp;r1,&amp;r2);
+<a name="line232">232: </a>    PetscOptionsScalar(<font color="#666666">"-rg_ellipse_center"</font>,<font color="#666666">"Center of ellipse"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RGEllipseSetParameters.html#RGEllipseSetParameters">RGEllipseSetParameters</a>"</font>,s,&amp;s,&amp;flg1);
+<a name="line233">233: </a>    PetscOptionsReal(<font color="#666666">"-rg_ellipse_radius"</font>,<font color="#666666">"Radius of ellipse"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RGEllipseSetParameters.html#RGEllipseSetParameters">RGEllipseSetParameters</a>"</font>,r1,&amp;r1,&amp;flg2);
+<a name="line234">234: </a>    PetscOptionsReal(<font color="#666666">"-rg_ellipse_vscale"</font>,<font color="#666666">"Vertical scale of ellipse"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RGEllipseSetParameters.html#RGEllipseSetParameters">RGEllipseSetParameters</a>"</font>,r2,&amp;r2,&amp;flg3);
+<a name="line235">235: </a>    <font color="#4169E1">if</font> (flg1 || flg2 || flg3) { <a href="../../../../../../docs/manualpages/RG/RGEllipseSetParameters.html#RGEllipseSetParameters">RGEllipseSetParameters</a>(rg,s,r1,r2); }
+
+<a name="line237">237: </a>  PetscOptionsTail();
+<a name="line238">238: </a>  <font color="#4169E1">return</font>(0);
+<a name="line239">239: </a>}
+
+<a name="line241">241: </a><strong><font color="#4169E1"><a name="RGDestroy_Ellipse"></a>PetscErrorCode RGDestroy_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line242">242: </a>{
+
+<a name="line246">246: </a>  PetscFree(rg-&gt;data);
+<a name="line247">247: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGEllipseSetParameters_C"</font>,NULL);
+<a name="line248">248: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGEllipseGetParameters_C"</font>,NULL);
+<a name="line249">249: </a>  <font color="#4169E1">return</font>(0);
+<a name="line250">250: </a>}
+
+<a name="line252">252: </a><strong><font color="#4169E1"><a name="RGCreate_Ellipse"></a>SLEPC_EXTERN PetscErrorCode RGCreate_Ellipse(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line253">253: </a>{
+<a name="line254">254: </a>  RG_ELLIPSE     *ellipse;
+
+<a name="line258">258: </a>  PetscNewLog(rg,&amp;ellipse);
+<a name="line259">259: </a>  ellipse-&gt;center = 0.0;
+<a name="line260">260: </a>  ellipse-&gt;radius = PETSC_MAX_REAL;
+<a name="line261">261: </a>  ellipse-&gt;vscale = 1.0;
+<a name="line262">262: </a>  rg-&gt;data = (void*)ellipse;
+
+<a name="line264">264: </a>  rg-&gt;ops-&gt;istrivial      = RGIsTrivial_Ellipse;
+<a name="line265">265: </a>  rg-&gt;ops-&gt;computecontour = RGComputeContour_Ellipse;
+<a name="line266">266: </a>  rg-&gt;ops-&gt;computebbox    = RGComputeBoundingBox_Ellipse;
+<a name="line267">267: </a>  rg-&gt;ops-&gt;checkinside    = RGCheckInside_Ellipse;
+<a name="line268">268: </a>  rg-&gt;ops-&gt;setfromoptions = RGSetFromOptions_Ellipse;
+<a name="line269">269: </a>  rg-&gt;ops-&gt;view           = RGView_Ellipse;
+<a name="line270">270: </a>  rg-&gt;ops-&gt;destroy        = RGDestroy_Ellipse;
+<a name="line271">271: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGEllipseSetParameters_C"</font>,RGEllipseSetParameters_Ellipse);
+<a name="line272">272: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGEllipseGetParameters_C"</font>,RGEllipseGetParameters_Ellipse);
+<a name="line273">273: </a>  <font color="#4169E1">return</font>(0);
+<a name="line274">274: </a>}
+
+</pre>
+</body>
+
+</html>

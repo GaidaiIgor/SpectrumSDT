@@ -1,0 +1,463 @@
+<center><a href="rgpolygon.c">Actual source code: rgpolygon.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/rg/impls/polygon/rgpolygon.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:49+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/rg/impls/polygon/rgpolygon.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Polygonal region defined by a set of vertices</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/rgimpl.h.html">&lt;slepc/private/rgimpl.h&gt;</A>
+<a name="line15"> 15: </a><font color="#A020F0">#include &lt;petscdraw.h&gt;</font>
+
+<a name="line17"> 17: </a><strong><font color="#228B22">#define VERTMAX 30</font></strong>
+
+<a name="line19"> 19: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line20"> 20: </a>  PetscInt    n;         <font color="#B22222">/* number of vertices */</font>
+<a name="line21"> 21: </a>  PetscScalar *vr,*vi;   <font color="#B22222">/* array of vertices (vi not used in complex scalars) */</font>
+<a name="line22"> 22: </a>} RG_POLYGON;
+
+<a name="line24"> 24: </a><strong><font color="#4169E1">PetscErrorCode RGComputeBoundingBox_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a>,PetscReal*,PetscReal*,PetscReal*,PetscReal*)</font></strong>;
+
+<a name="line26"> 26: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line27"> 27: </a><strong><font color="#4169E1"><a name="CheckSymmetry"></a>static PetscBool CheckSymmetry(PetscInt n,PetscScalar *vr,PetscScalar *vi)</font></strong>
+<a name="line28"> 28: </a>{
+<a name="line29"> 29: </a>  PetscInt i,j,k;
+<a name="line30"> 30: </a>  <font color="#B22222">/* find change of sign in imaginary part */</font>
+<a name="line31"> 31: </a>  j = vi[0]!=0.0? 0: 1;
+<a name="line32"> 32: </a>  <font color="#4169E1">for</font> (k=j+1;k&lt;n;k++) {
+<a name="line33"> 33: </a>    <font color="#4169E1">if</font> (vi[k]!=0.0) {
+<a name="line34"> 34: </a>      <font color="#4169E1">if</font> (vi[k]*vi[j]&lt;0.0) <font color="#4169E1">break</font>;
+<a name="line35"> 35: </a>      j++;
+<a name="line36"> 36: </a>    }
+<a name="line37"> 37: </a>  }
+<a name="line38"> 38: </a>  <font color="#4169E1">if</font> (k==n) <font color="#4169E1">return</font> (j==1)? PETSC_TRUE: PETSC_FALSE;
+<a name="line39"> 39: </a>  <font color="#B22222">/* check pairing vertices */</font>
+<a name="line40"> 40: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n/2;i++) {
+<a name="line41"> 41: </a>    <font color="#4169E1">if</font> (vr[k]!=vr[j] || vi[k]!=-vi[j]) <font color="#4169E1">return</font> PETSC_FALSE;
+<a name="line42"> 42: </a>    k = (k+1)%n;
+<a name="line43"> 43: </a>    j = (j-1+n)%n;
+<a name="line44"> 44: </a>  }
+<a name="line45"> 45: </a>  <font color="#4169E1">return</font> PETSC_TRUE;
+<a name="line46"> 46: </a>}
+<a name="line47"> 47: </a><font color="#A020F0">#endif</font>
+
+<a name="line49"> 49: </a><strong><font color="#4169E1"><a name="RGPolygonSetVertices_Polygon"></a>static PetscErrorCode RGPolygonSetVertices_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscInt n,PetscScalar *vr,PetscScalar *vi)</font></strong>
+<a name="line50"> 50: </a>{
+<a name="line52"> 52: </a>  PetscInt       i;
+<a name="line53"> 53: </a>  RG_POLYGON     *ctx = (RG_POLYGON*)rg-&gt;data;
+
+<a name="line56"> 56: </a>  <font color="#4169E1">if</font> (n&lt;3) SETERRQ1(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"At least 3 vertices required, you provided %s"</font>,n);
+<a name="line57"> 57: </a>  <font color="#4169E1">if</font> (n&gt;VERTMAX) SETERRQ1(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Too many points, maximum allowed is %d"</font>,VERTMAX);
+<a name="line58"> 58: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line59"> 59: </a>  <font color="#4169E1">if</font> (!CheckSymmetry(n,vr,vi)) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONG,<font color="#666666">"In real scalars the region must be symmetric wrt real axis"</font>);
+<a name="line60"> 60: </a><font color="#A020F0">#endif</font>
+<a name="line61"> 61: </a>  <font color="#4169E1">if</font> (ctx-&gt;n) {
+<a name="line62"> 62: </a>    PetscFree(ctx-&gt;vr);
+<a name="line63"> 63: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line64"> 64: </a>    PetscFree(ctx-&gt;vi);
+<a name="line65"> 65: </a><font color="#A020F0">#endif</font>
+<a name="line66"> 66: </a>  }
+<a name="line67"> 67: </a>  ctx-&gt;n = n;
+<a name="line68"> 68: </a>  PetscMalloc1(n,&amp;ctx-&gt;vr);
+<a name="line69"> 69: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line70"> 70: </a>  PetscMalloc1(n,&amp;ctx-&gt;vi);
+<a name="line71"> 71: </a><font color="#A020F0">#endif</font>
+<a name="line72"> 72: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line73"> 73: </a>    ctx-&gt;vr[i] = vr[i];
+<a name="line74"> 74: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line75"> 75: </a>    ctx-&gt;vi[i] = vi[i];
+<a name="line76"> 76: </a><font color="#A020F0">#endif</font>
+<a name="line77"> 77: </a>  }
+<a name="line78"> 78: </a>  <font color="#4169E1">return</font>(0);
+<a name="line79"> 79: </a>}
+
+<a name="line81"> 81: </a><font color="#B22222">/*@</font>
+<a name="line82"> 82: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/RG/RGPolygonSetVertices.html#RGPolygonSetVertices">RGPolygonSetVertices</a> - Sets the vertices that define the polygon region.</font>
+
+<a name="line84"> 84: </a><font color="#B22222">   Logically Collective on rg</font>
+
+<a name="line86"> 86: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line87"> 87: </a><font color="#B22222">+  rg - the region context</font>
+<a name="line88"> 88: </a><font color="#B22222">.  n  - number of vertices</font>
+<a name="line89"> 89: </a><font color="#B22222">.  vr - array of vertices</font>
+<a name="line90"> 90: </a><font color="#B22222">-  vi - array of vertices (imaginary part)</font>
+
+<a name="line92"> 92: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line93"> 93: </a><font color="#B22222">+  -rg_polygon_vertices - Sets the vertices</font>
+<a name="line94"> 94: </a><font color="#B22222">-  -rg_polygon_verticesi - Sets the vertices (imaginary part)</font>
+
+<a name="line96"> 96: </a><font color="#B22222">   Notes:</font>
+<a name="line97"> 97: </a><font color="#B22222">   In the case of complex scalars, only argument vr is used, containing</font>
+<a name="line98"> 98: </a><font color="#B22222">   the complex vertices; the list of vertices can be provided in the</font>
+<a name="line99"> 99: </a><font color="#B22222">   command line with a comma-separated list of complex values</font>
+<a name="line100">100: </a><font color="#B22222">   [+/-][realnumber][+/-]realnumberi with no spaces.</font>
+
+<a name="line102">102: </a><font color="#B22222">   When PETSc is built with real scalars, the real and imaginary parts of</font>
+<a name="line103">103: </a><font color="#B22222">   the vertices must be provided in two separate arrays (or two lists in</font>
+<a name="line104">104: </a><font color="#B22222">   the command line). In this case, the region must be symmetric with</font>
+<a name="line105">105: </a><font color="#B22222">   respect to the real axis.</font>
+
+<a name="line107">107: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line109">109: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/RG/RGPolygonGetVertices.html#RGPolygonGetVertices">RGPolygonGetVertices</a>()</font>
+<a name="line110">110: </a><font color="#B22222">@*/</font>
+<a name="line111">111: </a><strong><font color="#4169E1"><a name="RGPolygonSetVertices"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/RG/RGPolygonSetVertices.html#RGPolygonSetVertices">RGPolygonSetVertices</a>(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscInt n,PetscScalar vr[],PetscScalar vi[])</font></strong>
+<a name="line112">112: </a>{
+
+<a name="line119">119: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line121">121: </a><font color="#A020F0">#endif</font>
+<a name="line122">122: </a>  PetscTryMethod(rg,<font color="#666666">"RGPolygonSetVertices_C"</font>,(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a>,PetscInt,PetscScalar*,PetscScalar*),(rg,n,vr,vi));
+<a name="line123">123: </a>  <font color="#4169E1">return</font>(0);
+<a name="line124">124: </a>}
+
+<a name="line126">126: </a><strong><font color="#4169E1"><a name="RGPolygonGetVertices_Polygon"></a>static PetscErrorCode RGPolygonGetVertices_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscInt *n,PetscScalar **vr,PetscScalar **vi)</font></strong>
+<a name="line127">127: </a>{
+<a name="line129">129: </a>  RG_POLYGON     *ctx = (RG_POLYGON*)rg-&gt;data;
+<a name="line130">130: </a>  PetscInt       i;
+
+<a name="line133">133: </a>  <font color="#4169E1">if</font> (n) *n  = ctx-&gt;n;
+<a name="line134">134: </a>  <font color="#4169E1">if</font> (vr) {
+<a name="line135">135: </a>    <font color="#4169E1">if</font> (!ctx-&gt;n) *vr = NULL;
+<a name="line136">136: </a>    <font color="#4169E1">else</font> {
+<a name="line137">137: </a>      PetscMalloc1(ctx-&gt;n,vr);
+<a name="line138">138: </a>      <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n;i++) (*vr)[i] = ctx-&gt;vr[i];
+<a name="line139">139: </a>    }
+<a name="line140">140: </a>  }
+<a name="line141">141: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line142">142: </a>  <font color="#4169E1">if</font> (vi) {
+<a name="line143">143: </a>    <font color="#4169E1">if</font> (!ctx-&gt;n) *vi = NULL;
+<a name="line144">144: </a>    <font color="#4169E1">else</font> {
+<a name="line145">145: </a>      PetscMalloc1(ctx-&gt;n,vi);
+<a name="line146">146: </a>      <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n;i++) (*vi)[i] = ctx-&gt;vi[i];
+<a name="line147">147: </a>    }
+<a name="line148">148: </a>  }
+<a name="line149">149: </a><font color="#A020F0">#endif</font>
+<a name="line150">150: </a>  <font color="#4169E1">return</font>(0);
+<a name="line151">151: </a>}
+
+<a name="line153">153: </a><font color="#B22222">/*@C</font>
+<a name="line154">154: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/RG/RGPolygonGetVertices.html#RGPolygonGetVertices">RGPolygonGetVertices</a> - Gets the vertices that define the polygon region.</font>
+
+<a name="line156">156: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line158">158: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line159">159: </a><font color="#B22222">.  rg     - the region context</font>
+
+<a name="line161">161: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line162">162: </a><font color="#B22222">+  n  - number of vertices</font>
+<a name="line163">163: </a><font color="#B22222">.  vr - array of vertices</font>
+<a name="line164">164: </a><font color="#B22222">-  vi - array of vertices (imaginary part)</font>
+
+<a name="line166">166: </a><font color="#B22222">   Notes:</font>
+<a name="line167">167: </a><font color="#B22222">   The values passed by user with <a href="../../../../../../docs/manualpages/RG/RGPolygonSetVertices.html#RGPolygonSetVertices">RGPolygonSetVertices</a>() are returned (or null</font>
+<a name="line168">168: </a><font color="#B22222">   pointers otherwise).</font>
+<a name="line169">169: </a><font color="#B22222">   The returned arrays should be freed by the user when no longer needed.</font>
+
+<a name="line171">171: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line173">173: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/RG/RGPolygonSetVertices.html#RGPolygonSetVertices">RGPolygonSetVertices</a>()</font>
+<a name="line174">174: </a><font color="#B22222">@*/</font>
+<a name="line175">175: </a><strong><font color="#4169E1"><a name="RGPolygonGetVertices"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/RG/RGPolygonGetVertices.html#RGPolygonGetVertices">RGPolygonGetVertices</a>(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscInt *n,PetscScalar **vr,PetscScalar **vi)</font></strong>
+<a name="line176">176: </a>{
+
+<a name="line181">181: </a>  PetscUseMethod(rg,<font color="#666666">"RGPolygonGetVertices_C"</font>,(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a>,PetscInt*,PetscScalar**,PetscScalar**),(rg,n,vr,vi));
+<a name="line182">182: </a>  <font color="#4169E1">return</font>(0);
+<a name="line183">183: </a>}
+
+<a name="line185">185: </a><strong><font color="#4169E1"><a name="RGView_Polygon"></a>PetscErrorCode RGView_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscViewer viewer)</font></strong>
+<a name="line186">186: </a>{
+<a name="line188">188: </a>  RG_POLYGON     *ctx = (RG_POLYGON*)rg-&gt;data;
+<a name="line189">189: </a>  PetscBool      isdraw,isascii;
+<a name="line190">190: </a>  int            winw,winh;
+<a name="line191">191: </a>  PetscDraw      draw;
+<a name="line192">192: </a>  PetscDrawAxis  axis;
+<a name="line193">193: </a>  PetscReal      a,b,c,d,ab,cd,lx,ly,w,x0,y0,x1,y1,scale=1.2;
+<a name="line194">194: </a>  PetscInt       i;
+<a name="line195">195: </a>  char           str[50];
+
+<a name="line198">198: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERDRAW,&amp;isdraw);
+<a name="line199">199: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line200">200: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line201">201: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  vertices: "</font>);
+<a name="line202">202: </a>    PetscViewerASCIIUseTabs(viewer,PETSC_FALSE);
+<a name="line203">203: </a>    <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n;i++) {
+<a name="line204">204: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line205">205: </a>      <a href="../../../../../../docs/manualpages/sys/SlepcSNPrintfScalar.html#SlepcSNPrintfScalar">SlepcSNPrintfScalar</a>(str,50,ctx-&gt;vr[i],PETSC_FALSE);
+<a name="line206">206: </a><font color="#A020F0">#else</font>
+<a name="line207">207: </a>      <font color="#4169E1">if</font> (ctx-&gt;vi[i]!=0.0) {
+<a name="line208">208: </a>        PetscSNPrintf(str,50,<font color="#666666">"%g%+gi"</font>,(double)ctx-&gt;vr[i],(double)ctx-&gt;vi[i]);
+<a name="line209">209: </a>      } <font color="#4169E1">else</font> {
+<a name="line210">210: </a>        PetscSNPrintf(str,50,<font color="#666666">"%g"</font>,(double)ctx-&gt;vr[i]);
+<a name="line211">211: </a>      }
+<a name="line212">212: </a><font color="#A020F0">#endif</font>
+<a name="line213">213: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s%s"</font>,str,(i&lt;ctx-&gt;n-1)?<font color="#666666">", "</font>:<font color="#666666">""</font>);
+<a name="line214">214: </a>    }
+<a name="line215">215: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"\n"</font>);
+<a name="line216">216: </a>    PetscViewerASCIIUseTabs(viewer,PETSC_TRUE);
+<a name="line217">217: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (isdraw) {
+<a name="line218">218: </a>    PetscViewerDrawGetDraw(viewer,0,&amp;draw);
+<a name="line219">219: </a>    PetscDrawCheckResizedWindow(draw);
+<a name="line220">220: </a>    PetscDrawGetWindowSize(draw,&amp;winw,&amp;winh);
+<a name="line221">221: </a>    winw = PetscMax(winw,1); winh = PetscMax(winh,1);
+<a name="line222">222: </a>    PetscDrawClear(draw);
+<a name="line223">223: </a>    PetscDrawSetTitle(draw,<font color="#666666">"Polygonal region"</font>);
+<a name="line224">224: </a>    PetscDrawAxisCreate(draw,&amp;axis);
+<a name="line225">225: </a>    RGComputeBoundingBox_Polygon(rg,&amp;a,&amp;b,&amp;c,&amp;d);
+<a name="line226">226: </a>    a *= rg-&gt;sfactor;
+<a name="line227">227: </a>    b *= rg-&gt;sfactor;
+<a name="line228">228: </a>    c *= rg-&gt;sfactor;
+<a name="line229">229: </a>    d *= rg-&gt;sfactor;
+<a name="line230">230: </a>    lx = b-a;
+<a name="line231">231: </a>    ly = d-c;
+<a name="line232">232: </a>    ab = (a+b)/2;
+<a name="line233">233: </a>    cd = (c+d)/2;
+<a name="line234">234: </a>    w  = scale*PetscMax(lx/winw,ly/winh)/2;
+<a name="line235">235: </a>    PetscDrawAxisSetLimits(axis,ab-w*winw,ab+w*winw,cd-w*winh,cd+w*winh);
+<a name="line236">236: </a>    PetscDrawAxisDraw(axis);
+<a name="line237">237: </a>    PetscDrawAxisDestroy(&amp;axis);
+<a name="line238">238: </a>    <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n;i++) {
+<a name="line239">239: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line240">240: </a>      x0 = PetscRealPart(ctx-&gt;vr[i]); y0 = PetscImaginaryPart(ctx-&gt;vr[i]);
+<a name="line241">241: </a>      <font color="#4169E1">if</font> (i&lt;ctx-&gt;n-1) {
+<a name="line242">242: </a>        x1 = PetscRealPart(ctx-&gt;vr[i+1]); y1 = PetscImaginaryPart(ctx-&gt;vr[i+1]);
+<a name="line243">243: </a>      } <font color="#4169E1">else</font> {
+<a name="line244">244: </a>        x1 = PetscRealPart(ctx-&gt;vr[0]); y1 = PetscImaginaryPart(ctx-&gt;vr[0]);
+<a name="line245">245: </a>      }
+<a name="line246">246: </a><font color="#A020F0">#else</font>
+<a name="line247">247: </a>      x0 = ctx-&gt;vr[i]; y0 = ctx-&gt;vi[i];
+<a name="line248">248: </a>      <font color="#4169E1">if</font> (i&lt;ctx-&gt;n-1) {
+<a name="line249">249: </a>        x1 = ctx-&gt;vr[i+1]; y1 = ctx-&gt;vi[i+1];
+<a name="line250">250: </a>      } <font color="#4169E1">else</font> {
+<a name="line251">251: </a>        x1 = ctx-&gt;vr[0]; y1 = ctx-&gt;vi[0];
+<a name="line252">252: </a>      }
+<a name="line253">253: </a><font color="#A020F0">#endif</font>
+<a name="line254">254: </a>      PetscDrawLine(draw,x0*rg-&gt;sfactor,y0*rg-&gt;sfactor,x1*rg-&gt;sfactor,y1*rg-&gt;sfactor,PETSC_DRAW_MAGENTA);
+<a name="line255">255: </a>    }
+<a name="line256">256: </a>    PetscDrawFlush(draw);
+<a name="line257">257: </a>    PetscDrawSave(draw);
+<a name="line258">258: </a>    PetscDrawPause(draw);
+<a name="line259">259: </a>  }
+<a name="line260">260: </a>  <font color="#4169E1">return</font>(0);
+<a name="line261">261: </a>}
+
+<a name="line263">263: </a><strong><font color="#4169E1"><a name="RGIsTrivial_Polygon"></a>PetscErrorCode RGIsTrivial_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscBool *trivial)</font></strong>
+<a name="line264">264: </a>{
+<a name="line265">265: </a>  RG_POLYGON *ctx = (RG_POLYGON*)rg-&gt;data;
+
+<a name="line268">268: </a>  *trivial = PetscNot(ctx-&gt;n);
+<a name="line269">269: </a>  <font color="#4169E1">return</font>(0);
+<a name="line270">270: </a>}
+
+<a name="line272">272: </a><strong><font color="#4169E1"><a name="RGComputeContour_Polygon"></a>PetscErrorCode RGComputeContour_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscInt n,PetscScalar *cr,PetscScalar *ci)</font></strong>
+<a name="line273">273: </a>{
+<a name="line274">274: </a>  RG_POLYGON  *ctx = (RG_POLYGON*)rg-&gt;data;
+<a name="line275">275: </a>  PetscReal   length,h,d,rem=0.0;
+<a name="line276">276: </a>  PetscInt    k=1,idx=ctx-&gt;n-1,i;
+<a name="line277">277: </a>  PetscBool   ini=PETSC_FALSE;
+<a name="line278">278: </a>  PetscScalar incr;
+<a name="line279">279: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line280">280: </a>  PetscScalar inci;
+<a name="line281">281: </a><font color="#A020F0">#endif</font>
+
+<a name="line284">284: </a>  <font color="#4169E1">if</font> (!ctx-&gt;n) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"No vertices have been set yet"</font>);
+<a name="line285">285: </a>  length = SlepcAbsEigenvalue(ctx-&gt;vr[0]-ctx-&gt;vr[ctx-&gt;n-1],ctx-&gt;vi[0]-ctx-&gt;vi[ctx-&gt;n-1]);
+<a name="line286">286: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n-1;i++) length += SlepcAbsEigenvalue(ctx-&gt;vr[i]-ctx-&gt;vr[i+1],ctx-&gt;vi[i]-ctx-&gt;vi[i+1]);
+<a name="line287">287: </a>  h = length/n;
+<a name="line288">288: </a>  cr[0] = ctx-&gt;vr[0];
+<a name="line289">289: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line290">290: </a>  ci[0] = ctx-&gt;vi[0];
+<a name="line291">291: </a><font color="#A020F0">#endif</font>
+<a name="line292">292: </a>  incr = ctx-&gt;vr[ctx-&gt;n-1]-ctx-&gt;vr[0];
+<a name="line293">293: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line294">294: </a>  inci = ctx-&gt;vi[ctx-&gt;n-1]-ctx-&gt;vi[0];
+<a name="line295">295: </a><font color="#A020F0">#endif</font>
+<a name="line296">296: </a>  d = SlepcAbsEigenvalue(incr,inci);
+<a name="line297">297: </a>  incr /= d;
+<a name="line298">298: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line299">299: </a>  inci /= d;
+<a name="line300">300: </a><font color="#A020F0">#endif</font>
+<a name="line301">301: </a>  <font color="#4169E1">while</font> (k&lt;n) {
+<a name="line302">302: </a>    <font color="#4169E1">if</font> (ini) {
+<a name="line303">303: </a>      incr = ctx-&gt;vr[idx]-ctx-&gt;vr[idx+1];
+<a name="line304">304: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line305">305: </a>      inci = ctx-&gt;vi[idx]-ctx-&gt;vi[idx+1];
+<a name="line306">306: </a><font color="#A020F0">#endif</font>
+<a name="line307">307: </a>      d = SlepcAbsEigenvalue(incr,inci);
+<a name="line308">308: </a>      incr /= d;
+<a name="line309">309: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line310">310: </a>      inci /= d;
+<a name="line311">311: </a><font color="#A020F0">#endif</font>
+<a name="line312">312: </a>      <font color="#4169E1">if</font> (rem+d&gt;h) {
+<a name="line313">313: </a>        cr[k] = ctx-&gt;vr[idx+1]+incr*(h-rem);
+<a name="line314">314: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line315">315: </a>        ci[k] = ctx-&gt;vi[idx+1]+inci*(h-rem);
+<a name="line316">316: </a><font color="#A020F0">#endif</font>
+<a name="line317">317: </a>        k++;
+<a name="line318">318: </a>        ini = PETSC_FALSE;
+<a name="line319">319: </a>      } <font color="#4169E1">else</font> {rem += d; idx--;}
+<a name="line320">320: </a>    } <font color="#4169E1">else</font> {
+<a name="line321">321: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line322">322: </a>      rem = SlepcAbsEigenvalue(ctx-&gt;vr[idx]-cr[k-1],ctx-&gt;vi[idx]-ci[k-1]);
+<a name="line323">323: </a><font color="#A020F0">#else</font>
+<a name="line324">324: </a>      rem = PetscAbsScalar(ctx-&gt;vr[idx]-cr[k-1]);
+<a name="line325">325: </a><font color="#A020F0">#endif</font>
+<a name="line326">326: </a>      <font color="#4169E1">if</font> (rem&gt;h) {
+<a name="line327">327: </a>        cr[k] = cr[k-1]+incr*h;
+<a name="line328">328: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line329">329: </a>        ci[k] = ci[k-1]+inci*h;
+<a name="line330">330: </a><font color="#A020F0">#endif</font>
+<a name="line331">331: </a>        k++;
+<a name="line332">332: </a>      } <font color="#4169E1">else</font> {ini = PETSC_TRUE; idx--;}
+<a name="line333">333: </a>    }
+<a name="line334">334: </a>  }
+<a name="line335">335: </a>  <font color="#4169E1">return</font>(0);
+<a name="line336">336: </a>}
+
+<a name="line338">338: </a><strong><font color="#4169E1"><a name="RGComputeBoundingBox_Polygon"></a>PetscErrorCode RGComputeBoundingBox_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal *a,PetscReal *b,PetscReal *c,PetscReal *d)</font></strong>
+<a name="line339">339: </a>{
+<a name="line340">340: </a>  RG_POLYGON *ctx = (RG_POLYGON*)rg-&gt;data;
+<a name="line341">341: </a>  PetscInt   i;
+
+<a name="line344">344: </a>  *a =  PETSC_MAX_REAL;
+<a name="line345">345: </a>  *b = -PETSC_MAX_REAL;
+<a name="line346">346: </a>  *c =  PETSC_MAX_REAL;
+<a name="line347">347: </a>  *d = -PETSC_MAX_REAL;
+<a name="line348">348: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n;i++) {
+<a name="line349">349: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line350">350: </a>    <font color="#4169E1">if</font> (a) *a = PetscMin(*a,PetscRealPart(ctx-&gt;vr[i]));
+<a name="line351">351: </a>    <font color="#4169E1">if</font> (b) *b = PetscMax(*b,PetscRealPart(ctx-&gt;vr[i]));
+<a name="line352">352: </a>    <font color="#4169E1">if</font> (c) *c = PetscMin(*c,PetscImaginaryPart(ctx-&gt;vr[i]));
+<a name="line353">353: </a>    <font color="#4169E1">if</font> (d) *d = PetscMax(*d,PetscImaginaryPart(ctx-&gt;vr[i]));
+<a name="line354">354: </a><font color="#A020F0">#else</font>
+<a name="line355">355: </a>    <font color="#4169E1">if</font> (a) *a = PetscMin(*a,ctx-&gt;vr[i]);
+<a name="line356">356: </a>    <font color="#4169E1">if</font> (b) *b = PetscMax(*b,ctx-&gt;vr[i]);
+<a name="line357">357: </a>    <font color="#4169E1">if</font> (c) *c = PetscMin(*c,ctx-&gt;vi[i]);
+<a name="line358">358: </a>    <font color="#4169E1">if</font> (d) *d = PetscMax(*d,ctx-&gt;vi[i]);
+<a name="line359">359: </a><font color="#A020F0">#endif</font>
+<a name="line360">360: </a>  }
+<a name="line361">361: </a>  <font color="#4169E1">return</font>(0);
+<a name="line362">362: </a>}
+
+<a name="line364">364: </a><strong><font color="#4169E1"><a name="RGCheckInside_Polygon"></a>PetscErrorCode RGCheckInside_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal px,PetscReal py,PetscInt *inout)</font></strong>
+<a name="line365">365: </a>{
+<a name="line366">366: </a>  RG_POLYGON *ctx = (RG_POLYGON*)rg-&gt;data;
+<a name="line367">367: </a>  PetscReal  val,x[VERTMAX],y[VERTMAX];
+<a name="line368">368: </a>  PetscBool  mx,my,nx,ny;
+<a name="line369">369: </a>  PetscInt   i,j;
+
+<a name="line372">372: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n;i++) {
+<a name="line373">373: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line374">374: </a>    x[i] = PetscRealPart(ctx-&gt;vr[i])-px;
+<a name="line375">375: </a>    y[i] = PetscImaginaryPart(ctx-&gt;vr[i])-py;
+<a name="line376">376: </a><font color="#A020F0">#else</font>
+<a name="line377">377: </a>    x[i] = ctx-&gt;vr[i]-px;
+<a name="line378">378: </a>    y[i] = ctx-&gt;vi[i]-py;
+<a name="line379">379: </a><font color="#A020F0">#endif</font>
+<a name="line380">380: </a>  }
+<a name="line381">381: </a>  *inout = -1;
+<a name="line382">382: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;n;i++) {
+<a name="line383">383: </a>    j = (i+1)%ctx-&gt;n;
+<a name="line384">384: </a>    mx = PetscNot(x[i]&lt;0.0);
+<a name="line385">385: </a>    nx = PetscNot(x[j]&lt;0.0);
+<a name="line386">386: </a>    my = PetscNot(y[i]&lt;0.0);
+<a name="line387">387: </a>    ny = PetscNot(y[j]&lt;0.0);
+<a name="line388">388: </a>    <font color="#4169E1">if</font> (!((my||ny) &amp;&amp; (mx||nx)) || (mx&amp;&amp;nx)) <font color="#4169E1">continue</font>;
+<a name="line389">389: </a>    <font color="#4169E1">if</font> (((my &amp;&amp; ny &amp;&amp; (mx||nx)) &amp;&amp; (!(mx&amp;&amp;nx)))) {
+<a name="line390">390: </a>      *inout = -*inout;
+<a name="line391">391: </a>      <font color="#4169E1">continue</font>;
+<a name="line392">392: </a>    }
+<a name="line393">393: </a>    val = (y[i]*x[j]-x[i]*y[j])/(x[j]-x[i]);
+<a name="line394">394: </a>    <font color="#4169E1">if</font> (PetscAbs(val)&lt;10*PETSC_MACHINE_EPSILON) {
+<a name="line395">395: </a>      *inout = 0;
+<a name="line396">396: </a>      <font color="#4169E1">return</font>(0);
+<a name="line397">397: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (val&gt;0.0) *inout = -*inout;
+<a name="line398">398: </a>  }
+<a name="line399">399: </a>  <font color="#4169E1">return</font>(0);
+<a name="line400">400: </a>}
+
+<a name="line402">402: </a><strong><font color="#4169E1"><a name="RGSetFromOptions_Polygon"></a>PetscErrorCode RGSetFromOptions_Polygon(PetscOptionItems *PetscOptionsObject,<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line403">403: </a>{
+<a name="line405">405: </a>  PetscScalar    array[VERTMAX];
+<a name="line406">406: </a>  PetscInt       i,k;
+<a name="line407">407: </a>  PetscBool      flg,flgi=PETSC_FALSE;
+<a name="line408">408: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line409">409: </a>  PetscScalar    arrayi[VERTMAX];
+<a name="line410">410: </a>  PetscInt       ki;
+<a name="line411">411: </a><font color="#A020F0">#else</font>
+<a name="line412">412: </a>  PetscScalar    *arrayi=NULL;
+<a name="line413">413: </a><font color="#A020F0">#endif</font>
+
+<a name="line416">416: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> Polygon Options"</font>);
+
+<a name="line418">418: </a>    k = VERTMAX;
+<a name="line419">419: </a>    <font color="#4169E1">for</font> (i=0;i&lt;k;i++) array[i] = 0;
+<a name="line420">420: </a>    PetscOptionsScalarArray(<font color="#666666">"-rg_polygon_vertices"</font>,<font color="#666666">"Vertices of polygon"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RGPolygonSetVertices.html#RGPolygonSetVertices">RGPolygonSetVertices</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line421">421: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line422">422: </a>    ki = VERTMAX;
+<a name="line423">423: </a>    <font color="#4169E1">for</font> (i=0;i&lt;ki;i++) arrayi[i] = 0;
+<a name="line424">424: </a>    PetscOptionsScalarArray(<font color="#666666">"-rg_polygon_verticesi"</font>,<font color="#666666">"Vertices of polygon (imaginary part)"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RGPolygonSetVertices.html#RGPolygonSetVertices">RGPolygonSetVertices</a>"</font>,arrayi,&amp;ki,&amp;flgi);
+<a name="line425">425: </a>    <font color="#4169E1">if</font> (ki!=k) SETERRQ2(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_SIZ,<font color="#666666">"The number of real %D and imaginary %D parts do not match"</font>,k,ki);
+<a name="line426">426: </a><font color="#A020F0">#endif</font>
+<a name="line427">427: </a>    <font color="#4169E1">if</font> (flg || flgi) { <a href="../../../../../../docs/manualpages/RG/RGPolygonSetVertices.html#RGPolygonSetVertices">RGPolygonSetVertices</a>(rg,k,array,arrayi); }
+
+<a name="line429">429: </a>  PetscOptionsTail();
+<a name="line430">430: </a>  <font color="#4169E1">return</font>(0);
+<a name="line431">431: </a>}
+
+<a name="line433">433: </a><strong><font color="#4169E1"><a name="RGDestroy_Polygon"></a>PetscErrorCode RGDestroy_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line434">434: </a>{
+<a name="line436">436: </a>  RG_POLYGON     *ctx = (RG_POLYGON*)rg-&gt;data;
+
+<a name="line439">439: </a>  <font color="#4169E1">if</font> (ctx-&gt;n) {
+<a name="line440">440: </a>    PetscFree(ctx-&gt;vr);
+<a name="line441">441: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line442">442: </a>    PetscFree(ctx-&gt;vi);
+<a name="line443">443: </a><font color="#A020F0">#endif</font>
+<a name="line444">444: </a>  }
+<a name="line445">445: </a>  PetscFree(rg-&gt;data);
+<a name="line446">446: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGPolygonSetVertices_C"</font>,NULL);
+<a name="line447">447: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGPolygonGetVertices_C"</font>,NULL);
+<a name="line448">448: </a>  <font color="#4169E1">return</font>(0);
+<a name="line449">449: </a>}
+
+<a name="line451">451: </a><strong><font color="#4169E1"><a name="RGCreate_Polygon"></a>SLEPC_EXTERN PetscErrorCode RGCreate_Polygon(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line452">452: </a>{
+<a name="line453">453: </a>  RG_POLYGON     *polygon;
+
+<a name="line457">457: </a>  PetscNewLog(rg,&amp;polygon);
+<a name="line458">458: </a>  rg-&gt;data = (void*)polygon;
+
+<a name="line460">460: </a>  rg-&gt;ops-&gt;istrivial      = RGIsTrivial_Polygon;
+<a name="line461">461: </a>  rg-&gt;ops-&gt;computecontour = RGComputeContour_Polygon;
+<a name="line462">462: </a>  rg-&gt;ops-&gt;computebbox    = RGComputeBoundingBox_Polygon;
+<a name="line463">463: </a>  rg-&gt;ops-&gt;checkinside    = RGCheckInside_Polygon;
+<a name="line464">464: </a>  rg-&gt;ops-&gt;setfromoptions = RGSetFromOptions_Polygon;
+<a name="line465">465: </a>  rg-&gt;ops-&gt;view           = RGView_Polygon;
+<a name="line466">466: </a>  rg-&gt;ops-&gt;destroy        = RGDestroy_Polygon;
+<a name="line467">467: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGPolygonSetVertices_C"</font>,RGPolygonSetVertices_Polygon);
+<a name="line468">468: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGPolygonGetVertices_C"</font>,RGPolygonGetVertices_Polygon);
+<a name="line469">469: </a>  <font color="#4169E1">return</font>(0);
+<a name="line470">470: </a>}
+
+</pre>
+</body>
+
+</html>

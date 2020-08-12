@@ -1,0 +1,158 @@
+<center><a href="pool.c">Actual source code: pool.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/vec/pool.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:35+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/vec/pool.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Implementation of a pool of Vec using VecDuplicateVecs</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/vecimplslepc.h.html">&lt;slepc/private/vecimplslepc.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#B22222">/*@C</font>
+<a name="line17"> 17: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/SlepcVecPoolCreate.html#SlepcVecPoolCreate">SlepcVecPoolCreate</a> - Create a pool of Vec.</font>
+
+<a name="line19"> 19: </a><font color="#B22222">   Collective on v</font>
+
+<a name="line21"> 21: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line22"> 22: </a><font color="#B22222">+  v - template vector.</font>
+<a name="line23"> 23: </a><font color="#B22222">-  init_size - first guess of maximum vectors.</font>
+
+<a name="line25"> 25: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line26"> 26: </a><font color="#B22222">.  pool - the pool context.</font>
+
+<a name="line28"> 28: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line30"> 30: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a>(), <a href="../../../docs/manualpages/sys/SlepcVecPoolDestroy.html#SlepcVecPoolDestroy">SlepcVecPoolDestroy</a>()</font>
+<a name="line31"> 31: </a><font color="#B22222">@*/</font>
+<a name="line32"> 32: </a><strong><font color="#4169E1"><a name="SlepcVecPoolCreate"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/SlepcVecPoolCreate.html#SlepcVecPoolCreate">SlepcVecPoolCreate</a>(Vec v,PetscInt init_size,VecPool *p)</font></strong>
+<a name="line33"> 33: </a>{
+<a name="line35"> 35: </a>  VecPool_       *pool;
+
+<a name="line41"> 41: </a>  <font color="#4169E1">if</font> (init_size&lt;0) SETERRQ(PetscObjectComm((PetscObject)v),PETSC_ERR_ARG_WRONG,<font color="#666666">"init_size should be positive"</font>);
+<a name="line42"> 42: </a>  PetscCalloc1(1,&amp;pool);
+<a name="line43"> 43: </a>  PetscObjectReference((PetscObject)v);
+<a name="line44"> 44: </a>  pool-&gt;v     = v;
+<a name="line45"> 45: </a>  pool-&gt;guess = init_size;
+<a name="line46"> 46: </a>  *p = pool;
+<a name="line47"> 47: </a>  <font color="#4169E1">return</font>(0);
+<a name="line48"> 48: </a>}
+
+<a name="line50"> 50: </a><font color="#B22222">/*@C</font>
+<a name="line51"> 51: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/SlepcVecPoolDestroy.html#SlepcVecPoolDestroy">SlepcVecPoolDestroy</a> - Destroy the pool of Vec.</font>
+
+<a name="line53"> 53: </a><font color="#B22222">   Collective on p</font>
+
+<a name="line55"> 55: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line56"> 56: </a><font color="#B22222">.  pool - pool of Vec.</font>
+
+<a name="line58"> 58: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line60"> 60: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a>(), <a href="../../../docs/manualpages/sys/SlepcVecPoolCreate.html#SlepcVecPoolCreate">SlepcVecPoolCreate</a>()</font>
+<a name="line61"> 61: </a><font color="#B22222">@*/</font>
+<a name="line62"> 62: </a><strong><font color="#4169E1"><a name="SlepcVecPoolDestroy"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/SlepcVecPoolDestroy.html#SlepcVecPoolDestroy">SlepcVecPoolDestroy</a>(VecPool *p)</font></strong>
+<a name="line63"> 63: </a>{
+<a name="line65"> 65: </a>  VecPool_       *pool = (VecPool_*)*p;
+
+<a name="line68"> 68: </a>  <font color="#4169E1">if</font> (!*p) <font color="#4169E1">return</font>(0);
+<a name="line69"> 69: </a>  VecDestroy(&amp;pool-&gt;v);
+<a name="line70"> 70: </a>  VecDestroyVecs(pool-&gt;n,&amp;pool-&gt;vecs);
+<a name="line71"> 71: </a>  pool-&gt;n     = 0;
+<a name="line72"> 72: </a>  pool-&gt;used  = 0;
+<a name="line73"> 73: </a>  pool-&gt;guess = 0;
+<a name="line74"> 74: </a>  <a href="../../../docs/manualpages/sys/SlepcVecPoolDestroy.html#SlepcVecPoolDestroy">SlepcVecPoolDestroy</a>((VecPool*)&amp;pool-&gt;next);
+<a name="line75"> 75: </a>  PetscFree(pool);
+<a name="line76"> 76: </a>  *p = NULL;
+<a name="line77"> 77: </a>  <font color="#4169E1">return</font>(0);
+<a name="line78"> 78: </a>}
+
+<a name="line80"> 80: </a><font color="#B22222">/*@C</font>
+<a name="line81"> 81: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a> - Get an array of Vec from the pool.</font>
+
+<a name="line83"> 83: </a><font color="#B22222">   Collective on p</font>
+
+<a name="line85"> 85: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line86"> 86: </a><font color="#B22222">+  pool - pool of Vec.</font>
+<a name="line87"> 87: </a><font color="#B22222">-  n - number of vectors.</font>
+
+<a name="line89"> 89: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line90"> 90: </a><font color="#B22222">.  vecs - vectors</font>
+
+<a name="line92"> 92: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line94"> 94: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/SlepcVecPoolRestoreVecs.html#SlepcVecPoolRestoreVecs">SlepcVecPoolRestoreVecs</a>()</font>
+<a name="line95"> 95: </a><font color="#B22222">@*/</font>
+<a name="line96"> 96: </a><strong><font color="#4169E1"><a name="SlepcVecPoolGetVecs"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a>(VecPool p,PetscInt n,Vec **vecs)</font></strong>
+<a name="line97"> 97: </a>{
+<a name="line99"> 99: </a>  VecPool_       *pool = (VecPool_*)p;
+
+<a name="line104">104: </a>  <font color="#4169E1">if</font> (n&lt;0) SETERRQ(PetscObjectComm((PetscObject)pool-&gt;v),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"n should be positive"</font>);
+<a name="line105">105: </a>  <font color="#4169E1">while</font> (pool-&gt;next) pool = pool-&gt;next;
+<a name="line106">106: </a>  <font color="#4169E1">if</font> (pool-&gt;n-pool-&gt;used &lt; n) {
+<a name="line107">107: </a>    pool-&gt;guess = PetscMax(p-&gt;guess,pool-&gt;used+n);
+<a name="line108">108: </a>    <font color="#4169E1">if</font> (pool-&gt;vecs &amp;&amp; pool-&gt;used == 0) {
+<a name="line109">109: </a>      VecDestroyVecs(pool-&gt;n,&amp;pool-&gt;vecs);
+<a name="line110">110: </a>    }
+<a name="line111">111: </a>    <font color="#4169E1">if</font> (pool-&gt;vecs) {
+<a name="line112">112: </a>      <a href="../../../docs/manualpages/sys/SlepcVecPoolCreate.html#SlepcVecPoolCreate">SlepcVecPoolCreate</a>(p-&gt;v,pool-&gt;guess-pool-&gt;used,&amp;pool-&gt;next);
+<a name="line113">113: </a>      pool = pool-&gt;next;
+<a name="line114">114: </a>    }
+<a name="line115">115: </a>    pool-&gt;n = pool-&gt;guess;
+<a name="line116">116: </a>    VecDuplicateVecs(p-&gt;v,pool-&gt;n,&amp;pool-&gt;vecs);
+<a name="line117">117: </a>  }
+<a name="line118">118: </a>  *vecs = pool-&gt;vecs + pool-&gt;used;
+<a name="line119">119: </a>  pool-&gt;used += n;
+<a name="line120">120: </a>  <font color="#4169E1">return</font>(0);
+<a name="line121">121: </a>}
+
+<a name="line123">123: </a><font color="#B22222">/*@C</font>
+<a name="line124">124: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/SlepcVecPoolRestoreVecs.html#SlepcVecPoolRestoreVecs">SlepcVecPoolRestoreVecs</a> - Get back an array of Vec previously returned by</font>
+<a name="line125">125: </a><font color="#B22222">   <a href="../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a>().</font>
+
+<a name="line127">127: </a><font color="#B22222">   Collective on p</font>
+
+<a name="line129">129: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line130">130: </a><font color="#B22222">+  pool - pool of Vec.</font>
+<a name="line131">131: </a><font color="#B22222">.  n - number of vectors.</font>
+<a name="line132">132: </a><font color="#B22222">-  vecs - vectors</font>
+
+<a name="line134">134: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line136">136: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/SlepcVecPoolGetVecs.html#SlepcVecPoolGetVecs">SlepcVecPoolGetVecs</a>()</font>
+<a name="line137">137: </a><font color="#B22222">@*/</font>
+<a name="line138">138: </a><strong><font color="#4169E1"><a name="SlepcVecPoolRestoreVecs"></a>PetscErrorCode <a href="../../../docs/manualpages/sys/SlepcVecPoolRestoreVecs.html#SlepcVecPoolRestoreVecs">SlepcVecPoolRestoreVecs</a>(VecPool p,PetscInt n,Vec **vecs)</font></strong>
+<a name="line139">139: </a>{
+<a name="line141">141: </a>  VecPool_       *pool = (VecPool_*)p, *pool0 = pool;
+
+<a name="line144">144: </a>  <font color="#4169E1">while</font> (pool-&gt;next) pool = (pool0 = pool)-&gt;next;
+<a name="line145">145: </a>  <font color="#4169E1">if</font> (pool-&gt;used == 0 &amp;&amp; pool0 != pool) {
+<a name="line146">146: </a>    pool0-&gt;guess = pool0-&gt;used + pool-&gt;guess;
+<a name="line147">147: </a>    <a href="../../../docs/manualpages/sys/SlepcVecPoolDestroy.html#SlepcVecPoolDestroy">SlepcVecPoolDestroy</a>((VecPool*)&amp;pool);
+<a name="line148">148: </a>    pool = pool0;
+<a name="line149">149: </a>    pool-&gt;next = NULL;
+<a name="line150">150: </a>  }
+<a name="line151">151: </a>  pool-&gt;used -= n;
+<a name="line152">152: </a>  <font color="#4169E1">if</font> (pool-&gt;used &lt; 0) SETERRQ(PetscObjectComm((PetscObject)pool-&gt;v),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Unmatched <a href="../../../docs/manualpages/sys/SlepcVecPoolRestoreVecs.html#SlepcVecPoolRestoreVecs">SlepcVecPoolRestoreVecs</a>"</font>);
+<a name="line153">153: </a>  <font color="#4169E1">return</font>(0);
+<a name="line154">154: </a>}
+</pre>
+</body>
+
+</html>

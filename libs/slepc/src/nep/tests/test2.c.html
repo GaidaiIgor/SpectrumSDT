@@ -1,0 +1,199 @@
+<center><a href="test2.c">Actual source code: test2.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/nep/tests/test2.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:10+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/nep/tests/test2.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Test <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> interface functions.\n\n"</font>;
+
+<a name="line13"> 13: </a> #include <A href="../../../include/slepcnep.h.html">&lt;slepcnep.h&gt;</A>
+
+<a name="line15"> 15: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line16"> 16: </a>{
+<a name="line17"> 17: </a>  Mat                  A[3],B;      <font color="#B22222">/* problem matrices */</font>
+<a name="line18"> 18: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>                   f[3],g;      <font color="#B22222">/* problem functions */</font>
+<a name="line19"> 19: </a>  <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>                  nep;         <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line20"> 20: </a>  <a href="../../../docs/manualpages/DS/DS.html#DS">DS</a>                   ds;
+<a name="line21"> 21: </a>  <a href="../../../docs/manualpages/RG/RG.html#RG">RG</a>                   rg;
+<a name="line22"> 22: </a>  PetscReal            tol;
+<a name="line23"> 23: </a>  PetscScalar          coeffs[2],target;
+<a name="line24"> 24: </a>  PetscInt             n=20,i,its,nev,ncv,mpd,Istart,Iend,nterm;
+<a name="line25"> 25: </a>  PetscBool            twoside;
+<a name="line26"> 26: </a>  <a href="../../../docs/manualpages/NEP/NEPWhich.html#NEPWhich">NEPWhich</a>             which;
+<a name="line27"> 27: </a>  <a href="../../../docs/manualpages/NEP/NEPConvergedReason.html#NEPConvergedReason">NEPConvergedReason</a>   reason;
+<a name="line28"> 28: </a>  <a href="../../../docs/manualpages/NEP/NEPType.html#NEPType">NEPType</a>              type;
+<a name="line29"> 29: </a>  <a href="../../../docs/manualpages/NEP/NEPRefine.html#NEPRefine">NEPRefine</a>            refine;
+<a name="line30"> 30: </a>  <a href="../../../docs/manualpages/NEP/NEPRefineScheme.html#NEPRefineScheme">NEPRefineScheme</a>      rscheme;
+<a name="line31"> 31: </a>  <a href="../../../docs/manualpages/NEP/NEPConv.html#NEPConv">NEPConv</a>              conv;
+<a name="line32"> 32: </a>  <a href="../../../docs/manualpages/NEP/NEPStop.html#NEPStop">NEPStop</a>              stop;
+<a name="line33"> 33: </a>  <a href="../../../docs/manualpages/NEP/NEPProblemType.html#NEPProblemType">NEPProblemType</a>       ptype;
+<a name="line34"> 34: </a>  MatStructure         mstr;
+<a name="line35"> 35: </a>  PetscErrorCode       ierr;
+<a name="line36"> 36: </a>  PetscViewerAndFormat *vf;
+<a name="line37"> 37: </a>  const char           *str=NULL;
+
+<a name="line39"> 39: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line40"> 40: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nDiagonal Nonlinear Eigenproblem, n=%D\n\n"</font>,n);
+
+<a name="line42"> 42: </a>  <font color="#B22222">/*</font>
+<a name="line43"> 43: </a><font color="#B22222">     Matrices</font>
+<a name="line44"> 44: </a><font color="#B22222">  */</font>
+<a name="line45"> 45: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A[0]);
+<a name="line46"> 46: </a>  MatSetSizes(A[0],PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line47"> 47: </a>  MatSetFromOptions(A[0]);
+<a name="line48"> 48: </a>  MatSetUp(A[0]);
+<a name="line49"> 49: </a>  MatGetOwnershipRange(A[0],&amp;Istart,&amp;Iend);
+<a name="line50"> 50: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line51"> 51: </a>    MatSetValue(A[0],i,i,i+1,INSERT_VALUES);
+<a name="line52"> 52: </a>  }
+<a name="line53"> 53: </a>  MatAssemblyBegin(A[0],MAT_FINAL_ASSEMBLY);
+<a name="line54"> 54: </a>  MatAssemblyEnd(A[0],MAT_FINAL_ASSEMBLY);
+
+<a name="line56"> 56: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A[1]);
+<a name="line57"> 57: </a>  MatSetSizes(A[1],PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line58"> 58: </a>  MatSetFromOptions(A[1]);
+<a name="line59"> 59: </a>  MatSetUp(A[1]);
+<a name="line60"> 60: </a>  MatGetOwnershipRange(A[1],&amp;Istart,&amp;Iend);
+<a name="line61"> 61: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line62"> 62: </a>    MatSetValue(A[1],i,i,1.0,INSERT_VALUES);
+<a name="line63"> 63: </a>  }
+<a name="line64"> 64: </a>  MatAssemblyBegin(A[1],MAT_FINAL_ASSEMBLY);
+<a name="line65"> 65: </a>  MatAssemblyEnd(A[1],MAT_FINAL_ASSEMBLY);
+
+<a name="line67"> 67: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A[2]);
+<a name="line68"> 68: </a>  MatSetSizes(A[2],PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line69"> 69: </a>  MatSetFromOptions(A[2]);
+<a name="line70"> 70: </a>  MatSetUp(A[2]);
+<a name="line71"> 71: </a>  MatGetOwnershipRange(A[1],&amp;Istart,&amp;Iend);
+<a name="line72"> 72: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line73"> 73: </a>    MatSetValue(A[2],i,i,n/(PetscReal)(i+1),INSERT_VALUES);
+<a name="line74"> 74: </a>  }
+<a name="line75"> 75: </a>  MatAssemblyBegin(A[2],MAT_FINAL_ASSEMBLY);
+<a name="line76"> 76: </a>  MatAssemblyEnd(A[2],MAT_FINAL_ASSEMBLY);
+
+<a name="line78"> 78: </a>  <font color="#B22222">/*</font>
+<a name="line79"> 79: </a><font color="#B22222">     Functions: f0=-lambda, f1=1.0, f2=sqrt(lambda)</font>
+<a name="line80"> 80: </a><font color="#B22222">  */</font>
+<a name="line81"> 81: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;f[0]);
+<a name="line82"> 82: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f[0],FNRATIONAL);
+<a name="line83"> 83: </a>  coeffs[0] = -1.0; coeffs[1] = 0.0;
+<a name="line84"> 84: </a>  <a href="../../../docs/manualpages/FN/FNRationalSetNumerator.html#FNRationalSetNumerator">FNRationalSetNumerator</a>(f[0],2,coeffs);
+
+<a name="line86"> 86: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;f[1]);
+<a name="line87"> 87: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f[1],FNRATIONAL);
+<a name="line88"> 88: </a>  coeffs[0] = 1.0;
+<a name="line89"> 89: </a>  <a href="../../../docs/manualpages/FN/FNRationalSetNumerator.html#FNRationalSetNumerator">FNRationalSetNumerator</a>(f[1],1,coeffs);
+
+<a name="line91"> 91: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;f[2]);
+<a name="line92"> 92: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f[2],FNSQRT);
+
+<a name="line94"> 94: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line95"> 95: </a><font color="#B22222">             Create eigensolver and test interface functions</font>
+<a name="line96"> 96: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line97"> 97: </a>  <a href="../../../docs/manualpages/NEP/NEPCreate.html#NEPCreate">NEPCreate</a>(PETSC_COMM_WORLD,&amp;nep);
+<a name="line98"> 98: </a>  <a href="../../../docs/manualpages/NEP/NEPSetSplitOperator.html#NEPSetSplitOperator">NEPSetSplitOperator</a>(nep,3,A,f,SAME_NONZERO_PATTERN);
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/NEP/NEPGetSplitOperatorInfo.html#NEPGetSplitOperatorInfo">NEPGetSplitOperatorInfo</a>(nep,&amp;nterm,&amp;mstr);
+<a name="line100">100: </a>  <font color="#4169E1">switch</font> (mstr) {
+<a name="line101">101: </a>    <font color="#4169E1">case</font> DIFFERENT_NONZERO_PATTERN: str = <font color="#666666">"different"</font>; <font color="#4169E1">break</font>;
+<a name="line102">102: </a>    <font color="#4169E1">case</font> SUBSET_NONZERO_PATTERN:    str = <font color="#666666">"subset"</font>; <font color="#4169E1">break</font>;
+<a name="line103">103: </a>    <font color="#4169E1">case</font> SAME_NONZERO_PATTERN:      str = <font color="#666666">"same"</font>; <font color="#4169E1">break</font>;
+<a name="line104">104: </a>  }
+<a name="line105">105: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Nonlinear function with %d terms, with %s nonzero pattern\n"</font>,(int)nterm,str);
+<a name="line106">106: </a>  <a href="../../../docs/manualpages/NEP/NEPGetSplitOperatorTerm.html#NEPGetSplitOperatorTerm">NEPGetSplitOperatorTerm</a>(nep,0,&amp;B,&amp;g);
+<a name="line107">107: </a>  MatView(B,NULL);
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>(g,NULL);
+
+<a name="line110">110: </a>  <a href="../../../docs/manualpages/NEP/NEPSetType.html#NEPSetType">NEPSetType</a>(nep,NEPRII);
+<a name="line111">111: </a>  <a href="../../../docs/manualpages/NEP/NEPGetType.html#NEPGetType">NEPGetType</a>(nep,&amp;type);
+<a name="line112">112: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Type set to %s\n"</font>,type);
+<a name="line113">113: </a>  <a href="../../../docs/manualpages/NEP/NEPGetTwoSided.html#NEPGetTwoSided">NEPGetTwoSided</a>(nep,&amp;twoside);
+<a name="line114">114: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Two-sided flag = %s\n"</font>,twoside?<font color="#666666">"true"</font>:<font color="#666666">"false"</font>);
+
+<a name="line116">116: </a>  <a href="../../../docs/manualpages/NEP/NEPGetProblemType.html#NEPGetProblemType">NEPGetProblemType</a>(nep,&amp;ptype);
+<a name="line117">117: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Problem type before changing = %d"</font>,(int)ptype);
+<a name="line118">118: </a>  <a href="../../../docs/manualpages/NEP/NEPSetProblemType.html#NEPSetProblemType">NEPSetProblemType</a>(nep,<a href="../../../docs/manualpages/NEP/NEPProblemType.html#NEPProblemType">NEP_RATIONAL</a>);
+<a name="line119">119: </a>  <a href="../../../docs/manualpages/NEP/NEPGetProblemType.html#NEPGetProblemType">NEPGetProblemType</a>(nep,&amp;ptype);
+<a name="line120">120: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to %d.\n"</font>,(int)ptype);
+
+<a name="line122">122: </a>  <a href="../../../docs/manualpages/NEP/NEPSetRefine.html#NEPSetRefine">NEPSetRefine</a>(nep,<a href="../../../docs/manualpages/NEP/NEPRefine.html#NEPRefine">NEP_REFINE_SIMPLE</a>,1,1e-9,2,<a href="../../../docs/manualpages/NEP/NEPRefineScheme.html#NEPRefineScheme">NEP_REFINE_SCHEME_EXPLICIT</a>);
+<a name="line123">123: </a>  <a href="../../../docs/manualpages/NEP/NEPGetRefine.html#NEPGetRefine">NEPGetRefine</a>(nep,&amp;refine,NULL,&amp;tol,&amp;its,&amp;rscheme);
+<a name="line124">124: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Refinement: %s, tol=%g, its=%D, scheme=%s\n"</font>,NEPRefineTypes[refine],(double)tol,its,NEPRefineSchemes[rscheme]);
+
+<a name="line126">126: </a>  <a href="../../../docs/manualpages/NEP/NEPSetTarget.html#NEPSetTarget">NEPSetTarget</a>(nep,1.1);
+<a name="line127">127: </a>  <a href="../../../docs/manualpages/NEP/NEPGetTarget.html#NEPGetTarget">NEPGetTarget</a>(nep,&amp;target);
+<a name="line128">128: </a>  <a href="../../../docs/manualpages/NEP/NEPSetWhichEigenpairs.html#NEPSetWhichEigenpairs">NEPSetWhichEigenpairs</a>(nep,<a href="../../../docs/manualpages/NEP/NEPWhich.html#NEPWhich">NEP_TARGET_MAGNITUDE</a>);
+<a name="line129">129: </a>  <a href="../../../docs/manualpages/NEP/NEPGetWhichEigenpairs.html#NEPGetWhichEigenpairs">NEPGetWhichEigenpairs</a>(nep,&amp;which);
+<a name="line130">130: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Which = %d, target = %g\n"</font>,(int)which,(double)PetscRealPart(target));
+
+<a name="line132">132: </a>  <a href="../../../docs/manualpages/NEP/NEPSetDimensions.html#NEPSetDimensions">NEPSetDimensions</a>(nep,1,12,PETSC_DEFAULT);
+<a name="line133">133: </a>  <a href="../../../docs/manualpages/NEP/NEPGetDimensions.html#NEPGetDimensions">NEPGetDimensions</a>(nep,&amp;nev,&amp;ncv,&amp;mpd);
+<a name="line134">134: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Dimensions: nev=%D, ncv=%D, mpd=%D\n"</font>,nev,ncv,mpd);
+
+<a name="line136">136: </a>  <a href="../../../docs/manualpages/NEP/NEPSetTolerances.html#NEPSetTolerances">NEPSetTolerances</a>(nep,1.0e-6,200);
+<a name="line137">137: </a>  <a href="../../../docs/manualpages/NEP/NEPGetTolerances.html#NEPGetTolerances">NEPGetTolerances</a>(nep,&amp;tol,&amp;its);
+<a name="line138">138: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Tolerance = %.6f, max_its = %D\n"</font>,(double)tol,its);
+
+<a name="line140">140: </a>  <a href="../../../docs/manualpages/NEP/NEPSetConvergenceTest.html#NEPSetConvergenceTest">NEPSetConvergenceTest</a>(nep,<a href="../../../docs/manualpages/NEP/NEPConv.html#NEPConv">NEP_CONV_ABS</a>);
+<a name="line141">141: </a>  <a href="../../../docs/manualpages/NEP/NEPGetConvergenceTest.html#NEPGetConvergenceTest">NEPGetConvergenceTest</a>(nep,&amp;conv);
+<a name="line142">142: </a>  <a href="../../../docs/manualpages/NEP/NEPSetStoppingTest.html#NEPSetStoppingTest">NEPSetStoppingTest</a>(nep,<a href="../../../docs/manualpages/NEP/NEPStop.html#NEPStop">NEP_STOP_BASIC</a>);
+<a name="line143">143: </a>  <a href="../../../docs/manualpages/NEP/NEPGetStoppingTest.html#NEPGetStoppingTest">NEPGetStoppingTest</a>(nep,&amp;stop);
+<a name="line144">144: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Convergence test = %d, stopping test = %d\n"</font>,(int)conv,(int)stop);
+
+<a name="line146">146: </a>  PetscViewerAndFormatCreate(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_DEFAULT,&amp;vf);
+<a name="line147">147: </a>  <a href="../../../docs/manualpages/NEP/NEPMonitorSet.html#NEPMonitorSet">NEPMonitorSet</a>(nep,(PetscErrorCode (*)(<a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>,PetscInt,PetscInt,PetscScalar*,PetscScalar*,PetscReal*,PetscInt,void*))<a href="../../../docs/manualpages/NEP/NEPMonitorFirst.html#NEPMonitorFirst">NEPMonitorFirst</a>,vf,(PetscErrorCode (*)(void**))PetscViewerAndFormatDestroy);
+<a name="line148">148: </a>  <a href="../../../docs/manualpages/NEP/NEPMonitorCancel.html#NEPMonitorCancel">NEPMonitorCancel</a>(nep);
+
+<a name="line150">150: </a>  <a href="../../../docs/manualpages/NEP/NEPGetDS.html#NEPGetDS">NEPGetDS</a>(nep,&amp;ds);
+<a name="line151">151: </a>  <a href="../../../docs/manualpages/DS/DSView.html#DSView">DSView</a>(ds,NULL);
+<a name="line152">152: </a>  <a href="../../../docs/manualpages/NEP/NEPSetFromOptions.html#NEPSetFromOptions">NEPSetFromOptions</a>(nep);
+
+<a name="line154">154: </a>  <a href="../../../docs/manualpages/NEP/NEPGetRG.html#NEPGetRG">NEPGetRG</a>(nep,&amp;rg);
+<a name="line155">155: </a>  <a href="../../../docs/manualpages/RG/RGView.html#RGView">RGView</a>(rg,NULL);
+
+<a name="line157">157: </a>  <a href="../../../docs/manualpages/NEP/NEPSolve.html#NEPSolve">NEPSolve</a>(nep);
+<a name="line158">158: </a>  <a href="../../../docs/manualpages/NEP/NEPGetConvergedReason.html#NEPGetConvergedReason">NEPGetConvergedReason</a>(nep,&amp;reason);
+<a name="line159">159: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Finished - converged reason = %d\n"</font>,(int)reason);
+
+<a name="line161">161: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line162">162: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line163">163: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line164">164: </a>  <a href="../../../docs/manualpages/NEP/NEPErrorView.html#NEPErrorView">NEPErrorView</a>(nep,<a href="../../../docs/manualpages/NEP/NEPErrorType.html#NEPErrorType">NEP_ERROR_RELATIVE</a>,NULL);
+<a name="line165">165: </a>  <a href="../../../docs/manualpages/NEP/NEPDestroy.html#NEPDestroy">NEPDestroy</a>(&amp;nep);
+<a name="line166">166: </a>  MatDestroy(&amp;A[0]);
+<a name="line167">167: </a>  MatDestroy(&amp;A[1]);
+<a name="line168">168: </a>  MatDestroy(&amp;A[2]);
+<a name="line169">169: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;f[0]);
+<a name="line170">170: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;f[1]);
+<a name="line171">171: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;f[2]);
+<a name="line172">172: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line173">173: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line174">174: </a>}
+
+<a name="line176">176: </a><font color="#B22222">/*TEST</font>
+
+<a name="line178">178: </a><font color="#B22222">   test:</font>
+<a name="line179">179: </a><font color="#B22222">      suffix: 1</font>
+<a name="line180">180: </a><font color="#B22222">      requires: !single</font>
+
+<a name="line182">182: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

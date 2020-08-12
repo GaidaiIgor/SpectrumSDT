@@ -1,0 +1,457 @@
+<center><a href="cross.c">Actual source code: cross.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/svd/impls/cross/cross.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:01+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/svd/impls/cross/cross.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc singular value solver: "cross"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Uses a Hermitian eigensolver for A^T*A</font>
+<a name="line14"> 14: </a><font color="#B22222">*/</font>
+
+<a name="line16"> 16: </a> #include <A href="../../../../include/slepc/private/svdimpl.h.html">&lt;slepc/private/svdimpl.h&gt;</A>
+<a name="line17"> 17: </a> #include <A href="../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+
+<a name="line19"> 19: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line20"> 20: </a>  PetscBool explicitmatrix;
+<a name="line21"> 21: </a>  <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>       eps;
+<a name="line22"> 22: </a>  PetscBool usereps;
+<a name="line23"> 23: </a>  Mat       mat;
+<a name="line24"> 24: </a>  Vec       w,diag;
+<a name="line25"> 25: </a>} SVD_CROSS;
+
+<a name="line27"> 27: </a><strong><font color="#4169E1"><a name="MatMult_Cross"></a>static PetscErrorCode MatMult_Cross(Mat B,Vec x,Vec y)</font></strong>
+<a name="line28"> 28: </a>{
+<a name="line30"> 30: </a>  <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>            svd;
+<a name="line31"> 31: </a>  SVD_CROSS      *cross;
+
+<a name="line34"> 34: </a>  MatShellGetContext(B,(void**)&amp;svd);
+<a name="line35"> 35: </a>  cross = (SVD_CROSS*)svd-&gt;data;
+<a name="line36"> 36: </a>  SVDMatMult(svd,PETSC_FALSE,x,cross-&gt;w);
+<a name="line37"> 37: </a>  SVDMatMult(svd,PETSC_TRUE,cross-&gt;w,y);
+<a name="line38"> 38: </a>  <font color="#4169E1">return</font>(0);
+<a name="line39"> 39: </a>}
+
+<a name="line41"> 41: </a><strong><font color="#4169E1"><a name="MatCreateVecs_Cross"></a>static PetscErrorCode MatCreateVecs_Cross(Mat B,Vec *right,Vec *left)</font></strong>
+<a name="line42"> 42: </a>{
+<a name="line44"> 44: </a>  <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>            svd;
+
+<a name="line47"> 47: </a>  MatShellGetContext(B,(void**)&amp;svd);
+<a name="line48"> 48: </a>  <font color="#4169E1">if</font> (right) {
+<a name="line49"> 49: </a>    SVDMatCreateVecs(svd,right,NULL);
+<a name="line50"> 50: </a>    <font color="#4169E1">if</font> (left) { VecDuplicate(*right,left); }
+<a name="line51"> 51: </a>  } <font color="#4169E1">else</font> {
+<a name="line52"> 52: </a>    SVDMatCreateVecs(svd,left,NULL);
+<a name="line53"> 53: </a>  }
+<a name="line54"> 54: </a>  <font color="#4169E1">return</font>(0);
+<a name="line55"> 55: </a>}
+
+<a name="line57"> 57: </a><strong><font color="#4169E1"><a name="MatGetDiagonal_Cross"></a>static PetscErrorCode MatGetDiagonal_Cross(Mat B,Vec d)</font></strong>
+<a name="line58"> 58: </a>{
+<a name="line59"> 59: </a>  PetscErrorCode    ierr;
+<a name="line60"> 60: </a>  <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>               svd;
+<a name="line61"> 61: </a>  SVD_CROSS         *cross;
+<a name="line62"> 62: </a>  PetscMPIInt       len;
+<a name="line63"> 63: </a>  PetscInt          N,n,i,j,start,end,ncols;
+<a name="line64"> 64: </a>  PetscScalar       *work1,*work2,*diag;
+<a name="line65"> 65: </a>  const PetscInt    *cols;
+<a name="line66"> 66: </a>  const PetscScalar *vals;
+
+<a name="line69"> 69: </a>  MatShellGetContext(B,(void**)&amp;svd);
+<a name="line70"> 70: </a>  cross = (SVD_CROSS*)svd-&gt;data;
+<a name="line71"> 71: </a>  <font color="#4169E1">if</font> (!cross-&gt;diag) {
+<a name="line72"> 72: </a>    <font color="#B22222">/* compute diagonal from rows and store in cross-&gt;diag */</font>
+<a name="line73"> 73: </a>    VecDuplicate(d,&amp;cross-&gt;diag);
+<a name="line74"> 74: </a>    SVDMatGetSize(svd,NULL,&amp;N);
+<a name="line75"> 75: </a>    SVDMatGetLocalSize(svd,NULL,&amp;n);
+<a name="line76"> 76: </a>    PetscCalloc2(N,&amp;work1,N,&amp;work2);
+<a name="line77"> 77: </a>    <font color="#4169E1">if</font> (svd-&gt;AT) {
+<a name="line78"> 78: </a>      MatGetOwnershipRange(svd-&gt;AT,&amp;start,&amp;end);
+<a name="line79"> 79: </a>      <font color="#4169E1">for</font> (i=start;i&lt;end;i++) {
+<a name="line80"> 80: </a>        MatGetRow(svd-&gt;AT,i,&amp;ncols,NULL,&amp;vals);
+<a name="line81"> 81: </a>        <font color="#4169E1">for</font> (j=0;j&lt;ncols;j++)
+<a name="line82"> 82: </a>          work1[i] += vals[j]*vals[j];
+<a name="line83"> 83: </a>        MatRestoreRow(svd-&gt;AT,i,&amp;ncols,NULL,&amp;vals);
+<a name="line84"> 84: </a>      }
+<a name="line85"> 85: </a>    } <font color="#4169E1">else</font> {
+<a name="line86"> 86: </a>      MatGetOwnershipRange(svd-&gt;A,&amp;start,&amp;end);
+<a name="line87"> 87: </a>      <font color="#4169E1">for</font> (i=start;i&lt;end;i++) {
+<a name="line88"> 88: </a>        MatGetRow(svd-&gt;A,i,&amp;ncols,&amp;cols,&amp;vals);
+<a name="line89"> 89: </a>        <font color="#4169E1">for</font> (j=0;j&lt;ncols;j++)
+<a name="line90"> 90: </a>          work1[cols[j]] += vals[j]*vals[j];
+<a name="line91"> 91: </a>        MatRestoreRow(svd-&gt;A,i,&amp;ncols,&amp;cols,&amp;vals);
+<a name="line92"> 92: </a>      }
+<a name="line93"> 93: </a>    }
+<a name="line94"> 94: </a>    PetscMPIIntCast(N,&amp;len);
+<a name="line95"> 95: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(work1,work2,len,MPIU_SCALAR,MPIU_SUM,PetscObjectComm((PetscObject)svd));
+<a name="line96"> 96: </a>    VecGetOwnershipRange(cross-&gt;diag,&amp;start,&amp;end);
+<a name="line97"> 97: </a>    VecGetArray(cross-&gt;diag,&amp;diag);
+<a name="line98"> 98: </a>    <font color="#4169E1">for</font> (i=start;i&lt;end;i++) diag[i-start] = work2[i];
+<a name="line99"> 99: </a>    VecRestoreArray(cross-&gt;diag,&amp;diag);
+<a name="line100">100: </a>    PetscFree2(work1,work2);
+<a name="line101">101: </a>  }
+<a name="line102">102: </a>  VecCopy(cross-&gt;diag,d);
+<a name="line103">103: </a>  <font color="#4169E1">return</font>(0);
+<a name="line104">104: </a>}
+
+<a name="line106">106: </a><strong><font color="#4169E1"><a name="SVDSetUp_Cross"></a>PetscErrorCode SVDSetUp_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line107">107: </a>{
+<a name="line109">109: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+<a name="line110">110: </a>  PetscInt       n;
+<a name="line111">111: </a>  PetscBool      trackall;
+
+<a name="line114">114: </a>  <font color="#4169E1">if</font> (!cross-&gt;mat) {
+<a name="line115">115: </a>    <font color="#4169E1">if</font> (cross-&gt;explicitmatrix) {
+<a name="line116">116: </a>      <font color="#4169E1">if</font> (svd-&gt;A &amp;&amp; svd-&gt;AT) {  <font color="#B22222">/* explicit transpose */</font>
+<a name="line117">117: </a>        MatProductCreate(svd-&gt;AT,svd-&gt;A,NULL,&amp;cross-&gt;mat);
+<a name="line118">118: </a>        MatProductSetType(cross-&gt;mat,MATPRODUCT_AB);
+<a name="line119">119: </a>      } <font color="#4169E1">else</font> {  <font color="#B22222">/* implicit transpose */</font>
+<a name="line120">120: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line121">121: </a>        SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_SUP,<font color="#666666">"Must use explicit transpose with complex scalars"</font>);
+<a name="line122">122: </a><font color="#A020F0">#else</font>
+<a name="line123">123: </a>        <font color="#4169E1">if</font> (svd-&gt;A) {
+<a name="line124">124: </a>          MatProductCreate(svd-&gt;A,svd-&gt;A,NULL,&amp;cross-&gt;mat);
+<a name="line125">125: </a>          MatProductSetType(cross-&gt;mat,MATPRODUCT_AtB);
+<a name="line126">126: </a>        } <font color="#4169E1">else</font> {
+<a name="line127">127: </a>          MatProductCreate(svd-&gt;AT,svd-&gt;AT,NULL,&amp;cross-&gt;mat);
+<a name="line128">128: </a>          MatProductSetType(cross-&gt;mat,MATPRODUCT_ABt);
+<a name="line129">129: </a>        }
+<a name="line130">130: </a><font color="#A020F0">#endif</font>
+<a name="line131">131: </a>      }
+<a name="line132">132: </a>      MatProductSetFromOptions(cross-&gt;mat);
+<a name="line133">133: </a>      MatProductSymbolic(cross-&gt;mat);
+<a name="line134">134: </a>      MatProductNumeric(cross-&gt;mat);
+<a name="line135">135: </a>    } <font color="#4169E1">else</font> {
+<a name="line136">136: </a>      SVDMatGetLocalSize(svd,NULL,&amp;n);
+<a name="line137">137: </a>      MatCreateShell(PetscObjectComm((PetscObject)svd),n,n,PETSC_DETERMINE,PETSC_DETERMINE,svd,&amp;cross-&gt;mat);
+<a name="line138">138: </a>      MatShellSetOperation(cross-&gt;mat,MATOP_MULT,(void(*)(void))MatMult_Cross);
+<a name="line139">139: </a>      MatShellSetOperation(cross-&gt;mat,MATOP_CREATE_VECS,(void(*)(void))MatCreateVecs_Cross);
+<a name="line140">140: </a>      MatShellSetOperation(cross-&gt;mat,MATOP_GET_DIAGONAL,(void(*)(void))MatGetDiagonal_Cross);
+<a name="line141">141: </a>      SVDMatCreateVecs(svd,NULL,&amp;cross-&gt;w);
+<a name="line142">142: </a>      PetscLogObjectParent((PetscObject)svd,(PetscObject)cross-&gt;w);
+<a name="line143">143: </a>    }
+<a name="line144">144: </a>    PetscLogObjectParent((PetscObject)svd,(PetscObject)cross-&gt;mat);
+<a name="line145">145: </a>  }
+
+<a name="line147">147: </a>  <font color="#4169E1">if</font> (!cross-&gt;eps) { <a href="../../../../docs/manualpages/SVD/SVDCrossGetEPS.html#SVDCrossGetEPS">SVDCrossGetEPS</a>(svd,&amp;cross-&gt;eps); }
+<a name="line148">148: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(cross-&gt;eps,cross-&gt;mat,NULL);
+<a name="line149">149: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(cross-&gt;eps,<a href="../../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>);
+<a name="line150">150: </a>  <font color="#4169E1">if</font> (!cross-&gt;usereps) {
+<a name="line151">151: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(cross-&gt;eps,svd-&gt;which==<a href="../../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_LARGEST</a>?<a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>:<a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>);
+<a name="line152">152: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(cross-&gt;eps,svd-&gt;nsv,svd-&gt;ncv,svd-&gt;mpd);
+<a name="line153">153: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(cross-&gt;eps,svd-&gt;tol==PETSC_DEFAULT?SLEPC_DEFAULT_TOL/10.0:svd-&gt;tol,svd-&gt;max_it);
+<a name="line154">154: </a>    <font color="#4169E1">switch</font> (svd-&gt;conv) {
+<a name="line155">155: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_ABS</a>:
+<a name="line156">156: </a>      <a href="../../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(cross-&gt;eps,<a href="../../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_ABS</a>);<font color="#4169E1">break</font>;
+<a name="line157">157: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_REL</a>:
+<a name="line158">158: </a>      <a href="../../../../docs/manualpages/EPS/EPSSetConvergenceTest.html#EPSSetConvergenceTest">EPSSetConvergenceTest</a>(cross-&gt;eps,<a href="../../../../docs/manualpages/EPS/EPSConv.html#EPSConv">EPS_CONV_REL</a>);<font color="#4169E1">break</font>;
+<a name="line159">159: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_USER</a>:
+<a name="line160">160: </a>      SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_SUP,<font color="#666666">"User-defined convergence test not supported in this solver"</font>);
+<a name="line161">161: </a>    }
+<a name="line162">162: </a>  }
+<a name="line163">163: </a>  <font color="#4169E1">if</font> (svd-&gt;stop!=<a href="../../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_BASIC</a>) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_SUP,<font color="#666666">"User-defined stopping test not supported in this solver"</font>);
+<a name="line164">164: </a>  <font color="#B22222">/* Transfer the trackall option from svd to eps */</font>
+<a name="line165">165: </a>  <a href="../../../../docs/manualpages/SVD/SVDGetTrackAll.html#SVDGetTrackAll">SVDGetTrackAll</a>(svd,&amp;trackall);
+<a name="line166">166: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a>(cross-&gt;eps,trackall);
+<a name="line167">167: </a>  <font color="#B22222">/* Transfer the initial space from svd to eps */</font>
+<a name="line168">168: </a>  <font color="#4169E1">if</font> (svd-&gt;nini&lt;0) {
+<a name="line169">169: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetInitialSpace.html#EPSSetInitialSpace">EPSSetInitialSpace</a>(cross-&gt;eps,-svd-&gt;nini,svd-&gt;IS);
+<a name="line170">170: </a>    SlepcBasisDestroy_Private(&amp;svd-&gt;nini,&amp;svd-&gt;IS);
+<a name="line171">171: </a>  }
+<a name="line172">172: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>(cross-&gt;eps);
+<a name="line173">173: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(cross-&gt;eps,NULL,&amp;svd-&gt;ncv,&amp;svd-&gt;mpd);
+<a name="line174">174: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetTolerances.html#EPSGetTolerances">EPSGetTolerances</a>(cross-&gt;eps,NULL,&amp;svd-&gt;max_it);
+<a name="line175">175: </a>  <font color="#4169E1">if</font> (svd-&gt;tol==PETSC_DEFAULT) svd-&gt;tol = SLEPC_DEFAULT_TOL;
+
+<a name="line177">177: </a>  svd-&gt;leftbasis = PETSC_FALSE;
+<a name="line178">178: </a>  <a href="../../../../docs/manualpages/SVD/SVDAllocateSolution.html#SVDAllocateSolution">SVDAllocateSolution</a>(svd,0);
+<a name="line179">179: </a>  <font color="#4169E1">return</font>(0);
+<a name="line180">180: </a>}
+
+<a name="line182">182: </a><strong><font color="#4169E1"><a name="SVDSolve_Cross"></a>PetscErrorCode SVDSolve_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line183">183: </a>{
+<a name="line185">185: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+<a name="line186">186: </a>  PetscInt       i;
+<a name="line187">187: </a>  PetscScalar    lambda;
+<a name="line188">188: </a>  PetscReal      sigma;
+<a name="line189">189: </a>  Vec            v;
+
+<a name="line192">192: </a>  <a href="../../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(cross-&gt;eps);
+<a name="line193">193: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(cross-&gt;eps,&amp;svd-&gt;nconv);
+<a name="line194">194: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetIterationNumber.html#EPSGetIterationNumber">EPSGetIterationNumber</a>(cross-&gt;eps,&amp;svd-&gt;its);
+<a name="line195">195: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetConvergedReason.html#EPSGetConvergedReason">EPSGetConvergedReason</a>(cross-&gt;eps,(<a href="../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a>*)&amp;svd-&gt;reason);
+<a name="line196">196: </a>  <font color="#4169E1">for</font> (i=0;i&lt;svd-&gt;nconv;i++) {
+<a name="line197">197: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(svd-&gt;V,i,&amp;v);
+<a name="line198">198: </a>    <a href="../../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(cross-&gt;eps,i,&amp;lambda,NULL,v,NULL);
+<a name="line199">199: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(svd-&gt;V,i,&amp;v);
+<a name="line200">200: </a>    sigma = PetscRealPart(lambda);
+<a name="line201">201: </a>    <font color="#4169E1">if</font> (sigma&lt;-10*PETSC_MACHINE_EPSILON) SETERRQ1(PetscObjectComm((PetscObject)svd),1,<font color="#666666">"Negative eigenvalue computed by <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>: %g"</font>,sigma);
+<a name="line202">202: </a>    <font color="#4169E1">if</font> (sigma&lt;0.0) {
+<a name="line203">203: </a>      PetscInfo1(svd,<font color="#666666">"Negative eigenvalue computed by <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>: %g, resetting to 0\n"</font>,sigma);
+<a name="line204">204: </a>      sigma = 0.0;
+<a name="line205">205: </a>    }
+<a name="line206">206: </a>    svd-&gt;sigma[i] = PetscSqrtReal(sigma);
+<a name="line207">207: </a>  }
+<a name="line208">208: </a>  <font color="#4169E1">return</font>(0);
+<a name="line209">209: </a>}
+
+<a name="line211">211: </a><strong><font color="#4169E1"><a name="EPSMonitor_Cross"></a>static PetscErrorCode EPSMonitor_Cross(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt its,PetscInt nconv,PetscScalar *eigr,PetscScalar *eigi,PetscReal *errest,PetscInt nest,void *ctx)</font></strong>
+<a name="line212">212: </a>{
+<a name="line213">213: </a>  PetscInt       i;
+<a name="line214">214: </a>  <a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>            svd = (<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>)ctx;
+<a name="line215">215: </a>  PetscScalar    er,ei;
+
+<a name="line219">219: </a>  <font color="#4169E1">for</font> (i=0;i&lt;PetscMin(nest,svd-&gt;ncv);i++) {
+<a name="line220">220: </a>    er = eigr[i]; ei = eigi[i];
+<a name="line221">221: </a>    <a href="../../../../docs/manualpages/ST/STBackTransform.html#STBackTransform">STBackTransform</a>(eps-&gt;st,1,&amp;er,&amp;ei);
+<a name="line222">222: </a>    svd-&gt;sigma[i] = PetscSqrtReal(PetscAbsReal(PetscRealPart(er)));
+<a name="line223">223: </a>    svd-&gt;errest[i] = errest[i];
+<a name="line224">224: </a>  }
+<a name="line225">225: </a>  SVDMonitor(svd,its,nconv,svd-&gt;sigma,svd-&gt;errest,nest);
+<a name="line226">226: </a>  <font color="#4169E1">return</font>(0);
+<a name="line227">227: </a>}
+
+<a name="line229">229: </a><strong><font color="#4169E1"><a name="SVDSetFromOptions_Cross"></a>PetscErrorCode SVDSetFromOptions_Cross(PetscOptionItems *PetscOptionsObject,<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line230">230: </a>{
+<a name="line232">232: </a>  PetscBool      set,val;
+<a name="line233">233: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+<a name="line234">234: </a>  <a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+
+<a name="line237">237: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> Cross Options"</font>);
+
+<a name="line239">239: </a>    PetscOptionsBool(<font color="#666666">"-svd_cross_explicitmatrix"</font>,<font color="#666666">"Use cross explicit matrix"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/SVD/SVDCrossSetExplicitMatrix.html#SVDCrossSetExplicitMatrix">SVDCrossSetExplicitMatrix</a>"</font>,cross-&gt;explicitmatrix,&amp;val,&amp;set);
+<a name="line240">240: </a>    <font color="#4169E1">if</font> (set) { <a href="../../../../docs/manualpages/SVD/SVDCrossSetExplicitMatrix.html#SVDCrossSetExplicitMatrix">SVDCrossSetExplicitMatrix</a>(svd,val); }
+
+<a name="line242">242: </a>  PetscOptionsTail();
+
+<a name="line244">244: </a>  <font color="#4169E1">if</font> (!cross-&gt;eps) { <a href="../../../../docs/manualpages/SVD/SVDCrossGetEPS.html#SVDCrossGetEPS">SVDCrossGetEPS</a>(svd,&amp;cross-&gt;eps); }
+<a name="line245">245: </a>  <font color="#4169E1">if</font> (!cross-&gt;explicitmatrix &amp;&amp; !cross-&gt;usereps) {
+<a name="line246">246: </a>    <font color="#B22222">/* use as default an <a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a> with shell matrix and Jacobi */</font>
+<a name="line247">247: </a>    <a href="../../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(cross-&gt;eps,&amp;st);
+<a name="line248">248: </a>    <a href="../../../../docs/manualpages/ST/STSetMatMode.html#STSetMatMode">STSetMatMode</a>(st,<a href="../../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_SHELL</a>);
+<a name="line249">249: </a>  }
+<a name="line250">250: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(cross-&gt;eps);
+<a name="line251">251: </a>  <font color="#4169E1">return</font>(0);
+<a name="line252">252: </a>}
+
+<a name="line254">254: </a><strong><font color="#4169E1"><a name="SVDCrossSetExplicitMatrix_Cross"></a>static PetscErrorCode SVDCrossSetExplicitMatrix_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool explicitmatrix)</font></strong>
+<a name="line255">255: </a>{
+<a name="line256">256: </a>  SVD_CROSS *cross = (SVD_CROSS*)svd-&gt;data;
+
+<a name="line259">259: </a>  <font color="#4169E1">if</font> (cross-&gt;explicitmatrix != explicitmatrix) {
+<a name="line260">260: </a>    cross-&gt;explicitmatrix = explicitmatrix;
+<a name="line261">261: </a>    svd-&gt;state = SVD_STATE_INITIAL;
+<a name="line262">262: </a>  }
+<a name="line263">263: </a>  <font color="#4169E1">return</font>(0);
+<a name="line264">264: </a>}
+
+<a name="line266">266: </a><font color="#B22222">/*@</font>
+<a name="line267">267: </a><font color="#B22222">   <a href="../../../../docs/manualpages/SVD/SVDCrossSetExplicitMatrix.html#SVDCrossSetExplicitMatrix">SVDCrossSetExplicitMatrix</a> - Indicate if the eigensolver operator A^T*A must</font>
+<a name="line268">268: </a><font color="#B22222">   be computed explicitly.</font>
+
+<a name="line270">270: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line272">272: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line273">273: </a><font color="#B22222">+  svd      - singular value solver</font>
+<a name="line274">274: </a><font color="#B22222">-  explicit - boolean flag indicating if A^T*A is built explicitly</font>
+
+<a name="line276">276: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line277">277: </a><font color="#B22222">.  -svd_cross_explicitmatrix &lt;boolean&gt; - Indicates the boolean flag</font>
+
+<a name="line279">279: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line281">281: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/SVD/SVDCrossGetExplicitMatrix.html#SVDCrossGetExplicitMatrix">SVDCrossGetExplicitMatrix</a>()</font>
+<a name="line282">282: </a><font color="#B22222">@*/</font>
+<a name="line283">283: </a><strong><font color="#4169E1"><a name="SVDCrossSetExplicitMatrix"></a>PetscErrorCode <a href="../../../../docs/manualpages/SVD/SVDCrossSetExplicitMatrix.html#SVDCrossSetExplicitMatrix">SVDCrossSetExplicitMatrix</a>(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool explicitmatrix)</font></strong>
+<a name="line284">284: </a>{
+
+<a name="line290">290: </a>  PetscTryMethod(svd,<font color="#666666">"SVDCrossSetExplicitMatrix_C"</font>,(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscBool),(svd,explicitmatrix));
+<a name="line291">291: </a>  <font color="#4169E1">return</font>(0);
+<a name="line292">292: </a>}
+
+<a name="line294">294: </a><strong><font color="#4169E1"><a name="SVDCrossGetExplicitMatrix_Cross"></a>static PetscErrorCode SVDCrossGetExplicitMatrix_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool *explicitmatrix)</font></strong>
+<a name="line295">295: </a>{
+<a name="line296">296: </a>  SVD_CROSS *cross = (SVD_CROSS*)svd-&gt;data;
+
+<a name="line299">299: </a>  *explicitmatrix = cross-&gt;explicitmatrix;
+<a name="line300">300: </a>  <font color="#4169E1">return</font>(0);
+<a name="line301">301: </a>}
+
+<a name="line303">303: </a><font color="#B22222">/*@</font>
+<a name="line304">304: </a><font color="#B22222">   <a href="../../../../docs/manualpages/SVD/SVDCrossGetExplicitMatrix.html#SVDCrossGetExplicitMatrix">SVDCrossGetExplicitMatrix</a> - Returns the flag indicating if A^T*A is built explicitly.</font>
+
+<a name="line306">306: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line308">308: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line309">309: </a><font color="#B22222">.  svd  - singular value solver</font>
+
+<a name="line311">311: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line312">312: </a><font color="#B22222">.  explicit - the mode flag</font>
+
+<a name="line314">314: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line316">316: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/SVD/SVDCrossSetExplicitMatrix.html#SVDCrossSetExplicitMatrix">SVDCrossSetExplicitMatrix</a>()</font>
+<a name="line317">317: </a><font color="#B22222">@*/</font>
+<a name="line318">318: </a><strong><font color="#4169E1"><a name="SVDCrossGetExplicitMatrix"></a>PetscErrorCode <a href="../../../../docs/manualpages/SVD/SVDCrossGetExplicitMatrix.html#SVDCrossGetExplicitMatrix">SVDCrossGetExplicitMatrix</a>(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool *explicitmatrix)</font></strong>
+<a name="line319">319: </a>{
+
+<a name="line325">325: </a>  PetscUseMethod(svd,<font color="#666666">"SVDCrossGetExplicitMatrix_C"</font>,(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscBool*),(svd,explicitmatrix));
+<a name="line326">326: </a>  <font color="#4169E1">return</font>(0);
+<a name="line327">327: </a>}
+
+<a name="line329">329: </a><strong><font color="#4169E1"><a name="SVDCrossSetEPS_Cross"></a>static PetscErrorCode SVDCrossSetEPS_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line330">330: </a>{
+<a name="line332">332: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+
+<a name="line335">335: </a>  PetscObjectReference((PetscObject)eps);
+<a name="line336">336: </a>  <a href="../../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;cross-&gt;eps);
+<a name="line337">337: </a>  cross-&gt;eps = eps;
+<a name="line338">338: </a>  cross-&gt;usereps = PETSC_TRUE;
+<a name="line339">339: </a>  PetscLogObjectParent((PetscObject)svd,(PetscObject)cross-&gt;eps);
+<a name="line340">340: </a>  svd-&gt;state = SVD_STATE_INITIAL;
+<a name="line341">341: </a>  <font color="#4169E1">return</font>(0);
+<a name="line342">342: </a>}
+
+<a name="line344">344: </a><font color="#B22222">/*@</font>
+<a name="line345">345: </a><font color="#B22222">   <a href="../../../../docs/manualpages/SVD/SVDCrossSetEPS.html#SVDCrossSetEPS">SVDCrossSetEPS</a> - Associate an eigensolver object (<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) to the</font>
+<a name="line346">346: </a><font color="#B22222">   singular value solver.</font>
+
+<a name="line348">348: </a><font color="#B22222">   Collective on svd</font>
+
+<a name="line350">350: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line351">351: </a><font color="#B22222">+  svd - singular value solver</font>
+<a name="line352">352: </a><font color="#B22222">-  eps - the eigensolver object</font>
+
+<a name="line354">354: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line356">356: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/SVD/SVDCrossGetEPS.html#SVDCrossGetEPS">SVDCrossGetEPS</a>()</font>
+<a name="line357">357: </a><font color="#B22222">@*/</font>
+<a name="line358">358: </a><strong><font color="#4169E1"><a name="SVDCrossSetEPS"></a>PetscErrorCode <a href="../../../../docs/manualpages/SVD/SVDCrossSetEPS.html#SVDCrossSetEPS">SVDCrossSetEPS</a>(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line359">359: </a>{
+
+<a name="line366">366: </a>  PetscTryMethod(svd,<font color="#666666">"SVDCrossSetEPS_C"</font>,(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>),(svd,eps));
+<a name="line367">367: </a>  <font color="#4169E1">return</font>(0);
+<a name="line368">368: </a>}
+
+<a name="line370">370: </a><strong><font color="#4169E1"><a name="SVDCrossGetEPS_Cross"></a>static PetscErrorCode SVDCrossGetEPS_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> *eps)</font></strong>
+<a name="line371">371: </a>{
+<a name="line372">372: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+
+<a name="line376">376: </a>  <font color="#4169E1">if</font> (!cross-&gt;eps) {
+<a name="line377">377: </a>    <a href="../../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PetscObjectComm((PetscObject)svd),&amp;cross-&gt;eps);
+<a name="line378">378: </a>    PetscObjectIncrementTabLevel((PetscObject)cross-&gt;eps,(PetscObject)svd,1);
+<a name="line379">379: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(cross-&gt;eps,((PetscObject)svd)-&gt;prefix);
+<a name="line380">380: </a>    <a href="../../../../docs/manualpages/EPS/EPSAppendOptionsPrefix.html#EPSAppendOptionsPrefix">EPSAppendOptionsPrefix</a>(cross-&gt;eps,<font color="#666666">"svd_cross_"</font>);
+<a name="line381">381: </a>    PetscLogObjectParent((PetscObject)svd,(PetscObject)cross-&gt;eps);
+<a name="line382">382: </a>    PetscObjectSetOptions((PetscObject)cross-&gt;eps,((PetscObject)svd)-&gt;options);
+<a name="line383">383: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(cross-&gt;eps,<a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>);
+<a name="line384">384: </a>    <a href="../../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(cross-&gt;eps,EPSMonitor_Cross,svd,NULL);
+<a name="line385">385: </a>  }
+<a name="line386">386: </a>  *eps = cross-&gt;eps;
+<a name="line387">387: </a>  <font color="#4169E1">return</font>(0);
+<a name="line388">388: </a>}
+
+<a name="line390">390: </a><font color="#B22222">/*@</font>
+<a name="line391">391: </a><font color="#B22222">   <a href="../../../../docs/manualpages/SVD/SVDCrossGetEPS.html#SVDCrossGetEPS">SVDCrossGetEPS</a> - Retrieve the eigensolver object (<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) associated</font>
+<a name="line392">392: </a><font color="#B22222">   to the singular value solver.</font>
+
+<a name="line394">394: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line396">396: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line397">397: </a><font color="#B22222">.  svd - singular value solver</font>
+
+<a name="line399">399: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line400">400: </a><font color="#B22222">.  eps - the eigensolver object</font>
+
+<a name="line402">402: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line404">404: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/SVD/SVDCrossSetEPS.html#SVDCrossSetEPS">SVDCrossSetEPS</a>()</font>
+<a name="line405">405: </a><font color="#B22222">@*/</font>
+<a name="line406">406: </a><strong><font color="#4169E1"><a name="SVDCrossGetEPS"></a>PetscErrorCode <a href="../../../../docs/manualpages/SVD/SVDCrossGetEPS.html#SVDCrossGetEPS">SVDCrossGetEPS</a>(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> *eps)</font></strong>
+<a name="line407">407: </a>{
+
+<a name="line413">413: </a>  PetscUseMethod(svd,<font color="#666666">"SVDCrossGetEPS_C"</font>,(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>*),(svd,eps));
+<a name="line414">414: </a>  <font color="#4169E1">return</font>(0);
+<a name="line415">415: </a>}
+
+<a name="line417">417: </a><strong><font color="#4169E1"><a name="SVDView_Cross"></a>PetscErrorCode SVDView_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscViewer viewer)</font></strong>
+<a name="line418">418: </a>{
+<a name="line420">420: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+<a name="line421">421: </a>  PetscBool      isascii;
+
+<a name="line424">424: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line425">425: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line426">426: </a>    <font color="#4169E1">if</font> (!cross-&gt;eps) { <a href="../../../../docs/manualpages/SVD/SVDCrossGetEPS.html#SVDCrossGetEPS">SVDCrossGetEPS</a>(svd,&amp;cross-&gt;eps); }
+<a name="line427">427: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  %s matrix\n"</font>,cross-&gt;explicitmatrix?<font color="#666666">"explicit"</font>:<font color="#666666">"implicit"</font>);
+<a name="line428">428: </a>    PetscViewerASCIIPushTab(viewer);
+<a name="line429">429: </a>    <a href="../../../../docs/manualpages/EPS/EPSView.html#EPSView">EPSView</a>(cross-&gt;eps,viewer);
+<a name="line430">430: </a>    PetscViewerASCIIPopTab(viewer);
+<a name="line431">431: </a>  }
+<a name="line432">432: </a>  <font color="#4169E1">return</font>(0);
+<a name="line433">433: </a>}
+
+<a name="line435">435: </a><strong><font color="#4169E1"><a name="SVDReset_Cross"></a>PetscErrorCode SVDReset_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line436">436: </a>{
+<a name="line438">438: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+
+<a name="line441">441: </a>  <a href="../../../../docs/manualpages/EPS/EPSReset.html#EPSReset">EPSReset</a>(cross-&gt;eps);
+<a name="line442">442: </a>  MatDestroy(&amp;cross-&gt;mat);
+<a name="line443">443: </a>  VecDestroy(&amp;cross-&gt;w);
+<a name="line444">444: </a>  VecDestroy(&amp;cross-&gt;diag);
+<a name="line445">445: </a>  <font color="#4169E1">return</font>(0);
+<a name="line446">446: </a>}
+
+<a name="line448">448: </a><strong><font color="#4169E1"><a name="SVDDestroy_Cross"></a>PetscErrorCode SVDDestroy_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line449">449: </a>{
+<a name="line451">451: </a>  SVD_CROSS      *cross = (SVD_CROSS*)svd-&gt;data;
+
+<a name="line454">454: </a>  <a href="../../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;cross-&gt;eps);
+<a name="line455">455: </a>  PetscFree(svd-&gt;data);
+<a name="line456">456: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossSetEPS_C"</font>,NULL);
+<a name="line457">457: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossGetEPS_C"</font>,NULL);
+<a name="line458">458: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossSetExplicitMatrix_C"</font>,NULL);
+<a name="line459">459: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossGetExplicitMatrix_C"</font>,NULL);
+<a name="line460">460: </a>  <font color="#4169E1">return</font>(0);
+<a name="line461">461: </a>}
+
+<a name="line463">463: </a><strong><font color="#4169E1"><a name="SVDCreate_Cross"></a>SLEPC_EXTERN PetscErrorCode SVDCreate_Cross(<a href="../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line464">464: </a>{
+<a name="line466">466: </a>  SVD_CROSS      *cross;
+
+<a name="line469">469: </a>  PetscNewLog(svd,&amp;cross);
+<a name="line470">470: </a>  svd-&gt;data = (void*)cross;
+
+<a name="line472">472: </a>  svd-&gt;ops-&gt;solve          = SVDSolve_Cross;
+<a name="line473">473: </a>  svd-&gt;ops-&gt;setup          = SVDSetUp_Cross;
+<a name="line474">474: </a>  svd-&gt;ops-&gt;setfromoptions = SVDSetFromOptions_Cross;
+<a name="line475">475: </a>  svd-&gt;ops-&gt;destroy        = SVDDestroy_Cross;
+<a name="line476">476: </a>  svd-&gt;ops-&gt;reset          = SVDReset_Cross;
+<a name="line477">477: </a>  svd-&gt;ops-&gt;view           = SVDView_Cross;
+<a name="line478">478: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossSetEPS_C"</font>,SVDCrossSetEPS_Cross);
+<a name="line479">479: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossGetEPS_C"</font>,SVDCrossGetEPS_Cross);
+<a name="line480">480: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossSetExplicitMatrix_C"</font>,SVDCrossSetExplicitMatrix_Cross);
+<a name="line481">481: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDCrossGetExplicitMatrix_C"</font>,SVDCrossGetExplicitMatrix_Cross);
+<a name="line482">482: </a>  <font color="#4169E1">return</font>(0);
+<a name="line483">483: </a>}
+
+</pre>
+</body>
+
+</html>

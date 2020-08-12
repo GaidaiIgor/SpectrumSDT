@@ -1,0 +1,503 @@
+<center><a href="lmedense.c">Actual source code: lmedense.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/lme/interface/lmedense.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:15+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/lme/interface/lmedense.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Routines for solving dense matrix equations, in some cases calling SLICOT</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/lmeimpl.h.html">&lt;slepc/private/lmeimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#B22222">/*</font>
+<a name="line18"> 18: </a><font color="#B22222">   LMEDenseRankSVD - given a square matrix A, compute its <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> U*S*V', and determine the</font>
+<a name="line19"> 19: </a><font color="#B22222">   numerical rank. On exit, U contains U*S and A is overwritten with V'</font>
+<a name="line20"> 20: </a><font color="#B22222">*/</font>
+<a name="line21"> 21: </a><strong><font color="#4169E1"><a name="LMEDenseRankSVD"></a>PetscErrorCode LMEDenseRankSVD(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscInt n,PetscScalar *A,PetscInt lda,PetscScalar *U,PetscInt ldu,PetscInt *rank)</font></strong>
+<a name="line22"> 22: </a>{
+<a name="line24"> 24: </a>  PetscInt       i,j,rk=0;
+<a name="line25"> 25: </a>  PetscScalar    *work;
+<a name="line26"> 26: </a>  PetscReal      tol,*sg,*rwork;
+<a name="line27"> 27: </a>  PetscBLASInt   n_,lda_,ldu_,info,lw_;
+
+<a name="line30"> 30: </a>  PetscCalloc3(n,&amp;sg,10*n,&amp;work,5*n,&amp;rwork);
+<a name="line31"> 31: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line32"> 32: </a>  PetscBLASIntCast(lda,&amp;lda_);
+<a name="line33"> 33: </a>  PetscBLASIntCast(ldu,&amp;ldu_);
+<a name="line34"> 34: </a>  lw_ = 10*n_;
+<a name="line35"> 35: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line36"> 36: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"O"</font>,&amp;n_,&amp;n_,A,&amp;lda_,sg,U,&amp;ldu_,NULL,&amp;n_,work,&amp;lw_,&amp;info));
+<a name="line37"> 37: </a><font color="#A020F0">#else</font>
+<a name="line38"> 38: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"O"</font>,&amp;n_,&amp;n_,A,&amp;lda_,sg,U,&amp;ldu_,NULL,&amp;n_,work,&amp;lw_,rwork,&amp;info));
+<a name="line39"> 39: </a><font color="#A020F0">#endif</font>
+<a name="line40"> 40: </a>  SlepcCheckLapackInfo(<font color="#666666">"gesvd"</font>,info);
+<a name="line41"> 41: </a>  tol = 10*PETSC_MACHINE_EPSILON*n*sg[0];
+<a name="line42"> 42: </a>  <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line43"> 43: </a>    <font color="#4169E1">if</font> (sg[j]&gt;tol) {
+<a name="line44"> 44: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) U[i+j*n] *= sg[j];
+<a name="line45"> 45: </a>      rk++;
+<a name="line46"> 46: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">break</font>;
+<a name="line47"> 47: </a>  }
+<a name="line48"> 48: </a>  *rank = rk;
+<a name="line49"> 49: </a>  PetscFree3(sg,work,rwork);
+<a name="line50"> 50: </a>  <font color="#4169E1">return</font>(0);
+<a name="line51"> 51: </a>}
+
+<a name="line53"> 53: </a><font color="#A020F0">#if defined(PETSC_USE_INFO)</font>
+<a name="line54"> 54: </a><font color="#B22222">/*</font>
+<a name="line55"> 55: </a><font color="#B22222">   LyapunovCholResidual - compute the residual norm ||A*U'*U+U'*U*A'+B*B'||</font>
+<a name="line56"> 56: </a><font color="#B22222">*/</font>
+<a name="line57"> 57: </a><strong><font color="#4169E1"><a name="LyapunovCholResidual"></a>static PetscErrorCode LyapunovCholResidual(PetscInt m,PetscScalar *A,PetscInt lda,PetscInt k,PetscScalar *B,PetscInt ldb,PetscScalar *U,PetscInt ldu,PetscReal *res)</font></strong>
+<a name="line58"> 58: </a>{
+<a name="line60"> 60: </a>  PetscBLASInt   n,kk,la,lb,lu;
+<a name="line61"> 61: </a>  PetscScalar    *M,*R,zero=0.0,done=1.0;
+
+<a name="line64"> 64: </a>  *res = 0;
+<a name="line65"> 65: </a>  PetscBLASIntCast(lda,&amp;la);
+<a name="line66"> 66: </a>  PetscBLASIntCast(ldb,&amp;lb);
+<a name="line67"> 67: </a>  PetscBLASIntCast(ldu,&amp;lu);
+<a name="line68"> 68: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line69"> 69: </a>  PetscBLASIntCast(k,&amp;kk);
+<a name="line70"> 70: </a>  PetscMalloc2(m*m,&amp;M,m*m,&amp;R);
+
+<a name="line72"> 72: </a>  <font color="#B22222">/* R = B*B' */</font>
+<a name="line73"> 73: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;kk,&amp;done,B,&amp;lb,B,&amp;lb,&amp;zero,R,&amp;n));
+<a name="line74"> 74: </a>  <font color="#B22222">/* M = A*U' */</font>
+<a name="line75"> 75: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;n,&amp;done,A,&amp;la,U,&amp;lu,&amp;zero,M,&amp;n));
+<a name="line76"> 76: </a>  <font color="#B22222">/* R = R+M*U */</font>
+<a name="line77"> 77: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;n,&amp;done,M,&amp;n,U,&amp;lu,&amp;done,R,&amp;n));
+<a name="line78"> 78: </a>  <font color="#B22222">/* R = R+U'*M' */</font>
+<a name="line79"> 79: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;n,&amp;done,U,&amp;lu,M,&amp;n,&amp;done,R,&amp;n));
+
+<a name="line81"> 81: </a>  *res = LAPACKlange_(<font color="#666666">"F"</font>,&amp;n,&amp;n,R,&amp;n,NULL);
+<a name="line82"> 82: </a>  PetscFree2(M,R);
+<a name="line83"> 83: </a>  <font color="#4169E1">return</font>(0);
+<a name="line84"> 84: </a>}
+
+<a name="line86"> 86: </a><font color="#B22222">/*</font>
+<a name="line87"> 87: </a><font color="#B22222">   LyapunovResidual - compute the residual norm ||A*X+X*A'+B||</font>
+<a name="line88"> 88: </a><font color="#B22222">*/</font>
+<a name="line89"> 89: </a><strong><font color="#4169E1"><a name="LyapunovResidual"></a>static PetscErrorCode LyapunovResidual(PetscInt m,PetscScalar *A,PetscInt lda,PetscScalar *B,PetscInt ldb,PetscScalar *X,PetscInt ldx,PetscReal *res)</font></strong>
+<a name="line90"> 90: </a>{
+<a name="line92"> 92: </a>  PetscInt       i;
+<a name="line93"> 93: </a>  PetscBLASInt   n,la,lb,lx;
+<a name="line94"> 94: </a>  PetscScalar    *R,done=1.0;
+
+<a name="line97"> 97: </a>  *res = 0;
+<a name="line98"> 98: </a>  PetscBLASIntCast(lda,&amp;la);
+<a name="line99"> 99: </a>  PetscBLASIntCast(ldb,&amp;lb);
+<a name="line100">100: </a>  PetscBLASIntCast(ldx,&amp;lx);
+<a name="line101">101: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line102">102: </a>  PetscMalloc1(m*m,&amp;R);
+
+<a name="line104">104: </a>  <font color="#B22222">/* R = B+A*X */</font>
+<a name="line105">105: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m;i++) {
+<a name="line106">106: </a>    PetscArraycpy(R+i*m,B+i*ldb,m);
+<a name="line107">107: </a>  }
+<a name="line108">108: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;n,&amp;done,A,&amp;la,X,&amp;lx,&amp;done,R,&amp;n));
+<a name="line109">109: </a>  <font color="#B22222">/* R = R+X*A' */</font>
+<a name="line110">110: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;n,&amp;done,X,&amp;lx,A,&amp;la,&amp;done,R,&amp;n));
+
+<a name="line112">112: </a>  *res = LAPACKlange_(<font color="#666666">"F"</font>,&amp;n,&amp;n,R,&amp;n,NULL);
+<a name="line113">113: </a>  PetscFree(R);
+<a name="line114">114: </a>  <font color="#4169E1">return</font>(0);
+<a name="line115">115: </a>}
+<a name="line116">116: </a><font color="#A020F0">#endif</font>
+
+<a name="line118">118: </a><font color="#A020F0">#if defined(SLEPC_HAVE_SLICOT)</font>
+<a name="line119">119: </a><font color="#B22222">/*</font>
+<a name="line120">120: </a><font color="#B22222">   HessLyapunovChol_SLICOT - implementation used when SLICOT is available</font>
+<a name="line121">121: </a><font color="#B22222">*/</font>
+<a name="line122">122: </a><strong><font color="#4169E1"><a name="HessLyapunovChol_SLICOT"></a>static PetscErrorCode HessLyapunovChol_SLICOT(PetscInt m,PetscScalar *H,PetscInt ldh,PetscInt k,PetscScalar *B,PetscInt ldb,PetscScalar *U,PetscInt ldu,PetscReal *res)</font></strong>
+<a name="line123">123: </a>{
+<a name="line125">125: </a>  PetscBLASInt   lwork,info,n,kk,lu,ione=1,sdim;
+<a name="line126">126: </a>  PetscInt       i,j;
+<a name="line127">127: </a>  PetscReal      scal;
+<a name="line128">128: </a>  PetscScalar    *Q,*W,*wr,*wi,*work;
+
+<a name="line131">131: </a>  PetscBLASIntCast(ldu,&amp;lu);
+<a name="line132">132: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line133">133: </a>  PetscBLASIntCast(k,&amp;kk);
+<a name="line134">134: </a>  PetscBLASIntCast(6*m,&amp;lwork);
+
+<a name="line136">136: </a>  <font color="#B22222">/* transpose W = H' */</font>
+<a name="line137">137: </a>  PetscMalloc5(m*m,&amp;W,m*m,&amp;Q,m,&amp;wr,m,&amp;wi,lwork,&amp;work);
+<a name="line138">138: </a>  <font color="#4169E1">for</font> (j=0;j&lt;m;j++) {
+<a name="line139">139: </a>    <font color="#4169E1">for</font> (i=0;i&lt;m;i++) W[i+j*m] = H[j+i*ldh];
+<a name="line140">140: </a>  }
+
+<a name="line142">142: </a>  <font color="#B22222">/* compute the real Schur form of W */</font>
+<a name="line143">143: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgees"</font>,LAPACKgees_(<font color="#666666">"V"</font>,<font color="#666666">"N"</font>,NULL,&amp;n,W,&amp;n,&amp;sdim,wr,wi,Q,&amp;n,work,&amp;lwork,NULL,&amp;info));
+<a name="line144">144: </a>  SlepcCheckLapackInfo(<font color="#666666">"gees"</font>,info);
+<a name="line145">145: </a><font color="#A020F0">#if defined(PETSC_USE_DEBUG)</font>
+<a name="line146">146: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m;i++) <font color="#4169E1">if</font> (PetscRealPart(wr[i])&gt;=0.0) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Eigenvalue with non-negative real part, the coefficient matrix is not stable"</font>);
+<a name="line147">147: </a><font color="#A020F0">#endif</font>
+
+<a name="line149">149: </a>  <font color="#B22222">/* copy B' into first rows of U */</font>
+<a name="line150">150: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line151">151: </a>    <font color="#4169E1">for</font> (j=0;j&lt;m;j++) U[i+j*ldu] = B[j+i*ldb];
+<a name="line152">152: </a>  }
+
+<a name="line154">154: </a>  <font color="#B22222">/* solve Lyapunov equation (Hammarling) */</font>
+<a name="line155">155: </a>  PetscStackCallBLAS(<font color="#666666">"SLICOTsb03od"</font>,SLICOTsb03od_(<font color="#666666">"C"</font>,<font color="#666666">"F"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;kk,W,&amp;n,Q,&amp;n,U,&amp;lu,&amp;scal,wr,wi,work,&amp;lwork,&amp;info));
+<a name="line156">156: </a>  <font color="#4169E1">if</font> (info) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_LIB,<font color="#666666">"Error in SLICOT subroutine SB03OD: info=%d"</font>,(int)info);
+<a name="line157">157: </a>  <font color="#4169E1">if</font> (scal!=1.0) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"Current implementation cannot handle scale factor %g"</font>,scal);
+
+<a name="line159">159: </a>  <font color="#B22222">/* resnorm = norm(H(m+1,:)*U'*U), use Q(:,1) = U'*U(:,m) */</font>
+<a name="line160">160: </a>  <font color="#4169E1">if</font> (res) {
+<a name="line161">161: </a>    <font color="#4169E1">for</font> (j=0;j&lt;m;j++) Q[j] = U[j+(m-1)*ldu];
+<a name="line162">162: </a>    PetscStackCallBLAS(<font color="#666666">"BLAStrmv"</font>,BLAStrmv_(<font color="#666666">"U"</font>,<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;n,U,&amp;lu,Q,&amp;ione));
+<a name="line163">163: </a>    <font color="#4169E1">if</font> (k!=1) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_LIB,<font color="#666666">"Residual error is intended for k=1 only, but you set k=%d"</font>,(int)k);
+<a name="line164">164: </a>    *res *= BLASnrm2_(&amp;n,Q,&amp;ione);
+<a name="line165">165: </a>  }
+
+<a name="line167">167: </a>  PetscFree5(W,Q,wr,wi,work);
+<a name="line168">168: </a>  <font color="#4169E1">return</font>(0);
+<a name="line169">169: </a>}
+
+<a name="line171">171: </a><font color="#A020F0">#else</font>
+
+<a name="line173">173: </a><font color="#B22222">/*</font>
+<a name="line174">174: </a><font color="#B22222">   Compute the upper Cholesky factor of A</font>
+<a name="line175">175: </a><font color="#B22222"> */</font>
+<a name="line176">176: </a><strong><font color="#4169E1"><a name="CholeskyFactor"></a>static PetscErrorCode CholeskyFactor(PetscInt m,PetscScalar *A,PetscInt lda)</font></strong>
+<a name="line177">177: </a>{
+<a name="line179">179: </a>  PetscInt       i;
+<a name="line180">180: </a>  PetscScalar    *S;
+<a name="line181">181: </a>  PetscBLASInt   info,n,ld;
+
+<a name="line184">184: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line185">185: </a>  PetscBLASIntCast(lda,&amp;ld);
+<a name="line186">186: </a>  PetscMalloc1(m*m,&amp;S);
+
+<a name="line188">188: </a>  <font color="#B22222">/* save a copy of matrix in S */</font>
+<a name="line189">189: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m;i++) {
+<a name="line190">190: </a>    PetscArraycpy(S+i*m,A+i*lda,m);
+<a name="line191">191: </a>  }
+
+<a name="line193">193: </a>  <font color="#B22222">/* compute upper Cholesky factor in R */</font>
+<a name="line194">194: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKpotrf"</font>,LAPACKpotrf_(<font color="#666666">"U"</font>,&amp;n,A,&amp;ld,&amp;info));
+<a name="line195">195: </a>  PetscLogFlops((1.0*n*n*n)/3.0);
+
+<a name="line197">197: </a>  <font color="#4169E1">if</font> (info) {
+<a name="line198">198: </a>    PetscInfo(NULL,<font color="#666666">"potrf failed, retry on diagonally perturbed matrix\n"</font>);
+<a name="line199">199: </a>    <font color="#4169E1">for</font> (i=0;i&lt;m;i++) {
+<a name="line200">200: </a>      PetscArraycpy(A+i*lda,S+i*m,m);
+<a name="line201">201: </a>      A[i+i*lda] += 50.0*PETSC_MACHINE_EPSILON;
+<a name="line202">202: </a>    }
+<a name="line203">203: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKpotrf"</font>,LAPACKpotrf_(<font color="#666666">"U"</font>,&amp;n,A,&amp;ld,&amp;info));
+<a name="line204">204: </a>    SlepcCheckLapackInfo(<font color="#666666">"potrf"</font>,info);
+<a name="line205">205: </a>    PetscLogFlops((1.0*n*n*n)/3.0);
+<a name="line206">206: </a>  }
+
+<a name="line208">208: </a>  <font color="#B22222">/* Zero out entries below the diagonal */</font>
+<a name="line209">209: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m-1;i++) {
+<a name="line210">210: </a>    PetscArrayzero(A+i*lda+i+1,m-i-1);
+<a name="line211">211: </a>  }
+<a name="line212">212: </a>  PetscFree(S);
+<a name="line213">213: </a>  <font color="#4169E1">return</font>(0);
+<a name="line214">214: </a>}
+
+<a name="line216">216: </a><font color="#B22222">/*</font>
+<a name="line217">217: </a><font color="#B22222">   HessLyapunovChol_LAPACK - alternative implementation when SLICOT is not available</font>
+<a name="line218">218: </a><font color="#B22222">*/</font>
+<a name="line219">219: </a><strong><font color="#4169E1"><a name="HessLyapunovChol_LAPACK"></a>static PetscErrorCode HessLyapunovChol_LAPACK(PetscInt m,PetscScalar *H,PetscInt ldh,PetscInt k,PetscScalar *B,PetscInt ldb,PetscScalar *U,PetscInt ldu,PetscReal *res)</font></strong>
+<a name="line220">220: </a>{
+<a name="line222">222: </a>  PetscBLASInt   ilo=1,lwork,info,n,kk,lu,lb,ione=1;
+<a name="line223">223: </a>  PetscInt       i,j;
+<a name="line224">224: </a>  PetscReal      scal;
+<a name="line225">225: </a>  PetscScalar    *Q,*C,*W,*Z,*wr,*work,zero=0.0,done=1.0,dmone=-1.0;
+<a name="line226">226: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line227">227: </a>  PetscScalar    *wi;
+<a name="line228">228: </a><font color="#A020F0">#endif</font>
+
+<a name="line231">231: </a>  PetscBLASIntCast(ldb,&amp;lb);
+<a name="line232">232: </a>  PetscBLASIntCast(ldu,&amp;lu);
+<a name="line233">233: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line234">234: </a>  PetscBLASIntCast(k,&amp;kk);
+<a name="line235">235: </a>  PetscBLASIntCast(6*m,&amp;lwork);
+<a name="line236">236: </a>  C = U;
+
+<a name="line238">238: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line239">239: </a>  PetscMalloc6(m*m,&amp;Q,m*m,&amp;W,m*k,&amp;Z,m,&amp;wr,m,&amp;wi,lwork,&amp;work);
+<a name="line240">240: </a><font color="#A020F0">#else</font>
+<a name="line241">241: </a>  PetscMalloc5(m*m,&amp;Q,m*m,&amp;W,m*k,&amp;Z,m,&amp;wr,lwork,&amp;work);
+<a name="line242">242: </a><font color="#A020F0">#endif</font>
+
+<a name="line244">244: </a>  <font color="#B22222">/* save a copy W = H */</font>
+<a name="line245">245: </a>  <font color="#4169E1">for</font> (j=0;j&lt;m;j++) {
+<a name="line246">246: </a>    <font color="#4169E1">for</font> (i=0;i&lt;m;i++) W[i+j*m] = H[i+j*ldh];
+<a name="line247">247: </a>  }
+
+<a name="line249">249: </a>  <font color="#B22222">/* compute the (real) Schur form of W */</font>
+<a name="line250">250: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line251">251: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKhseqr"</font>,LAPACKhseqr_(<font color="#666666">"S"</font>,<font color="#666666">"I"</font>,&amp;n,&amp;ilo,&amp;n,W,&amp;n,wr,wi,Q,&amp;n,work,&amp;lwork,&amp;info));
+<a name="line252">252: </a><font color="#A020F0">#else</font>
+<a name="line253">253: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKhseqr"</font>,LAPACKhseqr_(<font color="#666666">"S"</font>,<font color="#666666">"I"</font>,&amp;n,&amp;ilo,&amp;n,W,&amp;n,wr,Q,&amp;n,work,&amp;lwork,&amp;info));
+<a name="line254">254: </a><font color="#A020F0">#endif</font>
+<a name="line255">255: </a>  SlepcCheckLapackInfo(<font color="#666666">"hseqr"</font>,info);
+<a name="line256">256: </a><font color="#A020F0">#if defined(PETSC_USE_DEBUG)</font>
+<a name="line257">257: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m;i++) <font color="#4169E1">if</font> (PetscRealPart(wr[i])&gt;=0.0) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"Eigenvalue with non-negative real part %g, the coefficient matrix is not stable"</font>,PetscRealPart(wr[i]));
+<a name="line258">258: </a><font color="#A020F0">#endif</font>
+
+<a name="line260">260: </a>  <font color="#B22222">/* C = -Z*Z', Z = Q'*B */</font>
+<a name="line261">261: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;kk,&amp;n,&amp;done,Q,&amp;n,B,&amp;lb,&amp;zero,Z,&amp;n));
+<a name="line262">262: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;kk,&amp;dmone,Z,&amp;n,Z,&amp;n,&amp;zero,C,&amp;lu));
+
+<a name="line264">264: </a>  <font color="#B22222">/* solve triangular Sylvester equation */</font>
+<a name="line265">265: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKtrsyl"</font>,LAPACKtrsyl_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;ione,&amp;n,&amp;n,W,&amp;n,W,&amp;n,C,&amp;lu,&amp;scal,&amp;info));
+<a name="line266">266: </a>  SlepcCheckLapackInfo(<font color="#666666">"trsyl"</font>,info);
+<a name="line267">267: </a>  <font color="#4169E1">if</font> (scal!=1.0) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"Current implementation cannot handle scale factor %g"</font>,scal);
+
+<a name="line269">269: </a>  <font color="#B22222">/* back-transform C = Q*C*Q' */</font>
+<a name="line270">270: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;n,&amp;done,Q,&amp;n,C,&amp;n,&amp;zero,W,&amp;n));
+<a name="line271">271: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;n,&amp;done,W,&amp;n,Q,&amp;n,&amp;zero,C,&amp;lu));
+
+<a name="line273">273: </a>  <font color="#B22222">/* resnorm = norm(H(m+1,:)*Y) */</font>
+<a name="line274">274: </a>  <font color="#4169E1">if</font> (res) {
+<a name="line275">275: </a>    <font color="#4169E1">if</font> (k!=1) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_LIB,<font color="#666666">"Residual error is intended for k=1 only, but you set k=%d"</font>,(int)k);
+<a name="line276">276: </a>    *res *= BLASnrm2_(&amp;n,C+m-1,&amp;n);
+<a name="line277">277: </a>  }
+
+<a name="line279">279: </a>  <font color="#B22222">/* U = chol(C) */</font>
+<a name="line280">280: </a>  CholeskyFactor(m,C,ldu);
+
+<a name="line282">282: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line283">283: </a>  PetscFree6(Q,W,Z,wr,wi,work);
+<a name="line284">284: </a><font color="#A020F0">#else</font>
+<a name="line285">285: </a>  PetscFree5(Q,W,Z,wr,work);
+<a name="line286">286: </a><font color="#A020F0">#endif</font>
+<a name="line287">287: </a>  <font color="#4169E1">return</font>(0);
+<a name="line288">288: </a>}
+
+<a name="line290">290: </a><font color="#A020F0">#endif </font><font color="#B22222">/* SLEPC_HAVE_SLICOT */</font><font color="#A020F0"></font>
+
+<a name="line292">292: </a><font color="#B22222">/*@C</font>
+<a name="line293">293: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEDenseHessLyapunovChol.html#LMEDenseHessLyapunovChol">LMEDenseHessLyapunovChol</a> - Computes the Cholesky factor of the solution of a</font>
+<a name="line294">294: </a><font color="#B22222">   dense Lyapunov equation with an upper Hessenberg coefficient matrix.</font>
+
+<a name="line296">296: </a><font color="#B22222">   Logically Collective on lme</font>
+
+<a name="line298">298: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line299">299: </a><font color="#B22222">+  lme - linear matrix equation solver context</font>
+<a name="line300">300: </a><font color="#B22222">.  m   - number of rows and columns of H</font>
+<a name="line301">301: </a><font color="#B22222">.  H   - coefficient matrix</font>
+<a name="line302">302: </a><font color="#B22222">.  ldh - leading dimension of H</font>
+<a name="line303">303: </a><font color="#B22222">.  k   - number of columns of B</font>
+<a name="line304">304: </a><font color="#B22222">.  B   - right-hand side matrix</font>
+<a name="line305">305: </a><font color="#B22222">.  ldb - leading dimension of B</font>
+<a name="line306">306: </a><font color="#B22222">-  ldu - leading dimension of U</font>
+
+<a name="line308">308: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line309">309: </a><font color="#B22222">.  U   - Cholesky factor of the solution</font>
+
+<a name="line311">311: </a><font color="#B22222">   Input/Output Parameter:</font>
+<a name="line312">312: </a><font color="#B22222">.  res - (optional) residual norm, on input it should contain H(m+1,m)</font>
+
+<a name="line314">314: </a><font color="#B22222">   Note:</font>
+<a name="line315">315: </a><font color="#B22222">   The Lyapunov equation has the form H*X + X*H' = -B*B', where H is an mxm</font>
+<a name="line316">316: </a><font color="#B22222">   upper Hessenberg matrix, B is an mxk matrix and the solution is expressed</font>
+<a name="line317">317: </a><font color="#B22222">   as X = U'*U, where U is upper triangular. H is supposed to be stable.</font>
+
+<a name="line319">319: </a><font color="#B22222">   When k=1 and the res argument is provided, the last row of X is used to</font>
+<a name="line320">320: </a><font color="#B22222">   compute the residual norm of a Lyapunov equation projected via Arnoldi.</font>
+
+<a name="line322">322: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line324">324: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMEDenseLyapunov.html#LMEDenseLyapunov">LMEDenseLyapunov</a>(), <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>()</font>
+<a name="line325">325: </a><font color="#B22222">@*/</font>
+<a name="line326">326: </a><strong><font color="#4169E1"><a name="LMEDenseHessLyapunovChol"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEDenseHessLyapunovChol.html#LMEDenseHessLyapunovChol">LMEDenseHessLyapunovChol</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscInt m,PetscScalar *H,PetscInt ldh,PetscInt k,PetscScalar *B,PetscInt ldb,PetscScalar *U,PetscInt ldu,PetscReal *res)</font></strong>
+<a name="line327">327: </a>{
+<a name="line329">329: </a><font color="#A020F0">#if defined(PETSC_USE_INFO)</font>
+<a name="line330">330: </a>  PetscReal      error;
+<a name="line331">331: </a><font color="#A020F0">#endif</font>
+
+
+<a name="line345">345: </a><font color="#A020F0">#if defined(SLEPC_HAVE_SLICOT)</font>
+<a name="line346">346: </a>  HessLyapunovChol_SLICOT(m,H,ldh,k,B,ldb,U,ldu,res);
+<a name="line347">347: </a><font color="#A020F0">#else</font>
+<a name="line348">348: </a>  HessLyapunovChol_LAPACK(m,H,ldh,k,B,ldb,U,ldu,res);
+<a name="line349">349: </a><font color="#A020F0">#endif</font>
+
+<a name="line351">351: </a><font color="#A020F0">#if defined(PETSC_USE_INFO)</font>
+<a name="line352">352: </a>  <font color="#4169E1">if</font> (PetscLogPrintInfo) {
+<a name="line353">353: </a>    LyapunovCholResidual(m,H,ldh,k,B,ldb,U,ldu,&amp;error);
+<a name="line354">354: </a>    PetscInfo1(lme,<font color="#666666">"Residual norm of dense Lyapunov equation = %g\n"</font>,error);
+<a name="line355">355: </a>  }
+<a name="line356">356: </a><font color="#A020F0">#endif</font>
+<a name="line357">357: </a>  <font color="#4169E1">return</font>(0);
+<a name="line358">358: </a>}
+
+<a name="line360">360: </a><font color="#A020F0">#if defined(SLEPC_HAVE_SLICOT)</font>
+<a name="line361">361: </a><font color="#B22222">/*</font>
+<a name="line362">362: </a><font color="#B22222">   Lyapunov_SLICOT - implementation used when SLICOT is available</font>
+<a name="line363">363: </a><font color="#B22222">*/</font>
+<a name="line364">364: </a><strong><font color="#4169E1"><a name="Lyapunov_SLICOT"></a>static PetscErrorCode Lyapunov_SLICOT(PetscInt m,PetscScalar *H,PetscInt ldh,PetscScalar *B,PetscInt ldb,PetscScalar *X,PetscInt ldx)</font></strong>
+<a name="line365">365: </a>{
+<a name="line367">367: </a>  PetscBLASInt   sdim,lwork,info,n,lx,*iwork;
+<a name="line368">368: </a>  PetscInt       i,j;
+<a name="line369">369: </a>  PetscReal      scal,sep,ferr,*work;
+<a name="line370">370: </a>  PetscScalar    *Q,*W,*wr,*wi;
+
+<a name="line373">373: </a>  PetscBLASIntCast(ldx,&amp;lx);
+<a name="line374">374: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line375">375: </a>  PetscBLASIntCast(PetscMax(20,m*m),&amp;lwork);
+
+<a name="line377">377: </a>  <font color="#B22222">/* transpose W = H' */</font>
+<a name="line378">378: </a>  PetscMalloc6(m*m,&amp;W,m*m,&amp;Q,m,&amp;wr,m,&amp;wi,m*m,&amp;iwork,lwork,&amp;work);
+<a name="line379">379: </a>  <font color="#4169E1">for</font> (j=0;j&lt;m;j++) {
+<a name="line380">380: </a>    <font color="#4169E1">for</font> (i=0;i&lt;m;i++) W[i+j*m] = H[j+i*ldh];
+<a name="line381">381: </a>  }
+
+<a name="line383">383: </a>  <font color="#B22222">/* compute the real Schur form of W */</font>
+<a name="line384">384: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgees"</font>,LAPACKgees_(<font color="#666666">"V"</font>,<font color="#666666">"N"</font>,NULL,&amp;n,W,&amp;n,&amp;sdim,wr,wi,Q,&amp;n,work,&amp;lwork,NULL,&amp;info));
+<a name="line385">385: </a>  SlepcCheckLapackInfo(<font color="#666666">"gees"</font>,info);
+
+<a name="line387">387: </a>  <font color="#B22222">/* copy -B into X */</font>
+<a name="line388">388: </a>  <font color="#4169E1">for</font> (i=0;i&lt;m;i++) {
+<a name="line389">389: </a>    <font color="#4169E1">for</font> (j=0;j&lt;m;j++) X[i+j*ldx] = -B[i+j*ldb];
+<a name="line390">390: </a>  }
+
+<a name="line392">392: </a>  <font color="#B22222">/* solve Lyapunov equation (Hammarling) */</font>
+<a name="line393">393: </a>  PetscStackCallBLAS(<font color="#666666">"SLICOTsb03od"</font>,SLICOTsb03md_(<font color="#666666">"C"</font>,<font color="#666666">"X"</font>,<font color="#666666">"F"</font>,<font color="#666666">"N"</font>,&amp;n,W,&amp;n,Q,&amp;n,X,&amp;lx,&amp;scal,&amp;sep,&amp;ferr,wr,wi,iwork,work,&amp;lwork,&amp;info));
+<a name="line394">394: </a>  <font color="#4169E1">if</font> (info) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_LIB,<font color="#666666">"Error in SLICOT subroutine SB03OD: info=%d"</font>,(int)info);
+<a name="line395">395: </a>  <font color="#4169E1">if</font> (scal!=1.0) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"Current implementation cannot handle scale factor %g"</font>,scal);
+
+<a name="line397">397: </a>  PetscFree6(W,Q,wr,wi,iwork,work);
+<a name="line398">398: </a>  <font color="#4169E1">return</font>(0);
+<a name="line399">399: </a>}
+
+<a name="line401">401: </a><font color="#A020F0">#else</font>
+
+<a name="line403">403: </a><font color="#B22222">/*</font>
+<a name="line404">404: </a><font color="#B22222">   Lyapunov_LAPACK - alternative implementation when SLICOT is not available</font>
+<a name="line405">405: </a><font color="#B22222">*/</font>
+<a name="line406">406: </a><strong><font color="#4169E1"><a name="Lyapunov_LAPACK"></a>static PetscErrorCode Lyapunov_LAPACK(PetscInt m,PetscScalar *A,PetscInt lda,PetscScalar *B,PetscInt ldb,PetscScalar *X,PetscInt ldx)</font></strong>
+<a name="line407">407: </a>{
+<a name="line409">409: </a>  PetscBLASInt   sdim,lwork,info,n,lx,lb,ione=1;
+<a name="line410">410: </a>  PetscInt       i,j;
+<a name="line411">411: </a>  PetscReal      scal;
+<a name="line412">412: </a>  PetscScalar    *Q,*W,*Z,*wr,*work,zero=0.0,done=1.0,dmone=-1.0;
+<a name="line413">413: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line414">414: </a>  PetscReal      *rwork;
+<a name="line415">415: </a><font color="#A020F0">#else</font>
+<a name="line416">416: </a>  PetscScalar    *wi;
+<a name="line417">417: </a><font color="#A020F0">#endif</font>
+
+<a name="line420">420: </a>  PetscBLASIntCast(ldb,&amp;lb);
+<a name="line421">421: </a>  PetscBLASIntCast(ldx,&amp;lx);
+<a name="line422">422: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line423">423: </a>  PetscBLASIntCast(6*m,&amp;lwork);
+
+<a name="line425">425: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line426">426: </a>  PetscMalloc6(m*m,&amp;Q,m*m,&amp;W,m*m,&amp;Z,m,&amp;wr,m,&amp;wi,lwork,&amp;work);
+<a name="line427">427: </a><font color="#A020F0">#else</font>
+<a name="line428">428: </a>  PetscMalloc6(m*m,&amp;Q,m*m,&amp;W,m*m,&amp;Z,m,&amp;wr,lwork,&amp;work,m,&amp;rwork);
+<a name="line429">429: </a><font color="#A020F0">#endif</font>
+
+<a name="line431">431: </a>  <font color="#B22222">/* save a copy W = A */</font>
+<a name="line432">432: </a>  <font color="#4169E1">for</font> (j=0;j&lt;m;j++) {
+<a name="line433">433: </a>    <font color="#4169E1">for</font> (i=0;i&lt;m;i++) W[i+j*m] = A[i+j*lda];
+<a name="line434">434: </a>  }
+
+<a name="line436">436: </a>  <font color="#B22222">/* compute the (real) Schur form of W */</font>
+<a name="line437">437: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line438">438: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgees"</font>,LAPACKgees_(<font color="#666666">"V"</font>,<font color="#666666">"N"</font>,NULL,&amp;n,W,&amp;n,&amp;sdim,wr,wi,Q,&amp;n,work,&amp;lwork,NULL,&amp;info));
+<a name="line439">439: </a><font color="#A020F0">#else</font>
+<a name="line440">440: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgees"</font>,LAPACKgees_(<font color="#666666">"V"</font>,<font color="#666666">"N"</font>,NULL,&amp;n,W,&amp;n,&amp;sdim,wr,Q,&amp;n,work,&amp;lwork,rwork,NULL,&amp;info));
+<a name="line441">441: </a><font color="#A020F0">#endif</font>
+<a name="line442">442: </a>  SlepcCheckLapackInfo(<font color="#666666">"gees"</font>,info);
+
+<a name="line444">444: </a>  <font color="#B22222">/* X = -Q'*B*Q */</font>
+<a name="line445">445: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;n,&amp;done,Q,&amp;n,B,&amp;lb,&amp;zero,Z,&amp;n));
+<a name="line446">446: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;n,&amp;dmone,Z,&amp;n,Q,&amp;n,&amp;zero,X,&amp;lx));
+
+<a name="line448">448: </a>  <font color="#B22222">/* solve triangular Sylvester equation */</font>
+<a name="line449">449: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKtrsyl"</font>,LAPACKtrsyl_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;ione,&amp;n,&amp;n,W,&amp;n,W,&amp;n,X,&amp;lx,&amp;scal,&amp;info));
+<a name="line450">450: </a>  SlepcCheckLapackInfo(<font color="#666666">"trsyl"</font>,info);
+<a name="line451">451: </a>  <font color="#4169E1">if</font> (scal!=1.0) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"Current implementation cannot handle scale factor %g"</font>,scal);
+
+<a name="line453">453: </a>  <font color="#B22222">/* back-transform X = Q*X*Q' */</font>
+<a name="line454">454: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;n,&amp;done,Q,&amp;n,X,&amp;n,&amp;zero,W,&amp;n));
+<a name="line455">455: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;n,&amp;done,W,&amp;n,Q,&amp;n,&amp;zero,X,&amp;lx));
+
+<a name="line457">457: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line458">458: </a>  PetscFree6(Q,W,Z,wr,wi,work);
+<a name="line459">459: </a><font color="#A020F0">#else</font>
+<a name="line460">460: </a>  PetscFree6(Q,W,Z,wr,work,rwork);
+<a name="line461">461: </a><font color="#A020F0">#endif</font>
+<a name="line462">462: </a>  <font color="#4169E1">return</font>(0);
+<a name="line463">463: </a>}
+
+<a name="line465">465: </a><font color="#A020F0">#endif </font><font color="#B22222">/* SLEPC_HAVE_SLICOT */</font><font color="#A020F0"></font>
+
+<a name="line467">467: </a><font color="#B22222">/*@C</font>
+<a name="line468">468: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEDenseLyapunov.html#LMEDenseLyapunov">LMEDenseLyapunov</a> - Computes the solution of a dense continuous-time Lyapunov</font>
+<a name="line469">469: </a><font color="#B22222">   equation.</font>
+
+<a name="line471">471: </a><font color="#B22222">   Logically Collective on lme</font>
+
+<a name="line473">473: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line474">474: </a><font color="#B22222">+  lme - linear matrix equation solver context</font>
+<a name="line475">475: </a><font color="#B22222">.  m   - number of rows and columns of A</font>
+<a name="line476">476: </a><font color="#B22222">.  A   - coefficient matrix</font>
+<a name="line477">477: </a><font color="#B22222">.  lda - leading dimension of A</font>
+<a name="line478">478: </a><font color="#B22222">.  B   - right-hand side matrix</font>
+<a name="line479">479: </a><font color="#B22222">.  ldb - leading dimension of B</font>
+<a name="line480">480: </a><font color="#B22222">-  ldx - leading dimension of X</font>
+
+<a name="line482">482: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line483">483: </a><font color="#B22222">.  X   - the solution</font>
+
+<a name="line485">485: </a><font color="#B22222">   Note:</font>
+<a name="line486">486: </a><font color="#B22222">   The Lyapunov equation has the form A*X + X*A' = -B, where all are mxm</font>
+<a name="line487">487: </a><font color="#B22222">   matrices, and B is symmetric.</font>
+
+<a name="line489">489: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line491">491: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMEDenseHessLyapunovChol.html#LMEDenseHessLyapunovChol">LMEDenseHessLyapunovChol</a>(), <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>()</font>
+<a name="line492">492: </a><font color="#B22222">@*/</font>
+<a name="line493">493: </a><strong><font color="#4169E1"><a name="LMEDenseLyapunov"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEDenseLyapunov.html#LMEDenseLyapunov">LMEDenseLyapunov</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscInt m,PetscScalar *A,PetscInt lda,PetscScalar *B,PetscInt ldb,PetscScalar *X,PetscInt ldx)</font></strong>
+<a name="line494">494: </a>{
+<a name="line496">496: </a><font color="#A020F0">#if defined(PETSC_USE_INFO)</font>
+<a name="line497">497: </a>  PetscReal      error;
+<a name="line498">498: </a><font color="#A020F0">#endif</font>
+
+
+<a name="line510">510: </a><font color="#A020F0">#if defined(SLEPC_HAVE_SLICOT)</font>
+<a name="line511">511: </a>  Lyapunov_SLICOT(m,A,lda,B,ldb,X,ldx);
+<a name="line512">512: </a><font color="#A020F0">#else</font>
+<a name="line513">513: </a>  Lyapunov_LAPACK(m,A,lda,B,ldb,X,ldx);
+<a name="line514">514: </a><font color="#A020F0">#endif</font>
+
+<a name="line516">516: </a><font color="#A020F0">#if defined(PETSC_USE_INFO)</font>
+<a name="line517">517: </a>  <font color="#4169E1">if</font> (PetscLogPrintInfo) {
+<a name="line518">518: </a>    LyapunovResidual(m,A,lda,B,ldb,X,ldx,&amp;error);
+<a name="line519">519: </a>    PetscInfo1(lme,<font color="#666666">"Residual norm of dense Lyapunov equation = %g\n"</font>,error);
+<a name="line520">520: </a>  }
+<a name="line521">521: </a><font color="#A020F0">#endif</font>
+<a name="line522">522: </a>  <font color="#4169E1">return</font>(0);
+<a name="line523">523: </a>}
+
+</pre>
+</body>
+
+</html>

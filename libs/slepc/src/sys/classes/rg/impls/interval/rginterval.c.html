@@ -1,0 +1,299 @@
+<center><a href="rginterval.c">Actual source code: rginterval.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/rg/impls/interval/rginterval.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:49+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/rg/impls/interval/rginterval.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Interval of the real axis or more generally a (possibly open) rectangle</font>
+<a name="line12"> 12: </a><font color="#B22222">   of the complex plane</font>
+<a name="line13"> 13: </a><font color="#B22222">*/</font>
+
+<a name="line15"> 15: </a> #include <A href="../../../../../../include/slepc/private/rgimpl.h.html">&lt;slepc/private/rgimpl.h&gt;</A>
+<a name="line16"> 16: </a><font color="#A020F0">#include &lt;petscdraw.h&gt;</font>
+
+<a name="line18"> 18: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line19"> 19: </a>  PetscReal   a,b;     <font color="#B22222">/* interval in the real axis */</font>
+<a name="line20"> 20: </a>  PetscReal   c,d;     <font color="#B22222">/* interval in the imaginary axis */</font>
+<a name="line21"> 21: </a>} RG_INTERVAL;
+
+<a name="line23"> 23: </a><strong><font color="#4169E1"><a name="RGIntervalSetEndpoints_Interval"></a>static PetscErrorCode RGIntervalSetEndpoints_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal a,PetscReal b,PetscReal c,PetscReal d)</font></strong>
+<a name="line24"> 24: </a>{
+<a name="line25"> 25: </a>  RG_INTERVAL *ctx = (RG_INTERVAL*)rg-&gt;data;
+
+<a name="line28"> 28: </a>  <font color="#4169E1">if</font> (!a &amp;&amp; !b &amp;&amp; !c &amp;&amp; !d) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONG,<font color="#666666">"At least one argument must be nonzero"</font>);
+<a name="line29"> 29: </a>  <font color="#4169E1">if</font> (a==b &amp;&amp; a) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONG,<font color="#666666">"Badly defined interval, endpoints must be distinct (or both zero)"</font>);
+<a name="line30"> 30: </a>  <font color="#4169E1">if</font> (a&gt;b) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONG,<font color="#666666">"Badly defined interval, must be a&lt;b"</font>);
+<a name="line31"> 31: </a>  <font color="#4169E1">if</font> (c==d &amp;&amp; c) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONG,<font color="#666666">"Badly defined interval, endpoints must be distinct (or both zero)"</font>);
+<a name="line32"> 32: </a>  <font color="#4169E1">if</font> (c&gt;d) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONG,<font color="#666666">"Badly defined interval, must be c&lt;d"</font>);
+<a name="line33"> 33: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line34"> 34: </a>  <font color="#4169E1">if</font> (c!=-d) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_WRONG,<font color="#666666">"In real scalars the region must be symmetric wrt real axis"</font>);
+<a name="line35"> 35: </a><font color="#A020F0">#endif</font>
+<a name="line36"> 36: </a>  ctx-&gt;a = a;
+<a name="line37"> 37: </a>  ctx-&gt;b = b;
+<a name="line38"> 38: </a>  ctx-&gt;c = c;
+<a name="line39"> 39: </a>  ctx-&gt;d = d;
+<a name="line40"> 40: </a>  <font color="#4169E1">return</font>(0);
+<a name="line41"> 41: </a>}
+
+<a name="line43"> 43: </a><font color="#B22222">/*@</font>
+<a name="line44"> 44: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/RG/RGIntervalSetEndpoints.html#RGIntervalSetEndpoints">RGIntervalSetEndpoints</a> - Sets the parameters defining the interval region.</font>
+
+<a name="line46"> 46: </a><font color="#B22222">   Logically Collective on rg</font>
+
+<a name="line48"> 48: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line49"> 49: </a><font color="#B22222">+  rg  - the region context</font>
+<a name="line50"> 50: </a><font color="#B22222">.  a,b - endpoints of the interval in the real axis</font>
+<a name="line51"> 51: </a><font color="#B22222">-  c,d - endpoints of the interval in the imaginary axis</font>
+
+<a name="line53"> 53: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line54"> 54: </a><font color="#B22222">.  -rg_interval_endpoints - the four endpoints</font>
+
+<a name="line56"> 56: </a><font color="#B22222">   Note:</font>
+<a name="line57"> 57: </a><font color="#B22222">   The region is defined as [a,b]x[c,d]. Particular cases are an interval on</font>
+<a name="line58"> 58: </a><font color="#B22222">   the real axis (c=d=0), similar for the imaginary axis (a=b=0), the whole</font>
+<a name="line59"> 59: </a><font color="#B22222">   complex plane (a=-inf,b=inf,c=-inf,d=inf), and so on.</font>
+
+<a name="line61"> 61: </a><font color="#B22222">   When PETSc is built with real scalars, the region must be symmetric with</font>
+<a name="line62"> 62: </a><font color="#B22222">   respect to the real axis.</font>
+
+<a name="line64"> 64: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line66"> 66: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/RG/RGIntervalGetEndpoints.html#RGIntervalGetEndpoints">RGIntervalGetEndpoints</a>()</font>
+<a name="line67"> 67: </a><font color="#B22222">@*/</font>
+<a name="line68"> 68: </a><strong><font color="#4169E1"><a name="RGIntervalSetEndpoints"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/RG/RGIntervalSetEndpoints.html#RGIntervalSetEndpoints">RGIntervalSetEndpoints</a>(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal a,PetscReal b,PetscReal c,PetscReal d)</font></strong>
+<a name="line69"> 69: </a>{
+
+<a name="line78"> 78: </a>  PetscTryMethod(rg,<font color="#666666">"RGIntervalSetEndpoints_C"</font>,(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a>,PetscReal,PetscReal,PetscReal,PetscReal),(rg,a,b,c,d));
+<a name="line79"> 79: </a>  <font color="#4169E1">return</font>(0);
+<a name="line80"> 80: </a>}
+
+<a name="line82"> 82: </a><strong><font color="#4169E1"><a name="RGIntervalGetEndpoints_Interval"></a>static PetscErrorCode RGIntervalGetEndpoints_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal *a,PetscReal *b,PetscReal *c,PetscReal *d)</font></strong>
+<a name="line83"> 83: </a>{
+<a name="line84"> 84: </a>  RG_INTERVAL *ctx = (RG_INTERVAL*)rg-&gt;data;
+
+<a name="line87"> 87: </a>  <font color="#4169E1">if</font> (a) *a = ctx-&gt;a;
+<a name="line88"> 88: </a>  <font color="#4169E1">if</font> (b) *b = ctx-&gt;b;
+<a name="line89"> 89: </a>  <font color="#4169E1">if</font> (c) *c = ctx-&gt;c;
+<a name="line90"> 90: </a>  <font color="#4169E1">if</font> (d) *d = ctx-&gt;d;
+<a name="line91"> 91: </a>  <font color="#4169E1">return</font>(0);
+<a name="line92"> 92: </a>}
+
+<a name="line94"> 94: </a><font color="#B22222">/*@C</font>
+<a name="line95"> 95: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/RG/RGIntervalGetEndpoints.html#RGIntervalGetEndpoints">RGIntervalGetEndpoints</a> - Gets the parameters that define the interval region.</font>
+
+<a name="line97"> 97: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line99"> 99: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line100">100: </a><font color="#B22222">.  rg - the region context</font>
+
+<a name="line102">102: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line103">103: </a><font color="#B22222">+  a,b - endpoints of the interval in the real axis</font>
+<a name="line104">104: </a><font color="#B22222">-  c,d - endpoints of the interval in the imaginary axis</font>
+
+<a name="line106">106: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line108">108: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/RG/RGIntervalSetEndpoints.html#RGIntervalSetEndpoints">RGIntervalSetEndpoints</a>()</font>
+<a name="line109">109: </a><font color="#B22222">@*/</font>
+<a name="line110">110: </a><strong><font color="#4169E1"><a name="RGIntervalGetEndpoints"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/RG/RGIntervalGetEndpoints.html#RGIntervalGetEndpoints">RGIntervalGetEndpoints</a>(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal *a,PetscReal *b,PetscReal *c,PetscReal *d)</font></strong>
+<a name="line111">111: </a>{
+
+<a name="line116">116: </a>  PetscUseMethod(rg,<font color="#666666">"RGIntervalGetEndpoints_C"</font>,(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a>,PetscReal*,PetscReal*,PetscReal*,PetscReal*),(rg,a,b,c,d));
+<a name="line117">117: </a>  <font color="#4169E1">return</font>(0);
+<a name="line118">118: </a>}
+
+<a name="line120">120: </a><strong><font color="#4169E1"><a name="RGView_Interval"></a>PetscErrorCode RGView_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscViewer viewer)</font></strong>
+<a name="line121">121: </a>{
+<a name="line123">123: </a>  RG_INTERVAL    *ctx = (RG_INTERVAL*)rg-&gt;data;
+<a name="line124">124: </a>  PetscBool      isdraw,isascii;
+<a name="line125">125: </a>  int            winw,winh;
+<a name="line126">126: </a>  PetscDraw      draw;
+<a name="line127">127: </a>  PetscDrawAxis  axis;
+<a name="line128">128: </a>  PetscReal      a,b,c,d,ab,cd,lx,ly,w,scale=1.2;
+
+<a name="line131">131: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERDRAW,&amp;isdraw);
+<a name="line132">132: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line133">133: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line134">134: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  region: [%g,%g]x[%g,%g]\n"</font>,RGShowReal(ctx-&gt;a),RGShowReal(ctx-&gt;b),RGShowReal(ctx-&gt;c),RGShowReal(ctx-&gt;d));
+<a name="line135">135: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (isdraw) {
+<a name="line136">136: </a>    PetscViewerDrawGetDraw(viewer,0,&amp;draw);
+<a name="line137">137: </a>    PetscDrawCheckResizedWindow(draw);
+<a name="line138">138: </a>    PetscDrawGetWindowSize(draw,&amp;winw,&amp;winh);
+<a name="line139">139: </a>    winw = PetscMax(winw,1); winh = PetscMax(winh,1);
+<a name="line140">140: </a>    PetscDrawClear(draw);
+<a name="line141">141: </a>    PetscDrawSetTitle(draw,<font color="#666666">"Interval region"</font>);
+<a name="line142">142: </a>    PetscDrawAxisCreate(draw,&amp;axis);
+<a name="line143">143: </a>    a  = ctx-&gt;a*rg-&gt;sfactor;
+<a name="line144">144: </a>    b  = ctx-&gt;b*rg-&gt;sfactor;
+<a name="line145">145: </a>    c  = ctx-&gt;c*rg-&gt;sfactor;
+<a name="line146">146: </a>    d  = ctx-&gt;d*rg-&gt;sfactor;
+<a name="line147">147: </a>    lx = b-a;
+<a name="line148">148: </a>    ly = d-c;
+<a name="line149">149: </a>    ab = (a+b)/2;
+<a name="line150">150: </a>    cd = (c+d)/2;
+<a name="line151">151: </a>    w  = scale*PetscMax(lx/winw,ly/winh)/2;
+<a name="line152">152: </a>    PetscDrawAxisSetLimits(axis,ab-w*winw,ab+w*winw,cd-w*winh,cd+w*winh);
+<a name="line153">153: </a>    PetscDrawAxisDraw(axis);
+<a name="line154">154: </a>    PetscDrawAxisDestroy(&amp;axis);
+<a name="line155">155: </a>    PetscDrawRectangle(draw,a,c,b,d,PETSC_DRAW_BLUE,PETSC_DRAW_BLUE,PETSC_DRAW_BLUE,PETSC_DRAW_BLUE);
+<a name="line156">156: </a>    PetscDrawFlush(draw);
+<a name="line157">157: </a>    PetscDrawSave(draw);
+<a name="line158">158: </a>    PetscDrawPause(draw);
+<a name="line159">159: </a>  }
+<a name="line160">160: </a>  <font color="#4169E1">return</font>(0);
+<a name="line161">161: </a>}
+
+<a name="line163">163: </a><strong><font color="#4169E1"><a name="RGIsTrivial_Interval"></a>PetscErrorCode RGIsTrivial_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscBool *trivial)</font></strong>
+<a name="line164">164: </a>{
+<a name="line165">165: </a>  RG_INTERVAL *ctx = (RG_INTERVAL*)rg-&gt;data;
+
+<a name="line168">168: </a>  <font color="#4169E1">if</font> (rg-&gt;complement) *trivial = (ctx-&gt;a==ctx-&gt;b &amp;&amp; ctx-&gt;c==ctx-&gt;d)? PETSC_TRUE: PETSC_FALSE;
+<a name="line169">169: </a>  <font color="#4169E1">else</font> *trivial = (ctx-&gt;a&lt;=-PETSC_MAX_REAL &amp;&amp; ctx-&gt;b&gt;=PETSC_MAX_REAL &amp;&amp; ctx-&gt;c&lt;=-PETSC_MAX_REAL &amp;&amp; ctx-&gt;d&gt;=PETSC_MAX_REAL)? PETSC_TRUE: PETSC_FALSE;
+<a name="line170">170: </a>  <font color="#4169E1">return</font>(0);
+<a name="line171">171: </a>}
+
+<a name="line173">173: </a><strong><font color="#4169E1"><a name="RGComputeContour_Interval"></a>PetscErrorCode RGComputeContour_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscInt n,PetscScalar *cr,PetscScalar *ci)</font></strong>
+<a name="line174">174: </a>{
+<a name="line175">175: </a>  RG_INTERVAL *ctx = (RG_INTERVAL*)rg-&gt;data;
+<a name="line176">176: </a>  PetscInt    i,pt,idx,j;
+<a name="line177">177: </a>  PetscReal   hr[4],hi[4],h,off,d[4],vr[4],vi[4];
+
+<a name="line180">180: </a>  <font color="#4169E1">if</font> (!(ctx-&gt;a&gt;-PETSC_MAX_REAL &amp;&amp; ctx-&gt;b&lt;PETSC_MAX_REAL &amp;&amp; ctx-&gt;c&gt;-PETSC_MAX_REAL &amp;&amp; ctx-&gt;d&lt;PETSC_MAX_REAL)) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_SUP,<font color="#666666">"Contour not defined in unbounded regions"</font>);
+<a name="line181">181: </a>  <font color="#4169E1">if</font> (ctx-&gt;a==ctx-&gt;b || ctx-&gt;c==ctx-&gt;d) {
+<a name="line182">182: </a>    <font color="#4169E1">if</font> (ctx-&gt;a==ctx-&gt;b) {hi[0] = (ctx-&gt;d-ctx-&gt;c)/(n-1); hr[0] = 0.0;}
+<a name="line183">183: </a>    <font color="#4169E1">else</font> {hr[0] = (ctx-&gt;b-ctx-&gt;a)/(n-1); hi[0] = 0.0;}
+<a name="line184">184: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line185">185: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line186">186: </a>      cr[i] = PetscCMPLX(ctx-&gt;a+hr[0]*i,ctx-&gt;c+hi[0]*i);
+<a name="line187">187: </a><font color="#A020F0">#else</font>
+<a name="line188">188: </a>      cr[i] = ctx-&gt;a+hr[0]*i; ci[i] = ctx-&gt;c+hi[0]*i;
+<a name="line189">189: </a><font color="#A020F0">#endif</font>
+<a name="line190">190: </a>    }
+<a name="line191">191: </a>  } <font color="#4169E1">else</font> {
+<a name="line192">192: </a>    d[1] = d[3] = ctx-&gt;d-ctx-&gt;c; d[0] = d[2] = ctx-&gt;b-ctx-&gt;a;
+<a name="line193">193: </a>    h = 2.0*(d[0]+d[1])/n;
+<a name="line194">194: </a>    vr[0] = ctx-&gt;a; vr[1] = ctx-&gt;b; vr[2] = ctx-&gt;b; vr[3] = ctx-&gt;a;
+<a name="line195">195: </a>    vi[0] = ctx-&gt;c; vi[1] = ctx-&gt;c; vi[2] = ctx-&gt;d; vi[3] = ctx-&gt;d;
+<a name="line196">196: </a>    hr[0] = h;   hr[1] = 0.0; hr[2] = -h;  hr[3] = 0.0;
+<a name="line197">197: </a>    hi[0] = 0.0; hi[1] = h;   hi[2] = 0.0; hi[3] = -h;
+<a name="line198">198: </a>    off = 0.0; idx = 0;
+<a name="line199">199: </a>    <font color="#4169E1">for</font> (i=0;i&lt;4;i++) {
+<a name="line200">200: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line201">201: </a>      cr[idx] = PetscCMPLX(vr[i]+off*(hr[i]/h),vi[i]+off*(hi[i]/h));
+<a name="line202">202: </a><font color="#A020F0">#else</font>
+<a name="line203">203: </a>      cr[idx] = vr[i]+off*(hr[i]/h); ci[idx] = vi[i]+off*(hi[i]/h);
+<a name="line204">204: </a><font color="#A020F0">#endif</font>
+<a name="line205">205: </a>      idx++;
+<a name="line206">206: </a>      pt = (PetscInt)((d[i]-off)/h)+1;
+<a name="line207">207: </a>      <font color="#4169E1">for</font> (j=1;j&lt;pt &amp;&amp; idx&lt;n;j++) {
+<a name="line208">208: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line209">209: </a>        cr[idx] = cr[idx-1]+PetscCMPLX(hr[i],hi[i]);
+<a name="line210">210: </a><font color="#A020F0">#else</font>
+<a name="line211">211: </a>        cr[idx] = cr[idx-1]+hr[i]; ci[idx] = ci[idx-1]+hi[i];
+<a name="line212">212: </a><font color="#A020F0">#endif</font>
+<a name="line213">213: </a>        idx++;
+<a name="line214">214: </a>      }
+<a name="line215">215: </a>      off += pt*h-d[i];
+<a name="line216">216: </a>      <font color="#4169E1">if</font> (off&gt;=d[i+1]) {off -= d[i+1]; i++;}
+<a name="line217">217: </a>    }
+<a name="line218">218: </a>  }
+<a name="line219">219: </a>  <font color="#4169E1">return</font>(0);
+<a name="line220">220: </a>}
+
+<a name="line222">222: </a><strong><font color="#4169E1"><a name="RGComputeBoundingBox_Interval"></a>PetscErrorCode RGComputeBoundingBox_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal *a,PetscReal *b,PetscReal *c,PetscReal *d)</font></strong>
+<a name="line223">223: </a>{
+<a name="line224">224: </a>  RG_INTERVAL *ctx = (RG_INTERVAL*)rg-&gt;data;
+
+<a name="line227">227: </a>  <font color="#4169E1">if</font> (a) *a = ctx-&gt;a;
+<a name="line228">228: </a>  <font color="#4169E1">if</font> (b) *b = ctx-&gt;b;
+<a name="line229">229: </a>  <font color="#4169E1">if</font> (c) *c = ctx-&gt;c;
+<a name="line230">230: </a>  <font color="#4169E1">if</font> (d) *d = ctx-&gt;d;
+<a name="line231">231: </a>  <font color="#4169E1">return</font>(0);
+<a name="line232">232: </a>}
+
+<a name="line234">234: </a><strong><font color="#4169E1"><a name="RGCheckInside_Interval"></a>PetscErrorCode RGCheckInside_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscReal dx,PetscReal dy,PetscInt *inside)</font></strong>
+<a name="line235">235: </a>{
+<a name="line236">236: </a>  RG_INTERVAL *ctx = (RG_INTERVAL*)rg-&gt;data;
+
+<a name="line239">239: </a>  <font color="#4169E1">if</font> (dx&gt;ctx-&gt;a &amp;&amp; dx&lt;ctx-&gt;b) *inside = 1;
+<a name="line240">240: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (dx==ctx-&gt;a || dx==ctx-&gt;b) *inside = 0;
+<a name="line241">241: </a>  <font color="#4169E1">else</font> *inside = -1;
+<a name="line242">242: </a>  <font color="#4169E1">if</font> (*inside&gt;=0) {
+<a name="line243">243: </a>    <font color="#4169E1">if</font> (dy&gt;ctx-&gt;c &amp;&amp; dy&lt;ctx-&gt;d) ;
+<a name="line244">244: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (dy==ctx-&gt;c || dy==ctx-&gt;d) *inside = 0;
+<a name="line245">245: </a>    <font color="#4169E1">else</font> *inside = -1;
+<a name="line246">246: </a>  }
+<a name="line247">247: </a>  <font color="#4169E1">return</font>(0);
+<a name="line248">248: </a>}
+
+<a name="line250">250: </a><strong><font color="#4169E1"><a name="RGSetFromOptions_Interval"></a>PetscErrorCode RGSetFromOptions_Interval(PetscOptionItems *PetscOptionsObject,<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line251">251: </a>{
+<a name="line253">253: </a>  PetscBool      flg;
+<a name="line254">254: </a>  PetscInt       k;
+<a name="line255">255: </a>  PetscReal      array[4]={0,0,0,0};
+
+<a name="line258">258: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> Interval Options"</font>);
+
+<a name="line260">260: </a>    k = 4;
+<a name="line261">261: </a>    PetscOptionsRealArray(<font color="#666666">"-rg_interval_endpoints"</font>,<font color="#666666">"Interval endpoints (two or four real values separated with a comma without spaces)"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/RG/RGIntervalSetEndpoints.html#RGIntervalSetEndpoints">RGIntervalSetEndpoints</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line262">262: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line263">263: </a>      <font color="#4169E1">if</font> (k&lt;2) SETERRQ(PetscObjectComm((PetscObject)rg),PETSC_ERR_ARG_SIZ,<font color="#666666">"Must pass at least two values in -rg_interval_endpoints (comma-separated without spaces)"</font>);
+<a name="line264">264: </a>      <a href="../../../../../../docs/manualpages/RG/RGIntervalSetEndpoints.html#RGIntervalSetEndpoints">RGIntervalSetEndpoints</a>(rg,array[0],array[1],array[2],array[3]);
+<a name="line265">265: </a>    }
+
+<a name="line267">267: </a>  PetscOptionsTail();
+<a name="line268">268: </a>  <font color="#4169E1">return</font>(0);
+<a name="line269">269: </a>}
+
+<a name="line271">271: </a><strong><font color="#4169E1"><a name="RGDestroy_Interval"></a>PetscErrorCode RGDestroy_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line272">272: </a>{
+
+<a name="line276">276: </a>  PetscFree(rg-&gt;data);
+<a name="line277">277: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGIntervalSetEndpoints_C"</font>,NULL);
+<a name="line278">278: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGIntervalGetEndpoints_C"</font>,NULL);
+<a name="line279">279: </a>  <font color="#4169E1">return</font>(0);
+<a name="line280">280: </a>}
+
+<a name="line282">282: </a><strong><font color="#4169E1"><a name="RGCreate_Interval"></a>SLEPC_EXTERN PetscErrorCode RGCreate_Interval(<a href="../../../../../../docs/manualpages/RG/RG.html#RG">RG</a> rg)</font></strong>
+<a name="line283">283: </a>{
+<a name="line284">284: </a>  RG_INTERVAL    *interval;
+
+<a name="line288">288: </a>  PetscNewLog(rg,&amp;interval);
+<a name="line289">289: </a>  interval-&gt;a = -PETSC_MAX_REAL;
+<a name="line290">290: </a>  interval-&gt;b = PETSC_MAX_REAL;
+<a name="line291">291: </a>  interval-&gt;c = -PETSC_MAX_REAL;
+<a name="line292">292: </a>  interval-&gt;d = PETSC_MAX_REAL;
+<a name="line293">293: </a>  rg-&gt;data = (void*)interval;
+
+<a name="line295">295: </a>  rg-&gt;ops-&gt;istrivial      = RGIsTrivial_Interval;
+<a name="line296">296: </a>  rg-&gt;ops-&gt;computecontour = RGComputeContour_Interval;
+<a name="line297">297: </a>  rg-&gt;ops-&gt;computebbox    = RGComputeBoundingBox_Interval;
+<a name="line298">298: </a>  rg-&gt;ops-&gt;checkinside    = RGCheckInside_Interval;
+<a name="line299">299: </a>  rg-&gt;ops-&gt;setfromoptions = RGSetFromOptions_Interval;
+<a name="line300">300: </a>  rg-&gt;ops-&gt;view           = RGView_Interval;
+<a name="line301">301: </a>  rg-&gt;ops-&gt;destroy        = RGDestroy_Interval;
+<a name="line302">302: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGIntervalSetEndpoints_C"</font>,RGIntervalSetEndpoints_Interval);
+<a name="line303">303: </a>  PetscObjectComposeFunction((PetscObject)rg,<font color="#666666">"RGIntervalGetEndpoints_C"</font>,RGIntervalGetEndpoints_Interval);
+<a name="line304">304: </a>  <font color="#4169E1">return</font>(0);
+<a name="line305">305: </a>}
+
+</pre>
+</body>
+
+</html>

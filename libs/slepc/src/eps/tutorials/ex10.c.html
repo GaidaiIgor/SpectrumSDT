@@ -1,0 +1,325 @@
+<center><a href="ex10.c">Actual source code: ex10.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tutorials/ex10.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:58+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tutorials/ex10.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Illustrates the use of shell spectral transformations. "</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The problem to be solved is the same as ex1.c and"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"corresponds to the Laplacian operator in 1 dimension.\n\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line15"> 15: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions = matrix dimension.\n\n"</font>;
+
+<a name="line17"> 17: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line19"> 19: </a><font color="#B22222">/* Define context for user-provided spectral transformation */</font>
+<a name="line20"> 20: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line21"> 21: </a>  KSP        ksp;
+<a name="line22"> 22: </a>} SampleShellST;
+
+<a name="line24"> 24: </a><font color="#B22222">/* Declare routines for user-provided spectral transformation */</font>
+<a name="line25"> 25: </a><strong><font color="#4169E1">PetscErrorCode STCreate_User(SampleShellST**)</font></strong>;
+<a name="line26"> 26: </a><strong><font color="#4169E1">PetscErrorCode STSetUp_User(SampleShellST*,<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>)</font></strong>;
+<a name="line27"> 27: </a><strong><font color="#4169E1">PetscErrorCode STApply_User(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec)</font></strong>;
+<a name="line28"> 28: </a><strong><font color="#4169E1">PetscErrorCode STApplyTranspose_User(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec)</font></strong>;
+<a name="line29"> 29: </a><strong><font color="#4169E1">PetscErrorCode STBackTransform_User(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt,PetscScalar*,PetscScalar*)</font></strong>;
+<a name="line30"> 30: </a><strong><font color="#4169E1">PetscErrorCode STDestroy_User(SampleShellST*)</font></strong>;
+
+<a name="line32"> 32: </a><strong><font color="#4169E1"><a name="main"></a>int main (int argc,char **argv)</font></strong>
+<a name="line33"> 33: </a>{
+<a name="line34"> 34: </a>  Mat            A;               <font color="#B22222">/* operator matrix */</font>
+<a name="line35"> 35: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;             <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line36"> 36: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;              <font color="#B22222">/* spectral transformation context */</font>
+<a name="line37"> 37: </a>  SampleShellST  *shell;          <font color="#B22222">/* user-defined spectral transform context */</font>
+<a name="line38"> 38: </a>  <a href="../../../docs/manualpages/EPS/EPSType.html#EPSType">EPSType</a>        type;
+<a name="line39"> 39: </a>  PetscInt       n=30,i,Istart,Iend,nev;
+<a name="line40"> 40: </a>  PetscBool      isShell,terse;
+
+<a name="line43"> 43: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line45"> 45: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line46"> 46: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n1-D Laplacian Eigenproblem (shell-enabled), n=%D\n\n"</font>,n);
+
+<a name="line48"> 48: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line49"> 49: </a><font color="#B22222">     Compute the operator matrix that defines the eigensystem, Ax=kx</font>
+<a name="line50"> 50: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line52"> 52: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line53"> 53: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line54"> 54: </a>  MatSetFromOptions(A);
+<a name="line55"> 55: </a>  MatSetUp(A);
+
+<a name="line57"> 57: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line58"> 58: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line59"> 59: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,i,i-1,-1.0,INSERT_VALUES); }
+<a name="line60"> 60: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(A,i,i+1,-1.0,INSERT_VALUES); }
+<a name="line61"> 61: </a>    MatSetValue(A,i,i,2.0,INSERT_VALUES);
+<a name="line62"> 62: </a>  }
+<a name="line63"> 63: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line64"> 64: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line66"> 66: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line67"> 67: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line68"> 68: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line70"> 70: </a>  <font color="#B22222">/*</font>
+<a name="line71"> 71: </a><font color="#B22222">     Create eigensolver context</font>
+<a name="line72"> 72: </a><font color="#B22222">  */</font>
+<a name="line73"> 73: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+
+<a name="line75"> 75: </a>  <font color="#B22222">/*</font>
+<a name="line76"> 76: </a><font color="#B22222">     Set operators. In this case, it is a standard eigenvalue problem</font>
+<a name="line77"> 77: </a><font color="#B22222">  */</font>
+<a name="line78"> 78: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,NULL);
+<a name="line79"> 79: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>);
+
+<a name="line81"> 81: </a>  <font color="#B22222">/*</font>
+<a name="line82"> 82: </a><font color="#B22222">     Set solver parameters at runtime</font>
+<a name="line83"> 83: </a><font color="#B22222">  */</font>
+<a name="line84"> 84: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line86"> 86: </a>  <font color="#B22222">/*</font>
+<a name="line87"> 87: </a><font color="#B22222">     Initialize shell spectral transformation if selected by user</font>
+<a name="line88"> 88: </a><font color="#B22222">  */</font>
+<a name="line89"> 89: </a>  <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line90"> 90: </a>  PetscObjectTypeCompare((PetscObject)st,<a href="../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>,&amp;isShell);
+<a name="line91"> 91: </a>  <font color="#4169E1">if</font> (isShell) {
+<a name="line92"> 92: </a>    <font color="#B22222">/* Change sorting criterion since this <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> example computes values</font>
+<a name="line93"> 93: </a><font color="#B22222">       closest to 0 */</font>
+<a name="line94"> 94: </a>    <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>);
+
+<a name="line96"> 96: </a>    <font color="#B22222">/* (Required) Create a context for the user-defined spectral transform;</font>
+<a name="line97"> 97: </a><font color="#B22222">       this context can be defined to contain any application-specific data. */</font>
+<a name="line98"> 98: </a>    STCreate_User(&amp;shell);
+<a name="line99"> 99: </a>    <a href="../../../docs/manualpages/ST/STShellSetContext.html#STShellSetContext">STShellSetContext</a>(st,shell);
+
+<a name="line101">101: </a>    <font color="#B22222">/* (Required) Set the user-defined routine for applying the operator */</font>
+<a name="line102">102: </a>    <a href="../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a>(st,STApply_User);
+
+<a name="line104">104: </a>    <font color="#B22222">/* (Optional) Set the user-defined routine for applying the transposed operator */</font>
+<a name="line105">105: </a>    <a href="../../../docs/manualpages/ST/STShellSetApplyTranspose.html#STShellSetApplyTranspose">STShellSetApplyTranspose</a>(st,STApplyTranspose_User);
+
+<a name="line107">107: </a>    <font color="#B22222">/* (Optional) Set the user-defined routine for back-transformation */</font>
+<a name="line108">108: </a>    <a href="../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>(st,STBackTransform_User);
+
+<a name="line110">110: </a>    <font color="#B22222">/* (Optional) Set a name for the transformation, used for <a href="../../../docs/manualpages/ST/STView.html#STView">STView</a>() */</font>
+<a name="line111">111: </a>    PetscObjectSetName((PetscObject)st,<font color="#666666">"MyTransformation"</font>);
+
+<a name="line113">113: </a>    <font color="#B22222">/* (Optional) Do any setup required for the new transformation */</font>
+<a name="line114">114: </a>    STSetUp_User(shell,st);
+<a name="line115">115: </a>  }
+
+<a name="line117">117: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line118">118: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line119">119: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line121">121: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+
+<a name="line123">123: </a>  <font color="#B22222">/*</font>
+<a name="line124">124: </a><font color="#B22222">     Optional: Get some information from the solver and display it</font>
+<a name="line125">125: </a><font color="#B22222">  */</font>
+<a name="line126">126: </a>  <a href="../../../docs/manualpages/EPS/EPSGetType.html#EPSGetType">EPSGetType</a>(eps,&amp;type);
+<a name="line127">127: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solution method: %s\n\n"</font>,type);
+<a name="line128">128: </a>  <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(eps,&amp;nev,NULL,NULL);
+<a name="line129">129: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of requested eigenvalues: %D\n"</font>,nev);
+
+<a name="line131">131: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line132">132: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line133">133: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line135">135: </a>  <font color="#B22222">/* show detailed info unless -terse option is given by user */</font>
+<a name="line136">136: </a>  PetscOptionsHasName(NULL,NULL,<font color="#666666">"-terse"</font>,&amp;terse);
+<a name="line137">137: </a>  <font color="#4169E1">if</font> (terse) {
+<a name="line138">138: </a>    <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+<a name="line139">139: </a>  } <font color="#4169E1">else</font> {
+<a name="line140">140: </a>    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INFO_DETAIL);
+<a name="line141">141: </a>    <a href="../../../docs/manualpages/EPS/EPSReasonView.html#EPSReasonView">EPSReasonView</a>(eps,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line142">142: </a>    <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line143">143: </a>    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+<a name="line144">144: </a>  }
+<a name="line145">145: </a>  <font color="#4169E1">if</font> (isShell) {
+<a name="line146">146: </a>    STDestroy_User(shell);
+<a name="line147">147: </a>  }
+<a name="line148">148: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line149">149: </a>  MatDestroy(&amp;A);
+<a name="line150">150: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line151">151: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line152">152: </a>}
+
+<a name="line154">154: </a><font color="#B22222">/***********************************************************************/</font>
+<a name="line155">155: </a><font color="#B22222">/*     Routines for a user-defined shell spectral transformation       */</font>
+<a name="line156">156: </a><font color="#B22222">/***********************************************************************/</font>
+
+<a name="line158">158: </a><font color="#B22222">/*</font>
+<a name="line159">159: </a><font color="#B22222">   STCreate_User - This routine creates a user-defined</font>
+<a name="line160">160: </a><font color="#B22222">   spectral transformation context.</font>
+
+<a name="line162">162: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line163">163: </a><font color="#B22222">.  shell - user-defined spectral transformation context</font>
+<a name="line164">164: </a><font color="#B22222">*/</font>
+<a name="line165">165: </a><strong><font color="#4169E1"><a name="STCreate_User"></a>PetscErrorCode STCreate_User(SampleShellST **shell)</font></strong>
+<a name="line166">166: </a>{
+<a name="line167">167: </a>  SampleShellST  *newctx;
+
+<a name="line171">171: </a>  PetscNew(&amp;newctx);
+<a name="line172">172: </a>  KSPCreate(PETSC_COMM_WORLD,&amp;newctx-&gt;ksp);
+<a name="line173">173: </a>  KSPAppendOptionsPrefix(newctx-&gt;ksp,<font color="#666666">"st_"</font>);
+<a name="line174">174: </a>  *shell = newctx;
+<a name="line175">175: </a>  <font color="#4169E1">return</font>(0);
+<a name="line176">176: </a>}
+<a name="line177">177: </a><font color="#B22222">/* ------------------------------------------------------------------- */</font>
+<a name="line178">178: </a><font color="#B22222">/*</font>
+<a name="line179">179: </a><font color="#B22222">   STSetUp_User - This routine sets up a user-defined</font>
+<a name="line180">180: </a><font color="#B22222">   spectral transformation context.</font>
+
+<a name="line182">182: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line183">183: </a><font color="#B22222">+  shell - user-defined spectral transformation context</font>
+<a name="line184">184: </a><font color="#B22222">-  st    - spectral transformation context containing the operator matrices</font>
+
+<a name="line186">186: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line187">187: </a><font color="#B22222">.  shell - fully set up user-defined transformation context</font>
+
+<a name="line189">189: </a><font color="#B22222">   Notes:</font>
+<a name="line190">190: </a><font color="#B22222">   In this example, the user-defined transformation is simply OP=A^-1.</font>
+<a name="line191">191: </a><font color="#B22222">   Therefore, the eigenpairs converge in reversed order. The KSP object</font>
+<a name="line192">192: </a><font color="#B22222">   used for the solution of linear systems with A is handled via the</font>
+<a name="line193">193: </a><font color="#B22222">   user-defined context SampleShellST.</font>
+<a name="line194">194: </a><font color="#B22222">*/</font>
+<a name="line195">195: </a><strong><font color="#4169E1"><a name="STSetUp_User"></a>PetscErrorCode STSetUp_User(SampleShellST *shell,<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line196">196: </a>{
+<a name="line197">197: </a>  Mat            A;
+
+<a name="line201">201: </a>  <a href="../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(st,0,&amp;A);
+<a name="line202">202: </a>  KSPSetOperators(shell-&gt;ksp,A,A);
+<a name="line203">203: </a>  KSPSetFromOptions(shell-&gt;ksp);
+<a name="line204">204: </a>  <font color="#4169E1">return</font>(0);
+<a name="line205">205: </a>}
+<a name="line206">206: </a><font color="#B22222">/* ------------------------------------------------------------------- */</font>
+<a name="line207">207: </a><font color="#B22222">/*</font>
+<a name="line208">208: </a><font color="#B22222">   STApply_User - This routine demonstrates the use of a</font>
+<a name="line209">209: </a><font color="#B22222">   user-provided spectral transformation.</font>
+
+<a name="line211">211: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line212">212: </a><font color="#B22222">+  st - spectral transformation context</font>
+<a name="line213">213: </a><font color="#B22222">-  x - input vector</font>
+
+<a name="line215">215: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line216">216: </a><font color="#B22222">.  y - output vector</font>
+
+<a name="line218">218: </a><font color="#B22222">   Notes:</font>
+<a name="line219">219: </a><font color="#B22222">   The transformation implemented in this code is just OP=A^-1 and</font>
+<a name="line220">220: </a><font color="#B22222">   therefore it is of little use, merely as an example of working with</font>
+<a name="line221">221: </a><font color="#B22222">   a <a href="../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>.</font>
+<a name="line222">222: </a><font color="#B22222">*/</font>
+<a name="line223">223: </a><strong><font color="#4169E1"><a name="STApply_User"></a>PetscErrorCode STApply_User(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec x,Vec y)</font></strong>
+<a name="line224">224: </a>{
+<a name="line225">225: </a>  SampleShellST  *shell;
+
+<a name="line229">229: </a>  <a href="../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>(st,(void**)&amp;shell);
+<a name="line230">230: </a>  KSPSolve(shell-&gt;ksp,x,y);
+<a name="line231">231: </a>  <font color="#4169E1">return</font>(0);
+<a name="line232">232: </a>}
+<a name="line233">233: </a><font color="#B22222">/* ------------------------------------------------------------------- */</font>
+<a name="line234">234: </a><font color="#B22222">/*</font>
+<a name="line235">235: </a><font color="#B22222">   STApplyTranspose_User - This is not required unless using a two-sided</font>
+<a name="line236">236: </a><font color="#B22222">   eigensolver.</font>
+
+<a name="line238">238: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line239">239: </a><font color="#B22222">+  st - spectral transformation context</font>
+<a name="line240">240: </a><font color="#B22222">-  x - input vector</font>
+
+<a name="line242">242: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line243">243: </a><font color="#B22222">.  y - output vector</font>
+<a name="line244">244: </a><font color="#B22222">*/</font>
+<a name="line245">245: </a><strong><font color="#4169E1"><a name="STApplyTranspose_User"></a>PetscErrorCode STApplyTranspose_User(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec x,Vec y)</font></strong>
+<a name="line246">246: </a>{
+<a name="line247">247: </a>  SampleShellST  *shell;
+
+<a name="line251">251: </a>  <a href="../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>(st,(void**)&amp;shell);
+<a name="line252">252: </a>  KSPSolveTranspose(shell-&gt;ksp,x,y);
+<a name="line253">253: </a>  <font color="#4169E1">return</font>(0);
+<a name="line254">254: </a>}
+<a name="line255">255: </a><font color="#B22222">/* ------------------------------------------------------------------- */</font>
+<a name="line256">256: </a><font color="#B22222">/*</font>
+<a name="line257">257: </a><font color="#B22222">   STBackTransform_User - This routine demonstrates the use of a</font>
+<a name="line258">258: </a><font color="#B22222">   user-provided spectral transformation.</font>
+
+<a name="line260">260: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line261">261: </a><font color="#B22222">+  st - spectral transformation context</font>
+<a name="line262">262: </a><font color="#B22222">-  n  - number of eigenvalues to transform</font>
+
+<a name="line264">264: </a><font color="#B22222">   Input/Output Parameters:</font>
+<a name="line265">265: </a><font color="#B22222">+  eigr - pointer to real part of eigenvalues</font>
+<a name="line266">266: </a><font color="#B22222">-  eigi - pointer to imaginary part of eigenvalues</font>
+
+<a name="line268">268: </a><font color="#B22222">   Notes:</font>
+<a name="line269">269: </a><font color="#B22222">   This code implements the back transformation of eigenvalues in</font>
+<a name="line270">270: </a><font color="#B22222">   order to retrieve the eigenvalues of the original problem. In this</font>
+<a name="line271">271: </a><font color="#B22222">   example, simply set k_i = 1/k_i.</font>
+<a name="line272">272: </a><font color="#B22222">*/</font>
+<a name="line273">273: </a><strong><font color="#4169E1"><a name="STBackTransform_User"></a>PetscErrorCode STBackTransform_User(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt n,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line274">274: </a>{
+<a name="line275">275: </a>  PetscInt j;
+
+<a name="line278">278: </a>  <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line279">279: </a>    eigr[j] = 1.0 / eigr[j];
+<a name="line280">280: </a>  }
+<a name="line281">281: </a>  <font color="#4169E1">return</font>(0);
+<a name="line282">282: </a>}
+<a name="line283">283: </a><font color="#B22222">/* ------------------------------------------------------------------- */</font>
+<a name="line284">284: </a><font color="#B22222">/*</font>
+<a name="line285">285: </a><font color="#B22222">   STDestroy_User - This routine destroys a user-defined</font>
+<a name="line286">286: </a><font color="#B22222">   spectral transformation context.</font>
+
+<a name="line288">288: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line289">289: </a><font color="#B22222">.  shell - user-defined spectral transformation context</font>
+<a name="line290">290: </a><font color="#B22222">*/</font>
+<a name="line291">291: </a><strong><font color="#4169E1"><a name="STDestroy_User"></a>PetscErrorCode STDestroy_User(SampleShellST *shell)</font></strong>
+<a name="line292">292: </a>{
+
+<a name="line296">296: </a>  KSPDestroy(&amp;shell-&gt;ksp);
+<a name="line297">297: </a>  PetscFree(shell);
+<a name="line298">298: </a>  <font color="#4169E1">return</font>(0);
+<a name="line299">299: </a>}
+
+<a name="line301">301: </a><font color="#B22222">/*TEST</font>
+
+<a name="line303">303: </a><font color="#B22222">   testset:</font>
+<a name="line304">304: </a><font color="#B22222">      args: -eps_nev 5 -eps_non_hermitian -terse</font>
+<a name="line305">305: </a><font color="#B22222">      requires: !single</font>
+<a name="line306">306: </a><font color="#B22222">      output_file: output/ex10_1.out</font>
+<a name="line307">307: </a><font color="#B22222">      test:</font>
+<a name="line308">308: </a><font color="#B22222">         suffix: 1_sinvert</font>
+<a name="line309">309: </a><font color="#B22222">         args: -st_type sinvert</font>
+<a name="line310">310: </a><font color="#B22222">      test:</font>
+<a name="line311">311: </a><font color="#B22222">         suffix: 1_sinvert_twoside</font>
+<a name="line312">312: </a><font color="#B22222">         args: -st_type sinvert -eps_balance twoside</font>
+<a name="line313">313: </a><font color="#B22222">      test:</font>
+<a name="line314">314: </a><font color="#B22222">         suffix: 1_shell</font>
+<a name="line315">315: </a><font color="#B22222">         args: -st_type shell</font>
+<a name="line316">316: </a><font color="#B22222">      test:</font>
+<a name="line317">317: </a><font color="#B22222">         suffix: 1_shell_twoside</font>
+<a name="line318">318: </a><font color="#B22222">         args: -st_type shell -eps_balance twoside</font>
+
+<a name="line320">320: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

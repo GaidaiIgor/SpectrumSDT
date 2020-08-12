@@ -1,0 +1,154 @@
+<center><a href="nepresolv.c">Actual source code: nepresolv.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/nep/interface/nepresolv.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:09+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/nep/interface/nepresolv.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> routines related to resolvent T^{-1}(z) = sum_i (z-lambda_i)^{-1} x_i y_i'</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/nepimpl.h.html">&lt;slepc/private/nepimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line17"> 17: </a>  <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>              nep;
+<a name="line18"> 18: </a>  <a href="../../../docs/manualpages/RG/RG.html#RG">RG</a>               rg;
+<a name="line19"> 19: </a>  PetscScalar      omega;
+<a name="line20"> 20: </a>  PetscScalar      *nfactor;         <font color="#B22222">/* normalization factors y_i'*T'(lambda_i)*x_i */</font>
+<a name="line21"> 21: </a>  PetscBool        *nfactor_avail;
+<a name="line22"> 22: </a>  PetscScalar      *dots;            <font color="#B22222">/* inner products y_i'*v */</font>
+<a name="line23"> 23: </a>  PetscBool        *dots_avail;
+<a name="line24"> 24: </a>  PetscObjectId    vid;
+<a name="line25"> 25: </a>  PetscObjectState vstate;
+<a name="line26"> 26: </a>} NEP_RESOLVENT_MATSHELL;
+
+<a name="line28"> 28: </a><strong><font color="#4169E1"><a name="MatMult_Resolvent"></a>static PetscErrorCode MatMult_Resolvent(Mat M,Vec v,Vec r)</font></strong>
+<a name="line29"> 29: </a>{
+<a name="line30"> 30: </a>  PetscErrorCode         ierr;
+<a name="line31"> 31: </a>  NEP_RESOLVENT_MATSHELL *ctx;
+<a name="line32"> 32: </a>  <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>                    nep;
+<a name="line33"> 33: </a>  PetscInt               i,inside=1;
+<a name="line34"> 34: </a>  PetscScalar            alpha;
+<a name="line35"> 35: </a>  Vec                    x,y,z,w;
+
+<a name="line38"> 38: </a>  MatShellGetContext(M,(void**)&amp;ctx);
+<a name="line39"> 39: </a>  nep = ctx-&gt;nep;
+<a name="line40"> 40: </a>  w = nep-&gt;work[0];
+<a name="line41"> 41: </a>  z = nep-&gt;work[1];
+<a name="line42"> 42: </a>  <font color="#4169E1">if</font> (((PetscObject)v)-&gt;id != ctx-&gt;vid || ((PetscObject)v)-&gt;state != ctx-&gt;vstate) {
+<a name="line43"> 43: </a>    PetscArrayzero(ctx-&gt;dots_avail,ctx-&gt;nep-&gt;nconv);
+<a name="line44"> 44: </a>    PetscObjectGetId((PetscObject)v,&amp;ctx-&gt;vid);
+<a name="line45"> 45: </a>    PetscObjectStateGet((PetscObject)v,&amp;ctx-&gt;vstate);
+<a name="line46"> 46: </a>  }
+<a name="line47"> 47: </a>  VecSet(r,0.0);
+<a name="line48"> 48: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nep-&gt;nconv;i++) {
+<a name="line49"> 49: </a>    <font color="#4169E1">if</font> (ctx-&gt;rg) {
+<a name="line50"> 50: </a>      <a href="../../../docs/manualpages/RG/RGCheckInside.html#RGCheckInside">RGCheckInside</a>(ctx-&gt;rg,1,&amp;nep-&gt;eigr[i],&amp;nep-&gt;eigi[i],&amp;inside);
+<a name="line51"> 51: </a>    }
+<a name="line52"> 52: </a>    <font color="#4169E1">if</font> (inside&gt;=0) {
+<a name="line53"> 53: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(nep-&gt;V,i,&amp;x);
+<a name="line54"> 54: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(nep-&gt;W,i,&amp;y);
+<a name="line55"> 55: </a>      <a href="../../../docs/manualpages/NEP/NEPApplyJacobian.html#NEPApplyJacobian">NEPApplyJacobian</a>(nep,nep-&gt;eigr[i],x,z,w,NULL);
+<a name="line56"> 56: </a>      <font color="#4169E1">if</font> (!ctx-&gt;dots_avail[i]) {
+<a name="line57"> 57: </a>        VecDot(v,y,&amp;ctx-&gt;dots[i]);
+<a name="line58"> 58: </a>        ctx-&gt;dots_avail[i] = PETSC_TRUE;
+<a name="line59"> 59: </a>      }
+<a name="line60"> 60: </a>      <font color="#4169E1">if</font> (!ctx-&gt;nfactor_avail[i]) {
+<a name="line61"> 61: </a>        VecDot(w,y,&amp;ctx-&gt;nfactor[i]);
+<a name="line62"> 62: </a>        ctx-&gt;nfactor_avail[i] = PETSC_TRUE;
+<a name="line63"> 63: </a>      }
+<a name="line64"> 64: </a>      alpha = ctx-&gt;dots[i]/(ctx-&gt;nfactor[i]*(ctx-&gt;omega-nep-&gt;eigr[i]));
+<a name="line65"> 65: </a>      VecAXPY(r,alpha,x);
+<a name="line66"> 66: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(nep-&gt;V,i,&amp;x);
+<a name="line67"> 67: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(nep-&gt;W,i,&amp;y);
+<a name="line68"> 68: </a>    }
+<a name="line69"> 69: </a>  }
+<a name="line70"> 70: </a>  <font color="#4169E1">return</font>(0);
+<a name="line71"> 71: </a>}
+
+<a name="line73"> 73: </a><strong><font color="#4169E1"><a name="MatDestroy_Resolvent"></a>static PetscErrorCode MatDestroy_Resolvent(Mat M)</font></strong>
+<a name="line74"> 74: </a>{
+<a name="line75"> 75: </a>  PetscErrorCode         ierr;
+<a name="line76"> 76: </a>  NEP_RESOLVENT_MATSHELL *ctx;
+
+<a name="line79"> 79: </a>  <font color="#4169E1">if</font> (M) {
+<a name="line80"> 80: </a>    MatShellGetContext(M,(void**)&amp;ctx);
+<a name="line81"> 81: </a>    PetscFree4(ctx-&gt;nfactor,ctx-&gt;nfactor_avail,ctx-&gt;dots,ctx-&gt;dots_avail);
+<a name="line82"> 82: </a>    PetscFree(ctx);
+<a name="line83"> 83: </a>  }
+<a name="line84"> 84: </a>  <font color="#4169E1">return</font>(0);
+<a name="line85"> 85: </a>}
+
+<a name="line87"> 87: </a><font color="#B22222">/*@</font>
+<a name="line88"> 88: </a><font color="#B22222">   <a href="../../../docs/manualpages/NEP/NEPApplyResolvent.html#NEPApplyResolvent">NEPApplyResolvent</a> - Applies the resolvent T^{-1}(z) to a given vector.</font>
+
+<a name="line90"> 90: </a><font color="#B22222">   Collective on nep</font>
+
+<a name="line92"> 92: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line93"> 93: </a><font color="#B22222">+  nep   - eigensolver context obtained from <a href="../../../docs/manualpages/NEP/NEPCreate.html#NEPCreate">NEPCreate</a>()</font>
+<a name="line94"> 94: </a><font color="#B22222">.  rg    - optional region</font>
+<a name="line95"> 95: </a><font color="#B22222">.  omega - value where the resolvent must be evaluated</font>
+<a name="line96"> 96: </a><font color="#B22222">-  v     - input vector</font>
+
+<a name="line98"> 98: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line99"> 99: </a><font color="#B22222">.  r     - result vector</font>
+
+<a name="line101">101: </a><font color="#B22222">   Notes:</font>
+<a name="line102">102: </a><font color="#B22222">   The resolvent T^{-1}(z) = sum_i (z-lambda_i)^{-1}*x_i*y_i' is evaluated at</font>
+<a name="line103">103: </a><font color="#B22222">   z=omega and the matrix-vector multiplication r = T^{-1}(omega)*v is computed.</font>
+<a name="line104">104: </a><font color="#B22222">   Vectors x_i and y_i are right and left eigenvectors, respectively, normalized</font>
+<a name="line105">105: </a><font color="#B22222">   so that y_i'*T'(lambda_i)*x_i=1. The sum contains only eigenvectors that have</font>
+<a name="line106">106: </a><font color="#B22222">   been previously computed with <a href="../../../docs/manualpages/NEP/NEPSolve.html#NEPSolve">NEPSolve</a>(), and if a region rg is given then only</font>
+<a name="line107">107: </a><font color="#B22222">   those corresponding to eigenvalues inside the region are considered.</font>
+
+<a name="line109">109: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line111">111: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/NEP/NEPGetLeftEigenvector.html#NEPGetLeftEigenvector">NEPGetLeftEigenvector</a>(), <a href="../../../docs/manualpages/NEP/NEPSolve.html#NEPSolve">NEPSolve</a>()</font>
+<a name="line112">112: </a><font color="#B22222">@*/</font>
+<a name="line113">113: </a><strong><font color="#4169E1"><a name="NEPApplyResolvent"></a>PetscErrorCode <a href="../../../docs/manualpages/NEP/NEPApplyResolvent.html#NEPApplyResolvent">NEPApplyResolvent</a>(<a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a> nep,<a href="../../../docs/manualpages/RG/RG.html#RG">RG</a> rg,PetscScalar omega,Vec v,Vec r)</font></strong>
+<a name="line114">114: </a>{
+<a name="line115">115: </a>  PetscErrorCode         ierr;
+<a name="line116">116: </a>  NEP_RESOLVENT_MATSHELL *ctx;
+
+<a name="line123">123: </a>  NEPCheckSolved(nep,1);
+
+<a name="line125">125: </a>  PetscLogEventBegin(NEP_Resolvent,nep,0,0,0);
+<a name="line126">126: </a>  <font color="#4169E1">if</font> (!nep-&gt;resolvent) {
+<a name="line127">127: </a>    PetscNew(&amp;ctx);
+<a name="line128">128: </a>    ctx-&gt;nep = nep;
+<a name="line129">129: </a>    PetscCalloc4(nep-&gt;nconv,&amp;ctx-&gt;nfactor,nep-&gt;nconv,&amp;ctx-&gt;nfactor_avail,nep-&gt;nconv,&amp;ctx-&gt;dots,nep-&gt;nconv,&amp;ctx-&gt;dots_avail);
+<a name="line130">130: </a>    MatCreateShell(PetscObjectComm((PetscObject)nep),nep-&gt;nloc,nep-&gt;nloc,nep-&gt;n,nep-&gt;n,ctx,&amp;nep-&gt;resolvent);
+<a name="line131">131: </a>    MatShellSetOperation(nep-&gt;resolvent,MATOP_MULT,(void(*)(void))MatMult_Resolvent);
+<a name="line132">132: </a>    MatShellSetOperation(nep-&gt;resolvent,MATOP_DESTROY,(void(*)(void))MatDestroy_Resolvent);
+<a name="line133">133: </a>  } <font color="#4169E1">else</font> {
+<a name="line134">134: </a>    MatShellGetContext(nep-&gt;resolvent,(void**)&amp;ctx);
+<a name="line135">135: </a>  }
+<a name="line136">136: </a>  NEPComputeVectors(nep);
+<a name="line137">137: </a>  <a href="../../../docs/manualpages/NEP/NEPSetWorkVecs.html#NEPSetWorkVecs">NEPSetWorkVecs</a>(nep,2);
+<a name="line138">138: </a>  ctx-&gt;rg    = rg;
+<a name="line139">139: </a>  ctx-&gt;omega = omega;
+<a name="line140">140: </a>  MatMult(nep-&gt;resolvent,v,r);
+<a name="line141">141: </a>  PetscLogEventEnd(NEP_Resolvent,nep,0,0,0);
+<a name="line142">142: </a>  <font color="#4169E1">return</font>(0);
+<a name="line143">143: </a>}
+
+</pre>
+</body>
+
+</html>

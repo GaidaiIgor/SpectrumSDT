@@ -1,0 +1,813 @@
+<center><a href="bvtensor.c">Actual source code: bvtensor.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/impls/tensor/bvtensor.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:44+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/impls/tensor/bvtensor.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> that is represented in compact form as V = (I otimes U) S</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line18"> 18: </a>  <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>          U;        <font color="#B22222">/* first factor */</font>
+<a name="line19"> 19: </a>  Mat         S;        <font color="#B22222">/* second factor */</font>
+<a name="line20"> 20: </a>  PetscScalar *qB;      <font color="#B22222">/* auxiliary matrix used in non-standard inner products */</font>
+<a name="line21"> 21: </a>  PetscScalar *sw;      <font color="#B22222">/* work space */</font>
+<a name="line22"> 22: </a>  PetscInt    d;        <font color="#B22222">/* degree of the tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> */</font>
+<a name="line23"> 23: </a>  PetscInt    ld;       <font color="#B22222">/* leading dimension of a single block in S */</font>
+<a name="line24"> 24: </a>  PetscInt    puk;      <font color="#B22222">/* copy of the k value */</font>
+<a name="line25"> 25: </a>  Vec         u;        <font color="#B22222">/* auxiliary work vector */</font>
+<a name="line26"> 26: </a>} BV_TENSOR;
+
+<a name="line28"> 28: </a><strong><font color="#4169E1"><a name="BVMultInPlace_Tensor"></a>PetscErrorCode BVMultInPlace_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line29"> 29: </a>{
+<a name="line31"> 31: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)V-&gt;data;
+<a name="line32"> 32: </a>  PetscScalar    *pS,*q;
+<a name="line33"> 33: </a>  PetscInt       ldq,lds = ctx-&gt;ld*ctx-&gt;d;
+
+<a name="line36"> 36: </a>  MatGetSize(Q,&amp;ldq,NULL);
+<a name="line37"> 37: </a>  MatDenseGetArray(ctx-&gt;S,&amp;pS);
+<a name="line38"> 38: </a>  MatDenseGetArray(Q,&amp;q);
+<a name="line39"> 39: </a>  BVMultInPlace_BLAS_Private(V,lds,V-&gt;k-V-&gt;l,ldq,s-V-&gt;l,e-V-&gt;l,pS+(V-&gt;nc+V-&gt;l)*lds,q+V-&gt;l*ldq+V-&gt;l,PETSC_FALSE);
+<a name="line40"> 40: </a>  MatDenseRestoreArray(Q,&amp;q);
+<a name="line41"> 41: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;pS);
+<a name="line42"> 42: </a>  <font color="#4169E1">return</font>(0);
+<a name="line43"> 43: </a>}
+
+<a name="line45"> 45: </a><strong><font color="#4169E1"><a name="BVMultInPlaceTranspose_Tensor"></a>PetscErrorCode BVMultInPlaceTranspose_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line46"> 46: </a>{
+<a name="line48"> 48: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)V-&gt;data;
+<a name="line49"> 49: </a>  PetscScalar    *pS,*q;
+<a name="line50"> 50: </a>  PetscInt       ldq,lds = ctx-&gt;ld*ctx-&gt;d;
+
+<a name="line53"> 53: </a>  MatGetSize(Q,&amp;ldq,NULL);
+<a name="line54"> 54: </a>  MatDenseGetArray(ctx-&gt;S,&amp;pS);
+<a name="line55"> 55: </a>  MatDenseGetArray(Q,&amp;q);
+<a name="line56"> 56: </a>  BVMultInPlace_BLAS_Private(V,lds,V-&gt;k-V-&gt;l,ldq,s-V-&gt;l,e-V-&gt;l,pS+(V-&gt;nc+V-&gt;l)*lds,q+V-&gt;l*ldq+V-&gt;l,PETSC_TRUE);
+<a name="line57"> 57: </a>  MatDenseRestoreArray(Q,&amp;q);
+<a name="line58"> 58: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;pS);
+<a name="line59"> 59: </a>  <font color="#4169E1">return</font>(0);
+<a name="line60"> 60: </a>}
+
+<a name="line62"> 62: </a><strong><font color="#4169E1"><a name="BVDot_Tensor"></a>PetscErrorCode BVDot_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y,Mat M)</font></strong>
+<a name="line63"> 63: </a>{
+<a name="line65"> 65: </a>  BV_TENSOR      *x = (BV_TENSOR*)X-&gt;data,*y = (BV_TENSOR*)Y-&gt;data;
+<a name="line66"> 66: </a>  PetscScalar    *m,*px,*py;
+<a name="line67"> 67: </a>  PetscInt       ldm,lds = x-&gt;ld*x-&gt;d;
+
+<a name="line70"> 70: </a>  <font color="#4169E1">if</font> (x-&gt;U!=y-&gt;U) SETERRQ(PetscObjectComm((PetscObject)X),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>() in BVTENSOR requires that both operands have the same U factor"</font>);
+<a name="line71"> 71: </a>  <font color="#4169E1">if</font> (lds!=y-&gt;ld*y-&gt;d) SETERRQ2(PetscObjectComm((PetscObject)X),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mismatching dimensions ld*d %D %D"</font>,lds,y-&gt;ld*y-&gt;d);
+<a name="line72"> 72: </a>  MatGetSize(M,&amp;ldm,NULL);
+<a name="line73"> 73: </a>  MatDenseGetArray(x-&gt;S,&amp;px);
+<a name="line74"> 74: </a>  MatDenseGetArray(y-&gt;S,&amp;py);
+<a name="line75"> 75: </a>  MatDenseGetArray(M,&amp;m);
+<a name="line76"> 76: </a>  BVDot_BLAS_Private(X,Y-&gt;k-Y-&gt;l,X-&gt;k-X-&gt;l,lds,ldm,py+(Y-&gt;nc+Y-&gt;l)*lds,px+(X-&gt;nc+X-&gt;l)*lds,m+X-&gt;l*ldm+Y-&gt;l,PETSC_FALSE);
+<a name="line77"> 77: </a>  MatDenseRestoreArray(M,&amp;m);
+<a name="line78"> 78: </a>  MatDenseRestoreArray(x-&gt;S,&amp;px);
+<a name="line79"> 79: </a>  MatDenseRestoreArray(y-&gt;S,&amp;py);
+<a name="line80"> 80: </a>  <font color="#4169E1">return</font>(0);
+<a name="line81"> 81: </a>}
+
+<a name="line83"> 83: </a><strong><font color="#4169E1"><a name="BVScale_Tensor"></a>PetscErrorCode BVScale_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscScalar alpha)</font></strong>
+<a name="line84"> 84: </a>{
+<a name="line86"> 86: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)bv-&gt;data;
+<a name="line87"> 87: </a>  PetscScalar    *pS;
+<a name="line88"> 88: </a>  PetscInt       lds = ctx-&gt;ld*ctx-&gt;d;
+
+<a name="line91"> 91: </a>  MatDenseGetArray(ctx-&gt;S,&amp;pS);
+<a name="line92"> 92: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line93"> 93: </a>    BVScale_BLAS_Private(bv,(bv-&gt;k-bv-&gt;l)*lds,pS+(bv-&gt;nc+bv-&gt;l)*lds,alpha);
+<a name="line94"> 94: </a>  } <font color="#4169E1">else</font> {
+<a name="line95"> 95: </a>    BVScale_BLAS_Private(bv,lds,pS+(bv-&gt;nc+j)*lds,alpha);
+<a name="line96"> 96: </a>  }
+<a name="line97"> 97: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;pS);
+<a name="line98"> 98: </a>  <font color="#4169E1">return</font>(0);
+<a name="line99"> 99: </a>}
+
+<a name="line101">101: </a><strong><font color="#4169E1"><a name="BVNorm_Tensor"></a>PetscErrorCode BVNorm_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,NormType type,PetscReal *val)</font></strong>
+<a name="line102">102: </a>{
+<a name="line104">104: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)bv-&gt;data;
+<a name="line105">105: </a>  PetscScalar    *pS;
+<a name="line106">106: </a>  PetscInt       lds = ctx-&gt;ld*ctx-&gt;d;
+
+<a name="line109">109: </a>  MatDenseGetArray(ctx-&gt;S,&amp;pS);
+<a name="line110">110: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line111">111: </a>    BVNorm_LAPACK_Private(bv,lds,bv-&gt;k-bv-&gt;l,pS+(bv-&gt;nc+bv-&gt;l)*lds,type,val,PETSC_FALSE);
+<a name="line112">112: </a>  } <font color="#4169E1">else</font> {
+<a name="line113">113: </a>    BVNorm_LAPACK_Private(bv,lds,1,pS+(bv-&gt;nc+j)*lds,type,val,PETSC_FALSE);
+<a name="line114">114: </a>  }
+<a name="line115">115: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;pS);
+<a name="line116">116: </a>  <font color="#4169E1">return</font>(0);
+<a name="line117">117: </a>}
+
+<a name="line119">119: </a><strong><font color="#4169E1"><a name="BVCopyColumn_Tensor"></a>PetscErrorCode BVCopyColumn_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt j,PetscInt i)</font></strong>
+<a name="line120">120: </a>{
+<a name="line122">122: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)V-&gt;data;
+<a name="line123">123: </a>  PetscScalar    *pS;
+<a name="line124">124: </a>  PetscInt       lds = ctx-&gt;ld*ctx-&gt;d;
+
+<a name="line127">127: </a>  MatDenseGetArray(ctx-&gt;S,&amp;pS);
+<a name="line128">128: </a>  PetscArraycpy(pS+(V-&gt;nc+i)*lds,pS+(V-&gt;nc+j)*lds,lds);
+<a name="line129">129: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;pS);
+<a name="line130">130: </a>  <font color="#4169E1">return</font>(0);
+<a name="line131">131: </a>}
+
+<a name="line133">133: </a><strong><font color="#4169E1"><a name="BVTensorNormColumn"></a>static PetscErrorCode BVTensorNormColumn(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscReal *norm)</font></strong>
+<a name="line134">134: </a>{
+<a name="line136">136: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)bv-&gt;data;
+<a name="line137">137: </a>  PetscBLASInt   one=1,lds_;
+<a name="line138">138: </a>  PetscScalar    sone=1.0,szero=0.0,*S,*x,dot;
+<a name="line139">139: </a>  PetscReal      alpha=1.0,scale=0.0,aval;
+<a name="line140">140: </a>  PetscInt       i,lds,ld=ctx-&gt;ld;
+
+<a name="line143">143: </a>  lds = ld*ctx-&gt;d;
+<a name="line144">144: </a>  MatDenseGetArray(ctx-&gt;S,&amp;S);
+<a name="line145">145: </a>  PetscBLASIntCast(lds,&amp;lds_);
+<a name="line146">146: </a>  <font color="#4169E1">if</font> (ctx-&gt;qB) {
+<a name="line147">147: </a>    x = ctx-&gt;sw;
+<a name="line148">148: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;lds_,&amp;lds_,&amp;sone,ctx-&gt;qB,&amp;lds_,S+j*lds,&amp;one,&amp;szero,x,&amp;one));
+<a name="line149">149: </a>    dot = PetscRealPart(BLASdot_(&amp;lds_,S+j*lds,&amp;one,x,&amp;one));
+<a name="line150">150: </a>    BV_SafeSqrt(bv,dot,norm);
+<a name="line151">151: </a>  } <font color="#4169E1">else</font> {
+<a name="line152">152: </a>    <font color="#B22222">/* Compute *norm = BLASnrm2_(&amp;lds_,S+j*lds,&amp;one); */</font>
+<a name="line153">153: </a>    <font color="#4169E1">if</font> (lds==1) *norm = PetscAbsScalar(S[j*lds]);
+<a name="line154">154: </a>    <font color="#4169E1">else</font> {
+<a name="line155">155: </a>      <font color="#4169E1">for</font> (i=0;i&lt;lds;i++) {
+<a name="line156">156: </a>        aval = PetscAbsScalar(S[i+j*lds]);
+<a name="line157">157: </a>        <font color="#4169E1">if</font> (aval!=0.0) {
+<a name="line158">158: </a>          <font color="#4169E1">if</font> (scale&lt;aval) {
+<a name="line159">159: </a>            alpha = 1.0 + alpha*PetscSqr(scale/aval);
+<a name="line160">160: </a>            scale = aval;
+<a name="line161">161: </a>          } <font color="#4169E1">else</font> alpha += PetscSqr(aval/scale);
+<a name="line162">162: </a>        }
+<a name="line163">163: </a>      }
+<a name="line164">164: </a>      *norm = scale*PetscSqrtReal(alpha);
+<a name="line165">165: </a>    }
+<a name="line166">166: </a>  }
+<a name="line167">167: </a>  <font color="#4169E1">return</font>(0);
+<a name="line168">168: </a>}
+
+<a name="line170">170: </a><strong><font color="#4169E1"><a name="BVOrthogonalizeGS1_Tensor"></a>PetscErrorCode BVOrthogonalizeGS1_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt k,Vec v,PetscBool *which,PetscScalar *h,PetscScalar *c,PetscReal *onorm,PetscReal *norm)</font></strong>
+<a name="line171">171: </a>{
+<a name="line172">172: </a>  PetscErrorCode    ierr;
+<a name="line173">173: </a>  BV_TENSOR         *ctx = (BV_TENSOR*)bv-&gt;data;
+<a name="line174">174: </a>  PetscScalar       *pS,*cc,*x,dot,sonem=-1.0,sone=1.0,szero=0.0;
+<a name="line175">175: </a>  PetscInt          i,lds = ctx-&gt;ld*ctx-&gt;d;
+<a name="line176">176: </a>  PetscBLASInt      lds_,k_,one=1;
+<a name="line177">177: </a>  const PetscScalar *omega;
+
+<a name="line180">180: </a>  <font color="#4169E1">if</font> (v) SETERRQ(PetscObjectComm((PetscObject)bv),PETSC_ERR_SUP,<font color="#666666">"Orthogonalization against an external vector is not allowed in BVTENSOR"</font>);
+<a name="line181">181: </a>  MatDenseGetArray(ctx-&gt;S,&amp;pS);
+<a name="line182">182: </a>  <font color="#4169E1">if</font> (!c) {
+<a name="line183">183: </a>    VecGetArray(bv-&gt;buffer,&amp;cc);
+<a name="line184">184: </a>  } <font color="#4169E1">else</font> cc = c;
+<a name="line185">185: </a>  PetscBLASIntCast(lds,&amp;lds_);
+<a name="line186">186: </a>  PetscBLASIntCast(k,&amp;k_);
+
+<a name="line188">188: </a>  <font color="#4169E1">if</font> (onorm) { BVTensorNormColumn(bv,k,onorm); }
+
+<a name="line190">190: </a>  <font color="#4169E1">if</font> (ctx-&gt;qB) x = ctx-&gt;sw;
+<a name="line191">191: </a>  <font color="#4169E1">else</font> x = pS+k*lds;
+
+<a name="line193">193: </a>  <font color="#4169E1">if</font> (bv-&gt;orthog_type==<a href="../../../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BV_ORTHOG_MGS</a>) {  <font color="#B22222">/* modified Gram-Schmidt */</font>
+
+<a name="line195">195: </a>    <font color="#4169E1">if</font> (bv-&gt;indef) { <font color="#B22222">/* signature */</font>
+<a name="line196">196: </a>      VecGetArrayRead(bv-&gt;omega,&amp;omega);
+<a name="line197">197: </a>    }
+<a name="line198">198: </a>    <font color="#4169E1">for</font> (i=-bv-&gt;nc;i&lt;k;i++) {
+<a name="line199">199: </a>      <font color="#4169E1">if</font> (which &amp;&amp; i&gt;=0 &amp;&amp; !which[i]) <font color="#4169E1">continue</font>;
+<a name="line200">200: </a>      <font color="#4169E1">if</font> (ctx-&gt;qB) PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;lds_,&amp;lds_,&amp;sone,ctx-&gt;qB,&amp;lds_,pS+k*lds,&amp;one,&amp;szero,x,&amp;one));
+<a name="line201">201: </a>      <font color="#B22222">/* c_i = (s_k, s_i) */</font>
+<a name="line202">202: </a>      dot = PetscRealPart(BLASdot_(&amp;lds_,pS+i*lds,&amp;one,x,&amp;one));
+<a name="line203">203: </a>      <font color="#4169E1">if</font> (bv-&gt;indef) dot /= PetscRealPart(omega[i]);
+<a name="line204">204: </a>      BV_SetValue(bv,i,0,cc,dot);
+<a name="line205">205: </a>      <font color="#B22222">/* s_k = s_k - c_i s_i */</font>
+<a name="line206">206: </a>      dot = -dot;
+<a name="line207">207: </a>      PetscStackCallBLAS(<font color="#666666">"BLASaxpy"</font>,BLASaxpy_(&amp;lds_,&amp;dot,pS+i*lds,&amp;one,pS+k*lds,&amp;one));
+<a name="line208">208: </a>    }
+<a name="line209">209: </a>    <font color="#4169E1">if</font> (bv-&gt;indef) {
+<a name="line210">210: </a>      VecRestoreArrayRead(bv-&gt;omega,&amp;omega);
+<a name="line211">211: </a>    }
+
+<a name="line213">213: </a>  } <font color="#4169E1">else</font> {  <font color="#B22222">/* classical Gram-Schmidt */</font>
+<a name="line214">214: </a>    <font color="#4169E1">if</font> (ctx-&gt;qB) PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;lds_,&amp;lds_,&amp;sone,ctx-&gt;qB,&amp;lds_,pS+k*lds,&amp;one,&amp;szero,x,&amp;one));
+
+<a name="line216">216: </a>    <font color="#B22222">/* cc = S_{0:k-1}^* s_k */</font>
+<a name="line217">217: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"C"</font>,&amp;lds_,&amp;k_,&amp;sone,pS,&amp;lds_,x,&amp;one,&amp;szero,cc,&amp;one));
+
+<a name="line219">219: </a>    <font color="#B22222">/* s_k = s_k - S_{0:k-1} cc */</font>
+<a name="line220">220: </a>    <font color="#4169E1">if</font> (bv-&gt;indef) { BV_ApplySignature(bv,k,cc,PETSC_TRUE); }
+<a name="line221">221: </a>     PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;lds_,&amp;k_,&amp;sonem,pS,&amp;lds_,cc,&amp;one,&amp;sone,pS+k*lds,&amp;one));
+<a name="line222">222: </a>    <font color="#4169E1">if</font> (bv-&gt;indef) { BV_ApplySignature(bv,k,cc,PETSC_FALSE); }
+<a name="line223">223: </a>  }
+
+<a name="line225">225: </a>  <font color="#4169E1">if</font> (norm) { BVTensorNormColumn(bv,k,norm); }
+<a name="line226">226: </a>  BV_AddCoefficients(bv,k,h,cc);
+<a name="line227">227: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;pS);
+<a name="line228">228: </a>  VecRestoreArray(bv-&gt;buffer,&amp;cc);
+<a name="line229">229: </a>  <font color="#4169E1">return</font>(0);
+<a name="line230">230: </a>}
+
+<a name="line232">232: </a><strong><font color="#4169E1"><a name="BVView_Tensor"></a>PetscErrorCode BVView_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscViewer viewer)</font></strong>
+<a name="line233">233: </a>{
+<a name="line234">234: </a>  PetscErrorCode    ierr;
+<a name="line235">235: </a>  BV_TENSOR         *ctx = (BV_TENSOR*)bv-&gt;data;
+<a name="line236">236: </a>  PetscViewerFormat format;
+<a name="line237">237: </a>  PetscBool         isascii;
+<a name="line238">238: </a>  const char        *bvname,*uname,*sname;
+
+<a name="line241">241: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line242">242: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line243">243: </a>    PetscViewerGetFormat(viewer,&amp;format);
+<a name="line244">244: </a>    <font color="#4169E1">if</font> (format == PETSC_VIEWER_ASCII_INFO || format == PETSC_VIEWER_ASCII_INFO_DETAIL) {
+<a name="line245">245: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"number of tensor blocks (degree): %D\n"</font>,ctx-&gt;d);
+<a name="line246">246: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"number of columns of U factor: %D\n"</font>,ctx-&gt;ld);
+<a name="line247">247: </a>      <font color="#4169E1">return</font>(0);
+<a name="line248">248: </a>    }
+<a name="line249">249: </a>    <a href="../../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(ctx-&gt;U,viewer);
+<a name="line250">250: </a>    MatView(ctx-&gt;S,viewer);
+<a name="line251">251: </a>    <font color="#4169E1">if</font> (format == PETSC_VIEWER_ASCII_MATLAB) {
+<a name="line252">252: </a>      PetscObjectGetName((PetscObject)bv,&amp;bvname);
+<a name="line253">253: </a>      PetscObjectGetName((PetscObject)ctx-&gt;U,&amp;uname);
+<a name="line254">254: </a>      PetscObjectGetName((PetscObject)ctx-&gt;S,&amp;sname);
+<a name="line255">255: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s=kron(eye(%D),%s)*%s(:,1:%D);\n"</font>,bvname,ctx-&gt;d,uname,sname,bv-&gt;k);
+<a name="line256">256: </a>    }
+<a name="line257">257: </a>  } <font color="#4169E1">else</font> {
+<a name="line258">258: </a>    <a href="../../../../../../docs/manualpages/BV/BVView.html#BVView">BVView</a>(ctx-&gt;U,viewer);
+<a name="line259">259: </a>    MatView(ctx-&gt;S,viewer);
+<a name="line260">260: </a>  }
+<a name="line261">261: </a>  <font color="#4169E1">return</font>(0);
+<a name="line262">262: </a>}
+
+<a name="line264">264: </a><strong><font color="#4169E1"><a name="BVTensorUpdateMatrix"></a>static PetscErrorCode BVTensorUpdateMatrix(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt ini,PetscInt end)</font></strong>
+<a name="line265">265: </a>{
+<a name="line267">267: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)V-&gt;data;
+<a name="line268">268: </a>  PetscInt       i,j,r,c,l,k,ld=ctx-&gt;ld,lds=ctx-&gt;d*ctx-&gt;ld;
+<a name="line269">269: </a>  PetscScalar    *qB,*sqB;
+<a name="line270">270: </a>  Vec            u;
+<a name="line271">271: </a>  Mat            A;
+
+<a name="line274">274: </a>  <font color="#4169E1">if</font> (!V-&gt;matrix) <font color="#4169E1">return</font>(0);
+<a name="line275">275: </a>  l = ctx-&gt;U-&gt;l; k = ctx-&gt;U-&gt;k;
+<a name="line276">276: </a>  <font color="#B22222">/* update inner product matrix */</font>
+<a name="line277">277: </a>  <font color="#4169E1">if</font> (!ctx-&gt;qB) {
+<a name="line278">278: </a>    PetscCalloc2(lds*lds,&amp;ctx-&gt;qB,lds,&amp;ctx-&gt;sw);
+<a name="line279">279: </a>    VecDuplicate(ctx-&gt;U-&gt;t,&amp;ctx-&gt;u);
+<a name="line280">280: </a>  }
+<a name="line281">281: </a>  ctx-&gt;U-&gt;l = 0;
+<a name="line282">282: </a>  <font color="#4169E1">for</font> (r=0;r&lt;ctx-&gt;d;r++) {
+<a name="line283">283: </a>    <font color="#4169E1">for</font> (c=0;c&lt;=r;c++) {
+<a name="line284">284: </a>      MatNestGetSubMat(V-&gt;matrix,r,c,&amp;A);
+<a name="line285">285: </a>      <font color="#4169E1">if</font> (A) {
+<a name="line286">286: </a>        qB = ctx-&gt;qB+c*ld*lds+r*ld;
+<a name="line287">287: </a>        <font color="#4169E1">for</font> (i=ini;i&lt;end;i++) {
+<a name="line288">288: </a>          <a href="../../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(ctx-&gt;U,i,&amp;u);
+<a name="line289">289: </a>          MatMult(A,u,ctx-&gt;u);
+<a name="line290">290: </a>          ctx-&gt;U-&gt;k = i+1;
+<a name="line291">291: </a>          <a href="../../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(ctx-&gt;U,ctx-&gt;u,qB+i*lds);
+<a name="line292">292: </a>          <a href="../../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(ctx-&gt;U,i,&amp;u);
+<a name="line293">293: </a>          <font color="#4169E1">for</font> (j=0;j&lt;i;j++) qB[i+j*lds] = PetscConj(qB[j+i*lds]);
+<a name="line294">294: </a>          qB[i*lds+i] = PetscRealPart(qB[i+i*lds]);
+<a name="line295">295: </a>        }
+<a name="line296">296: </a>        <font color="#4169E1">if</font> (c!=r) {
+<a name="line297">297: </a>          sqB = ctx-&gt;qB+r*ld*lds+c*ld;
+<a name="line298">298: </a>          <font color="#4169E1">for</font> (i=ini;i&lt;end;i++) <font color="#4169E1">for</font> (j=0;j&lt;=i;j++) {
+<a name="line299">299: </a>            sqB[i+j*lds] = PetscConj(qB[j+i*lds]);
+<a name="line300">300: </a>            sqB[j+i*lds] = qB[j+i*lds];
+<a name="line301">301: </a>          }
+<a name="line302">302: </a>        }
+<a name="line303">303: </a>      }
+<a name="line304">304: </a>    }
+<a name="line305">305: </a>  }
+<a name="line306">306: </a>  ctx-&gt;U-&gt;l = l; ctx-&gt;U-&gt;k = k;
+<a name="line307">307: </a>  <font color="#4169E1">return</font>(0);
+<a name="line308">308: </a>}
+
+<a name="line310">310: </a><strong><font color="#4169E1"><a name="BVTensorBuildFirstColumn_Tensor"></a>static PetscErrorCode BVTensorBuildFirstColumn_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt k)</font></strong>
+<a name="line311">311: </a>{
+<a name="line313">313: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)V-&gt;data;
+<a name="line314">314: </a>  PetscInt       i,nq=0;
+<a name="line315">315: </a>  PetscScalar    *pS,*omega;
+<a name="line316">316: </a>  PetscReal      norm;
+<a name="line317">317: </a>  PetscBool      breakdown=PETSC_FALSE;
+
+<a name="line320">320: </a>  MatDenseGetArray(ctx-&gt;S,&amp;pS);
+<a name="line321">321: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;d;i++) {
+<a name="line322">322: </a>    <font color="#4169E1">if</font> (i&gt;=k) {
+<a name="line323">323: </a>      <a href="../../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(ctx-&gt;U,nq);
+<a name="line324">324: </a>    } <font color="#4169E1">else</font> {
+<a name="line325">325: </a>      <a href="../../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(ctx-&gt;U,i,nq);
+<a name="line326">326: </a>    }
+<a name="line327">327: </a>    <a href="../../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(ctx-&gt;U,nq,pS+i*ctx-&gt;ld,&amp;norm,&amp;breakdown);
+<a name="line328">328: </a>    <font color="#4169E1">if</font> (!breakdown) {
+<a name="line329">329: </a>      <a href="../../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(ctx-&gt;U,nq,1.0/norm);
+<a name="line330">330: </a>      pS[nq+i*ctx-&gt;ld] = norm;
+<a name="line331">331: </a>      nq++;
+<a name="line332">332: </a>    }
+<a name="line333">333: </a>  }
+<a name="line334">334: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;pS);
+<a name="line335">335: </a>  <font color="#4169E1">if</font> (!nq) SETERRQ1(PetscObjectComm((PetscObject)V),1,<font color="#666666">"Cannot build first column of tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>; U should contain k=%D nonzero columns"</font>,k);
+<a name="line336">336: </a>  BVTensorUpdateMatrix(V,0,nq);
+<a name="line337">337: </a>  BVTensorNormColumn(V,0,&amp;norm);
+<a name="line338">338: </a>  BVScale_Tensor(V,0,1.0/norm);
+<a name="line339">339: </a>  <font color="#4169E1">if</font> (V-&gt;indef) {
+<a name="line340">340: </a>    BV_AllocateSignature(V);
+<a name="line341">341: </a>    VecGetArray(V-&gt;omega,&amp;omega);
+<a name="line342">342: </a>    omega[0] = (norm&lt;0.0)? -1.0: 1.0;
+<a name="line343">343: </a>    VecRestoreArray(V-&gt;omega,&amp;omega);
+<a name="line344">344: </a>  }
+<a name="line345">345: </a>  <font color="#B22222">/* set active columns */</font>
+<a name="line346">346: </a>  ctx-&gt;U-&gt;l = 0;
+<a name="line347">347: </a>  ctx-&gt;U-&gt;k = nq;
+<a name="line348">348: </a>  <font color="#4169E1">return</font>(0);
+<a name="line349">349: </a>}
+
+<a name="line351">351: </a><font color="#B22222">/*@</font>
+<a name="line352">352: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BVTensorBuildFirstColumn.html#BVTensorBuildFirstColumn">BVTensorBuildFirstColumn</a> - Builds the first column of the tensor basis vectors</font>
+<a name="line353">353: </a><font color="#B22222">   V from the data contained in the first k columns of U.</font>
+
+<a name="line355">355: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line357">357: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line358">358: </a><font color="#B22222">+  V - the basis vectors context</font>
+<a name="line359">359: </a><font color="#B22222">-  k - the number of columns of U with relevant information</font>
+
+<a name="line361">361: </a><font color="#B22222">   Notes:</font>
+<a name="line362">362: </a><font color="#B22222">   At most d columns are considered, where d is the degree of the tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>.</font>
+<a name="line363">363: </a><font color="#B22222">   Given V = (I otimes U) S, this function computes the first column of V, that</font>
+<a name="line364">364: </a><font color="#B22222">   is, it computes the coefficients of the first column of S by orthogonalizing</font>
+<a name="line365">365: </a><font color="#B22222">   the first d columns of U. If k is less than d (or linearly dependent columns</font>
+<a name="line366">366: </a><font color="#B22222">   are found) then additional random columns are used.</font>
+
+<a name="line368">368: </a><font color="#B22222">   The computed column has unit norm.</font>
+
+<a name="line370">370: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line372">372: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/BV/BVCreateTensor.html#BVCreateTensor">BVCreateTensor</a>()</font>
+<a name="line373">373: </a><font color="#B22222">@*/</font>
+<a name="line374">374: </a><strong><font color="#4169E1"><a name="BVTensorBuildFirstColumn"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/BV/BVTensorBuildFirstColumn.html#BVTensorBuildFirstColumn">BVTensorBuildFirstColumn</a>(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt k)</font></strong>
+<a name="line375">375: </a>{
+
+<a name="line381">381: </a>  PetscUseMethod(V,<font color="#666666">"BVTensorBuildFirstColumn_C"</font>,(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>,PetscInt),(V,k));
+<a name="line382">382: </a>  <font color="#4169E1">return</font>(0);
+<a name="line383">383: </a>}
+
+<a name="line385">385: </a><strong><font color="#4169E1"><a name="BVTensorCompress_Tensor"></a>static PetscErrorCode BVTensorCompress_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt newc)</font></strong>
+<a name="line386">386: </a>{
+<a name="line388">388: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)V-&gt;data;
+<a name="line389">389: </a>  PetscInt       nwu=0,nnc,nrow,lwa,r,c;
+<a name="line390">390: </a>  PetscInt       i,j,k,n,lds=ctx-&gt;ld*ctx-&gt;d,deg=ctx-&gt;d,lock,cs1=V-&gt;k,rs1=ctx-&gt;U-&gt;k,rk=0,offu;
+<a name="line391">391: </a>  PetscScalar    *S,*M,*Z,*pQ,*SS,*SS2,t,sone=1.0,zero=0.0,mone=-1.0,*p,*tau,*work,*qB,*sqB;
+<a name="line392">392: </a>  PetscReal      *sg,tol,*rwork;
+<a name="line393">393: </a>  PetscBLASInt   ld_,cs1_,rs1_,cs1tdeg,n_,info,lw_,newc_,newctdeg,nnc_,nrow_,nnctdeg,lds_,rk_;
+<a name="line394">394: </a>  Mat            Q,A;
+
+<a name="line397">397: </a>  <font color="#4169E1">if</font> (!cs1) <font color="#4169E1">return</font>(0);
+<a name="line398">398: </a>  lwa = 6*ctx-&gt;ld*lds+2*cs1;
+<a name="line399">399: </a>  n = PetscMin(rs1,deg*cs1);
+<a name="line400">400: </a>  lock = ctx-&gt;U-&gt;l;
+<a name="line401">401: </a>  nnc = cs1-lock-newc;
+<a name="line402">402: </a>  nrow = rs1-lock;
+<a name="line403">403: </a>  PetscCalloc6(deg*newc*nnc,&amp;SS,newc*nnc,&amp;SS2,(rs1+lock+newc)*n,&amp;pQ,deg*rs1,&amp;tau,lwa,&amp;work,6*n,&amp;rwork);
+<a name="line404">404: </a>  offu = lock*(rs1+1);
+<a name="line405">405: </a>  M = work+nwu;
+<a name="line406">406: </a>  nwu += rs1*cs1*deg;
+<a name="line407">407: </a>  sg = rwork;
+<a name="line408">408: </a>  Z = work+nwu;
+<a name="line409">409: </a>  nwu += deg*cs1*n;
+<a name="line410">410: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line411">411: </a>  PetscBLASIntCast(nnc,&amp;nnc_);
+<a name="line412">412: </a>  PetscBLASIntCast(cs1,&amp;cs1_);
+<a name="line413">413: </a>  PetscBLASIntCast(rs1,&amp;rs1_);
+<a name="line414">414: </a>  PetscBLASIntCast(newc,&amp;newc_);
+<a name="line415">415: </a>  PetscBLASIntCast(newc*deg,&amp;newctdeg);
+<a name="line416">416: </a>  PetscBLASIntCast(nnc*deg,&amp;nnctdeg);
+<a name="line417">417: </a>  PetscBLASIntCast(cs1*deg,&amp;cs1tdeg);
+<a name="line418">418: </a>  PetscBLASIntCast(lwa-nwu,&amp;lw_);
+<a name="line419">419: </a>  PetscBLASIntCast(nrow,&amp;nrow_);
+<a name="line420">420: </a>  PetscBLASIntCast(lds,&amp;lds_);
+<a name="line421">421: </a>  MatDenseGetArray(ctx-&gt;S,&amp;S);
+
+<a name="line423">423: </a>  <font color="#4169E1">if</font> (newc&gt;0) {
+<a name="line424">424: </a>    <font color="#B22222">/* truncate columns associated with new converged eigenpairs */</font>
+<a name="line425">425: </a>    <font color="#4169E1">for</font> (j=0;j&lt;deg;j++) {
+<a name="line426">426: </a>      <font color="#4169E1">for</font> (i=lock;i&lt;lock+newc;i++) {
+<a name="line427">427: </a>        PetscArraycpy(M+(i-lock+j*newc)*nrow,S+i*lds+j*ctx-&gt;ld+lock,nrow);
+<a name="line428">428: </a>      }
+<a name="line429">429: </a>    }
+<a name="line430">430: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line431">431: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"S"</font>,&amp;nrow_,&amp;newctdeg,M,&amp;nrow_,sg,pQ+offu,&amp;rs1_,Z,&amp;n_,work+nwu,&amp;lw_,&amp;info));
+<a name="line432">432: </a><font color="#A020F0">#else</font>
+<a name="line433">433: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"S"</font>,&amp;nrow_,&amp;newctdeg,M,&amp;nrow_,sg,pQ+offu,&amp;rs1_,Z,&amp;n_,work+nwu,&amp;lw_,rwork+n,&amp;info));
+<a name="line434">434: </a><font color="#A020F0">#endif</font>
+<a name="line435">435: </a>    SlepcCheckLapackInfo(<font color="#666666">"gesvd"</font>,info);
+<a name="line436">436: </a>    <font color="#B22222">/* <a href="../../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> has rank min(newc,nrow) */</font>
+<a name="line437">437: </a>    rk = PetscMin(newc,nrow);
+<a name="line438">438: </a>    <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) {
+<a name="line439">439: </a>      t = sg[i];
+<a name="line440">440: </a>      PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;newctdeg,&amp;t,Z+i,&amp;n_));
+<a name="line441">441: </a>    }
+<a name="line442">442: </a>    <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) {
+<a name="line443">443: </a>      <font color="#4169E1">for</font> (j=lock;j&lt;lock+newc;j++) {
+<a name="line444">444: </a>        PetscArraycpy(S+j*lds+i*ctx-&gt;ld+lock,Z+(newc*i+j-lock)*n,rk);
+<a name="line445">445: </a>        PetscArrayzero(S+j*lds+i*ctx-&gt;ld+lock+rk,(ctx-&gt;ld-lock-rk));
+<a name="line446">446: </a>      }
+<a name="line447">447: </a>    }
+<a name="line448">448: </a>    <font color="#B22222">/*</font>
+<a name="line449">449: </a><font color="#B22222">      update columns associated with non-converged vectors, orthogonalize</font>
+<a name="line450">450: </a><font color="#B22222">      against pQ so that next M has rank nnc+d-1 insted of nrow+d-1</font>
+<a name="line451">451: </a><font color="#B22222">    */</font>
+<a name="line452">452: </a>    <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) {
+<a name="line453">453: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;newc_,&amp;nnc_,&amp;nrow_,&amp;sone,pQ+offu,&amp;rs1_,S+(lock+newc)*lds+i*ctx-&gt;ld+lock,&amp;lds_,&amp;zero,SS+i*newc*nnc,&amp;newc_));
+<a name="line454">454: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;nrow_,&amp;nnc_,&amp;newc_,&amp;mone,pQ+offu,&amp;rs1_,SS+i*newc*nnc,&amp;newc_,&amp;sone,S+(lock+newc)*lds+i*ctx-&gt;ld+lock,&amp;lds_));
+<a name="line455">455: </a>      <font color="#B22222">/* repeat orthogonalization step */</font>
+<a name="line456">456: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;newc_,&amp;nnc_,&amp;nrow_,&amp;sone,pQ+offu,&amp;rs1_,S+(lock+newc)*lds+i*ctx-&gt;ld+lock,&amp;lds_,&amp;zero,SS2,&amp;newc_));
+<a name="line457">457: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;nrow_,&amp;nnc_,&amp;newc_,&amp;mone,pQ+offu,&amp;rs1_,SS2,&amp;newc_,&amp;sone,S+(lock+newc)*lds+i*ctx-&gt;ld+lock,&amp;lds_));
+<a name="line458">458: </a>      <font color="#4169E1">for</font> (j=0;j&lt;newc*nnc;j++) *(SS+i*newc*nnc+j) += SS2[j];
+<a name="line459">459: </a>    }
+<a name="line460">460: </a>  }
+
+<a name="line462">462: </a>  <font color="#B22222">/* truncate columns associated with non-converged eigenpairs */</font>
+<a name="line463">463: </a>  <font color="#4169E1">for</font> (j=0;j&lt;deg;j++) {
+<a name="line464">464: </a>    <font color="#4169E1">for</font> (i=lock+newc;i&lt;cs1;i++) {
+<a name="line465">465: </a>      PetscArraycpy(M+(i-lock-newc+j*nnc)*nrow,S+i*lds+j*ctx-&gt;ld+lock,nrow);
+<a name="line466">466: </a>    }
+<a name="line467">467: </a>  }
+<a name="line468">468: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line469">469: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"S"</font>,&amp;nrow_,&amp;nnctdeg,M,&amp;nrow_,sg,pQ+offu+newc*rs1,&amp;rs1_,Z,&amp;n_,work+nwu,&amp;lw_,&amp;info));
+<a name="line470">470: </a><font color="#A020F0">#else</font>
+<a name="line471">471: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"S"</font>,&amp;nrow_,&amp;nnctdeg,M,&amp;nrow_,sg,pQ+offu+newc*rs1,&amp;rs1_,Z,&amp;n_,work+nwu,&amp;lw_,rwork+n,&amp;info));
+<a name="line472">472: </a><font color="#A020F0">#endif</font>
+<a name="line473">473: </a>  SlepcCheckLapackInfo(<font color="#666666">"gesvd"</font>,info);
+<a name="line474">474: </a>  tol = PetscMax(rs1,deg*cs1)*PETSC_MACHINE_EPSILON*sg[0];
+<a name="line475">475: </a>  rk = 0;
+<a name="line476">476: </a>  <font color="#4169E1">for</font> (i=0;i&lt;PetscMin(nrow,nnctdeg);i++) <font color="#4169E1">if</font> (sg[i]&gt;tol) rk++;
+<a name="line477">477: </a>  rk = PetscMin(nnc+deg-1,rk);
+<a name="line478">478: </a>  <font color="#B22222">/* the <a href="../../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> has rank (at most) nnc+deg-1 */</font>
+<a name="line479">479: </a>  <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) {
+<a name="line480">480: </a>    t = sg[i];
+<a name="line481">481: </a>    PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;nnctdeg,&amp;t,Z+i,&amp;n_));
+<a name="line482">482: </a>  }
+<a name="line483">483: </a>  <font color="#B22222">/* update S */</font>
+<a name="line484">484: </a>  PetscArrayzero(S+cs1*lds,(V-&gt;m-cs1)*lds);
+<a name="line485">485: </a>  k = ctx-&gt;ld-lock-newc-rk;
+<a name="line486">486: </a>  <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) {
+<a name="line487">487: </a>    <font color="#4169E1">for</font> (j=lock+newc;j&lt;cs1;j++) {
+<a name="line488">488: </a>      PetscArraycpy(S+j*lds+i*ctx-&gt;ld+lock+newc,Z+(nnc*i+j-lock-newc)*n,rk);
+<a name="line489">489: </a>      PetscArrayzero(S+j*lds+i*ctx-&gt;ld+lock+newc+rk,k);
+<a name="line490">490: </a>    }
+<a name="line491">491: </a>  }
+<a name="line492">492: </a>  <font color="#4169E1">if</font> (newc&gt;0) {
+<a name="line493">493: </a>    <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) {
+<a name="line494">494: </a>      p = SS+nnc*newc*i;
+<a name="line495">495: </a>      <font color="#4169E1">for</font> (j=lock+newc;j&lt;cs1;j++) {
+<a name="line496">496: </a>        <font color="#4169E1">for</font> (k=0;k&lt;newc;k++) S[j*lds+i*ctx-&gt;ld+lock+k] = *(p++);
+<a name="line497">497: </a>      }
+<a name="line498">498: </a>    }
+<a name="line499">499: </a>  }
+
+<a name="line501">501: </a>  <font color="#B22222">/* orthogonalize pQ */</font>
+<a name="line502">502: </a>  rk = rk+newc;
+<a name="line503">503: </a>  PetscBLASIntCast(rk,&amp;rk_);
+<a name="line504">504: </a>  PetscBLASIntCast(cs1-lock,&amp;nnc_);
+<a name="line505">505: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgeqrf"</font>,LAPACKgeqrf_(&amp;nrow_,&amp;rk_,pQ+offu,&amp;rs1_,tau,work+nwu,&amp;lw_,&amp;info));
+<a name="line506">506: </a>  SlepcCheckLapackInfo(<font color="#666666">"geqrf"</font>,info);
+<a name="line507">507: </a>  <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) {
+<a name="line508">508: </a>    PetscStackCallBLAS(<font color="#666666">"BLAStrmm"</font>,BLAStrmm_(<font color="#666666">"L"</font>,<font color="#666666">"U"</font>,<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;rk_,&amp;nnc_,&amp;sone,pQ+offu,&amp;rs1_,S+lock*lds+lock+i*ctx-&gt;ld,&amp;lds_));
+<a name="line509">509: </a>  }
+<a name="line510">510: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKorgqr"</font>,LAPACKorgqr_(&amp;nrow_,&amp;rk_,&amp;rk_,pQ+offu,&amp;rs1_,tau,work+nwu,&amp;lw_,&amp;info));
+<a name="line511">511: </a>  SlepcCheckLapackInfo(<font color="#666666">"orgqr"</font>,info);
+
+<a name="line513">513: </a>  <font color="#B22222">/* update vectors U(:,idx) = U*Q(:,idx) */</font>
+<a name="line514">514: </a>  rk = rk+lock;
+<a name="line515">515: </a>  <font color="#4169E1">for</font> (i=0;i&lt;lock;i++) pQ[i*(1+rs1)] = 1.0;
+<a name="line516">516: </a>  MatCreateSeqDense(PETSC_COMM_SELF,rs1,rk,pQ,&amp;Q);
+<a name="line517">517: </a>  ctx-&gt;U-&gt;k = rs1;
+<a name="line518">518: </a>  <a href="../../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(ctx-&gt;U,Q,lock,rk);
+<a name="line519">519: </a>  MatDestroy(&amp;Q);
+
+<a name="line521">521: </a>  <font color="#4169E1">if</font> (ctx-&gt;qB) {
+<a name="line522">522: </a>   <font color="#B22222">/* update matrix qB */</font>
+<a name="line523">523: </a>    PetscBLASIntCast(ctx-&gt;ld,&amp;ld_);
+<a name="line524">524: </a>    PetscBLASIntCast(rk,&amp;rk_);
+<a name="line525">525: </a>    <font color="#4169E1">for</font> (r=0;r&lt;ctx-&gt;d;r++) {
+<a name="line526">526: </a>      <font color="#4169E1">for</font> (c=0;c&lt;=r;c++) {
+<a name="line527">527: </a>        MatNestGetSubMat(V-&gt;matrix,r,c,&amp;A);
+<a name="line528">528: </a>        <font color="#4169E1">if</font> (A) {
+<a name="line529">529: </a>          qB = ctx-&gt;qB+r*ctx-&gt;ld+c*ctx-&gt;ld*lds;
+<a name="line530">530: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;rs1_,&amp;rk_,&amp;rs1_,&amp;sone,qB,&amp;lds_,pQ,&amp;rs1_,&amp;zero,work+nwu,&amp;rs1_));
+<a name="line531">531: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;rk_,&amp;rk_,&amp;rs1_,&amp;sone,pQ,&amp;rs1_,work+nwu,&amp;rs1_,&amp;zero,qB,&amp;lds_));
+<a name="line532">532: </a>          <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) {
+<a name="line533">533: </a>            <font color="#4169E1">for</font> (j=0;j&lt;i;j++) qB[i+j*lds] = PetscConj(qB[j+i*lds]);
+<a name="line534">534: </a>            qB[i+i*lds] = PetscRealPart(qB[i+i*lds]);
+<a name="line535">535: </a>          }
+<a name="line536">536: </a>          <font color="#4169E1">for</font> (i=rk;i&lt;ctx-&gt;ld;i++) {
+<a name="line537">537: </a>            PetscArrayzero(qB+i*lds,ctx-&gt;ld);
+<a name="line538">538: </a>          }
+<a name="line539">539: </a>          <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) {
+<a name="line540">540: </a>            PetscArrayzero(qB+i*lds+rk,(ctx-&gt;ld-rk));
+<a name="line541">541: </a>          }
+<a name="line542">542: </a>          <font color="#4169E1">if</font> (c!=r) {
+<a name="line543">543: </a>            sqB = ctx-&gt;qB+r*ctx-&gt;ld*lds+c*ctx-&gt;ld;
+<a name="line544">544: </a>            <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;ld;i++) <font color="#4169E1">for</font> (j=0;j&lt;ctx-&gt;ld;j++) sqB[i+j*lds] = PetscConj(qB[j+i*lds]);
+<a name="line545">545: </a>          }
+<a name="line546">546: </a>        }
+<a name="line547">547: </a>      }
+<a name="line548">548: </a>    }
+<a name="line549">549: </a>  }
+
+<a name="line551">551: </a>  <font color="#B22222">/* free work space */</font>
+<a name="line552">552: </a>  PetscFree6(SS,SS2,pQ,tau,work,rwork);
+<a name="line553">553: </a>  MatDenseRestoreArray(ctx-&gt;S,&amp;S);
+
+<a name="line555">555: </a>  <font color="#B22222">/* set active columns */</font>
+<a name="line556">556: </a>  <font color="#4169E1">if</font> (newc) ctx-&gt;U-&gt;l += newc;
+<a name="line557">557: </a>  ctx-&gt;U-&gt;k = rk;
+<a name="line558">558: </a>  <font color="#4169E1">return</font>(0);
+<a name="line559">559: </a>}
+
+<a name="line561">561: </a><font color="#B22222">/*@</font>
+<a name="line562">562: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BVTensorCompress.html#BVTensorCompress">BVTensorCompress</a> - Updates the U and S factors of the tensor basis vectors</font>
+<a name="line563">563: </a><font color="#B22222">   object V by means of an <a href="../../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>, removing redundant information.</font>
+
+<a name="line565">565: </a><font color="#B22222">   Collective on V</font>
+
+<a name="line567">567: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line568">568: </a><font color="#B22222">+  V - the tensor basis vectors context</font>
+<a name="line569">569: </a><font color="#B22222">-  newc - additional columns to be locked</font>
+
+<a name="line571">571: </a><font color="#B22222">   Notes:</font>
+<a name="line572">572: </a><font color="#B22222">   This function is typically used when restarting Krylov solvers. Truncating a</font>
+<a name="line573">573: </a><font color="#B22222">   tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V = (I otimes U) S to its leading columns amounts to keeping the</font>
+<a name="line574">574: </a><font color="#B22222">   leading columns of S. However, to effectively reduce the size of the</font>
+<a name="line575">575: </a><font color="#B22222">   decomposition, it is necessary to compress it in a way that fewer columns of</font>
+<a name="line576">576: </a><font color="#B22222">   U are employed. This can be achieved by means of an update that involves the</font>
+<a name="line577">577: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> of the low-rank matrix [S_0 S_1 ... S_{d-1}], where S_i are the pieces of S.</font>
+
+<a name="line579">579: </a><font color="#B22222">   If newc is nonzero, then newc columns are added to the leading columns of V.</font>
+<a name="line580">580: </a><font color="#B22222">   This means that the corresponding columns of the U and S factors will remain</font>
+<a name="line581">581: </a><font color="#B22222">   invariant in subsequent operations.</font>
+
+<a name="line583">583: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line585">585: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/BV/BVCreateTensor.html#BVCreateTensor">BVCreateTensor</a>(), <a href="../../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line586">586: </a><font color="#B22222">@*/</font>
+<a name="line587">587: </a><strong><font color="#4169E1"><a name="BVTensorCompress"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/BV/BVTensorCompress.html#BVTensorCompress">BVTensorCompress</a>(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt newc)</font></strong>
+<a name="line588">588: </a>{
+
+<a name="line594">594: </a>  PetscUseMethod(V,<font color="#666666">"BVTensorCompress_C"</font>,(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>,PetscInt),(V,newc));
+<a name="line595">595: </a>  <font color="#4169E1">return</font>(0);
+<a name="line596">596: </a>}
+
+<a name="line598">598: </a><strong><font color="#4169E1"><a name="BVTensorGetDegree_Tensor"></a>static PetscErrorCode BVTensorGetDegree_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt *d)</font></strong>
+<a name="line599">599: </a>{
+<a name="line600">600: </a>  BV_TENSOR *ctx = (BV_TENSOR*)bv-&gt;data;
+
+<a name="line603">603: </a>  *d = ctx-&gt;d;
+<a name="line604">604: </a>  <font color="#4169E1">return</font>(0);
+<a name="line605">605: </a>}
+
+<a name="line607">607: </a><font color="#B22222">/*@</font>
+<a name="line608">608: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BVTensorGetDegree.html#BVTensorGetDegree">BVTensorGetDegree</a> - Returns the number of blocks (degree) of the tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>.</font>
+
+<a name="line610">610: </a><font color="#B22222">   Not collective</font>
+
+<a name="line612">612: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line613">613: </a><font color="#B22222">.  bv - the basis vectors context</font>
+
+<a name="line615">615: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line616">616: </a><font color="#B22222">.  d - the degree</font>
+
+<a name="line618">618: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line620">620: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/BV/BVCreateTensor.html#BVCreateTensor">BVCreateTensor</a>()</font>
+<a name="line621">621: </a><font color="#B22222">@*/</font>
+<a name="line622">622: </a><strong><font color="#4169E1"><a name="BVTensorGetDegree"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/BV/BVTensorGetDegree.html#BVTensorGetDegree">BVTensorGetDegree</a>(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt *d)</font></strong>
+<a name="line623">623: </a>{
+
+<a name="line629">629: </a>  PetscUseMethod(bv,<font color="#666666">"BVTensorGetDegree_C"</font>,(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>,PetscInt*),(bv,d));
+<a name="line630">630: </a>  <font color="#4169E1">return</font>(0);
+<a name="line631">631: </a>}
+
+<a name="line633">633: </a><strong><font color="#4169E1"><a name="BVTensorGetFactors_Tensor"></a>static PetscErrorCode BVTensorGetFactors_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *U,Mat *S)</font></strong>
+<a name="line634">634: </a>{
+<a name="line635">635: </a>  BV_TENSOR *ctx = (BV_TENSOR*)V-&gt;data;
+
+<a name="line638">638: </a>  <font color="#4169E1">if</font> (ctx-&gt;puk&gt;-1) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ORDER,<font color="#666666">"Previous call to BVTensonGetFactors without a <a href="../../../../../../docs/manualpages/BV/BVTensorRestoreFactors.html#BVTensorRestoreFactors">BVTensorRestoreFactors</a> call"</font>);
+<a name="line639">639: </a>  ctx-&gt;puk = ctx-&gt;U-&gt;k;
+<a name="line640">640: </a>  <font color="#4169E1">if</font> (U) *U = ctx-&gt;U;
+<a name="line641">641: </a>  <font color="#4169E1">if</font> (S) *S = ctx-&gt;S;
+<a name="line642">642: </a>  <font color="#4169E1">return</font>(0);
+<a name="line643">643: </a>}
+
+<a name="line645">645: </a><font color="#B22222">/*@C</font>
+<a name="line646">646: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BVTensorGetFactors.html#BVTensorGetFactors">BVTensorGetFactors</a> - Returns the two factors involved in the definition of the</font>
+<a name="line647">647: </a><font color="#B22222">   tensor basis vectors object, V = (I otimes U) S.</font>
+
+<a name="line649">649: </a><font color="#B22222">   Logically Collective on V</font>
+
+<a name="line651">651: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line652">652: </a><font color="#B22222">.  V - the basis vectors context</font>
+
+<a name="line654">654: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line655">655: </a><font color="#B22222">+  U - the <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> factor</font>
+<a name="line656">656: </a><font color="#B22222">-  S - the Mat factor</font>
+
+<a name="line658">658: </a><font color="#B22222">   Notes:</font>
+<a name="line659">659: </a><font color="#B22222">   The returned factors are references (not copies) of the internal factors,</font>
+<a name="line660">660: </a><font color="#B22222">   so modifying them will change the tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> as well. Some operations of the</font>
+<a name="line661">661: </a><font color="#B22222">   tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> assume that U has orthonormal columns, so if the user modifies U</font>
+<a name="line662">662: </a><font color="#B22222">   this restriction must be taken into account.</font>
+
+<a name="line664">664: </a><font color="#B22222">   The returned factors must not be destroyed. <a href="../../../../../../docs/manualpages/BV/BVTensorRestoreFactors.html#BVTensorRestoreFactors">BVTensorRestoreFactors</a>() must</font>
+<a name="line665">665: </a><font color="#B22222">   be called when they are no longer needed.</font>
+
+<a name="line667">667: </a><font color="#B22222">   Pass a NULL vector for any of the arguments that is not needed.</font>
+
+<a name="line669">669: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line671">671: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/BV/BVTensorRestoreFactors.html#BVTensorRestoreFactors">BVTensorRestoreFactors</a>()</font>
+<a name="line672">672: </a><font color="#B22222">@*/</font>
+<a name="line673">673: </a><strong><font color="#4169E1"><a name="BVTensorGetFactors"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/BV/BVTensorGetFactors.html#BVTensorGetFactors">BVTensorGetFactors</a>(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *U,Mat *S)</font></strong>
+<a name="line674">674: </a>{
+
+<a name="line679">679: </a>  PetscUseMethod(V,<font color="#666666">"BVTensorGetFactors_C"</font>,(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>*,Mat*),(V,U,S));
+<a name="line680">680: </a>  <font color="#4169E1">return</font>(0);
+<a name="line681">681: </a>}
+
+<a name="line683">683: </a><strong><font color="#4169E1"><a name="BVTensorRestoreFactors_Tensor"></a>static PetscErrorCode BVTensorRestoreFactors_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *U,Mat *S)</font></strong>
+<a name="line684">684: </a>{
+<a name="line686">686: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)V-&gt;data;
+
+<a name="line689">689: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line690">690: </a>  <font color="#4169E1">if</font> (U) *U = NULL;
+<a name="line691">691: </a>  <font color="#4169E1">if</font> (S) *S = NULL;
+<a name="line692">692: </a>  BVTensorUpdateMatrix(V,ctx-&gt;puk,ctx-&gt;U-&gt;k);
+<a name="line693">693: </a>  ctx-&gt;puk = -1;
+<a name="line694">694: </a>  <font color="#4169E1">return</font>(0);
+<a name="line695">695: </a>}
+
+<a name="line697">697: </a><font color="#B22222">/*@C</font>
+<a name="line698">698: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BVTensorRestoreFactors.html#BVTensorRestoreFactors">BVTensorRestoreFactors</a> - Restore the two factors that were obtained with</font>
+<a name="line699">699: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BVTensorGetFactors.html#BVTensorGetFactors">BVTensorGetFactors</a>().</font>
+
+<a name="line701">701: </a><font color="#B22222">   Logically Collective on V</font>
+
+<a name="line703">703: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line704">704: </a><font color="#B22222">+  V - the basis vectors context</font>
+<a name="line705">705: </a><font color="#B22222">.  U - the <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> factor (or NULL)</font>
+<a name="line706">706: </a><font color="#B22222">-  S - the Mat factor (or NULL)</font>
+
+<a name="line708">708: </a><font color="#B22222">   Nots:</font>
+<a name="line709">709: </a><font color="#B22222">   The arguments must match the corresponding call to <a href="../../../../../../docs/manualpages/BV/BVTensorGetFactors.html#BVTensorGetFactors">BVTensorGetFactors</a>().</font>
+
+<a name="line711">711: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line713">713: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/BV/BVTensorGetFactors.html#BVTensorGetFactors">BVTensorGetFactors</a>()</font>
+<a name="line714">714: </a><font color="#B22222">@*/</font>
+<a name="line715">715: </a><strong><font color="#4169E1"><a name="BVTensorRestoreFactors"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/BV/BVTensorRestoreFactors.html#BVTensorRestoreFactors">BVTensorRestoreFactors</a>(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *U,Mat *S)</font></strong>
+<a name="line716">716: </a>{
+
+<a name="line723">723: </a>  PetscUseMethod(V,<font color="#666666">"BVTensorRestoreFactors_C"</font>,(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>*,Mat*),(V,U,S));
+<a name="line724">724: </a>  <font color="#4169E1">return</font>(0);
+<a name="line725">725: </a>}
+
+<a name="line727">727: </a><strong><font color="#4169E1"><a name="BVDestroy_Tensor"></a>PetscErrorCode BVDestroy_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line728">728: </a>{
+<a name="line730">730: </a>  BV_TENSOR      *ctx = (BV_TENSOR*)bv-&gt;data;
+
+<a name="line733">733: </a>  <a href="../../../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;ctx-&gt;U);
+<a name="line734">734: </a>  MatDestroy(&amp;ctx-&gt;S);
+<a name="line735">735: </a>  <font color="#4169E1">if</font> (ctx-&gt;u) {
+<a name="line736">736: </a>    PetscFree2(ctx-&gt;qB,ctx-&gt;sw);
+<a name="line737">737: </a>    VecDestroy(&amp;ctx-&gt;u);
+<a name="line738">738: </a>  }
+<a name="line739">739: </a>  PetscFree(bv-&gt;data);
+<a name="line740">740: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorBuildFirstColumn_C"</font>,NULL);
+<a name="line741">741: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorCompress_C"</font>,NULL);
+<a name="line742">742: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorGetDegree_C"</font>,NULL);
+<a name="line743">743: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorGetFactors_C"</font>,NULL);
+<a name="line744">744: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorRestoreFactors_C"</font>,NULL);
+<a name="line745">745: </a>  <font color="#4169E1">return</font>(0);
+<a name="line746">746: </a>}
+
+<a name="line748">748: </a><strong><font color="#4169E1"><a name="BVCreate_Tensor"></a>SLEPC_EXTERN PetscErrorCode BVCreate_Tensor(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line749">749: </a>{
+<a name="line751">751: </a>  BV_TENSOR      *ctx;
+
+<a name="line754">754: </a>  PetscNewLog(bv,&amp;ctx);
+<a name="line755">755: </a>  bv-&gt;data = (void*)ctx;
+<a name="line756">756: </a>  ctx-&gt;puk = -1;
+
+<a name="line758">758: </a>  bv-&gt;ops-&gt;multinplace      = BVMultInPlace_Tensor;
+<a name="line759">759: </a>  bv-&gt;ops-&gt;multinplacetrans = BVMultInPlaceTranspose_Tensor;
+<a name="line760">760: </a>  bv-&gt;ops-&gt;dot              = BVDot_Tensor;
+<a name="line761">761: </a>  bv-&gt;ops-&gt;scale            = BVScale_Tensor;
+<a name="line762">762: </a>  bv-&gt;ops-&gt;norm             = BVNorm_Tensor;
+<a name="line763">763: </a>  bv-&gt;ops-&gt;copycolumn       = BVCopyColumn_Tensor;
+<a name="line764">764: </a>  bv-&gt;ops-&gt;gramschmidt      = BVOrthogonalizeGS1_Tensor;
+<a name="line765">765: </a>  bv-&gt;ops-&gt;destroy          = BVDestroy_Tensor;
+<a name="line766">766: </a>  bv-&gt;ops-&gt;view             = BVView_Tensor;
+
+<a name="line768">768: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorBuildFirstColumn_C"</font>,BVTensorBuildFirstColumn_Tensor);
+<a name="line769">769: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorCompress_C"</font>,BVTensorCompress_Tensor);
+<a name="line770">770: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorGetDegree_C"</font>,BVTensorGetDegree_Tensor);
+<a name="line771">771: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorGetFactors_C"</font>,BVTensorGetFactors_Tensor);
+<a name="line772">772: </a>  PetscObjectComposeFunction((PetscObject)bv,<font color="#666666">"BVTensorRestoreFactors_C"</font>,BVTensorRestoreFactors_Tensor);
+<a name="line773">773: </a>  <font color="#4169E1">return</font>(0);
+<a name="line774">774: </a>}
+
+<a name="line776">776: </a><font color="#B22222">/*@</font>
+<a name="line777">777: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BVCreateTensor.html#BVCreateTensor">BVCreateTensor</a> - Creates a tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> that is represented in compact form</font>
+<a name="line778">778: </a><font color="#B22222">   as V = (I otimes U) S, where U has orthonormal columns.</font>
+
+<a name="line780">780: </a><font color="#B22222">   Collective on U</font>
+
+<a name="line782">782: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line783">783: </a><font color="#B22222">+  U - a basis vectors object</font>
+<a name="line784">784: </a><font color="#B22222">-  d - the number of blocks (degree) of the tensor <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a></font>
+
+<a name="line786">786: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line787">787: </a><font color="#B22222">.  V - the new basis vectors context</font>
+
+<a name="line789">789: </a><font color="#B22222">   Notes:</font>
+<a name="line790">790: </a><font color="#B22222">   The new basis vectors object is V = (I otimes U) S, where otimes denotes</font>
+<a name="line791">791: </a><font color="#B22222">   the Kronecker product, I is the identity matrix of order d, and S is a</font>
+<a name="line792">792: </a><font color="#B22222">   sequential matrix allocated internally. This compact representation is</font>
+<a name="line793">793: </a><font color="#B22222">   used e.g. to represent the Krylov basis generated with the linearization</font>
+<a name="line794">794: </a><font color="#B22222">   of a matrix polynomial of degree d.</font>
+
+<a name="line796">796: </a><font color="#B22222">   The size of V (number of rows) is equal to d times n, where n is the size</font>
+<a name="line797">797: </a><font color="#B22222">   of U. The dimensions of S are d times m rows and m-d+1 columns, where m is</font>
+<a name="line798">798: </a><font color="#B22222">   the number of columns of U, so m should be at least d.</font>
+
+<a name="line800">800: </a><font color="#B22222">   The communicator of V will be the same as U.</font>
+
+<a name="line802">802: </a><font color="#B22222">   On input, the content of U is irrelevant. Alternatively, it may contain</font>
+<a name="line803">803: </a><font color="#B22222">   some nonzero columns that will be used by <a href="../../../../../../docs/manualpages/BV/BVTensorBuildFirstColumn.html#BVTensorBuildFirstColumn">BVTensorBuildFirstColumn</a>().</font>
+
+<a name="line805">805: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line807">807: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/BV/BVTensorGetDegree.html#BVTensorGetDegree">BVTensorGetDegree</a>(), <a href="../../../../../../docs/manualpages/BV/BVTensorGetFactors.html#BVTensorGetFactors">BVTensorGetFactors</a>(), <a href="../../../../../../docs/manualpages/BV/BVTensorBuildFirstColumn.html#BVTensorBuildFirstColumn">BVTensorBuildFirstColumn</a>()</font>
+<a name="line808">808: </a><font color="#B22222">@*/</font>
+<a name="line809">809: </a><strong><font color="#4169E1"><a name="BVCreateTensor"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/BV/BVCreateTensor.html#BVCreateTensor">BVCreateTensor</a>(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> U,PetscInt d,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> *V)</font></strong>
+<a name="line810">810: </a>{
+<a name="line812">812: </a>  PetscBool      match;
+<a name="line813">813: </a>  PetscInt       n,N,m;
+<a name="line814">814: </a>  BV_TENSOR      *ctx;
+
+<a name="line819">819: </a>  PetscObjectTypeCompare((PetscObject)U,BVTENSOR,&amp;match);
+<a name="line820">820: </a>  <font color="#4169E1">if</font> (match) SETERRQ(PetscObjectComm((PetscObject)U),PETSC_ERR_SUP,<font color="#666666">"U cannot be of type tensor"</font>);
+
+<a name="line822">822: </a>  <a href="../../../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>(PetscObjectComm((PetscObject)U),V);
+<a name="line823">823: </a>  <a href="../../../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(U,&amp;n,&amp;N,&amp;m);
+<a name="line824">824: </a>  <font color="#4169E1">if</font> (m&lt;d) SETERRQ2(PetscObjectComm((PetscObject)U),PETSC_ERR_ARG_SIZ,<font color="#666666">"U has %D columns, it should have at least d=%D"</font>,m,d);
+<a name="line825">825: </a>  <a href="../../../../../../docs/manualpages/BV/BVSetSizes.html#BVSetSizes">BVSetSizes</a>(*V,d*n,d*N,m-d+1);
+<a name="line826">826: </a>  PetscObjectChangeTypeName((PetscObject)*V,BVTENSOR);
+<a name="line827">827: </a>  PetscLogEventBegin(BV_Create,*V,0,0,0);
+<a name="line828">828: </a>  BVCreate_Tensor(*V);
+<a name="line829">829: </a>  PetscLogEventEnd(BV_Create,*V,0,0,0);
+
+<a name="line831">831: </a>  ctx = (BV_TENSOR*)(*V)-&gt;data;
+<a name="line832">832: </a>  ctx-&gt;U  = U;
+<a name="line833">833: </a>  ctx-&gt;d  = d;
+<a name="line834">834: </a>  ctx-&gt;ld = m;
+<a name="line835">835: </a>  PetscObjectReference((PetscObject)U);
+<a name="line836">836: </a>  PetscLogObjectParent((PetscObject)*V,(PetscObject)U);
+<a name="line837">837: </a>  MatCreateSeqDense(PETSC_COMM_SELF,d*m,m-d+1,NULL,&amp;ctx-&gt;S);
+<a name="line838">838: </a>  PetscLogObjectParent((PetscObject)*V,(PetscObject)ctx-&gt;S);
+<a name="line839">839: </a>  PetscObjectSetName((PetscObject)ctx-&gt;S,<font color="#666666">"S"</font>);
+
+<a name="line841">841: </a>  <font color="#B22222">/* Copy user-provided attributes of U */</font>
+<a name="line842">842: </a>  (*V)-&gt;orthog_type  = U-&gt;orthog_type;
+<a name="line843">843: </a>  (*V)-&gt;orthog_ref   = U-&gt;orthog_ref;
+<a name="line844">844: </a>  (*V)-&gt;orthog_eta   = U-&gt;orthog_eta;
+<a name="line845">845: </a>  (*V)-&gt;orthog_block = U-&gt;orthog_block;
+<a name="line846">846: </a>  (*V)-&gt;vmm          = U-&gt;vmm;
+<a name="line847">847: </a>  (*V)-&gt;rrandom      = U-&gt;rrandom;
+<a name="line848">848: </a>  <font color="#4169E1">return</font>(0);
+<a name="line849">849: </a>}
+
+</pre>
+</body>
+
+</html>

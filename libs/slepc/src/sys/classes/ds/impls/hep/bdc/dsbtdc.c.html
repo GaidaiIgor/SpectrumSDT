@@ -1,0 +1,697 @@
+<center><a href="dsbtdc.c">Actual source code: dsbtdc.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/ds/impls/hep/bdc/dsbtdc.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:40+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/ds/impls/hep/bdc/dsbtdc.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   BDC - Block-divide and conquer (see description in README file)</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../../include/slepc/private/dsimpl.h.html">&lt;slepc/private/dsimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="BDC_dsbtdc_"></a>PetscErrorCode BDC_dsbtdc_(const char *jobz,const char *jobacc,PetscBLASInt n,</font></strong>
+<a name="line18"> 18: </a><strong><font color="#4169E1">        PetscBLASInt nblks,PetscBLASInt *ksizes,PetscReal *d,PetscBLASInt l1d,</font></strong>
+<a name="line19"> 19: </a><strong><font color="#4169E1">        PetscBLASInt l2d,PetscReal *e,PetscBLASInt l1e,PetscBLASInt l2e,PetscReal tol,</font></strong>
+<a name="line20"> 20: </a><strong><font color="#4169E1">        PetscReal tau1,PetscReal tau2,PetscReal *ev,PetscReal *z,PetscBLASInt ldz,</font></strong>
+<a name="line21"> 21: </a><strong><font color="#4169E1">        PetscReal *work,PetscBLASInt lwork,PetscBLASInt *iwork,PetscBLASInt liwork,</font></strong>
+<a name="line22"> 22: </a><strong><font color="#4169E1">        PetscReal *mingap,PetscBLASInt *mingapi,PetscBLASInt *info,</font></strong>
+<a name="line23"> 23: </a><strong><font color="#4169E1">        PetscBLASInt jobz_len,PetscBLASInt jobacc_len)</font></strong>
+<a name="line24"> 24: </a>{
+<a name="line25"> 25: </a><font color="#B22222">/*  -- Routine written in LAPACK Version 3.0 style -- */</font>
+<a name="line26"> 26: </a><font color="#B22222">/* *************************************************** */</font>
+<a name="line27"> 27: </a><font color="#B22222">/*     Written by */</font>
+<a name="line28"> 28: </a><font color="#B22222">/*     Michael Moldaschl and Wilfried Gansterer */</font>
+<a name="line29"> 29: </a><font color="#B22222">/*     University of Vienna */</font>
+<a name="line30"> 30: </a><font color="#B22222">/*     last modification: March 28, 2014 */</font>
+
+<a name="line32"> 32: </a><font color="#B22222">/*     Small adaptations of original code written by */</font>
+<a name="line33"> 33: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line34"> 34: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+<a name="line35"> 35: </a><font color="#B22222">/*     see https://doi.org/10.1137/S1064827501399432 */</font>
+<a name="line36"> 36: </a><font color="#B22222">/* *************************************************** */</font>
+
+<a name="line38"> 38: </a><font color="#B22222">/*  Purpose */</font>
+<a name="line39"> 39: </a><font color="#B22222">/*  ======= */</font>
+
+<a name="line41"> 41: </a><font color="#B22222">/*  DSBTDC computes approximations to all eigenvalues and eigenvectors */</font>
+<a name="line42"> 42: </a><font color="#B22222">/*  of a symmetric block tridiagonal matrix using the divide and */</font>
+<a name="line43"> 43: </a><font color="#B22222">/*  conquer method with lower rank approximations to the subdiagonal blocks. */</font>
+
+<a name="line45"> 45: </a><font color="#B22222">/*  This code makes very mild assumptions about floating point */</font>
+<a name="line46"> 46: </a><font color="#B22222">/*  arithmetic. It will work on machines with a guard digit in */</font>
+<a name="line47"> 47: </a><font color="#B22222">/*  add/subtract, or on those binary machines without guard digits */</font>
+<a name="line48"> 48: </a><font color="#B22222">/*  which subtract like the Cray X-MP, Cray Y-MP, Cray C-90, or Cray-2. */</font>
+<a name="line49"> 49: </a><font color="#B22222">/*  It could conceivably fail on hexadecimal or decimal machines */</font>
+<a name="line50"> 50: </a><font color="#B22222">/*  without guard digits, but we know of none.  See DLAED3M for details. */</font>
+
+<a name="line52"> 52: </a><font color="#B22222">/*  Arguments */</font>
+<a name="line53"> 53: </a><font color="#B22222">/*  ========= */</font>
+
+<a name="line55"> 55: </a><font color="#B22222">/*  JOBZ    (input) CHARACTER*1 */</font>
+<a name="line56"> 56: </a><font color="#B22222">/*          = 'N':  Compute eigenvalues only (not implemented); */</font>
+<a name="line57"> 57: </a><font color="#B22222">/*          = 'D':  Compute eigenvalues and eigenvectors. Eigenvectors */</font>
+<a name="line58"> 58: </a><font color="#B22222">/*                  are accumulated in the divide-and-conquer process. */</font>
+
+<a name="line60"> 60: </a><font color="#B22222">/*  JOBACC  (input) CHARACTER*1 */</font>
+<a name="line61"> 61: </a><font color="#B22222">/*          = 'A' ("automatic"): The accuracy parameters TAU1 and TAU2 */</font>
+<a name="line62"> 62: </a><font color="#B22222">/*                               are determined automatically from the */</font>
+<a name="line63"> 63: </a><font color="#B22222">/*                               parameter TOL according to the analytical */</font>
+<a name="line64"> 64: </a><font color="#B22222">/*                               bounds. In that case the input values of */</font>
+<a name="line65"> 65: </a><font color="#B22222">/*                               TAU1 and TAU2 are irrelevant (ignored). */</font>
+<a name="line66"> 66: </a><font color="#B22222">/*          = 'M' ("manual"): The input values of the accuracy parameters */</font>
+<a name="line67"> 67: </a><font color="#B22222">/*                            TAU1 and TAU2 are used. In that case the input */</font>
+<a name="line68"> 68: </a><font color="#B22222">/*                            value of the parameter TOL is irrelevant */</font>
+<a name="line69"> 69: </a><font color="#B22222">/*                            (ignored). */</font>
+
+<a name="line71"> 71: </a><font color="#B22222">/*  N       (input) INTEGER */</font>
+<a name="line72"> 72: </a><font color="#B22222">/*          The dimension of the symmetric block tridiagonal matrix. */</font>
+<a name="line73"> 73: </a><font color="#B22222">/*          N &gt;= 1. */</font>
+
+<a name="line75"> 75: </a><font color="#B22222">/*  NBLKS   (input) INTEGER, 1 &lt;= NBLKS &lt;= N */</font>
+<a name="line76"> 76: </a><font color="#B22222">/*          The number of diagonal blocks in the matrix. */</font>
+
+<a name="line78"> 78: </a><font color="#B22222">/*  KSIZES  (input) INTEGER array, dimension (NBLKS) */</font>
+<a name="line79"> 79: </a><font color="#B22222">/*          The dimensions of the square diagonal blocks from top left */</font>
+<a name="line80"> 80: </a><font color="#B22222">/*          to bottom right.  KSIZES(I) &gt;= 1 for all I, and the sum of */</font>
+<a name="line81"> 81: </a><font color="#B22222">/*          KSIZES(I) for I = 1 to NBLKS has to be equal to N. */</font>
+
+<a name="line83"> 83: </a><font color="#B22222">/*  D       (input) DOUBLE PRECISION array, dimension (L1D,L2D,NBLKS) */</font>
+<a name="line84"> 84: </a><font color="#B22222">/*          The lower triangular elements of the symmetric diagonal */</font>
+<a name="line85"> 85: </a><font color="#B22222">/*          blocks of the block tridiagonal matrix. The elements of the top */</font>
+<a name="line86"> 86: </a><font color="#B22222">/*          left diagonal block, which is of dimension KSIZES(1), have to */</font>
+<a name="line87"> 87: </a><font color="#B22222">/*          be placed in D(*,*,1); the elements of the next diagonal */</font>
+<a name="line88"> 88: </a><font color="#B22222">/*          block, which is of dimension KSIZES(2), have to be placed in */</font>
+<a name="line89"> 89: </a><font color="#B22222">/*          D(*,*,2); etc. */</font>
+
+<a name="line91"> 91: </a><font color="#B22222">/*  L1D     (input) INTEGER */</font>
+<a name="line92"> 92: </a><font color="#B22222">/*          The leading dimension of the array D.  L1D &gt;= max(3,KMAX), */</font>
+<a name="line93"> 93: </a><font color="#B22222">/*          where KMAX is the dimension of the largest diagonal block, */</font>
+<a name="line94"> 94: </a><font color="#B22222">/*          i.e.,  KMAX = max_I (KSIZES(I)). */</font>
+
+<a name="line96"> 96: </a><font color="#B22222">/*  L2D     (input) INTEGER */</font>
+<a name="line97"> 97: </a><font color="#B22222">/*          The second dimension of the array D.  L2D &gt;= max(3,KMAX), */</font>
+<a name="line98"> 98: </a><font color="#B22222">/*          where KMAX is as stated in L1D above. */</font>
+
+<a name="line100">100: </a><font color="#B22222">/*  E       (input) DOUBLE PRECISION array, dimension (L1E,L2E,NBLKS-1) */</font>
+<a name="line101">101: </a><font color="#B22222">/*          The elements of the subdiagonal blocks of the */</font>
+<a name="line102">102: </a><font color="#B22222">/*          block tridiagonal matrix. The elements of the top left */</font>
+<a name="line103">103: </a><font color="#B22222">/*          subdiagonal block, which is KSIZES(2) x KSIZES(1), have to be */</font>
+<a name="line104">104: </a><font color="#B22222">/*          placed in E(*,*,1); the elements of the next subdiagonal block, */</font>
+<a name="line105">105: </a><font color="#B22222">/*          which is KSIZES(3) x KSIZES(2), have to be placed in E(*,*,2); etc. */</font>
+<a name="line106">106: </a><font color="#B22222">/*          During runtime, the original contents of E(*,*,K) is */</font>
+<a name="line107">107: </a><font color="#B22222">/*          overwritten by the singular vectors and singular values of */</font>
+<a name="line108">108: </a><font color="#B22222">/*          the lower rank representation. */</font>
+
+<a name="line110">110: </a><font color="#B22222">/*  L1E     (input) INTEGER */</font>
+<a name="line111">111: </a><font color="#B22222">/*          The leading dimension of the array E.  L1E &gt;= max(3,2*KMAX+1), */</font>
+<a name="line112">112: </a><font color="#B22222">/*          where KMAX is as stated in L1D above. The size of L1E enables */</font>
+<a name="line113">113: </a><font color="#B22222">/*          the storage of ALL singular vectors and singular values for */</font>
+<a name="line114">114: </a><font color="#B22222">/*          the corresponding off-diagonal block in E(*,*,K) and therefore */</font>
+<a name="line115">115: </a><font color="#B22222">/*          there are no restrictions on the rank of the approximation */</font>
+<a name="line116">116: </a><font color="#B22222">/*          (only the "natural" restriction */</font>
+<a name="line117">117: </a><font color="#B22222">/*          RANK(K) .LE. MIN(KSIZES(K),KSIZES(K+1))). */</font>
+
+<a name="line119">119: </a><font color="#B22222">/*  L2E     (input) INTEGER */</font>
+<a name="line120">120: </a><font color="#B22222">/*          The second dimension of the array E.  L2E &gt;= max(3,2*KMAX+1), */</font>
+<a name="line121">121: </a><font color="#B22222">/*          where KMAX is as stated in L1D above. The size of L2E enables */</font>
+<a name="line122">122: </a><font color="#B22222">/*          the storage of ALL singular vectors and singular values for */</font>
+<a name="line123">123: </a><font color="#B22222">/*          the corresponding off-diagonal block in E(*,*,K) and therefore */</font>
+<a name="line124">124: </a><font color="#B22222">/*          there are no restrictions on the rank of the approximation */</font>
+<a name="line125">125: </a><font color="#B22222">/*          (only the "natural" restriction */</font>
+<a name="line126">126: </a><font color="#B22222">/*          RANK(K) .LE. MIN(KSIZES(K),KSIZES(K+1))). */</font>
+
+<a name="line128">128: </a><font color="#B22222">/*  TOL     (input) DOUBLE PRECISION, TOL.LE.TOLMAX */</font>
+<a name="line129">129: </a><font color="#B22222">/*          User specified tolerance for the residuals of the computed */</font>
+<a name="line130">130: </a><font color="#B22222">/*          eigenpairs. If (JOBACC.EQ.'A') then it is used to determine */</font>
+<a name="line131">131: </a><font color="#B22222">/*          TAU1 and TAU2; ignored otherwise. */</font>
+<a name="line132">132: </a><font color="#B22222">/*          If (TOL.LT.40*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> .AND. JOBACC.EQ.'A') then TAU1 is set to machine */</font>
+<a name="line133">133: </a><font color="#B22222">/*          epsilon and TAU2 is set to the standard deflation tolerance from */</font>
+<a name="line134">134: </a><font color="#B22222">/*          LAPACK. */</font>
+
+<a name="line136">136: </a><font color="#B22222">/*  TAU1    (input) DOUBLE PRECISION, TAU1.LE.TOLMAX/2 */</font>
+<a name="line137">137: </a><font color="#B22222">/*          User specified tolerance for determining the rank of the */</font>
+<a name="line138">138: </a><font color="#B22222">/*          lower rank approximations to the off-diagonal blocks. */</font>
+<a name="line139">139: </a><font color="#B22222">/*          The rank for each off-diagonal block is determined such that */</font>
+<a name="line140">140: </a><font color="#B22222">/*          the resulting absolute eigenvalue error is less than or equal */</font>
+<a name="line141">141: </a><font color="#B22222">/*          to TAU1. */</font>
+<a name="line142">142: </a><font color="#B22222">/*          If (JOBACC.EQ.'A') then TAU1 is determined automatically from */</font>
+<a name="line143">143: </a><font color="#B22222">/*             TOL and the input value is ignored. */</font>
+<a name="line144">144: </a><font color="#B22222">/*          If (JOBACC.EQ.'M' .AND. TAU1.LT.20*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) then TAU1 is set to */</font>
+<a name="line145">145: </a><font color="#B22222">/*             machine epsilon. */</font>
+
+<a name="line147">147: </a><font color="#B22222">/*  TAU2    (input) DOUBLE PRECISION, TAU2.LE.TOLMAX/2 */</font>
+<a name="line148">148: </a><font color="#B22222">/*          User specified deflation tolerance for the routine DIBTDC. */</font>
+<a name="line149">149: </a><font color="#B22222">/*          If (1.0D-1.GT.TAU2.GT.20*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) then TAU2 is used as */</font>
+<a name="line150">150: </a><font color="#B22222">/*          the deflation tolerance in DSRTDF (<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> is the machine epsilon). */</font>
+<a name="line151">151: </a><font color="#B22222">/*          If (TAU2.LE.20*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) then the standard deflation tolerance from */</font>
+<a name="line152">152: </a><font color="#B22222">/*          LAPACK is used as the deflation tolerance in DSRTDF. */</font>
+<a name="line153">153: </a><font color="#B22222">/*          If (JOBACC.EQ.'A') then TAU2 is determined automatically from */</font>
+<a name="line154">154: </a><font color="#B22222">/*             TOL and the input value is ignored. */</font>
+<a name="line155">155: </a><font color="#B22222">/*          If (JOBACC.EQ.'M' .AND. TAU2.LT.20*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) then TAU2 is set to */</font>
+<a name="line156">156: </a><font color="#B22222">/*             the standard deflation tolerance from LAPACK. */</font>
+
+<a name="line158">158: </a><font color="#B22222">/*  EV      (output) DOUBLE PRECISION array, dimension (N) */</font>
+<a name="line159">159: </a><font color="#B22222">/*          If INFO = 0, then EV contains the computed eigenvalues of the */</font>
+<a name="line160">160: </a><font color="#B22222">/*          symmetric block tridiagonal matrix in ascending order. */</font>
+
+<a name="line162">162: </a><font color="#B22222">/*  Z       (output) DOUBLE PRECISION array, dimension (LDZ,N) */</font>
+<a name="line163">163: </a><font color="#B22222">/*          If (JOBZ.EQ.'D' .AND. INFO = 0) */</font>
+<a name="line164">164: </a><font color="#B22222">/*          then Z contains the orthonormal eigenvectors of the symmetric */</font>
+<a name="line165">165: </a><font color="#B22222">/*          block tridiagonal matrix computed by the routine DIBTDC */</font>
+<a name="line166">166: </a><font color="#B22222">/*          (accumulated in the divide-and-conquer process). */</font>
+<a name="line167">167: </a><font color="#B22222">/*          If (-199 &lt; INFO &lt; -99) then Z contains the orthonormal */</font>
+<a name="line168">168: </a><font color="#B22222">/*          eigenvectors of the symmetric block tridiagonal matrix, */</font>
+<a name="line169">169: </a><font color="#B22222">/*          computed without divide-and-conquer (quick returns). */</font>
+<a name="line170">170: </a><font color="#B22222">/*          Otherwise not referenced. */</font>
+
+<a name="line172">172: </a><font color="#B22222">/*  LDZ     (input) INTEGER */</font>
+<a name="line173">173: </a><font color="#B22222">/*          The leading dimension of the array Z.  LDZ &gt;= max(1,N). */</font>
+
+<a name="line175">175: </a><font color="#B22222">/*  WORK    (workspace/output) DOUBLE PRECISION array, dimension (LWORK) */</font>
+
+<a name="line177">177: </a><font color="#B22222">/*  LWORK   (input) INTEGER */</font>
+<a name="line178">178: </a><font color="#B22222">/*          The dimension of the array WORK. */</font>
+<a name="line179">179: </a><font color="#B22222">/*          If NBLKS.EQ.1, then LWORK has to be at least 2N^2+6N+1 */</font>
+<a name="line180">180: </a><font color="#B22222">/*          (for the call of DSYEVD). */</font>
+<a name="line181">181: </a><font color="#B22222">/*          If NBLKS.GE.2 and (JOBZ.EQ.'D') then the absolute minimum */</font>
+<a name="line182">182: </a><font color="#B22222">/*             required for DIBTDC is (N**2 + 3*N). This will not always */</font>
+<a name="line183">183: </a><font color="#B22222">/*             suffice, though, the routine will return a corresponding */</font>
+<a name="line184">184: </a><font color="#B22222">/*             error code and report how much work space was missing (see */</font>
+<a name="line185">185: </a><font color="#B22222">/*             INFO). */</font>
+<a name="line186">186: </a><font color="#B22222">/*          In order to guarantee correct results in all cases where */</font>
+<a name="line187">187: </a><font color="#B22222">/*          NBLKS.GE.2, LWORK must be at least (2*N**2 + 3*N). */</font>
+
+<a name="line189">189: </a><font color="#B22222">/*  IWORK   (workspace/output) INTEGER array, dimension (LIWORK) */</font>
+
+<a name="line191">191: </a><font color="#B22222">/*  LIWORK  (input) INTEGER */</font>
+<a name="line192">192: </a><font color="#B22222">/*          The dimension of the array IWORK. */</font>
+<a name="line193">193: </a><font color="#B22222">/*          LIWORK must be at least (5*N + 5*NBLKS - 1) (for DIBTDC) */</font>
+<a name="line194">194: </a><font color="#B22222">/*          Note that this should also suffice for the call of DSYEVD on a */</font>
+<a name="line195">195: </a><font color="#B22222">/*          diagonal block which requires (5*KMAX + 3). */</font>
+
+
+<a name="line198">198: </a><font color="#B22222">/*  MINGAP  (output) DOUBLE PRECISION */</font>
+<a name="line199">199: </a><font color="#B22222">/*          The minimum "gap" between the approximate eigenvalues */</font>
+<a name="line200">200: </a><font color="#B22222">/*          computed, i.e., MIN( ABS(EV(I+1)-EV(I)) for I=1,2,..., N-1 */</font>
+<a name="line201">201: </a><font color="#B22222">/*          IF (MINGAP.LE.TOL/10) THEN a warning flag is returned in INFO, */</font>
+<a name="line202">202: </a><font color="#B22222">/*          because the computed eigenvectors may be unreliable individually */</font>
+<a name="line203">203: </a><font color="#B22222">/*          (only the subspaces spanned are approximated reliably). */</font>
+
+<a name="line205">205: </a><font color="#B22222">/*  MINGAPI (output) INTEGER */</font>
+<a name="line206">206: </a><font color="#B22222">/*          Index I where the minimum gap in the spectrum occurred. */</font>
+
+<a name="line208">208: </a><font color="#B22222">/*  INFO    (output) INTEGER */</font>
+<a name="line209">209: </a><font color="#B22222">/*          = 0:  successful exit, no special cases occurred. */</font>
+<a name="line210">210: </a><font color="#B22222">/*          &lt; -200: not enough workspace. Space for ABS(INFO + 200) */</font>
+<a name="line211">211: </a><font color="#B22222">/*                numbers is required in addition to the workspace provided, */</font>
+<a name="line212">212: </a><font color="#B22222">/*                otherwise some of the computed eigenvectors will be incorrect. */</font>
+<a name="line213">213: </a><font color="#B22222">/*          &lt; -99, &gt; -199: successful exit, but quick returns. */</font>
+<a name="line214">214: </a><font color="#B22222">/*                if INFO = -100, successful exit, but the input matrix */</font>
+<a name="line215">215: </a><font color="#B22222">/*                                was the zero matrix and no */</font>
+<a name="line216">216: </a><font color="#B22222">/*                                divide-and-conquer was performed */</font>
+<a name="line217">217: </a><font color="#B22222">/*                if INFO = -101, successful exit, but N was 1 and no */</font>
+<a name="line218">218: </a><font color="#B22222">/*                                divide-and-conquer was performed */</font>
+<a name="line219">219: </a><font color="#B22222">/*                if INFO = -102, successful exit, but only a single */</font>
+<a name="line220">220: </a><font color="#B22222">/*                                dense block. Standard dense solver */</font>
+<a name="line221">221: </a><font color="#B22222">/*                                was called, no divide-and-conquer was */</font>
+<a name="line222">222: </a><font color="#B22222">/*                                performed */</font>
+<a name="line223">223: </a><font color="#B22222">/*                if INFO = -103, successful exit, but warning that */</font>
+<a name="line224">224: </a><font color="#B22222">/*                                MINGAP.LE.TOL/10 and therefore the */</font>
+<a name="line225">225: </a><font color="#B22222">/*                                eigenvectors corresponding to close */</font>
+<a name="line226">226: </a><font color="#B22222">/*                                approximate eigenvalues may individually */</font>
+<a name="line227">227: </a><font color="#B22222">/*                                be unreliable (although taken together they */</font>
+<a name="line228">228: </a><font color="#B22222">/*                                do approximate the corresponding subspace to */</font>
+<a name="line229">229: </a><font color="#B22222">/*                                the desired accuracy) */</font>
+<a name="line230">230: </a><font color="#B22222">/*          = -99: error in the preprocessing in DIBTDC (when determining */</font>
+<a name="line231">231: </a><font color="#B22222">/*                 the merging order). */</font>
+<a name="line232">232: </a><font color="#B22222">/*          &lt; 0, &gt; -99: illegal arguments. */</font>
+<a name="line233">233: </a><font color="#B22222">/*                if INFO = -i, the i-th argument had an illegal value. */</font>
+<a name="line234">234: </a><font color="#B22222">/*          &gt; 0:  The algorithm failed to compute an eigenvalue while */</font>
+<a name="line235">235: </a><font color="#B22222">/*                working on the submatrix lying in rows and columns */</font>
+<a name="line236">236: </a><font color="#B22222">/*                INFO/(N+1) through mod(INFO,N+1). */</font>
+
+<a name="line238">238: </a><font color="#B22222">/*  Further Details */</font>
+<a name="line239">239: </a><font color="#B22222">/*  =============== */</font>
+
+<a name="line241">241: </a><font color="#B22222">/*  Small modifications of code written by */</font>
+<a name="line242">242: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line243">243: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+<a name="line244">244: </a><font color="#B22222">/*     see https://doi.org/10.1137/S1064827501399432 */</font>
+
+<a name="line246">246: </a><font color="#B22222">/*  Based on the design of the LAPACK code sstedc.f written by Jeff */</font>
+<a name="line247">247: </a><font color="#B22222">/*  Rutter, Computer Science Division, University of California at */</font>
+<a name="line248">248: </a><font color="#B22222">/*  Berkeley, and modified by Francoise Tisseur, University of Tennessee. */</font>
+
+<a name="line250">250: </a><font color="#B22222">/*  ===================================================================== */</font>
+
+<a name="line252">252: </a><font color="#B22222">/*     .. Parameters .. */</font>
+
+<a name="line254">254: </a><strong><font color="#228B22">#define TOLMAX 0.1</font></strong>
+
+<a name="line256">256: </a><font color="#B22222">/*        TOLMAX       .... upper bound for tolerances TOL, TAU1, TAU2 */</font>
+<a name="line257">257: </a><font color="#B22222">/*                          NOTE: in the routine DIBTDC, the value */</font>
+<a name="line258">258: </a><font color="#B22222">/*                                1.D-1 is hardcoded for TOLMAX ! */</font>
+
+<a name="line260">260: </a>  PetscBLASInt   i, j, k, i1, iwspc, lwmin, start;
+<a name="line261">261: </a>  PetscBLASInt   ii, ip, nk, rk, np, iu, rp1, ldu;
+<a name="line262">262: </a>  PetscBLASInt   ksk, ivt, iend, kchk=0, kmax=0, one=1, zero=0;
+<a name="line263">263: </a>  PetscBLASInt   ldvt, ksum=0, kskp1, spneed, nrblks, liwmin, isvals;
+<a name="line264">264: </a>  PetscReal      p, d2, eps, dmax, emax, done = 1.0;
+<a name="line265">265: </a>  PetscReal      dnrm, tiny, anorm, exdnrm=0, dropsv, absdiff;
+
+<a name="line269">269: </a>  <font color="#B22222">/* Determine machine epsilon. */</font>
+<a name="line270">270: </a>  eps = LAPACKlamch_(<font color="#666666">"Epsilon"</font>);
+
+<a name="line272">272: </a>  *info = 0;
+
+<a name="line274">274: </a>  <font color="#4169E1">if</font> (*(unsigned char *)jobz != 'N' &amp;&amp; *(unsigned char *)jobz != 'D') *info = -1;
+<a name="line275">275: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*(unsigned char *)jobacc != 'A' &amp;&amp; *(unsigned char *)jobacc != 'M') *info = -2;
+<a name="line276">276: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (n &lt; 1) *info = -3;
+<a name="line277">277: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (nblks &lt; 1 || nblks &gt; n) *info = -4;
+<a name="line278">278: </a>  <font color="#4169E1">if</font> (*info == 0) {
+<a name="line279">279: </a>    <font color="#4169E1">for</font> (k = 0; k &lt; nblks; ++k) {
+<a name="line280">280: </a>      ksk = ksizes[k];
+<a name="line281">281: </a>      ksum += ksk;
+<a name="line282">282: </a>      <font color="#4169E1">if</font> (ksk &gt; kmax) kmax = ksk;
+<a name="line283">283: </a>      <font color="#4169E1">if</font> (ksk &lt; 1) kchk = 1;
+<a name="line284">284: </a>    }
+<a name="line285">285: </a>    <font color="#4169E1">if</font> (nblks == 1) lwmin = 2*n*n + n*6 + 1;
+<a name="line286">286: </a>    <font color="#4169E1">else</font> lwmin = n*n + n*3;
+<a name="line287">287: </a>    liwmin = n * 5 + nblks * 5 - 4;
+<a name="line288">288: </a>    <font color="#4169E1">if</font> (ksum != n || kchk == 1) *info = -5;
+<a name="line289">289: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l1d &lt; PetscMax(3,kmax)) *info = -7;
+<a name="line290">290: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l2d &lt; PetscMax(3,kmax)) *info = -8;
+<a name="line291">291: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l1e &lt; PetscMax(3,2*kmax+1)) *info = -10;
+<a name="line292">292: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (l2e &lt; PetscMax(3,2*kmax+1)) *info = -11;
+<a name="line293">293: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*(unsigned char *)jobacc == 'A' &amp;&amp; tol &gt; TOLMAX) *info = -12;
+<a name="line294">294: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*(unsigned char *)jobacc == 'M' &amp;&amp; tau1 &gt; TOLMAX/2) *info = -13;
+<a name="line295">295: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (*(unsigned char *)jobacc == 'M' &amp;&amp; tau2 &gt; TOLMAX/2) *info = -14;
+<a name="line296">296: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ldz &lt; PetscMax(1,n)) *info = -17;
+<a name="line297">297: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (lwork &lt; lwmin) *info = -19;
+<a name="line298">298: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (liwork &lt; liwmin) *info = -21;
+<a name="line299">299: </a>  }
+
+<a name="line301">301: </a>  <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Wrong argument %d in DSBTDC"</font>,-(*info));
+
+<a name="line303">303: </a>  <font color="#B22222">/* Quick return if possible */</font>
+
+<a name="line305">305: </a>  <font color="#4169E1">if</font> (n == 1) {
+<a name="line306">306: </a>    ev[0] = d[0]; z[0] = 1.;
+<a name="line307">307: </a>    *info = -101;
+<a name="line308">308: </a>    <font color="#4169E1">return</font>(0);
+<a name="line309">309: </a>  }
+
+<a name="line311">311: </a>  <font color="#B22222">/* If NBLKS is equal to 1, then solve the problem with standard */</font>
+<a name="line312">312: </a>  <font color="#B22222">/* dense solver (in this case KSIZES(1) = N). */</font>
+
+<a name="line314">314: </a>  <font color="#4169E1">if</font> (nblks == 1) {
+<a name="line315">315: </a>    <font color="#4169E1">for</font> (i = 0; i &lt; n; ++i) {
+<a name="line316">316: </a>      <font color="#4169E1">for</font> (j = 0; j &lt;= i; ++j) {
+<a name="line317">317: </a>        z[i + j*ldz] = d[i + j*l1d];
+<a name="line318">318: </a>      }
+<a name="line319">319: </a>    }
+<a name="line320">320: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKsyevd"</font>,LAPACKsyevd_(<font color="#666666">"V"</font>, <font color="#666666">"L"</font>, &amp;n, z, &amp;ldz, ev, work, &amp;lwork, iwork, &amp;liwork, info));
+<a name="line321">321: </a>    <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Error in DSYEVD, info = %d"</font>,*info);
+<a name="line322">322: </a>    *info = -102;
+<a name="line323">323: </a>    <font color="#4169E1">return</font>(0);
+<a name="line324">324: </a>  }
+
+<a name="line326">326: </a>  <font color="#B22222">/* determine the accuracy parameters (if requested) */</font>
+
+<a name="line328">328: </a>  <font color="#4169E1">if</font> (*(unsigned char *)jobacc == 'A') {
+<a name="line329">329: </a>    tau1 = tol / 2;
+<a name="line330">330: </a>    <font color="#4169E1">if</font> (tau1 &lt; eps * 20) tau1 = eps;
+<a name="line331">331: </a>    tau2 = tol / 2;
+<a name="line332">332: </a>  }
+
+<a name="line334">334: </a>  <font color="#B22222">/* Initialize Z as the identity matrix */</font>
+
+<a name="line336">336: </a>  <font color="#4169E1">if</font> (*(unsigned char *)jobz == 'D') {
+<a name="line337">337: </a>    <font color="#4169E1">for</font> (j=0;j&lt;n;j++) <font color="#4169E1">for</font> (i=0;i&lt;n;i++) z[i+j*ldz] = 0.0;
+<a name="line338">338: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) z[i+i*ldz] = 1.0;
+<a name="line339">339: </a>  }
+
+<a name="line341">341: </a>  <font color="#B22222">/* Determine the off-diagonal ranks, form and store the lower rank */</font>
+<a name="line342">342: </a>  <font color="#B22222">/* approximations based on the tolerance parameters, the */</font>
+<a name="line343">343: </a>  <font color="#B22222">/* RANK(K) largest singular values and the associated singular */</font>
+<a name="line344">344: </a>  <font color="#B22222">/* vectors of each subdiagonal block. Also find the maximum norm of */</font>
+<a name="line345">345: </a>  <font color="#B22222">/* the subdiagonal blocks (in EMAX). */</font>
+
+<a name="line347">347: </a>  <font color="#B22222">/* Compute SVDs of the subdiagonal blocks.... */</font>
+
+<a name="line349">349: </a>  <font color="#B22222">/* EMAX .... maximum norm of the off-diagonal blocks */</font>
+
+<a name="line351">351: </a>  emax = 0.;
+<a name="line352">352: </a>  <font color="#4169E1">for</font> (k = 0; k &lt; nblks-1; ++k) {
+<a name="line353">353: </a>    ksk = ksizes[k];
+<a name="line354">354: </a>    kskp1 = ksizes[k+1];
+<a name="line355">355: </a>    isvals = 0;
+
+<a name="line357">357: </a>    <font color="#B22222">/* Note that min(KSKP1,KSK).LE.N/2 (equality possible for */</font>
+<a name="line358">358: </a>    <font color="#B22222">/* NBLKS=2), and therefore storing the singular values requires */</font>
+<a name="line359">359: </a>    <font color="#B22222">/* at most N/2 entries of the *        array WORK. */</font>
+
+<a name="line361">361: </a>    iu = isvals + n / 2;
+<a name="line362">362: </a>    ivt = isvals + n / 2;
+
+<a name="line364">364: </a>    <font color="#B22222">/* Call of DGESVD: The space for U is not referenced, since */</font>
+<a name="line365">365: </a>    <font color="#B22222">/* JOBU='O' and therefore this portion of the array WORK */</font>
+<a name="line366">366: </a>    <font color="#B22222">/* is not referenced for U. */</font>
+
+<a name="line368">368: </a>    ldu = kskp1;
+<a name="line369">369: </a>    ldvt = PetscMin(kskp1,ksk);
+<a name="line370">370: </a>    iwspc = ivt + n * n / 2;
+
+<a name="line372">372: </a>    <font color="#B22222">/* Note that the minimum workspace required for this call */</font>
+<a name="line373">373: </a>    <font color="#B22222">/* of DGESVD is: N/2 for storing the singular values + N**2/2 for */</font>
+<a name="line374">374: </a>    <font color="#B22222">/* storing V^T + 5*N/2 workspace =  N**2/2 + 3*N. */</font>
+
+<a name="line376">376: </a>    i1 = lwork - iwspc;
+<a name="line377">377: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"O"</font>, <font color="#666666">"S"</font>, &amp;kskp1, &amp;ksk,
+<a name="line378">378: </a>            &amp;e[k*l1e*l2e], &amp;l1e, &amp;work[isvals],
+<a name="line379">379: </a>            &amp;work[iu], &amp;ldu, &amp;work[ivt], &amp;ldvt, &amp;work[iwspc], &amp;i1, info));
+<a name="line380">380: </a>    <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Error in DGESVD, info = %d"</font>,*info);
+
+<a name="line382">382: </a>    <font color="#B22222">/* Note that after the return from DGESVD U is stored in */</font>
+<a name="line383">383: </a>    <font color="#B22222">/* E(*,*,K), and V^{\top} is stored in WORK(IVT, IVT+1, ....) */</font>
+
+<a name="line385">385: </a>    <font color="#B22222">/* determine the ranks RANK() for the approximations */</font>
+
+<a name="line387">387: </a>    rk = PetscMin(ksk,kskp1);
+<a name="line388">388: </a><strong><font color="#FF0000">L8:</font></strong>
+<a name="line389">389: </a>    dropsv = work[isvals - 1 + rk];
+
+<a name="line391">391: </a>    <font color="#4169E1">if</font> (dropsv * 2. &lt;= tau1) {
+
+<a name="line393">393: </a>      <font color="#B22222">/* the error caused by dropping singular value RK is */</font>
+<a name="line394">394: </a>      <font color="#B22222">/* small enough, try to reduce the rank by one more */</font>
+
+<a name="line396">396: </a>      <font color="#4169E1">if</font> (--rk &gt; 0) <font color="#4169E1">goto</font> L8;
+<a name="line397">397: </a>      <font color="#4169E1">else</font> iwork[k] = 0;
+<a name="line398">398: </a>    } <font color="#4169E1">else</font> {
+
+<a name="line400">400: </a>      <font color="#B22222">/* the error caused by dropping singular value RK is */</font>
+<a name="line401">401: </a>      <font color="#B22222">/* too large already, RK is the rank required to achieve the */</font>
+<a name="line402">402: </a>      <font color="#B22222">/* desired accuracy */</font>
+
+<a name="line404">404: </a>      iwork[k] = rk;
+<a name="line405">405: </a>    }
+
+<a name="line407">407: </a><font color="#B22222">/* ************************************************************************** */</font>
+
+<a name="line409">409: </a>    <font color="#B22222">/* Store the first RANK(K) terms of the <a href="../../../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> of the current */</font>
+<a name="line410">410: </a>    <font color="#B22222">/* off-diagonal block. */</font>
+<a name="line411">411: </a>    <font color="#B22222">/* NOTE that here it is required that L1E, L2E &gt;= 2*KMAX+1 in order */</font>
+<a name="line412">412: </a>    <font color="#B22222">/* to have enough space for storing singular vectors and values up */</font>
+<a name="line413">413: </a>    <font color="#B22222">/* to the full <a href="../../../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> of an off-diagonal block !!!! */</font>
+
+<a name="line415">415: </a>    <font color="#B22222">/* u1-u_RANK(K) is already contained in E(:,1:RANK(K),K) (as a */</font>
+<a name="line416">416: </a>    <font color="#B22222">/* result of the call of DGESVD !), the sigma1-sigmaK are to be */</font>
+<a name="line417">417: </a>    <font color="#B22222">/* stored in E(1:RANK(K),RANK(K)+1,K),  and v1-v_RANK(K) are to be */</font>
+<a name="line418">418: </a>    <font color="#B22222">/* stored in E(:,RANK(K)+2:2*RANK(K)+1,K) */</font>
+
+<a name="line420">420: </a>    rp1 = iwork[k];
+<a name="line421">421: </a>    <font color="#4169E1">for</font> (j = 0; j &lt; iwork[k]; ++j) {
+
+<a name="line423">423: </a>      <font color="#B22222">/* store sigma_J in E(J,RANK(K)+1,K) */</font>
+
+<a name="line425">425: </a>      e[j + (rp1 + k*l2e)* l1e] = work[isvals + j];
+
+<a name="line427">427: </a>      <font color="#B22222">/* update maximum norm of subdiagonal blocks */</font>
+
+<a name="line429">429: </a>      <font color="#4169E1">if</font> (e[j + (rp1 + k*l2e)*l1e] &gt; emax) {
+<a name="line430">430: </a>        emax = e[j + (rp1 + k*l2e)*l1e];
+<a name="line431">431: </a>      }
+
+<a name="line433">433: </a>      <font color="#B22222">/* store v_J in E(:,RANK(K)+1+J,K) */</font>
+<a name="line434">434: </a>      <font color="#B22222">/* (note that WORK contains V^{\top} and therefore */</font>
+<a name="line435">435: </a>      <font color="#B22222">/* we need to read rowwise !) */</font>
+
+<a name="line437">437: </a>      <font color="#4169E1">for</font> (i = 1; i &lt;= ksk; ++i) {
+<a name="line438">438: </a>        e[i-1 + (rp1+j+1 + k*l2e)*l1e] = work[ivt+j + (i-1)*ldvt];
+<a name="line439">439: </a>      }
+<a name="line440">440: </a>    }
+
+<a name="line442">442: </a>  }
+
+<a name="line444">444: </a>  <font color="#B22222">/* Compute the maximum norm of diagonal blocks and store the norm */</font>
+<a name="line445">445: </a>  <font color="#B22222">/* of each diagonal block in E(RP1,RP1,K) (after the singular values); */</font>
+<a name="line446">446: </a>  <font color="#B22222">/* store the norm of the last diagonal block in EXDNRM. */</font>
+
+<a name="line448">448: </a>  <font color="#B22222">/* DMAX .... maximum one-norm of the diagonal blocks */</font>
+
+<a name="line450">450: </a>  dmax = 0.;
+<a name="line451">451: </a>  <font color="#4169E1">for</font> (k = 0; k &lt; nblks; ++k) {
+<a name="line452">452: </a>    rp1 = iwork[k];
+
+<a name="line454">454: </a>    <font color="#B22222">/* compute the one-norm of diagonal block K */</font>
+
+<a name="line456">456: </a>    dnrm = LAPACKlansy_(<font color="#666666">"1"</font>, <font color="#666666">"L"</font>, &amp;ksizes[k], &amp;d[k*l1d*l2d], &amp;l1d, work);
+<a name="line457">457: </a>    <font color="#4169E1">if</font> (k+1 == nblks) exdnrm = dnrm;
+<a name="line458">458: </a>    <font color="#4169E1">else</font> e[rp1 + (rp1 + k*l2e)*l1e] = dnrm;
+<a name="line459">459: </a>    <font color="#4169E1">if</font> (dnrm &gt; dmax) dmax = dnrm;
+<a name="line460">460: </a>  }
+
+<a name="line462">462: </a>  <font color="#B22222">/* Check for zero matrix. */</font>
+
+<a name="line464">464: </a>  <font color="#4169E1">if</font> (emax == 0. &amp;&amp; dmax == 0.) {
+<a name="line465">465: </a>    <font color="#4169E1">for</font> (i = 0; i &lt; n; ++i) ev[i] = 0.;
+<a name="line466">466: </a>    *info = -100;
+<a name="line467">467: </a>    <font color="#4169E1">return</font>(0);
+<a name="line468">468: </a>  }
+
+<a name="line470">470: </a><font color="#B22222">/* **************************************************************** */</font>
+
+<a name="line472">472: </a>  <font color="#B22222">/* ....Identify irreducible parts of the block tridiagonal matrix */</font>
+<a name="line473">473: </a>  <font color="#B22222">/* [while (START &lt;= NBLKS)].... */</font>
+
+<a name="line475">475: </a>  start = 0;
+<a name="line476">476: </a>  np = 0;
+<a name="line477">477: </a><strong><font color="#FF0000">L10:</font></strong>
+<a name="line478">478: </a>  <font color="#4169E1">if</font> (start &lt; nblks) {
+
+<a name="line480">480: </a>    <font color="#B22222">/* Let IEND be the number of the next subdiagonal block such that */</font>
+<a name="line481">481: </a>    <font color="#B22222">/* its RANK is 0 or IEND = NBLKS if no such subdiagonal exists. */</font>
+<a name="line482">482: </a>    <font color="#B22222">/* The matrix identified by the elements between the diagonal block START */</font>
+<a name="line483">483: </a>    <font color="#B22222">/* and the diagonal block IEND constitutes an independent (irreducible) */</font>
+<a name="line484">484: </a>    <font color="#B22222">/* sub-problem. */</font>
+
+<a name="line486">486: </a>    iend = start;
+
+<a name="line488">488: </a><strong><font color="#FF0000">L20:</font></strong>
+<a name="line489">489: </a>    <font color="#4169E1">if</font> (iend &lt; nblks) {
+<a name="line490">490: </a>      rk = iwork[iend];
+
+<a name="line492">492: </a>      <font color="#B22222">/* NOTE: if RANK(IEND).EQ.0 then decoupling happens due to */</font>
+<a name="line493">493: </a>      <font color="#B22222">/*       reduced accuracy requirements ! (because in this case */</font>
+<a name="line494">494: </a>      <font color="#B22222">/*       we would not merge the corresponding two diagonal blocks) */</font>
+
+<a name="line496">496: </a>      <font color="#B22222">/* NOTE: seems like any combination may potentially happen: */</font>
+<a name="line497">497: </a>      <font color="#B22222">/*       (i) RANK = 0 but no decoupling due to small norm of */</font>
+<a name="line498">498: </a>      <font color="#B22222">/*           off-diagonal block (corresponding diagonal blocks */</font>
+<a name="line499">499: </a>      <font color="#B22222">/*           also have small norm) as well as */</font>
+<a name="line500">500: </a>      <font color="#B22222">/*       (ii) RANK &gt; 0 but decoupling due to small norm of */</font>
+<a name="line501">501: </a>      <font color="#B22222">/*           off-diagonal block (corresponding diagonal blocks */</font>
+<a name="line502">502: </a>      <font color="#B22222">/*           have very large norm) */</font>
+<a name="line503">503: </a>      <font color="#B22222">/*       case (i) is ruled out by checking for RANK = 0 above */</font>
+<a name="line504">504: </a>      <font color="#B22222">/*       (we decide to decouple all the time when the rank */</font>
+<a name="line505">505: </a>      <font color="#B22222">/*       of an off-diagonal block is zero, independently of */</font>
+<a name="line506">506: </a>      <font color="#B22222">/*       the norms of the corresponding diagonal blocks. */</font>
+
+<a name="line508">508: </a>      <font color="#4169E1">if</font> (rk &gt; 0) {
+
+<a name="line510">510: </a>        <font color="#B22222">/* check for decoupling due to small norm of off-diagonal block */</font>
+<a name="line511">511: </a>        <font color="#B22222">/* (relative to the norms of the corresponding diagonal blocks) */</font>
+
+<a name="line513">513: </a>        <font color="#4169E1">if</font> (iend == nblks-2) {
+<a name="line514">514: </a>          d2 = PetscSqrtReal(exdnrm);
+<a name="line515">515: </a>        } <font color="#4169E1">else</font> {
+<a name="line516">516: </a>          d2 = PetscSqrtReal(e[iwork[iend+1] + (iwork[iend+1] + (iend+1)*l2e)*l1e]);
+<a name="line517">517: </a>        }
+
+<a name="line519">519: </a>        <font color="#B22222">/* this definition of TINY is analogous to the definition */</font>
+<a name="line520">520: </a>        <font color="#B22222">/* in the tridiagonal divide&amp;conquer (dstedc) */</font>
+
+<a name="line522">522: </a>        tiny = eps * PetscSqrtReal(e[iwork[iend] + (iwork[iend] + iend*l2e)*l1e])*d2;
+<a name="line523">523: </a>        <font color="#4169E1">if</font> (e[(iwork[iend] + iend*l2e)*l1e] &gt; tiny) {
+
+<a name="line525">525: </a>          <font color="#B22222">/* no decoupling due to small norm of off-diagonal block */</font>
+
+<a name="line527">527: </a>          ++iend;
+<a name="line528">528: </a>          <font color="#4169E1">goto</font> L20;
+<a name="line529">529: </a>        }
+<a name="line530">530: </a>      }
+<a name="line531">531: </a>    }
+
+<a name="line533">533: </a>    <font color="#B22222">/* ....(Sub) Problem determined: between diagonal blocks */</font>
+<a name="line534">534: </a>    <font color="#B22222">/*     START and IEND. Compute its size and solve it.... */</font>
+
+<a name="line536">536: </a>    nrblks = iend - start + 1;
+<a name="line537">537: </a>    <font color="#4169E1">if</font> (nrblks == 1) {
+
+<a name="line539">539: </a>      <font color="#B22222">/* Isolated problem is a single diagonal block */</font>
+
+<a name="line541">541: </a>      nk = ksizes[start];
+
+<a name="line543">543: </a>      <font color="#B22222">/* copy this isolated block into Z */</font>
+
+<a name="line545">545: </a>      <font color="#4169E1">for</font> (i = 0; i &lt; nk; ++i) {
+<a name="line546">546: </a>        ip = np + i + 1;
+<a name="line547">547: </a>        <font color="#4169E1">for</font> (j = 0; j &lt;= i; ++j) z[ip + (np+j+1)*ldz] = d[i + (j + start*l2d)*l1d];
+<a name="line548">548: </a>      }
+
+<a name="line550">550: </a>      <font color="#B22222">/* check whether there is enough workspace */</font>
+
+<a name="line552">552: </a>      spneed = 2*nk*nk + nk * 6 + 1;
+<a name="line553">553: </a>      <font color="#4169E1">if</font> (spneed &gt; lwork) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: not enough workspace for DSYEVD, info = %d"</font>,lwork - 200 - spneed);
+
+<a name="line555">555: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKsyevd"</font>,LAPACKsyevd_(<font color="#666666">"V"</font>, <font color="#666666">"L"</font>, &amp;nk,
+<a name="line556">556: </a>                    &amp;z[np + np*ldz], &amp;ldz, &amp;ev[np],
+<a name="line557">557: </a>                    work, &amp;lwork, &amp;iwork[nblks-1], &amp;liwork, info));
+<a name="line558">558: </a>      <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Error in DSYEVD, info = %d"</font>,*info);
+<a name="line559">559: </a>      start = iend + 1;
+<a name="line560">560: </a>      np += nk;
+
+<a name="line562">562: </a>      <font color="#B22222">/* go to the next irreducible subproblem */</font>
+
+<a name="line564">564: </a>      <font color="#4169E1">goto</font> L10;
+<a name="line565">565: </a>    }
+
+<a name="line567">567: </a>    <font color="#B22222">/* ....Isolated problem consists of more than one diagonal block. */</font>
+<a name="line568">568: </a>    <font color="#B22222">/*     Start the divide and conquer algorithm.... */</font>
+
+<a name="line570">570: </a>    <font color="#B22222">/* Scale: Divide by the maximum of all norms of diagonal blocks */</font>
+<a name="line571">571: </a>    <font color="#B22222">/*        and singular values of the subdiagonal blocks */</font>
+
+<a name="line573">573: </a>    <font color="#B22222">/* ....determine maximum of the norms of all diagonal and subdiagonal */</font>
+<a name="line574">574: </a>    <font color="#B22222">/*     blocks.... */</font>
+
+<a name="line576">576: </a>    <font color="#4169E1">if</font> (iend == nblks-1) anorm = exdnrm;
+<a name="line577">577: </a>    <font color="#4169E1">else</font> anorm = e[iwork[iend] + (iwork[iend] + iend*l2e)*l1e];
+<a name="line578">578: </a>    <font color="#4169E1">for</font> (k = start; k &lt; iend; ++k) {
+<a name="line579">579: </a>      rp1 = iwork[k];
+
+<a name="line581">581: </a>      <font color="#B22222">/* norm of diagonal block */</font>
+<a name="line582">582: </a>      anorm = PetscMax(anorm,e[rp1 + (rp1 + k*l2e)*l1e]);
+
+<a name="line584">584: </a>      <font color="#B22222">/* singular value of subdiagonal block */</font>
+<a name="line585">585: </a>      anorm = PetscMax(anorm,e[(rp1 + k*l2e)*l1e]);
+<a name="line586">586: </a>    }
+
+<a name="line588">588: </a>    nk = 0;
+<a name="line589">589: </a>    <font color="#4169E1">for</font> (k = start; k &lt; iend+1; ++k) {
+<a name="line590">590: </a>      ksk = ksizes[k];
+<a name="line591">591: </a>      nk += ksk;
+
+<a name="line593">593: </a>      <font color="#B22222">/* scale the diagonal block */</font>
+<a name="line594">594: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlascl"</font>,LAPACKlascl_(<font color="#666666">"L"</font>, &amp;zero, &amp;zero,
+<a name="line595">595: </a>                    &amp;anorm, &amp;done, &amp;ksk, &amp;ksk, &amp;d[k*l2d*l1d], &amp;l1d, info));
+<a name="line596">596: </a>      <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Error in DLASCL, info = %d"</font>,*info);
+
+<a name="line598">598: </a>      <font color="#B22222">/* scale the (approximated) off-diagonal block by dividing its */</font>
+<a name="line599">599: </a>      <font color="#B22222">/* singular values */</font>
+
+<a name="line601">601: </a>      <font color="#4169E1">if</font> (k != iend) {
+
+<a name="line603">603: </a>        <font color="#B22222">/* the last subdiagonal block has index IEND-1 !!!! */</font>
+<a name="line604">604: </a>        <font color="#4169E1">for</font> (i = 0; i &lt; iwork[k]; ++i) {
+<a name="line605">605: </a>          e[i + (iwork[k] + k*l2e)*l1e] /= anorm;
+<a name="line606">606: </a>        }
+<a name="line607">607: </a>      }
+<a name="line608">608: </a>    }
+
+<a name="line610">610: </a>    <font color="#B22222">/* call the block-tridiagonal divide-and-conquer on the */</font>
+<a name="line611">611: </a>    <font color="#B22222">/* irreducible subproblem which has been identified */</font>
+
+<a name="line613">613: </a>    BDC_dibtdc_(jobz, nk, nrblks, &amp;ksizes[start], &amp;d[start*l1d*l2d], l1d, l2d,
+<a name="line614">614: </a>                &amp;e[start*l2e*l1e], &amp;iwork[start], l1e, l2e, tau2, &amp;ev[np],
+<a name="line615">615: </a>                &amp;z[np + np*ldz], ldz, work, lwork, &amp;iwork[nblks-1], liwork, info, 1);
+<a name="line616">616: </a>                
+<a name="line617">617: </a>    <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Error in DIBTDC, info = %d"</font>,*info);
+
+<a name="line619">619: </a><font color="#B22222">/* ************************************************************************** */</font>
+
+<a name="line621">621: </a>    <font color="#B22222">/* Scale back the computed eigenvalues. */</font>
+
+<a name="line623">623: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKlascl"</font>,LAPACKlascl_(<font color="#666666">"G"</font>, &amp;zero, &amp;zero, &amp;done,
+<a name="line624">624: </a>            &amp;anorm, &amp;nk, &amp;one, &amp;ev[np], &amp;nk, info));
+<a name="line625">625: </a>    <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Error in DLASCL, info = %d"</font>,*info);
+
+<a name="line627">627: </a>    start = iend + 1;
+<a name="line628">628: </a>    np += nk;
+
+<a name="line630">630: </a>    <font color="#B22222">/* Go to the next irreducible subproblem. */</font>
+
+<a name="line632">632: </a>    <font color="#4169E1">goto</font> L10;
+<a name="line633">633: </a>  }
+
+<a name="line635">635: </a>  <font color="#B22222">/* ....If the problem split any number of times, then the eigenvalues */</font>
+<a name="line636">636: </a>  <font color="#B22222">/* will not be properly ordered. Here we permute the eigenvalues */</font>
+<a name="line637">637: </a>  <font color="#B22222">/* (and the associated eigenvectors) across the irreducible parts */</font>
+<a name="line638">638: </a>  <font color="#B22222">/* into ascending order.... */</font>
+
+<a name="line640">640: </a>  <font color="#B22222">/*  IF(NRBLKS.LT.NBLKS)THEN */</font>
+
+<a name="line642">642: </a>  <font color="#B22222">/*    Use Selection Sort to minimize swaps of eigenvectors */</font>
+
+<a name="line644">644: </a>  <font color="#4169E1">for</font> (ii = 1; ii &lt; n; ++ii) {
+<a name="line645">645: </a>    i = ii;
+<a name="line646">646: </a>    k = i;
+<a name="line647">647: </a>    p = ev[i];
+<a name="line648">648: </a>    <font color="#4169E1">for</font> (j = ii; j &lt; n; ++j) {
+<a name="line649">649: </a>      <font color="#4169E1">if</font> (ev[j] &lt; p) {
+<a name="line650">650: </a>        k = j;
+<a name="line651">651: </a>        p = ev[j];
+<a name="line652">652: </a>      }
+<a name="line653">653: </a>    }
+<a name="line654">654: </a>    <font color="#4169E1">if</font> (k != i) {
+<a name="line655">655: </a>      ev[k] = ev[i];
+<a name="line656">656: </a>      ev[i] = p;
+<a name="line657">657: </a>      PetscStackCallBLAS(<font color="#666666">"BLASswap"</font>,BLASswap_(&amp;n, &amp;z[i*ldz], &amp;one, &amp;z[k*ldz], &amp;one));
+<a name="line658">658: </a>    }
+<a name="line659">659: </a>  }
+
+<a name="line661">661: </a>  <font color="#B22222">/* ...Compute MINGAP (minimum difference between neighboring eigenvalue */</font>
+<a name="line662">662: </a>  <font color="#B22222">/*    approximations).............................................. */</font>
+
+<a name="line664">664: </a>  *mingap = ev[1] - ev[0];
+<a name="line665">665: </a>  <font color="#4169E1">if</font> (*mingap &lt; 0.) SETERRQ2(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Eigenvalue approximations are not ordered properly. Approximation %d is larger than approximation %d."</font>,1,2);
+<a name="line666">666: </a>  *mingapi = 1;
+<a name="line667">667: </a>  <font color="#4169E1">for</font> (i = 2; i &lt; n; ++i) {
+<a name="line668">668: </a>    absdiff = ev[i] - ev[i-1];
+<a name="line669">669: </a>    <font color="#4169E1">if</font> (absdiff &lt; 0.) SETERRQ2(PETSC_COMM_SELF,1,<font color="#666666">"dsbtdc: Eigenvalue approximations are not ordered properly. Approximation %d is larger than approximation %d."</font>,i,i+1);
+<a name="line670">670: </a>    <font color="#4169E1">else</font> <font color="#4169E1">if</font> (absdiff &lt; *mingap) {
+<a name="line671">671: </a>      *mingap = absdiff;
+<a name="line672">672: </a>      *mingapi = i;
+<a name="line673">673: </a>    }
+<a name="line674">674: </a>  }
+
+<a name="line676">676: </a>  <font color="#B22222">/* check whether the minimum gap between eigenvalue approximations */</font>
+<a name="line677">677: </a>  <font color="#B22222">/* may indicate severe inaccuracies in the eigenvector approximations */</font>
+
+<a name="line679">679: </a>  <font color="#4169E1">if</font> (*mingap &lt;= tol / 10) *info = -103;
+<a name="line680">680: </a>  <font color="#4169E1">return</font>(0);
+<a name="line681">681: </a>}
+
+</pre>
+</body>
+
+</html>

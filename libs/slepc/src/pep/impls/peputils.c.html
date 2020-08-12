@@ -1,0 +1,126 @@
+<center><a href="peputils.c">Actual source code: peputils.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/impls/peputils.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:04+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/impls/peputils.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Common subroutines for several <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> solvers</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/pepimpl.h.html">&lt;slepc/private/pepimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#B22222">/*</font>
+<a name="line18"> 18: </a><font color="#B22222">  Computes T_j=phy_idx(T) for a matrix T.</font>
+<a name="line19"> 19: </a><font color="#B22222">    Tp (if j&gt;0) and Tpp (if j&gt;1) are the evaluation</font>
+<a name="line20"> 20: </a><font color="#B22222">    of phy_(j-1) and phy(j-2)respectively.</font>
+<a name="line21"> 21: </a><font color="#B22222">*/</font>
+<a name="line22"> 22: </a><strong><font color="#4169E1"><a name="PEPEvaluateBasisMat"></a>PetscErrorCode PEPEvaluateBasisMat(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt k,PetscScalar *T,PetscInt ldt,PetscInt idx,PetscScalar *Tpp,PetscInt ldtpp,PetscScalar *Tp,PetscInt ldtp,PetscScalar *Tj,PetscInt ldtj)</font></strong>
+<a name="line23"> 23: </a>{
+<a name="line25"> 25: </a>  PetscInt       i;
+<a name="line26"> 26: </a>  PetscReal      *ca,*cb,*cg;
+<a name="line27"> 27: </a>  PetscScalar    g,a;
+<a name="line28"> 28: </a>  PetscBLASInt   k_,ldt_,ldtj_,ldtp_;
+
+<a name="line31"> 31: </a>  <font color="#4169E1">if</font> (idx==0) {
+<a name="line32"> 32: </a>    <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line33"> 33: </a>      PetscArrayzero(Tj+i*ldtj,k);
+<a name="line34"> 34: </a>      Tj[i+i*ldtj] = 1.0;
+<a name="line35"> 35: </a>    }
+<a name="line36"> 36: </a>  } <font color="#4169E1">else</font> {
+<a name="line37"> 37: </a>    PetscBLASIntCast(ldt,&amp;ldt_);
+<a name="line38"> 38: </a>    PetscBLASIntCast(ldtj,&amp;ldtj_);
+<a name="line39"> 39: </a>    PetscBLASIntCast(ldtp,&amp;ldtp_);
+<a name="line40"> 40: </a>    PetscBLASIntCast(k,&amp;k_);
+<a name="line41"> 41: </a>    ca = pep-&gt;pbc; cb = pep-&gt;pbc+pep-&gt;nmat; cg = pep-&gt;pbc+2*pep-&gt;nmat;
+<a name="line42"> 42: </a>    <font color="#4169E1">for</font> (i=0;i&lt;k;i++) T[i*ldt+i] -= cb[idx-1];
+<a name="line43"> 43: </a>    <font color="#4169E1">if</font> (idx&gt;1) {
+<a name="line44"> 44: </a>      <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line45"> 45: </a>        PetscArraycpy(Tj+i*ldtj,Tpp+i*ldtpp,k);
+<a name="line46"> 46: </a>      }
+<a name="line47"> 47: </a>    }
+<a name="line48"> 48: </a>    a = 1/ca[idx-1];
+<a name="line49"> 49: </a>    g = (idx==1)?0.0:-cg[idx-1]/ca[idx-1];
+<a name="line50"> 50: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;k_,&amp;k_,&amp;k_,&amp;a,T,&amp;ldt_,Tp,&amp;ldtp_,&amp;g,Tj,&amp;ldtj_));
+<a name="line51"> 51: </a>    <font color="#4169E1">for</font> (i=0;i&lt;k;i++) T[i*ldt+i] += cb[idx-1];
+<a name="line52"> 52: </a>  }
+<a name="line53"> 53: </a>  <font color="#4169E1">return</font>(0);
+<a name="line54"> 54: </a>}
+
+<a name="line56"> 56: </a><font color="#B22222">/*</font>
+<a name="line57"> 57: </a><font color="#B22222">   PEPEvaluateBasis - evaluate the polynomial basis on a given parameter sigma</font>
+<a name="line58"> 58: </a><font color="#B22222">*/</font>
+<a name="line59"> 59: </a><strong><font color="#4169E1"><a name="PEPEvaluateBasis"></a>PetscErrorCode PEPEvaluateBasis(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscScalar sigma,PetscScalar isigma,PetscScalar *vals,PetscScalar *ivals)</font></strong>
+<a name="line60"> 60: </a>{
+<a name="line61"> 61: </a>  PetscInt   nmat=pep-&gt;nmat,k;
+<a name="line62"> 62: </a>  PetscReal  *a=pep-&gt;pbc,*b=pep-&gt;pbc+nmat,*g=pep-&gt;pbc+2*nmat;
+
+<a name="line65"> 65: </a>  <font color="#4169E1">if</font> (ivals) <font color="#4169E1">for</font> (k=0;k&lt;nmat;k++) ivals[k] = 0.0;
+<a name="line66"> 66: </a>  vals[0] = 1.0;
+<a name="line67"> 67: </a>  vals[1] = (sigma-b[0])/a[0];
+<a name="line68"> 68: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (ivals) ivals[1] = isigma/a[0];
+<a name="line70"> 70: </a><font color="#A020F0">#endif</font>
+<a name="line71"> 71: </a>  <font color="#4169E1">for</font> (k=2;k&lt;nmat;k++) {
+<a name="line72"> 72: </a>    vals[k] = ((sigma-b[k-1])*vals[k-1]-g[k-1]*vals[k-2])/a[k-1];
+<a name="line73"> 73: </a>    <font color="#4169E1">if</font> (ivals) vals[k] -= isigma*ivals[k-1]/a[k-1];
+<a name="line74"> 74: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line75"> 75: </a>    <font color="#4169E1">if</font> (ivals) ivals[k] = ((sigma-b[k-1])*ivals[k-1]+isigma*vals[k-1]-g[k-1]*ivals[k-2])/a[k-1];
+<a name="line76"> 76: </a><font color="#A020F0">#endif</font>
+<a name="line77"> 77: </a>  }
+<a name="line78"> 78: </a>  <font color="#4169E1">return</font>(0);
+<a name="line79"> 79: </a>}
+
+<a name="line81"> 81: </a><font color="#B22222">/*</font>
+<a name="line82"> 82: </a><font color="#B22222">   PEPEvaluateBasisDerivative - evaluate the derivative of the polynomial basis on a given parameter sigma</font>
+<a name="line83"> 83: </a><font color="#B22222">*/</font>
+<a name="line84"> 84: </a><strong><font color="#4169E1"><a name="PEPEvaluateBasisDerivative"></a>PetscErrorCode PEPEvaluateBasisDerivative(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscScalar sigma,PetscScalar isigma,PetscScalar *vals,PetscScalar *ivals)</font></strong>
+<a name="line85"> 85: </a>{
+<a name="line87"> 87: </a>  PetscInt       nmat=pep-&gt;nmat,k;
+<a name="line88"> 88: </a>  PetscReal      *a=pep-&gt;pbc,*b=pep-&gt;pbc+nmat,*g=pep-&gt;pbc+2*nmat;
+
+<a name="line91"> 91: </a>  PEPEvaluateBasis(pep,sigma,isigma,vals,ivals);
+<a name="line92"> 92: </a>  <font color="#4169E1">for</font> (k=nmat-1;k&gt;0;k--) {
+<a name="line93"> 93: </a>    vals[k] = vals[k-1];
+<a name="line94"> 94: </a>    <font color="#4169E1">if</font> (ivals) ivals[k] = ivals[k-1];
+<a name="line95"> 95: </a>  }
+<a name="line96"> 96: </a>  vals[0] = 0.0;
+<a name="line97"> 97: </a>  vals[1] = vals[1]/a[0];
+<a name="line98"> 98: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line99"> 99: </a>  <font color="#4169E1">if</font> (ivals) ivals[1] = ivals[1]/a[0];
+<a name="line100">100: </a><font color="#A020F0">#endif</font>
+<a name="line101">101: </a>  <font color="#4169E1">for</font> (k=2;k&lt;nmat;k++) {
+<a name="line102">102: </a>    vals[k] += (sigma-b[k-1])*vals[k-1]-g[k-1]*vals[k-2];
+<a name="line103">103: </a>    <font color="#4169E1">if</font> (ivals) vals[k] -= isigma*ivals[k-1];
+<a name="line104">104: </a>    vals[k] /= a[k-1];
+<a name="line105">105: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line106">106: </a>    <font color="#4169E1">if</font> (ivals) {
+<a name="line107">107: </a>      ivals[k] += (sigma-b[k-1])*ivals[k-1]+isigma*vals[k-1]-g[k-1]*ivals[k-2];
+<a name="line108">108: </a>      ivals[k] /= a[k-1];
+<a name="line109">109: </a>    }
+<a name="line110">110: </a><font color="#A020F0">#endif</font>
+<a name="line111">111: </a>  }
+<a name="line112">112: </a>  <font color="#4169E1">return</font>(0);
+<a name="line113">113: </a>}
+
+</pre>
+</body>
+
+</html>

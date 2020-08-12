@@ -1,0 +1,813 @@
+<center><a href="epssolve.c">Actual source code: epssolve.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/interface/epssolve.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:51+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/interface/epssolve.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> routines related to the solution process</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+<a name="line16"> 16: </a><font color="#A020F0">#include &lt;petscdraw.h&gt;</font>
+
+<a name="line18"> 18: </a><strong><font color="#4169E1"><a name="EPSComputeVectors"></a>PetscErrorCode EPSComputeVectors(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line19"> 19: </a>{
+
+<a name="line23"> 23: </a>  EPSCheckSolved(eps,1);
+<a name="line24"> 24: </a>  <font color="#4169E1">if</font> (eps-&gt;state==EPS_STATE_SOLVED &amp;&amp; eps-&gt;ops-&gt;computevectors) {
+<a name="line25"> 25: </a>    (*eps-&gt;ops-&gt;computevectors)(eps);
+<a name="line26"> 26: </a>  }
+<a name="line27"> 27: </a>  eps-&gt;state = EPS_STATE_EIGENVECTORS;
+<a name="line28"> 28: </a>  <font color="#4169E1">return</font>(0);
+<a name="line29"> 29: </a>}
+
+<a name="line31"> 31: </a><strong><font color="#228B22">#define SWAP(a,b,t) {t=a;a=b;b=t;}</font></strong>
+
+<a name="line33"> 33: </a><strong><font color="#4169E1"><a name="EPSComputeValues"></a>static PetscErrorCode EPSComputeValues(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line34"> 34: </a>{
+<a name="line36"> 36: </a>  PetscBool      injective,iscomp,isfilter;
+<a name="line37"> 37: </a>  PetscInt       i,n,aux,nconv0;
+<a name="line38"> 38: </a>  Mat            A,B=NULL,G,Z;
+
+<a name="line41"> 41: </a>  <font color="#4169E1">switch</font> (eps-&gt;categ) {
+<a name="line42"> 42: </a>    <font color="#4169E1">case</font> EPS_CATEGORY_KRYLOV:
+<a name="line43"> 43: </a>    <font color="#4169E1">case</font> EPS_CATEGORY_OTHER:
+<a name="line44"> 44: </a>      <a href="../../../docs/manualpages/ST/STIsInjective.html#STIsInjective">STIsInjective</a>(eps-&gt;st,&amp;injective);
+<a name="line45"> 45: </a>      <font color="#4169E1">if</font> (injective) {
+<a name="line46"> 46: </a>        <font color="#B22222">/* one-to-one mapping: backtransform eigenvalues */</font>
+<a name="line47"> 47: </a>        <font color="#4169E1">if</font> (eps-&gt;ops-&gt;backtransform) {
+<a name="line48"> 48: </a>          (*eps-&gt;ops-&gt;backtransform)(eps);
+<a name="line49"> 49: </a>        } <font color="#4169E1">else</font> SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_PLIB,<font color="#666666">"Internal error, spectral transform should have a backtransform operation"</font>);
+<a name="line50"> 50: </a>      } <font color="#4169E1">else</font> {
+<a name="line51"> 51: </a>        <font color="#B22222">/* compute eigenvalues from Rayleigh quotient */</font>
+<a name="line52"> 52: </a>        <a href="../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(eps-&gt;ds,&amp;n,NULL,NULL,NULL,NULL);
+<a name="line53"> 53: </a>        <font color="#4169E1">if</font> (!n) <font color="#4169E1">break</font>;
+<a name="line54"> 54: </a>        <a href="../../../docs/manualpages/EPS/EPSGetOperators.html#EPSGetOperators">EPSGetOperators</a>(eps,&amp;A,&amp;B);
+<a name="line55"> 55: </a>        <a href="../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,n);
+<a name="line56"> 56: </a>        <a href="../../../docs/manualpages/DS/DSGetCompact.html#DSGetCompact">DSGetCompact</a>(eps-&gt;ds,&amp;iscomp);
+<a name="line57"> 57: </a>        <a href="../../../docs/manualpages/DS/DSSetCompact.html#DSSetCompact">DSSetCompact</a>(eps-&gt;ds,PETSC_FALSE);
+<a name="line58"> 58: </a>        <a href="../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;G);
+<a name="line59"> 59: </a>        <a href="../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(eps-&gt;V,A,eps-&gt;V,G);
+<a name="line60"> 60: </a>        <a href="../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;G);
+<a name="line61"> 61: </a>        <font color="#4169E1">if</font> (B) {
+<a name="line62"> 62: </a>          <a href="../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>,&amp;G);
+<a name="line63"> 63: </a>          <a href="../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(eps-&gt;V,B,eps-&gt;V,G);
+<a name="line64"> 64: </a>          <a href="../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;G);
+<a name="line65"> 65: </a>        }
+<a name="line66"> 66: </a>        <a href="../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;ds,eps-&gt;eigr,eps-&gt;eigi);
+<a name="line67"> 67: </a>        <a href="../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;ds,eps-&gt;eigr,eps-&gt;eigi,NULL,NULL,NULL);
+<a name="line68"> 68: </a>        <a href="../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;ds,eps-&gt;eigr,eps-&gt;eigi);
+<a name="line69"> 69: </a>        <a href="../../../docs/manualpages/DS/DSSetCompact.html#DSSetCompact">DSSetCompact</a>(eps-&gt;ds,iscomp);
+<a name="line70"> 70: </a>        <font color="#4169E1">if</font> (eps-&gt;ishermitian &amp;&amp; (!eps-&gt;isgeneralized || eps-&gt;ispositive)) { <font color="#B22222">/* V = V * Z */</font>
+<a name="line71"> 71: </a>          <a href="../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line72"> 72: </a>          <a href="../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;Z);
+<a name="line73"> 73: </a>          <a href="../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;V,Z,0,n);
+<a name="line74"> 74: </a>          MatDestroy(&amp;Z);
+<a name="line75"> 75: </a>        }
+<a name="line76"> 76: </a>        <font color="#B22222">/* in case of STFILTER discard computed eigenvalues that lie outside the wanted interval */</font>
+<a name="line77"> 77: </a>        PetscObjectTypeCompare((PetscObject)eps-&gt;st,STFILTER,&amp;isfilter);
+<a name="line78"> 78: </a>        <font color="#4169E1">if</font> (isfilter) {
+<a name="line79"> 79: </a>          nconv0 = eps-&gt;nconv;
+<a name="line80"> 80: </a>          <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv;i++) {
+<a name="line81"> 81: </a>            <font color="#4169E1">if</font> (PetscRealPart(eps-&gt;eigr[eps-&gt;perm[i]])&lt;eps-&gt;inta || PetscRealPart(eps-&gt;eigr[eps-&gt;perm[i]])&gt;eps-&gt;intb) {
+<a name="line82"> 82: </a>              eps-&gt;nconv--;
+<a name="line83"> 83: </a>              <font color="#4169E1">if</font> (i&lt;eps-&gt;nconv) { SWAP(eps-&gt;perm[i],eps-&gt;perm[eps-&gt;nconv],aux); i--; }
+<a name="line84"> 84: </a>            }
+<a name="line85"> 85: </a>          }
+<a name="line86"> 86: </a>          <font color="#4169E1">if</font> (nconv0&gt;eps-&gt;nconv) {
+<a name="line87"> 87: </a>            PetscInfo1(eps,<font color="#666666">"Discarded %D computed eigenvalues lying outside the interval\n"</font>,nconv0-eps-&gt;nconv);
+<a name="line88"> 88: </a>          }
+<a name="line89"> 89: </a>        }
+<a name="line90"> 90: </a>      }
+<a name="line91"> 91: </a>      <font color="#4169E1">break</font>;
+<a name="line92"> 92: </a>    <font color="#4169E1">case</font> EPS_CATEGORY_PRECOND:
+<a name="line93"> 93: </a>    <font color="#4169E1">case</font> EPS_CATEGORY_CONTOUR:
+<a name="line94"> 94: </a>      <font color="#B22222">/* eigenvalues already available as an output of the solver */</font>
+<a name="line95"> 95: </a>      <font color="#4169E1">break</font>;
+<a name="line96"> 96: </a>  }
+<a name="line97"> 97: </a>  <font color="#4169E1">return</font>(0);
+<a name="line98"> 98: </a>}
+
+<a name="line100">100: </a><font color="#B22222">/*@</font>
+<a name="line101">101: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a> - Solves the eigensystem.</font>
+
+<a name="line103">103: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line105">105: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line106">106: </a><font color="#B22222">.  eps - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+
+<a name="line108">108: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line109">109: </a><font color="#B22222">+  -eps_view - print information about the solver used</font>
+<a name="line110">110: </a><font color="#B22222">.  -eps_view_mat0 binary - save the first matrix (A) to the default binary viewer</font>
+<a name="line111">111: </a><font color="#B22222">.  -eps_view_mat1 binary - save the second matrix (B) to the default binary viewer</font>
+<a name="line112">112: </a><font color="#B22222">.  -eps_view_vectors binary - save the computed eigenvectors to the default binary viewer</font>
+<a name="line113">113: </a><font color="#B22222">.  -eps_view_values - print computed eigenvalues</font>
+<a name="line114">114: </a><font color="#B22222">.  -eps_converged_reason - print reason for convergence, and number of iterations</font>
+<a name="line115">115: </a><font color="#B22222">.  -eps_error_absolute - print absolute errors of each eigenpair</font>
+<a name="line116">116: </a><font color="#B22222">.  -eps_error_relative - print relative errors of each eigenpair</font>
+<a name="line117">117: </a><font color="#B22222">-  -eps_error_backward - print backward errors of each eigenpair</font>
+
+<a name="line119">119: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line121">121: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(), <a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>(), <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(), <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>()</font>
+<a name="line122">122: </a><font color="#B22222">@*/</font>
+<a name="line123">123: </a><strong><font color="#4169E1"><a name="EPSSolve"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line124">124: </a>{
+<a name="line126">126: </a>  PetscInt       i;
+<a name="line127">127: </a>  <a href="../../../docs/manualpages/ST/STMatMode.html#STMatMode">STMatMode</a>      matmode;
+<a name="line128">128: </a>  Mat            A,B;
+
+<a name="line132">132: </a>  <font color="#4169E1">if</font> (eps-&gt;state&gt;=EPS_STATE_SOLVED) <font color="#4169E1">return</font>(0);
+<a name="line133">133: </a>  PetscLogEventBegin(EPS_Solve,eps,0,0,0);
+
+<a name="line135">135: </a>  <font color="#B22222">/* call setup */</font>
+<a name="line136">136: </a>  <a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>(eps);
+<a name="line137">137: </a>  eps-&gt;nconv = 0;
+<a name="line138">138: </a>  eps-&gt;its   = 0;
+<a name="line139">139: </a>  <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;ncv;i++) {
+<a name="line140">140: </a>    eps-&gt;eigr[i]   = 0.0;
+<a name="line141">141: </a>    eps-&gt;eigi[i]   = 0.0;
+<a name="line142">142: </a>    eps-&gt;errest[i] = 0.0;
+<a name="line143">143: </a>    eps-&gt;perm[i]   = i;
+<a name="line144">144: </a>  }
+<a name="line145">145: </a>  <a href="../../../docs/manualpages/EPS/EPSViewFromOptions.html#EPSViewFromOptions">EPSViewFromOptions</a>(eps,NULL,<font color="#666666">"-eps_view_pre"</font>);
+<a name="line146">146: </a>  <a href="../../../docs/manualpages/RG/RGViewFromOptions.html#RGViewFromOptions">RGViewFromOptions</a>(eps-&gt;rg,NULL,<font color="#666666">"-rg_view"</font>);
+
+<a name="line148">148: </a>  <font color="#B22222">/* call solver */</font>
+<a name="line149">149: </a>  (*eps-&gt;ops-&gt;solve)(eps);
+<a name="line150">150: </a>  eps-&gt;state = EPS_STATE_SOLVED;
+
+<a name="line152">152: </a>  <a href="../../../docs/manualpages/ST/STGetMatMode.html#STGetMatMode">STGetMatMode</a>(eps-&gt;st,&amp;matmode);
+<a name="line153">153: </a>  <font color="#4169E1">if</font> (matmode == <a href="../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_INPLACE</a> &amp;&amp; eps-&gt;ispositive) {
+<a name="line154">154: </a>    <font color="#B22222">/* Purify eigenvectors before reverting operator */</font>
+<a name="line155">155: </a>    EPSComputeVectors(eps);
+<a name="line156">156: </a>  }
+<a name="line157">157: </a>  <a href="../../../docs/manualpages/ST/STPostSolve.html#STPostSolve">STPostSolve</a>(eps-&gt;st);
+
+<a name="line159">159: </a>  <font color="#4169E1">if</font> (!eps-&gt;reason) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_PLIB,<font color="#666666">"Internal error, solver returned without setting converged reason"</font>);
+
+<a name="line161">161: </a>  <font color="#B22222">/* Map eigenvalues back to the original problem if appropriate */</font>
+<a name="line162">162: </a>  EPSComputeValues(eps);
+
+<a name="line164">164: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line165">165: </a>  <font color="#B22222">/* reorder conjugate eigenvalues (positive imaginary first) */</font>
+<a name="line166">166: </a>  <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv-1;i++) {
+<a name="line167">167: </a>    <font color="#4169E1">if</font> (eps-&gt;eigi[i] != 0) {
+<a name="line168">168: </a>      <font color="#4169E1">if</font> (eps-&gt;eigi[i] &lt; 0) {
+<a name="line169">169: </a>        eps-&gt;eigi[i] = -eps-&gt;eigi[i];
+<a name="line170">170: </a>        eps-&gt;eigi[i+1] = -eps-&gt;eigi[i+1];
+<a name="line171">171: </a>        <font color="#B22222">/* the next correction only works with eigenvectors */</font>
+<a name="line172">172: </a>        EPSComputeVectors(eps);
+<a name="line173">173: </a>        <a href="../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;V,i+1,-1.0);
+<a name="line174">174: </a>      }
+<a name="line175">175: </a>      i++;
+<a name="line176">176: </a>    }
+<a name="line177">177: </a>  }
+<a name="line178">178: </a><font color="#A020F0">#endif</font>
+
+<a name="line180">180: </a>  <font color="#B22222">/* sort eigenvalues according to eps-&gt;which parameter */</font>
+<a name="line181">181: </a>  <a href="../../../docs/manualpages/sys/SlepcSortEigenvalues.html#SlepcSortEigenvalues">SlepcSortEigenvalues</a>(eps-&gt;sc,eps-&gt;nconv,eps-&gt;eigr,eps-&gt;eigi,eps-&gt;perm);
+<a name="line182">182: </a>  PetscLogEventEnd(EPS_Solve,eps,0,0,0);
+
+<a name="line184">184: </a>  <font color="#B22222">/* various viewers */</font>
+<a name="line185">185: </a>  <a href="../../../docs/manualpages/EPS/EPSViewFromOptions.html#EPSViewFromOptions">EPSViewFromOptions</a>(eps,NULL,<font color="#666666">"-eps_view"</font>);
+<a name="line186">186: </a>  <a href="../../../docs/manualpages/EPS/EPSReasonViewFromOptions.html#EPSReasonViewFromOptions">EPSReasonViewFromOptions</a>(eps);
+<a name="line187">187: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorViewFromOptions.html#EPSErrorViewFromOptions">EPSErrorViewFromOptions</a>(eps);
+<a name="line188">188: </a>  <a href="../../../docs/manualpages/EPS/EPSValuesViewFromOptions.html#EPSValuesViewFromOptions">EPSValuesViewFromOptions</a>(eps);
+<a name="line189">189: </a>  <a href="../../../docs/manualpages/EPS/EPSVectorsViewFromOptions.html#EPSVectorsViewFromOptions">EPSVectorsViewFromOptions</a>(eps);
+<a name="line190">190: </a>  <a href="../../../docs/manualpages/EPS/EPSGetOperators.html#EPSGetOperators">EPSGetOperators</a>(eps,&amp;A,&amp;B);
+<a name="line191">191: </a>  MatViewFromOptions(A,(PetscObject)eps,<font color="#666666">"-eps_view_mat0"</font>);
+<a name="line192">192: </a>  <font color="#4169E1">if</font> (eps-&gt;isgeneralized) {
+<a name="line193">193: </a>    MatViewFromOptions(B,(PetscObject)eps,<font color="#666666">"-eps_view_mat1"</font>);
+<a name="line194">194: </a>  }
+
+<a name="line196">196: </a>  <font color="#B22222">/* Remove deflation and initial subspaces */</font>
+<a name="line197">197: </a>  <font color="#4169E1">if</font> (eps-&gt;nds) {
+<a name="line198">198: </a>    <a href="../../../docs/manualpages/BV/BVSetNumConstraints.html#BVSetNumConstraints">BVSetNumConstraints</a>(eps-&gt;V,0);
+<a name="line199">199: </a>    eps-&gt;nds = 0;
+<a name="line200">200: </a>  }
+<a name="line201">201: </a>  eps-&gt;nini = 0;
+<a name="line202">202: </a>  <font color="#4169E1">return</font>(0);
+<a name="line203">203: </a>}
+
+<a name="line205">205: </a><font color="#B22222">/*@</font>
+<a name="line206">206: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetIterationNumber.html#EPSGetIterationNumber">EPSGetIterationNumber</a> - Gets the current iteration number. If the</font>
+<a name="line207">207: </a><font color="#B22222">   call to <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>() is complete, then it returns the number of iterations</font>
+<a name="line208">208: </a><font color="#B22222">   carried out by the solution method.</font>
+
+<a name="line210">210: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line212">212: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line213">213: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line215">215: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line216">216: </a><font color="#B22222">.  its - number of iterations</font>
+
+<a name="line218">218: </a><font color="#B22222">   Note:</font>
+<a name="line219">219: </a><font color="#B22222">   During the i-th iteration this call returns i-1. If <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>() is</font>
+<a name="line220">220: </a><font color="#B22222">   complete, then parameter "its" contains either the iteration number at</font>
+<a name="line221">221: </a><font color="#B22222">   which convergence was successfully reached, or failure was detected.</font>
+<a name="line222">222: </a><font color="#B22222">   Call <a href="../../../docs/manualpages/EPS/EPSGetConvergedReason.html#EPSGetConvergedReason">EPSGetConvergedReason</a>() to determine if the solver converged or</font>
+<a name="line223">223: </a><font color="#B22222">   failed and why.</font>
+
+<a name="line225">225: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line227">227: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetConvergedReason.html#EPSGetConvergedReason">EPSGetConvergedReason</a>(), <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>()</font>
+<a name="line228">228: </a><font color="#B22222">@*/</font>
+<a name="line229">229: </a><strong><font color="#4169E1"><a name="EPSGetIterationNumber"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetIterationNumber.html#EPSGetIterationNumber">EPSGetIterationNumber</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *its)</font></strong>
+<a name="line230">230: </a>{
+<a name="line234">234: </a>  *its = eps-&gt;its;
+<a name="line235">235: </a>  <font color="#4169E1">return</font>(0);
+<a name="line236">236: </a>}
+
+<a name="line238">238: </a><font color="#B22222">/*@</font>
+<a name="line239">239: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a> - Gets the number of converged eigenpairs.</font>
+
+<a name="line241">241: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line243">243: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line244">244: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line246">246: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line247">247: </a><font color="#B22222">.  nconv - number of converged eigenpairs</font>
+
+<a name="line249">249: </a><font color="#B22222">   Note:</font>
+<a name="line250">250: </a><font color="#B22222">   This function should be called after <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>() has finished.</font>
+
+<a name="line252">252: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line254">254: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(), <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>()</font>
+<a name="line255">255: </a><font color="#B22222">@*/</font>
+<a name="line256">256: </a><strong><font color="#4169E1"><a name="EPSGetConverged"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *nconv)</font></strong>
+<a name="line257">257: </a>{
+<a name="line261">261: </a>  EPSCheckSolved(eps,1);
+<a name="line262">262: </a>  *nconv = eps-&gt;nconv;
+<a name="line263">263: </a>  <font color="#4169E1">return</font>(0);
+<a name="line264">264: </a>}
+
+<a name="line266">266: </a><font color="#B22222">/*@</font>
+<a name="line267">267: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetConvergedReason.html#EPSGetConvergedReason">EPSGetConvergedReason</a> - Gets the reason why the <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>() iteration was</font>
+<a name="line268">268: </a><font color="#B22222">   stopped.</font>
+
+<a name="line270">270: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line272">272: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line273">273: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line275">275: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line276">276: </a><font color="#B22222">.  reason - negative value indicates diverged, positive value converged</font>
+
+<a name="line278">278: </a><font color="#B22222">   Notes:</font>
+<a name="line279">279: </a><font color="#B22222">   Possible values for reason are</font>
+<a name="line280">280: </a><font color="#B22222">+  <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_TOL</a> - converged up to tolerance</font>
+<a name="line281">281: </a><font color="#B22222">.  <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_USER</a> - converged due to a user-defined condition</font>
+<a name="line282">282: </a><font color="#B22222">.  <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_ITS</a> - required more than max_it iterations to reach convergence</font>
+<a name="line283">283: </a><font color="#B22222">.  <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_BREAKDOWN</a> - generic breakdown in method</font>
+<a name="line284">284: </a><font color="#B22222">-  <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_SYMMETRY_LOST</a> - pseudo-Lanczos was not able to keep symmetry</font>
+
+<a name="line286">286: </a><font color="#B22222">   Can only be called after the call to <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>() is complete.</font>
+
+<a name="line288">288: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line290">290: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(), <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(), <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a></font>
+<a name="line291">291: </a><font color="#B22222">@*/</font>
+<a name="line292">292: </a><strong><font color="#4169E1"><a name="EPSGetConvergedReason"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetConvergedReason.html#EPSGetConvergedReason">EPSGetConvergedReason</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a> *reason)</font></strong>
+<a name="line293">293: </a>{
+<a name="line297">297: </a>  EPSCheckSolved(eps,1);
+<a name="line298">298: </a>  *reason = eps-&gt;reason;
+<a name="line299">299: </a>  <font color="#4169E1">return</font>(0);
+<a name="line300">300: </a>}
+
+<a name="line302">302: </a><font color="#B22222">/*@</font>
+<a name="line303">303: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetInvariantSubspace.html#EPSGetInvariantSubspace">EPSGetInvariantSubspace</a> - Gets an orthonormal basis of the computed invariant</font>
+<a name="line304">304: </a><font color="#B22222">   subspace.</font>
+
+<a name="line306">306: </a><font color="#B22222">   Not Collective, but vectors are shared by all processors that share the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a></font>
+
+<a name="line308">308: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line309">309: </a><font color="#B22222">.  eps - the eigensolver context</font>
+
+<a name="line311">311: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line312">312: </a><font color="#B22222">.  v - an array of vectors</font>
+
+<a name="line314">314: </a><font color="#B22222">   Notes:</font>
+<a name="line315">315: </a><font color="#B22222">   This function should be called after <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>() has finished.</font>
+
+<a name="line317">317: </a><font color="#B22222">   The user should provide in v an array of nconv vectors, where nconv is</font>
+<a name="line318">318: </a><font color="#B22222">   the value returned by <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>().</font>
+
+<a name="line320">320: </a><font color="#B22222">   The first k vectors returned in v span an invariant subspace associated</font>
+<a name="line321">321: </a><font color="#B22222">   with the first k computed eigenvalues (note that this is not true if the</font>
+<a name="line322">322: </a><font color="#B22222">   k-th eigenvalue is complex and matrix A is real; in this case the first</font>
+<a name="line323">323: </a><font color="#B22222">   k+1 vectors should be used). An invariant subspace X of A satisfies Ax</font>
+<a name="line324">324: </a><font color="#B22222">   in X for all x in X (a similar definition applies for generalized</font>
+<a name="line325">325: </a><font color="#B22222">   eigenproblems).</font>
+
+<a name="line327">327: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line329">329: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(), <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(), <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>()</font>
+<a name="line330">330: </a><font color="#B22222">@*/</font>
+<a name="line331">331: </a><strong><font color="#4169E1"><a name="EPSGetInvariantSubspace"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetInvariantSubspace.html#EPSGetInvariantSubspace">EPSGetInvariantSubspace</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,Vec v[])</font></strong>
+<a name="line332">332: </a>{
+<a name="line334">334: </a>  PetscInt       i;
+<a name="line335">335: </a>  <a href="../../../docs/manualpages/BV/BV.html#BV">BV</a>             V=eps-&gt;V;
+<a name="line336">336: </a>  Vec            w;
+
+<a name="line342">342: </a>  EPSCheckSolved(eps,1);
+<a name="line343">343: </a>  <font color="#4169E1">if</font> (!eps-&gt;ishermitian &amp;&amp; eps-&gt;state==EPS_STATE_EIGENVECTORS) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSGetInvariantSubspace.html#EPSGetInvariantSubspace">EPSGetInvariantSubspace</a> must be called before <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>,<a href="../../../docs/manualpages/EPS/EPSGetEigenvector.html#EPSGetEigenvector">EPSGetEigenvector</a> or <a href="../../../docs/manualpages/EPS/EPSComputeError.html#EPSComputeError">EPSComputeError</a>"</font>);
+<a name="line344">344: </a>  <font color="#4169E1">if</font> (eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D) {
+<a name="line345">345: </a>    <a href="../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(eps-&gt;V,eps-&gt;nconv,&amp;V);
+<a name="line346">346: </a>    <a href="../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,eps-&gt;nconv);
+<a name="line347">347: </a>    <a href="../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(eps-&gt;V,V);
+<a name="line348">348: </a>    <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv;i++) {
+<a name="line349">349: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,i,&amp;w);
+<a name="line350">350: </a>      VecPointwiseDivide(w,w,eps-&gt;D);
+<a name="line351">351: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,i,&amp;w);
+<a name="line352">352: </a>    }
+<a name="line353">353: </a>    <a href="../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(V,NULL);
+<a name="line354">354: </a>  }
+<a name="line355">355: </a>  <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv;i++) {
+<a name="line356">356: </a>    <a href="../../../docs/manualpages/BV/BVCopyVec.html#BVCopyVec">BVCopyVec</a>(V,i,v[i]);
+<a name="line357">357: </a>  }
+<a name="line358">358: </a>  <font color="#4169E1">if</font> (eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D) {
+<a name="line359">359: </a>    <a href="../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;V);
+<a name="line360">360: </a>  }
+<a name="line361">361: </a>  <font color="#4169E1">return</font>(0);
+<a name="line362">362: </a>}
+
+<a name="line364">364: </a><font color="#B22222">/*@C</font>
+<a name="line365">365: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a> - Gets the i-th solution of the eigenproblem as computed by</font>
+<a name="line366">366: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(). The solution consists in both the eigenvalue and the eigenvector.</font>
+
+<a name="line368">368: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line370">370: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line371">371: </a><font color="#B22222">+  eps - eigensolver context</font>
+<a name="line372">372: </a><font color="#B22222">-  i   - index of the solution</font>
+
+<a name="line374">374: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line375">375: </a><font color="#B22222">+  eigr - real part of eigenvalue</font>
+<a name="line376">376: </a><font color="#B22222">.  eigi - imaginary part of eigenvalue</font>
+<a name="line377">377: </a><font color="#B22222">.  Vr   - real part of eigenvector</font>
+<a name="line378">378: </a><font color="#B22222">-  Vi   - imaginary part of eigenvector</font>
+
+<a name="line380">380: </a><font color="#B22222">   Notes:</font>
+<a name="line381">381: </a><font color="#B22222">   It is allowed to pass NULL for Vr and Vi, if the eigenvector is not</font>
+<a name="line382">382: </a><font color="#B22222">   required. Otherwise, the caller must provide valid Vec objects, i.e.,</font>
+<a name="line383">383: </a><font color="#B22222">   they must be created by the calling program with e.g. MatCreateVecs().</font>
+
+<a name="line385">385: </a><font color="#B22222">   If the eigenvalue is real, then eigi and Vi are set to zero. If PETSc is</font>
+<a name="line386">386: </a><font color="#B22222">   configured with complex scalars the eigenvalue is stored</font>
+<a name="line387">387: </a><font color="#B22222">   directly in eigr (eigi is set to zero) and the eigenvector in Vr (Vi is</font>
+<a name="line388">388: </a><font color="#B22222">   set to zero). In both cases, the user can pass NULL in eigi and Vi.</font>
+
+<a name="line390">390: </a><font color="#B22222">   The index i should be a value between 0 and nconv-1 (see <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>()).</font>
+<a name="line391">391: </a><font color="#B22222">   Eigenpairs are indexed according to the ordering criterion established</font>
+<a name="line392">392: </a><font color="#B22222">   with <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>().</font>
+
+<a name="line394">394: </a><font color="#B22222">   The 2-norm of the eigenvector is one unless the problem is generalized</font>
+<a name="line395">395: </a><font color="#B22222">   Hermitian. In this case the eigenvector is normalized with respect to the</font>
+<a name="line396">396: </a><font color="#B22222">   norm defined by the B matrix.</font>
+
+<a name="line398">398: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line400">400: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetEigenvalue.html#EPSGetEigenvalue">EPSGetEigenvalue</a>(), <a href="../../../docs/manualpages/EPS/EPSGetEigenvector.html#EPSGetEigenvector">EPSGetEigenvector</a>(), <a href="../../../docs/manualpages/EPS/EPSGetLeftEigenvector.html#EPSGetLeftEigenvector">EPSGetLeftEigenvector</a>(), <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(),</font>
+<a name="line401">401: </a><font color="#B22222">          <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(), <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(), <a href="../../../docs/manualpages/EPS/EPSGetInvariantSubspace.html#EPSGetInvariantSubspace">EPSGetInvariantSubspace</a>()</font>
+<a name="line402">402: </a><font color="#B22222">@*/</font>
+<a name="line403">403: </a><strong><font color="#4169E1"><a name="EPSGetEigenpair"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,PetscScalar *eigr,PetscScalar *eigi,Vec Vr,Vec Vi)</font></strong>
+<a name="line404">404: </a>{
+
+<a name="line410">410: </a>  EPSCheckSolved(eps,1);
+<a name="line411">411: </a>  <font color="#4169E1">if</font> (i&lt;0 || i&gt;=eps-&gt;nconv) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument 2 out of range"</font>);
+<a name="line412">412: </a>  <a href="../../../docs/manualpages/EPS/EPSGetEigenvalue.html#EPSGetEigenvalue">EPSGetEigenvalue</a>(eps,i,eigr,eigi);
+<a name="line413">413: </a>  <font color="#4169E1">if</font> (Vr || Vi) { <a href="../../../docs/manualpages/EPS/EPSGetEigenvector.html#EPSGetEigenvector">EPSGetEigenvector</a>(eps,i,Vr,Vi); }
+<a name="line414">414: </a>  <font color="#4169E1">return</font>(0);
+<a name="line415">415: </a>}
+
+<a name="line417">417: </a><font color="#B22222">/*@C</font>
+<a name="line418">418: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetEigenvalue.html#EPSGetEigenvalue">EPSGetEigenvalue</a> - Gets the i-th eigenvalue as computed by <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>().</font>
+
+<a name="line420">420: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line422">422: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line423">423: </a><font color="#B22222">+  eps - eigensolver context</font>
+<a name="line424">424: </a><font color="#B22222">-  i   - index of the solution</font>
+
+<a name="line426">426: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line427">427: </a><font color="#B22222">+  eigr - real part of eigenvalue</font>
+<a name="line428">428: </a><font color="#B22222">-  eigi - imaginary part of eigenvalue</font>
+
+<a name="line430">430: </a><font color="#B22222">   Notes:</font>
+<a name="line431">431: </a><font color="#B22222">   If the eigenvalue is real, then eigi is set to zero. If PETSc is</font>
+<a name="line432">432: </a><font color="#B22222">   configured with complex scalars the eigenvalue is stored</font>
+<a name="line433">433: </a><font color="#B22222">   directly in eigr (eigi is set to zero).</font>
+
+<a name="line435">435: </a><font color="#B22222">   The index i should be a value between 0 and nconv-1 (see <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>()).</font>
+<a name="line436">436: </a><font color="#B22222">   Eigenpairs are indexed according to the ordering criterion established</font>
+<a name="line437">437: </a><font color="#B22222">   with <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>().</font>
+
+<a name="line439">439: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line441">441: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(), <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(), <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(), <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>()</font>
+<a name="line442">442: </a><font color="#B22222">@*/</font>
+<a name="line443">443: </a><strong><font color="#4169E1"><a name="EPSGetEigenvalue"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetEigenvalue.html#EPSGetEigenvalue">EPSGetEigenvalue</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line444">444: </a>{
+<a name="line445">445: </a>  PetscInt k;
+
+<a name="line449">449: </a>  EPSCheckSolved(eps,1);
+<a name="line450">450: </a>  <font color="#4169E1">if</font> (i&lt;0 || i&gt;=eps-&gt;nconv) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument 2 out of range"</font>);
+<a name="line451">451: </a>  k = eps-&gt;perm[i];
+<a name="line452">452: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line453">453: </a>  <font color="#4169E1">if</font> (eigr) *eigr = eps-&gt;eigr[k];
+<a name="line454">454: </a>  <font color="#4169E1">if</font> (eigi) *eigi = 0;
+<a name="line455">455: </a><font color="#A020F0">#else</font>
+<a name="line456">456: </a>  <font color="#4169E1">if</font> (eigr) *eigr = eps-&gt;eigr[k];
+<a name="line457">457: </a>  <font color="#4169E1">if</font> (eigi) *eigi = eps-&gt;eigi[k];
+<a name="line458">458: </a><font color="#A020F0">#endif</font>
+<a name="line459">459: </a>  <font color="#4169E1">return</font>(0);
+<a name="line460">460: </a>}
+
+<a name="line462">462: </a><font color="#B22222">/*@</font>
+<a name="line463">463: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetEigenvector.html#EPSGetEigenvector">EPSGetEigenvector</a> - Gets the i-th right eigenvector as computed by <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>().</font>
+
+<a name="line465">465: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line467">467: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line468">468: </a><font color="#B22222">+  eps - eigensolver context</font>
+<a name="line469">469: </a><font color="#B22222">-  i   - index of the solution</font>
+
+<a name="line471">471: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line472">472: </a><font color="#B22222">+  Vr   - real part of eigenvector</font>
+<a name="line473">473: </a><font color="#B22222">-  Vi   - imaginary part of eigenvector</font>
+
+<a name="line475">475: </a><font color="#B22222">   Notes:</font>
+<a name="line476">476: </a><font color="#B22222">   The caller must provide valid Vec objects, i.e., they must be created</font>
+<a name="line477">477: </a><font color="#B22222">   by the calling program with e.g. MatCreateVecs().</font>
+
+<a name="line479">479: </a><font color="#B22222">   If the corresponding eigenvalue is real, then Vi is set to zero. If PETSc is</font>
+<a name="line480">480: </a><font color="#B22222">   configured with complex scalars the eigenvector is stored</font>
+<a name="line481">481: </a><font color="#B22222">   directly in Vr (Vi is set to zero). In any case, the user can pass NULL in Vr</font>
+<a name="line482">482: </a><font color="#B22222">   or Vi if one of them is not required.</font>
+
+<a name="line484">484: </a><font color="#B22222">   The index i should be a value between 0 and nconv-1 (see <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>()).</font>
+<a name="line485">485: </a><font color="#B22222">   Eigenpairs are indexed according to the ordering criterion established</font>
+<a name="line486">486: </a><font color="#B22222">   with <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>().</font>
+
+<a name="line488">488: </a><font color="#B22222">   The 2-norm of the eigenvector is one unless the problem is generalized</font>
+<a name="line489">489: </a><font color="#B22222">   Hermitian. In this case the eigenvector is normalized with respect to the</font>
+<a name="line490">490: </a><font color="#B22222">   norm defined by the B matrix.</font>
+
+<a name="line492">492: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line494">494: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(), <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(), <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(), <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(), <a href="../../../docs/manualpages/EPS/EPSGetLeftEigenvector.html#EPSGetLeftEigenvector">EPSGetLeftEigenvector</a>()</font>
+<a name="line495">495: </a><font color="#B22222">@*/</font>
+<a name="line496">496: </a><strong><font color="#4169E1"><a name="EPSGetEigenvector"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetEigenvector.html#EPSGetEigenvector">EPSGetEigenvector</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,Vec Vr,Vec Vi)</font></strong>
+<a name="line497">497: </a>{
+<a name="line499">499: </a>  PetscInt       k;
+
+<a name="line506">506: </a>  EPSCheckSolved(eps,1);
+<a name="line507">507: </a>  <font color="#4169E1">if</font> (i&lt;0 || i&gt;=eps-&gt;nconv) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument 2 out of range"</font>);
+<a name="line508">508: </a>  EPSComputeVectors(eps);
+<a name="line509">509: </a>  k = eps-&gt;perm[i];
+<a name="line510">510: </a>  BV_GetEigenvector(eps-&gt;V,k,eps-&gt;eigi[k],Vr,Vi);
+<a name="line511">511: </a>  <font color="#4169E1">return</font>(0);
+<a name="line512">512: </a>}
+
+<a name="line514">514: </a><font color="#B22222">/*@</font>
+<a name="line515">515: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetLeftEigenvector.html#EPSGetLeftEigenvector">EPSGetLeftEigenvector</a> - Gets the i-th left eigenvector as computed by <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>().</font>
+
+<a name="line517">517: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line519">519: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line520">520: </a><font color="#B22222">+  eps - eigensolver context</font>
+<a name="line521">521: </a><font color="#B22222">-  i   - index of the solution</font>
+
+<a name="line523">523: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line524">524: </a><font color="#B22222">+  Wr   - real part of left eigenvector</font>
+<a name="line525">525: </a><font color="#B22222">-  Wi   - imaginary part of left eigenvector</font>
+
+<a name="line527">527: </a><font color="#B22222">   Notes:</font>
+<a name="line528">528: </a><font color="#B22222">   The caller must provide valid Vec objects, i.e., they must be created</font>
+<a name="line529">529: </a><font color="#B22222">   by the calling program with e.g. MatCreateVecs().</font>
+
+<a name="line531">531: </a><font color="#B22222">   If the corresponding eigenvalue is real, then Wi is set to zero. If PETSc is</font>
+<a name="line532">532: </a><font color="#B22222">   configured with complex scalars the eigenvector is stored directly in Wr</font>
+<a name="line533">533: </a><font color="#B22222">   (Wi is set to zero). In any case, the user can pass NULL in Wr or Wi if</font>
+<a name="line534">534: </a><font color="#B22222">   one of them is not required.</font>
+
+<a name="line536">536: </a><font color="#B22222">   The index i should be a value between 0 and nconv-1 (see <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>()).</font>
+<a name="line537">537: </a><font color="#B22222">   Eigensolutions are indexed according to the ordering criterion established</font>
+<a name="line538">538: </a><font color="#B22222">   with <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>().</font>
+
+<a name="line540">540: </a><font color="#B22222">   Left eigenvectors are available only if the twosided flag was set, see</font>
+<a name="line541">541: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>().</font>
+
+<a name="line543">543: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line545">545: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSGetEigenvector.html#EPSGetEigenvector">EPSGetEigenvector</a>(), <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(), <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(), <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>()</font>
+<a name="line546">546: </a><font color="#B22222">@*/</font>
+<a name="line547">547: </a><strong><font color="#4169E1"><a name="EPSGetLeftEigenvector"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetLeftEigenvector.html#EPSGetLeftEigenvector">EPSGetLeftEigenvector</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,Vec Wr,Vec Wi)</font></strong>
+<a name="line548">548: </a>{
+<a name="line550">550: </a>  PetscInt       k;
+
+<a name="line557">557: </a>  EPSCheckSolved(eps,1);
+<a name="line558">558: </a>  <font color="#4169E1">if</font> (!eps-&gt;twosided) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Must request left vectors with <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>"</font>);
+<a name="line559">559: </a>  <font color="#4169E1">if</font> (i&lt;0 || i&gt;=eps-&gt;nconv) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument 2 out of range"</font>);
+<a name="line560">560: </a>  EPSComputeVectors(eps);
+<a name="line561">561: </a>  k = eps-&gt;perm[i];
+<a name="line562">562: </a>  BV_GetEigenvector(eps-&gt;W,k,eps-&gt;eigi[k],Wr,Wi);
+<a name="line563">563: </a>  <font color="#4169E1">return</font>(0);
+<a name="line564">564: </a>}
+
+<a name="line566">566: </a><font color="#B22222">/*@</font>
+<a name="line567">567: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSGetErrorEstimate.html#EPSGetErrorEstimate">EPSGetErrorEstimate</a> - Returns the error estimate associated to the i-th</font>
+<a name="line568">568: </a><font color="#B22222">   computed eigenpair.</font>
+
+<a name="line570">570: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line572">572: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line573">573: </a><font color="#B22222">+  eps - eigensolver context</font>
+<a name="line574">574: </a><font color="#B22222">-  i   - index of eigenpair</font>
+
+<a name="line576">576: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line577">577: </a><font color="#B22222">.  errest - the error estimate</font>
+
+<a name="line579">579: </a><font color="#B22222">   Notes:</font>
+<a name="line580">580: </a><font color="#B22222">   This is the error estimate used internally by the eigensolver. The actual</font>
+<a name="line581">581: </a><font color="#B22222">   error bound can be computed with <a href="../../../docs/manualpages/EPS/EPSComputeError.html#EPSComputeError">EPSComputeError</a>(). See also the users</font>
+<a name="line582">582: </a><font color="#B22222">   manual for details.</font>
+
+<a name="line584">584: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line586">586: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSComputeError.html#EPSComputeError">EPSComputeError</a>()</font>
+<a name="line587">587: </a><font color="#B22222">@*/</font>
+<a name="line588">588: </a><strong><font color="#4169E1"><a name="EPSGetErrorEstimate"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSGetErrorEstimate.html#EPSGetErrorEstimate">EPSGetErrorEstimate</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,PetscReal *errest)</font></strong>
+<a name="line589">589: </a>{
+<a name="line593">593: </a>  EPSCheckSolved(eps,1);
+<a name="line594">594: </a>  <font color="#4169E1">if</font> (i&lt;0 || i&gt;=eps-&gt;nconv) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument 2 out of range"</font>);
+<a name="line595">595: </a>  *errest = eps-&gt;errest[eps-&gt;perm[i]];
+<a name="line596">596: </a>  <font color="#4169E1">return</font>(0);
+<a name="line597">597: </a>}
+
+<a name="line599">599: </a><font color="#B22222">/*</font>
+<a name="line600">600: </a><font color="#B22222">   EPSComputeResidualNorm_Private - Computes the norm of the residual vector</font>
+<a name="line601">601: </a><font color="#B22222">   associated with an eigenpair.</font>
+
+<a name="line603">603: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line604">604: </a><font color="#B22222">     trans - whether A' must be used instead of A</font>
+<a name="line605">605: </a><font color="#B22222">     kr,ki - eigenvalue</font>
+<a name="line606">606: </a><font color="#B22222">     xr,xi - eigenvector</font>
+<a name="line607">607: </a><font color="#B22222">     z     - three work vectors (the second one not referenced in complex scalars)</font>
+<a name="line608">608: </a><font color="#B22222">*/</font>
+<a name="line609">609: </a><strong><font color="#4169E1"><a name="EPSComputeResidualNorm_Private"></a>PetscErrorCode EPSComputeResidualNorm_Private(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscBool trans,PetscScalar kr,PetscScalar ki,Vec xr,Vec xi,Vec *z,PetscReal *norm)</font></strong>
+<a name="line610">610: </a>{
+<a name="line612">612: </a>  PetscInt       nmat;
+<a name="line613">613: </a>  Mat            A,B;
+<a name="line614">614: </a>  Vec            u,w;
+<a name="line615">615: </a>  PetscScalar    alpha;
+<a name="line616">616: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line617">617: </a>  Vec            v;
+<a name="line618">618: </a>  PetscReal      ni,nr;
+<a name="line619">619: </a><font color="#A020F0">#endif</font>
+<a name="line620">620: </a>  PetscErrorCode (*matmult)(Mat,Vec,Vec) = trans? MatMultHermitianTranspose: MatMult;
+
+<a name="line623">623: </a>  u = z[0]; w = z[2];
+<a name="line624">624: </a>  <a href="../../../docs/manualpages/ST/STGetNumMatrices.html#STGetNumMatrices">STGetNumMatrices</a>(eps-&gt;st,&amp;nmat);
+<a name="line625">625: </a>  <a href="../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,0,&amp;A);
+<a name="line626">626: </a>  <font color="#4169E1">if</font> (nmat&gt;1) { <a href="../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,1,&amp;B); }
+
+<a name="line628">628: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line629">629: </a>  v = z[1];
+<a name="line630">630: </a>  <font color="#4169E1">if</font> (ki == 0 || PetscAbsScalar(ki) &lt; PetscAbsScalar(kr*PETSC_MACHINE_EPSILON)) {
+<a name="line631">631: </a><font color="#A020F0">#endif</font>
+<a name="line632">632: </a>    (*matmult)(A,xr,u);                          <font color="#B22222">/* u=A*x */</font>
+<a name="line633">633: </a>    <font color="#4169E1">if</font> (PetscAbsScalar(kr) &gt; PETSC_MACHINE_EPSILON) {
+<a name="line634">634: </a>      <font color="#4169E1">if</font> (nmat&gt;1) { (*matmult)(B,xr,w); }
+<a name="line635">635: </a>      <font color="#4169E1">else</font> { VecCopy(xr,w); }                    <font color="#B22222">/* w=B*x */</font>
+<a name="line636">636: </a>      alpha = trans? -PetscConj(kr): -kr;
+<a name="line637">637: </a>      VecAXPY(u,alpha,w);                        <font color="#B22222">/* u=A*x-k*B*x */</font>
+<a name="line638">638: </a>    }
+<a name="line639">639: </a>    VecNorm(u,NORM_2,norm);
+<a name="line640">640: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line641">641: </a>  } <font color="#4169E1">else</font> {
+<a name="line642">642: </a>    (*matmult)(A,xr,u);                          <font color="#B22222">/* u=A*xr */</font>
+<a name="line643">643: </a>    <font color="#4169E1">if</font> (SlepcAbsEigenvalue(kr,ki) &gt; PETSC_MACHINE_EPSILON) {
+<a name="line644">644: </a>      <font color="#4169E1">if</font> (nmat&gt;1) { (*matmult)(B,xr,v); }
+<a name="line645">645: </a>      <font color="#4169E1">else</font> { VecCopy(xr,v); }                    <font color="#B22222">/* v=B*xr */</font>
+<a name="line646">646: </a>      VecAXPY(u,-kr,v);                          <font color="#B22222">/* u=A*xr-kr*B*xr */</font>
+<a name="line647">647: </a>      <font color="#4169E1">if</font> (nmat&gt;1) { (*matmult)(B,xi,w); }
+<a name="line648">648: </a>      <font color="#4169E1">else</font> { VecCopy(xi,w); }                    <font color="#B22222">/* w=B*xi */</font>
+<a name="line649">649: </a>      VecAXPY(u,trans?-ki:ki,w);                 <font color="#B22222">/* u=A*xr-kr*B*xr+ki*B*xi */</font>
+<a name="line650">650: </a>    }
+<a name="line651">651: </a>    VecNorm(u,NORM_2,&amp;nr);
+<a name="line652">652: </a>    (*matmult)(A,xi,u);                          <font color="#B22222">/* u=A*xi */</font>
+<a name="line653">653: </a>    <font color="#4169E1">if</font> (SlepcAbsEigenvalue(kr,ki) &gt; PETSC_MACHINE_EPSILON) {
+<a name="line654">654: </a>      VecAXPY(u,-kr,w);                          <font color="#B22222">/* u=A*xi-kr*B*xi */</font>
+<a name="line655">655: </a>      VecAXPY(u,trans?ki:-ki,v);                 <font color="#B22222">/* u=A*xi-kr*B*xi-ki*B*xr */</font>
+<a name="line656">656: </a>    }
+<a name="line657">657: </a>    VecNorm(u,NORM_2,&amp;ni);
+<a name="line658">658: </a>    *norm = SlepcAbsEigenvalue(nr,ni);
+<a name="line659">659: </a>  }
+<a name="line660">660: </a><font color="#A020F0">#endif</font>
+<a name="line661">661: </a>  <font color="#4169E1">return</font>(0);
+<a name="line662">662: </a>}
+
+<a name="line664">664: </a><font color="#B22222">/*@</font>
+<a name="line665">665: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSComputeError.html#EPSComputeError">EPSComputeError</a> - Computes the error (based on the residual norm) associated</font>
+<a name="line666">666: </a><font color="#B22222">   with the i-th computed eigenpair.</font>
+
+<a name="line668">668: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line670">670: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line671">671: </a><font color="#B22222">+  eps  - the eigensolver context</font>
+<a name="line672">672: </a><font color="#B22222">.  i    - the solution index</font>
+<a name="line673">673: </a><font color="#B22222">-  type - the type of error to compute</font>
+
+<a name="line675">675: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line676">676: </a><font color="#B22222">.  error - the error</font>
+
+<a name="line678">678: </a><font color="#B22222">   Notes:</font>
+<a name="line679">679: </a><font color="#B22222">   The error can be computed in various ways, all of them based on the residual</font>
+<a name="line680">680: </a><font color="#B22222">   norm ||Ax-kBx||_2 where k is the eigenvalue and x is the eigenvector.</font>
+
+<a name="line682">682: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line684">684: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPSErrorType</a>, <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(), <a href="../../../docs/manualpages/EPS/EPSGetErrorEstimate.html#EPSGetErrorEstimate">EPSGetErrorEstimate</a>()</font>
+<a name="line685">685: </a><font color="#B22222">@*/</font>
+<a name="line686">686: </a><strong><font color="#4169E1"><a name="EPSComputeError"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSComputeError.html#EPSComputeError">EPSComputeError</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPSErrorType</a> type,PetscReal *error)</font></strong>
+<a name="line687">687: </a>{
+<a name="line689">689: </a>  Mat            A,B;
+<a name="line690">690: </a>  Vec            xr,xi,w[3];
+<a name="line691">691: </a>  PetscReal      t,vecnorm=1.0,errorl;
+<a name="line692">692: </a>  PetscScalar    kr,ki;
+<a name="line693">693: </a>  PetscBool      flg;
+
+<a name="line700">700: </a>  EPSCheckSolved(eps,1);
+
+<a name="line702">702: </a>  <font color="#B22222">/* allocate work vectors */</font>
+<a name="line703">703: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line704">704: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(eps,3);
+<a name="line705">705: </a>  xi   = NULL;
+<a name="line706">706: </a>  w[1] = NULL;
+<a name="line707">707: </a><font color="#A020F0">#else</font>
+<a name="line708">708: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(eps,5);
+<a name="line709">709: </a>  xi   = eps-&gt;work[3];
+<a name="line710">710: </a>  w[1] = eps-&gt;work[4];
+<a name="line711">711: </a><font color="#A020F0">#endif</font>
+<a name="line712">712: </a>  xr   = eps-&gt;work[0];
+<a name="line713">713: </a>  w[0] = eps-&gt;work[1];
+<a name="line714">714: </a>  w[2] = eps-&gt;work[2];
+
+<a name="line716">716: </a>  <font color="#B22222">/* compute residual norm */</font>
+<a name="line717">717: </a>  <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(eps,i,&amp;kr,&amp;ki,xr,xi);
+<a name="line718">718: </a>  EPSComputeResidualNorm_Private(eps,PETSC_FALSE,kr,ki,xr,xi,w,error);
+
+<a name="line720">720: </a>  <font color="#B22222">/* compute 2-norm of eigenvector */</font>
+<a name="line721">721: </a>  <font color="#4169E1">if</font> (eps-&gt;problem_type==<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHEP</a>) {
+<a name="line722">722: </a>    VecNorm(xr,NORM_2,&amp;vecnorm);
+<a name="line723">723: </a>  }
+
+<a name="line725">725: </a>  <font color="#B22222">/* if two-sided, compute left residual norm and take the maximum */</font>
+<a name="line726">726: </a>  <font color="#4169E1">if</font> (eps-&gt;twosided) {
+<a name="line727">727: </a>    <a href="../../../docs/manualpages/EPS/EPSGetLeftEigenvector.html#EPSGetLeftEigenvector">EPSGetLeftEigenvector</a>(eps,i,xr,xi);
+<a name="line728">728: </a>    EPSComputeResidualNorm_Private(eps,PETSC_TRUE,kr,ki,xr,xi,w,&amp;errorl);
+<a name="line729">729: </a>    *error = PetscMax(*error,errorl);
+<a name="line730">730: </a>  }
+
+<a name="line732">732: </a>  <font color="#B22222">/* compute error */</font>
+<a name="line733">733: </a>  <font color="#4169E1">switch</font> (type) {
+<a name="line734">734: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_ABSOLUTE</a>:
+<a name="line735">735: </a>      <font color="#4169E1">break</font>;
+<a name="line736">736: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>:
+<a name="line737">737: </a>      *error /= SlepcAbsEigenvalue(kr,ki)*vecnorm;
+<a name="line738">738: </a>      <font color="#4169E1">break</font>;
+<a name="line739">739: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_BACKWARD</a>:
+<a name="line740">740: </a>      <font color="#B22222">/* initialization of matrix norms */</font>
+<a name="line741">741: </a>      <font color="#4169E1">if</font> (!eps-&gt;nrma) {
+<a name="line742">742: </a>        <a href="../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,0,&amp;A);
+<a name="line743">743: </a>        MatHasOperation(A,MATOP_NORM,&amp;flg);
+<a name="line744">744: </a>        <font color="#4169E1">if</font> (!flg) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_WRONG,<font color="#666666">"The computation of backward errors requires a matrix norm operation"</font>);
+<a name="line745">745: </a>        MatNorm(A,NORM_INFINITY,&amp;eps-&gt;nrma);
+<a name="line746">746: </a>      }
+<a name="line747">747: </a>      <font color="#4169E1">if</font> (eps-&gt;isgeneralized) {
+<a name="line748">748: </a>        <font color="#4169E1">if</font> (!eps-&gt;nrmb) {
+<a name="line749">749: </a>          <a href="../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,1,&amp;B);
+<a name="line750">750: </a>          MatHasOperation(B,MATOP_NORM,&amp;flg);
+<a name="line751">751: </a>          <font color="#4169E1">if</font> (!flg) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_WRONG,<font color="#666666">"The computation of backward errors requires a matrix norm operation"</font>);
+<a name="line752">752: </a>          MatNorm(B,NORM_INFINITY,&amp;eps-&gt;nrmb);
+<a name="line753">753: </a>        }
+<a name="line754">754: </a>      } <font color="#4169E1">else</font> eps-&gt;nrmb = 1.0;
+<a name="line755">755: </a>      t = SlepcAbsEigenvalue(kr,ki);
+<a name="line756">756: </a>      *error /= (eps-&gt;nrma+t*eps-&gt;nrmb)*vecnorm;
+<a name="line757">757: </a>      <font color="#4169E1">break</font>;
+<a name="line758">758: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line759">759: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid error type"</font>);
+<a name="line760">760: </a>  }
+<a name="line761">761: </a>  <font color="#4169E1">return</font>(0);
+<a name="line762">762: </a>}
+
+<a name="line764">764: </a><font color="#B22222">/*</font>
+<a name="line765">765: </a><font color="#B22222">   EPSGetStartVector - Generate a suitable vector to be used as the starting vector</font>
+<a name="line766">766: </a><font color="#B22222">   for the recurrence that builds the right subspace.</font>
+
+<a name="line768">768: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line770">770: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line771">771: </a><font color="#B22222">+  eps - the eigensolver context</font>
+<a name="line772">772: </a><font color="#B22222">-  i   - iteration number</font>
+
+<a name="line774">774: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line775">775: </a><font color="#B22222">.  breakdown - flag indicating that a breakdown has occurred</font>
+
+<a name="line777">777: </a><font color="#B22222">   Notes:</font>
+<a name="line778">778: </a><font color="#B22222">   The start vector is computed from another vector: for the first step (i=0),</font>
+<a name="line779">779: </a><font color="#B22222">   the first initial vector is used (see <a href="../../../docs/manualpages/EPS/EPSSetInitialSpace.html#EPSSetInitialSpace">EPSSetInitialSpace</a>()); otherwise a random</font>
+<a name="line780">780: </a><font color="#B22222">   vector is created. Then this vector is forced to be in the range of OP (only</font>
+<a name="line781">781: </a><font color="#B22222">   for generalized definite problems) and orthonormalized with respect to all</font>
+<a name="line782">782: </a><font color="#B22222">   V-vectors up to i-1. The resulting vector is placed in V[i].</font>
+
+<a name="line784">784: </a><font color="#B22222">   The flag breakdown is set to true if either i=0 and the vector belongs to the</font>
+<a name="line785">785: </a><font color="#B22222">   deflation space, or i&gt;0 and the vector is linearly dependent with respect</font>
+<a name="line786">786: </a><font color="#B22222">   to the V-vectors.</font>
+<a name="line787">787: </a><font color="#B22222">*/</font>
+<a name="line788">788: </a><strong><font color="#4169E1"><a name="EPSGetStartVector"></a>PetscErrorCode EPSGetStartVector(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,PetscBool *breakdown)</font></strong>
+<a name="line789">789: </a>{
+<a name="line791">791: </a>  PetscReal      norm;
+<a name="line792">792: </a>  PetscBool      lindep;
+<a name="line793">793: </a>  Vec            w,z;
+
+
+<a name="line799">799: </a>  <font color="#B22222">/* For the first step, use the first initial vector, otherwise a random one */</font>
+<a name="line800">800: </a>  <font color="#4169E1">if</font> (i&gt;0 || eps-&gt;nini==0) {
+<a name="line801">801: </a>    <a href="../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(eps-&gt;V,i);
+<a name="line802">802: </a>  }
+
+<a name="line804">804: </a>  <font color="#B22222">/* Force the vector to be in the range of OP for definite generalized problems */</font>
+<a name="line805">805: </a>  <font color="#4169E1">if</font> (eps-&gt;ispositive || (eps-&gt;isgeneralized &amp;&amp; eps-&gt;ishermitian)) {
+<a name="line806">806: </a>    <a href="../../../docs/manualpages/BV/BVCreateVec.html#BVCreateVec">BVCreateVec</a>(eps-&gt;V,&amp;w);
+<a name="line807">807: </a>    <a href="../../../docs/manualpages/BV/BVCopyVec.html#BVCopyVec">BVCopyVec</a>(eps-&gt;V,i,w);
+<a name="line808">808: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;z);
+<a name="line809">809: </a>    <a href="../../../docs/manualpages/ST/STApply.html#STApply">STApply</a>(eps-&gt;st,w,z);
+<a name="line810">810: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;z);
+<a name="line811">811: </a>    VecDestroy(&amp;w);
+<a name="line812">812: </a>  }
+
+<a name="line814">814: </a>  <font color="#B22222">/* Orthonormalize the vector with respect to previous vectors */</font>
+<a name="line815">815: </a>  <a href="../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(eps-&gt;V,i,NULL,&amp;norm,&amp;lindep);
+<a name="line816">816: </a>  <font color="#4169E1">if</font> (breakdown) *breakdown = lindep;
+<a name="line817">817: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (lindep || norm == 0.0) {
+<a name="line818">818: </a>    <font color="#4169E1">if</font> (i==0) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"Initial vector is zero or belongs to the deflation space"</font>);
+<a name="line819">819: </a>    <font color="#4169E1">else</font> SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"Unable to generate more start vectors"</font>);
+<a name="line820">820: </a>  }
+<a name="line821">821: </a>  <a href="../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;V,i,1.0/norm);
+<a name="line822">822: </a>  <font color="#4169E1">return</font>(0);
+<a name="line823">823: </a>}
+
+<a name="line825">825: </a><font color="#B22222">/*</font>
+<a name="line826">826: </a><font color="#B22222">   EPSGetLeftStartVector - Generate a suitable vector to be used as the left starting</font>
+<a name="line827">827: </a><font color="#B22222">   vector for the recurrence that builds the left subspace. See EPSGetStartVector().</font>
+<a name="line828">828: </a><font color="#B22222">*/</font>
+<a name="line829">829: </a><strong><font color="#4169E1"><a name="EPSGetLeftStartVector"></a>PetscErrorCode EPSGetLeftStartVector(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt i,PetscBool *breakdown)</font></strong>
+<a name="line830">830: </a>{
+<a name="line832">832: </a>  PetscReal      norm;
+<a name="line833">833: </a>  PetscBool      lindep;
+
+
+<a name="line839">839: </a>  <font color="#B22222">/* For the first step, use the first initial vector, otherwise a random one */</font>
+<a name="line840">840: </a>  <font color="#4169E1">if</font> (i&gt;0 || eps-&gt;ninil==0) {
+<a name="line841">841: </a>    <a href="../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(eps-&gt;W,i);
+<a name="line842">842: </a>  }
+
+<a name="line844">844: </a>  <font color="#B22222">/* Orthonormalize the vector with respect to previous vectors */</font>
+<a name="line845">845: </a>  <a href="../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(eps-&gt;W,i,NULL,&amp;norm,&amp;lindep);
+<a name="line846">846: </a>  <font color="#4169E1">if</font> (breakdown) *breakdown = lindep;
+<a name="line847">847: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (lindep || norm == 0.0) {
+<a name="line848">848: </a>    <font color="#4169E1">if</font> (i==0) SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"Left initial vector is zero"</font>);
+<a name="line849">849: </a>    <font color="#4169E1">else</font> SETERRQ(PetscObjectComm((PetscObject)eps),1,<font color="#666666">"Unable to generate more left start vectors"</font>);
+<a name="line850">850: </a>  }
+<a name="line851">851: </a>  <a href="../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;W,i,1.0/norm);
+<a name="line852">852: </a>  <font color="#4169E1">return</font>(0);
+<a name="line853">853: </a>}
+
+</pre>
+</body>
+
+</html>

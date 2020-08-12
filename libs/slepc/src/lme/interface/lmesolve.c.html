@@ -1,0 +1,327 @@
+<center><a href="lmesolve.c">Actual source code: lmesolve.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/lme/interface/lmesolve.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:15+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/lme/interface/lmesolve.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> routines related to the solution process</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/lmeimpl.h.html">&lt;slepc/private/lmeimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#B22222">/*@</font>
+<a name="line18"> 18: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a> - Solves the linear matrix equation.</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line22"> 22: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line23"> 23: </a><font color="#B22222">.  lme - linear matrix equation solver context obtained from <a href="../../../docs/manualpages/LME/LMECreate.html#LMECreate">LMECreate</a>()</font>
+
+<a name="line25"> 25: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line26"> 26: </a><font color="#B22222">+  -lme_view - print information about the solver used</font>
+<a name="line27"> 27: </a><font color="#B22222">.  -lme_view_mat binary - save the matrix to the default binary viewer</font>
+<a name="line28"> 28: </a><font color="#B22222">.  -lme_view_rhs binary - save right hand side to the default binary viewer</font>
+<a name="line29"> 29: </a><font color="#B22222">.  -lme_view_solution binary - save computed solution to the default binary viewer</font>
+<a name="line30"> 30: </a><font color="#B22222">-  -lme_converged_reason - print reason for convergence, and number of iterations</font>
+
+<a name="line32"> 32: </a><font color="#B22222">   Notes:</font>
+<a name="line33"> 33: </a><font color="#B22222">   The matrix coefficients are specified with <a href="../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a>().</font>
+<a name="line34"> 34: </a><font color="#B22222">   The right-hand side is specified with <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>().</font>
+<a name="line35"> 35: </a><font color="#B22222">   The placeholder for the solution is specified with <a href="../../../docs/manualpages/LME/LMESetSolution.html#LMESetSolution">LMESetSolution</a>().</font>
+
+<a name="line37"> 37: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line39"> 39: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMECreate.html#LMECreate">LMECreate</a>(), <a href="../../../docs/manualpages/LME/LMESetUp.html#LMESetUp">LMESetUp</a>(), <a href="../../../docs/manualpages/LME/LMEDestroy.html#LMEDestroy">LMEDestroy</a>(), <a href="../../../docs/manualpages/LME/LMESetTolerances.html#LMESetTolerances">LMESetTolerances</a>(), <a href="../../../docs/manualpages/LME/LMESetCoefficients.html#LMESetCoefficients">LMESetCoefficients</a>(), <a href="../../../docs/manualpages/LME/LMESetRHS.html#LMESetRHS">LMESetRHS</a>(), <a href="../../../docs/manualpages/LME/LMESetSolution.html#LMESetSolution">LMESetSolution</a>()</font>
+<a name="line40"> 40: </a><font color="#B22222">@*/</font>
+<a name="line41"> 41: </a><strong><font color="#4169E1"><a name="LMESolve"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme)</font></strong>
+<a name="line42"> 42: </a>{
+
+
+<a name="line48"> 48: </a>  <font color="#B22222">/* call setup */</font>
+<a name="line49"> 49: </a>  <a href="../../../docs/manualpages/LME/LMESetUp.html#LMESetUp">LMESetUp</a>(lme);
+<a name="line50"> 50: </a>  lme-&gt;its    = 0;
+<a name="line51"> 51: </a>  lme-&gt;errest = 0.0;
+
+<a name="line53"> 53: </a>  <a href="../../../docs/manualpages/LME/LMEViewFromOptions.html#LMEViewFromOptions">LMEViewFromOptions</a>(lme,NULL,<font color="#666666">"-lme_view_pre"</font>);
+
+<a name="line55"> 55: </a>  <font color="#B22222">/* call solver */</font>
+<a name="line56"> 56: </a>  <font color="#4169E1">if</font> (!lme-&gt;ops-&gt;solve[lme-&gt;problem_type]) SETERRQ1(PetscObjectComm((PetscObject)lme),PETSC_ERR_SUP,<font color="#666666">"The specified solver does not support equation type %s"</font>,LMEProblemTypes[lme-&gt;problem_type]);
+<a name="line57"> 57: </a>  PetscLogEventBegin(LME_Solve,lme,0,0,0);
+<a name="line58"> 58: </a>  (*lme-&gt;ops-&gt;solve[lme-&gt;problem_type])(lme);
+<a name="line59"> 59: </a>  PetscLogEventEnd(LME_Solve,lme,0,0,0);
+
+<a name="line61"> 61: </a>  <font color="#4169E1">if</font> (!lme-&gt;reason) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_PLIB,<font color="#666666">"Internal error, solver returned without setting converged reason"</font>);
+
+<a name="line63"> 63: </a>  <font color="#4169E1">if</font> (lme-&gt;errorifnotconverged &amp;&amp; lme-&gt;reason &lt; 0) SETERRQ(PetscObjectComm((PetscObject)lme),PETSC_ERR_NOT_CONVERGED,<font color="#666666">"<a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a> has not converged"</font>);
+
+<a name="line65"> 65: </a>  <font color="#B22222">/* various viewers */</font>
+<a name="line66"> 66: </a>  <a href="../../../docs/manualpages/LME/LMEViewFromOptions.html#LMEViewFromOptions">LMEViewFromOptions</a>(lme,NULL,<font color="#666666">"-lme_view"</font>);
+<a name="line67"> 67: </a>  <a href="../../../docs/manualpages/LME/LMEReasonViewFromOptions.html#LMEReasonViewFromOptions">LMEReasonViewFromOptions</a>(lme);
+<a name="line68"> 68: </a>  MatViewFromOptions(lme-&gt;A,(PetscObject)lme,<font color="#666666">"-lme_view_mat"</font>);
+<a name="line69"> 69: </a>  MatViewFromOptions(lme-&gt;C,(PetscObject)lme,<font color="#666666">"-lme_view_rhs"</font>);
+<a name="line70"> 70: </a>  MatViewFromOptions(lme-&gt;X,(PetscObject)lme,<font color="#666666">"-lme_view_solution"</font>);
+<a name="line71"> 71: </a>  <font color="#4169E1">return</font>(0);
+<a name="line72"> 72: </a>}
+
+<a name="line74"> 74: </a><font color="#B22222">/*@</font>
+<a name="line75"> 75: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEGetIterationNumber.html#LMEGetIterationNumber">LMEGetIterationNumber</a> - Gets the current iteration number. If the</font>
+<a name="line76"> 76: </a><font color="#B22222">   call to <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>() is complete, then it returns the number of iterations</font>
+<a name="line77"> 77: </a><font color="#B22222">   carried out by the solution method.</font>
+
+<a name="line79"> 79: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line81"> 81: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line82"> 82: </a><font color="#B22222">.  lme - the linear matrix equation solver context</font>
+
+<a name="line84"> 84: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line85"> 85: </a><font color="#B22222">.  its - number of iterations</font>
+
+<a name="line87"> 87: </a><font color="#B22222">   Note:</font>
+<a name="line88"> 88: </a><font color="#B22222">   During the i-th iteration this call returns i-1. If <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>() is</font>
+<a name="line89"> 89: </a><font color="#B22222">   complete, then parameter "its" contains either the iteration number at</font>
+<a name="line90"> 90: </a><font color="#B22222">   which convergence was successfully reached, or failure was detected.</font>
+<a name="line91"> 91: </a><font color="#B22222">   Call <a href="../../../docs/manualpages/LME/LMEGetConvergedReason.html#LMEGetConvergedReason">LMEGetConvergedReason</a>() to determine if the solver converged or</font>
+<a name="line92"> 92: </a><font color="#B22222">   failed and why.</font>
+
+<a name="line94"> 94: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line96"> 96: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMEGetConvergedReason.html#LMEGetConvergedReason">LMEGetConvergedReason</a>(), <a href="../../../docs/manualpages/LME/LMESetTolerances.html#LMESetTolerances">LMESetTolerances</a>()</font>
+<a name="line97"> 97: </a><font color="#B22222">@*/</font>
+<a name="line98"> 98: </a><strong><font color="#4169E1"><a name="LMEGetIterationNumber"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEGetIterationNumber.html#LMEGetIterationNumber">LMEGetIterationNumber</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscInt *its)</font></strong>
+<a name="line99"> 99: </a>{
+<a name="line103">103: </a>  *its = lme-&gt;its;
+<a name="line104">104: </a>  <font color="#4169E1">return</font>(0);
+<a name="line105">105: </a>}
+
+<a name="line107">107: </a><font color="#B22222">/*@</font>
+<a name="line108">108: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEGetConvergedReason.html#LMEGetConvergedReason">LMEGetConvergedReason</a> - Gets the reason why the <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>() iteration was</font>
+<a name="line109">109: </a><font color="#B22222">   stopped.</font>
+
+<a name="line111">111: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line113">113: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line114">114: </a><font color="#B22222">.  lme - the linear matrix equation solver context</font>
+
+<a name="line116">116: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line117">117: </a><font color="#B22222">.  reason - negative value indicates diverged, positive value converged</font>
+
+<a name="line119">119: </a><font color="#B22222">   Notes:</font>
+
+<a name="line121">121: </a><font color="#B22222">   Possible values for reason are</font>
+<a name="line122">122: </a><font color="#B22222">+  <a href="../../../docs/manualpages/LME/LMEConvergedReason.html#LMEConvergedReason">LME_CONVERGED_TOL</a> - converged up to tolerance</font>
+<a name="line123">123: </a><font color="#B22222">.  <a href="../../../docs/manualpages/LME/LMEConvergedReason.html#LMEConvergedReason">LME_DIVERGED_ITS</a> - required more than max_it iterations to reach convergence</font>
+<a name="line124">124: </a><font color="#B22222">-  <a href="../../../docs/manualpages/LME/LMEConvergedReason.html#LMEConvergedReason">LME_DIVERGED_BREAKDOWN</a> - generic breakdown in method</font>
+
+<a name="line126">126: </a><font color="#B22222">   Can only be called after the call to <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>() is complete.</font>
+
+<a name="line128">128: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line130">130: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMESetTolerances.html#LMESetTolerances">LMESetTolerances</a>(), <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(), <a href="../../../docs/manualpages/LME/LMEConvergedReason.html#LMEConvergedReason">LMEConvergedReason</a>, <a href="../../../docs/manualpages/LME/LMESetErrorIfNotConverged.html#LMESetErrorIfNotConverged">LMESetErrorIfNotConverged</a>()</font>
+<a name="line131">131: </a><font color="#B22222">@*/</font>
+<a name="line132">132: </a><strong><font color="#4169E1"><a name="LMEGetConvergedReason"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEGetConvergedReason.html#LMEGetConvergedReason">LMEGetConvergedReason</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,<a href="../../../docs/manualpages/LME/LMEConvergedReason.html#LMEConvergedReason">LMEConvergedReason</a> *reason)</font></strong>
+<a name="line133">133: </a>{
+<a name="line137">137: </a>  *reason = lme-&gt;reason;
+<a name="line138">138: </a>  <font color="#4169E1">return</font>(0);
+<a name="line139">139: </a>}
+
+<a name="line141">141: </a><font color="#B22222">/*@</font>
+<a name="line142">142: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEGetErrorEstimate.html#LMEGetErrorEstimate">LMEGetErrorEstimate</a> - Returns the error estimate obtained during solve.</font>
+
+<a name="line144">144: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line146">146: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line147">147: </a><font color="#B22222">.  lme - linear matrix equation solver context</font>
+
+<a name="line149">149: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line150">150: </a><font color="#B22222">.  errest - the error estimate</font>
+
+<a name="line152">152: </a><font color="#B22222">   Notes:</font>
+<a name="line153">153: </a><font color="#B22222">   This is the error estimated internally by the solver. The actual</font>
+<a name="line154">154: </a><font color="#B22222">   error bound can be computed with <a href="../../../docs/manualpages/LME/LMEComputeError.html#LMEComputeError">LMEComputeError</a>(). Note that some</font>
+<a name="line155">155: </a><font color="#B22222">   solvers may not be able to provide an error estimate.</font>
+
+<a name="line157">157: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line159">159: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMEComputeError.html#LMEComputeError">LMEComputeError</a>()</font>
+<a name="line160">160: </a><font color="#B22222">@*/</font>
+<a name="line161">161: </a><strong><font color="#4169E1"><a name="LMEGetErrorEstimate"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEGetErrorEstimate.html#LMEGetErrorEstimate">LMEGetErrorEstimate</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscReal *errest)</font></strong>
+<a name="line162">162: </a>{
+<a name="line166">166: </a>  *errest = lme-&gt;errest;
+<a name="line167">167: </a>  <font color="#4169E1">return</font>(0);
+<a name="line168">168: </a>}
+
+<a name="line170">170: </a><font color="#B22222">/*</font>
+<a name="line171">171: </a><font color="#B22222">   LMEComputeResidualNorm_Lyapunov - Computes the Frobenius norm of the residual matrix</font>
+<a name="line172">172: </a><font color="#B22222">   associated with the Lyapunov equation.</font>
+<a name="line173">173: </a><font color="#B22222">*/</font>
+<a name="line174">174: </a><strong><font color="#4169E1"><a name="LMEComputeResidualNorm_Lyapunov"></a>PetscErrorCode LMEComputeResidualNorm_Lyapunov(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscReal *norm)</font></strong>
+<a name="line175">175: </a>{
+<a name="line176">176: </a>  PetscErrorCode    ierr;
+<a name="line177">177: </a>  PetscInt          j,n,N,k,l;
+<a name="line178">178: </a>  PetscBLASInt      n_,N_,k_,l_;
+<a name="line179">179: </a>  PetscScalar       *Rarray,alpha=1.0,beta=0.0;
+<a name="line180">180: </a>  const PetscScalar *A,*B;
+<a name="line181">181: </a>  <a href="../../../docs/manualpages/BV/BV.html#BV">BV</a>                W,AX,X1,C1;
+<a name="line182">182: </a>  Mat               R,X1m,C1m;
+<a name="line183">183: </a>  Vec               v,w;
+<a name="line184">184: </a>  VecScatter        vscat;
+
+<a name="line187">187: </a>  MatLRCGetMats(lme-&gt;C,NULL,&amp;C1m,NULL,NULL);
+<a name="line188">188: </a>  MatLRCGetMats(lme-&gt;X,NULL,&amp;X1m,NULL,NULL);
+<a name="line189">189: </a>  <a href="../../../docs/manualpages/BV/BVCreateFromMat.html#BVCreateFromMat">BVCreateFromMat</a>(C1m,&amp;C1);
+<a name="line190">190: </a>  <a href="../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(C1);
+<a name="line191">191: </a>  <a href="../../../docs/manualpages/BV/BVCreateFromMat.html#BVCreateFromMat">BVCreateFromMat</a>(X1m,&amp;X1);
+<a name="line192">192: </a>  <a href="../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(X1);
+<a name="line193">193: </a>  <a href="../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(X1,&amp;n,&amp;N,&amp;k);
+<a name="line194">194: </a>  <a href="../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(C1,NULL,NULL,&amp;l);
+<a name="line195">195: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line196">196: </a>  PetscBLASIntCast(N,&amp;N_);
+<a name="line197">197: </a>  PetscBLASIntCast(k,&amp;k_);
+<a name="line198">198: </a>  PetscBLASIntCast(l,&amp;l_);
+
+<a name="line200">200: </a>  <font color="#B22222">/* create W to store a redundant copy of a <a href="../../../docs/manualpages/BV/BV.html#BV">BV</a> in each process */</font>
+<a name="line201">201: </a>  <a href="../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>(PETSC_COMM_SELF,&amp;W);
+<a name="line202">202: </a>  <a href="../../../docs/manualpages/BV/BVSetSizes.html#BVSetSizes">BVSetSizes</a>(W,N,N,k);
+<a name="line203">203: </a>  <a href="../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(W);
+<a name="line204">204: </a>  <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(X1,0,&amp;v);
+<a name="line205">205: </a>  VecScatterCreateToAll(v,&amp;vscat,NULL);
+<a name="line206">206: </a>  <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(X1,0,&amp;v);
+
+<a name="line208">208: </a>  <font color="#B22222">/* create AX to hold the product A*X1 */</font>
+<a name="line209">209: </a>  <a href="../../../docs/manualpages/BV/BVDuplicate.html#BVDuplicate">BVDuplicate</a>(X1,&amp;AX);
+<a name="line210">210: </a>  <a href="../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(X1,lme-&gt;A,AX);
+
+<a name="line212">212: </a>  <font color="#B22222">/* create dense matrix to hold the residual R=C1*C1'+AX*X1'+X1*AX' */</font>
+<a name="line213">213: </a>  MatCreateDense(PetscObjectComm((PetscObject)lme),n,n,N,N,NULL,&amp;R);
+
+<a name="line215">215: </a>  <font color="#B22222">/* R=C1*C1' */</font>
+<a name="line216">216: </a>  MatDenseGetArray(R,&amp;Rarray);
+<a name="line217">217: </a>  <font color="#4169E1">for</font> (j=0;j&lt;l;j++) {
+<a name="line218">218: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(C1,j,&amp;v);
+<a name="line219">219: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(W,j,&amp;w);
+<a name="line220">220: </a>    VecScatterBegin(vscat,v,w,INSERT_VALUES,SCATTER_FORWARD);
+<a name="line221">221: </a>    VecScatterEnd(vscat,v,w,INSERT_VALUES,SCATTER_FORWARD);
+<a name="line222">222: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(C1,j,&amp;v);
+<a name="line223">223: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(W,j,&amp;w);
+<a name="line224">224: </a>  }
+<a name="line225">225: </a>  <font color="#4169E1">if</font> (n) {
+<a name="line226">226: </a>    <a href="../../../docs/manualpages/BV/BVGetArrayRead.html#BVGetArrayRead">BVGetArrayRead</a>(C1,&amp;A);
+<a name="line227">227: </a>    <a href="../../../docs/manualpages/BV/BVGetArrayRead.html#BVGetArrayRead">BVGetArrayRead</a>(W,&amp;B);
+<a name="line228">228: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n_,&amp;N_,&amp;l_,&amp;alpha,(PetscScalar*)A,&amp;n_,(PetscScalar*)B,&amp;N_,&amp;beta,Rarray,&amp;n_));
+<a name="line229">229: </a>    <a href="../../../docs/manualpages/BV/BVRestoreArrayRead.html#BVRestoreArrayRead">BVRestoreArrayRead</a>(C1,&amp;A);
+<a name="line230">230: </a>    <a href="../../../docs/manualpages/BV/BVRestoreArrayRead.html#BVRestoreArrayRead">BVRestoreArrayRead</a>(W,&amp;B);
+<a name="line231">231: </a>  }
+<a name="line232">232: </a>  beta = 1.0;
+
+<a name="line234">234: </a>  <font color="#B22222">/* R+=AX*X1' */</font>
+<a name="line235">235: </a>  <font color="#4169E1">for</font> (j=0;j&lt;k;j++) {
+<a name="line236">236: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(X1,j,&amp;v);
+<a name="line237">237: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(W,j,&amp;w);
+<a name="line238">238: </a>    VecScatterBegin(vscat,v,w,INSERT_VALUES,SCATTER_FORWARD);
+<a name="line239">239: </a>    VecScatterEnd(vscat,v,w,INSERT_VALUES,SCATTER_FORWARD);
+<a name="line240">240: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(X1,j,&amp;v);
+<a name="line241">241: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(W,j,&amp;w);
+<a name="line242">242: </a>  }
+<a name="line243">243: </a>  <font color="#4169E1">if</font> (n) {
+<a name="line244">244: </a>    <a href="../../../docs/manualpages/BV/BVGetArrayRead.html#BVGetArrayRead">BVGetArrayRead</a>(AX,&amp;A);
+<a name="line245">245: </a>    <a href="../../../docs/manualpages/BV/BVGetArrayRead.html#BVGetArrayRead">BVGetArrayRead</a>(W,&amp;B);
+<a name="line246">246: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n_,&amp;N_,&amp;k_,&amp;alpha,(PetscScalar*)A,&amp;n_,(PetscScalar*)B,&amp;N_,&amp;beta,Rarray,&amp;n_));
+<a name="line247">247: </a>    <a href="../../../docs/manualpages/BV/BVRestoreArrayRead.html#BVRestoreArrayRead">BVRestoreArrayRead</a>(AX,&amp;A);
+<a name="line248">248: </a>    <a href="../../../docs/manualpages/BV/BVRestoreArrayRead.html#BVRestoreArrayRead">BVRestoreArrayRead</a>(W,&amp;B);
+<a name="line249">249: </a>  }
+
+<a name="line251">251: </a>  <font color="#B22222">/* R+=X1*AX' */</font>
+<a name="line252">252: </a>  <font color="#4169E1">for</font> (j=0;j&lt;k;j++) {
+<a name="line253">253: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(AX,j,&amp;v);
+<a name="line254">254: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(W,j,&amp;w);
+<a name="line255">255: </a>    VecScatterBegin(vscat,v,w,INSERT_VALUES,SCATTER_FORWARD);
+<a name="line256">256: </a>    VecScatterEnd(vscat,v,w,INSERT_VALUES,SCATTER_FORWARD);
+<a name="line257">257: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(AX,j,&amp;v);
+<a name="line258">258: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(W,j,&amp;w);
+<a name="line259">259: </a>  }
+<a name="line260">260: </a>  <font color="#4169E1">if</font> (n) {
+<a name="line261">261: </a>    <a href="../../../docs/manualpages/BV/BVGetArrayRead.html#BVGetArrayRead">BVGetArrayRead</a>(X1,&amp;A);
+<a name="line262">262: </a>    <a href="../../../docs/manualpages/BV/BVGetArrayRead.html#BVGetArrayRead">BVGetArrayRead</a>(W,&amp;B);
+<a name="line263">263: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"C"</font>,&amp;n_,&amp;N_,&amp;k_,&amp;alpha,(PetscScalar*)A,&amp;n_,(PetscScalar*)B,&amp;N_,&amp;beta,Rarray,&amp;n_));
+<a name="line264">264: </a>    <a href="../../../docs/manualpages/BV/BVRestoreArrayRead.html#BVRestoreArrayRead">BVRestoreArrayRead</a>(X1,&amp;A);
+<a name="line265">265: </a>    <a href="../../../docs/manualpages/BV/BVRestoreArrayRead.html#BVRestoreArrayRead">BVRestoreArrayRead</a>(W,&amp;B);
+<a name="line266">266: </a>  }
+<a name="line267">267: </a>  MatDenseRestoreArray(R,&amp;Rarray);
+
+<a name="line269">269: </a>  <font color="#B22222">/* compute ||R||_F */</font>
+<a name="line270">270: </a>  MatAssemblyBegin(R,MAT_FINAL_ASSEMBLY);
+<a name="line271">271: </a>  MatAssemblyEnd(R,MAT_FINAL_ASSEMBLY);
+<a name="line272">272: </a>  MatNorm(R,NORM_FROBENIUS,norm);
+
+<a name="line274">274: </a>  <a href="../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;W);
+<a name="line275">275: </a>  VecScatterDestroy(&amp;vscat);
+<a name="line276">276: </a>  <a href="../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;AX);
+<a name="line277">277: </a>  MatDestroy(&amp;R);
+<a name="line278">278: </a>  <a href="../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;C1);
+<a name="line279">279: </a>  <a href="../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;X1);
+<a name="line280">280: </a>  <font color="#4169E1">return</font>(0);
+<a name="line281">281: </a>}
+
+<a name="line283">283: </a><font color="#B22222">/*@</font>
+<a name="line284">284: </a><font color="#B22222">   <a href="../../../docs/manualpages/LME/LMEComputeError.html#LMEComputeError">LMEComputeError</a> - Computes the error (based on the residual norm) associated</font>
+<a name="line285">285: </a><font color="#B22222">   with the last equation solved.</font>
+
+<a name="line287">287: </a><font color="#B22222">   Collective on lme</font>
+
+<a name="line289">289: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line290">290: </a><font color="#B22222">.  lme  - the linear matrix equation solver context</font>
+
+<a name="line292">292: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line293">293: </a><font color="#B22222">.  error - the error</font>
+
+<a name="line295">295: </a><font color="#B22222">   Notes:</font>
+<a name="line296">296: </a><font color="#B22222">   This function is not scalable (in terms of memory or parallel communication),</font>
+<a name="line297">297: </a><font color="#B22222">   so it should not be called except in the case of small problem size. For</font>
+<a name="line298">298: </a><font color="#B22222">   large equations, use <a href="../../../docs/manualpages/LME/LMEGetErrorEstimate.html#LMEGetErrorEstimate">LMEGetErrorEstimate</a>().</font>
+
+<a name="line300">300: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line302">302: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/LME/LMESolve.html#LMESolve">LMESolve</a>(), <a href="../../../docs/manualpages/LME/LMEGetErrorEstimate.html#LMEGetErrorEstimate">LMEGetErrorEstimate</a>()</font>
+<a name="line303">303: </a><font color="#B22222">@*/</font>
+<a name="line304">304: </a><strong><font color="#4169E1"><a name="LMEComputeError"></a>PetscErrorCode <a href="../../../docs/manualpages/LME/LMEComputeError.html#LMEComputeError">LMEComputeError</a>(<a href="../../../docs/manualpages/LME/LME.html#LME">LME</a> lme,PetscReal *error)</font></strong>
+<a name="line305">305: </a>{
+
+
+<a name="line312">312: </a>  PetscLogEventBegin(LME_ComputeError,lme,0,0,0);
+<a name="line313">313: </a>  <font color="#B22222">/* compute residual norm */</font>
+<a name="line314">314: </a>  <font color="#4169E1">switch</font> (lme-&gt;problem_type) {
+<a name="line315">315: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/LME/LMEProblemType.html#LMEProblemType">LME_LYAPUNOV</a>:
+<a name="line316">316: </a>      LMEComputeResidualNorm_Lyapunov(lme,error);
+<a name="line317">317: </a>      <font color="#4169E1">break</font>;
+<a name="line318">318: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line319">319: </a>      SETERRQ1(PetscObjectComm((PetscObject)lme),PETSC_ERR_SUP,<font color="#666666">"Not implemented for equation type %s"</font>,LMEProblemTypes[lme-&gt;problem_type]);
+<a name="line320">320: </a>  }
+
+<a name="line322">322: </a>  <font color="#B22222">/* compute error */</font>
+<a name="line323">323: </a>  <font color="#B22222">/* currently we only support absolute error, so just return the norm */</font>
+<a name="line324">324: </a>  PetscLogEventEnd(LME_ComputeError,lme,0,0,0);
+<a name="line325">325: </a>  <font color="#4169E1">return</font>(0);
+<a name="line326">326: </a>}
+
+</pre>
+</body>
+
+</html>

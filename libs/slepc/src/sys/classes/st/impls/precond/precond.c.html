@@ -1,0 +1,325 @@
+<center><a href="precond.c">Actual source code: precond.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/st/impls/precond/precond.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:47+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/st/impls/precond/precond.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Implements the <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> class for preconditioned eigenvalue methods</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/stimpl.h.html">&lt;slepc/private/stimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line17"> 17: </a>  PetscBool ksphasmat;  <font color="#B22222">/* the KSP must have the same matrix as PC */</font>
+<a name="line18"> 18: </a>  PetscBool usermat;    <font color="#B22222">/* the user has set a matrix */</font>
+<a name="line19"> 19: </a>  Mat       mat;        <font color="#B22222">/* user-provided matrix */</font>
+<a name="line20"> 20: </a>} ST_PRECOND;
+
+<a name="line22"> 22: </a><strong><font color="#4169E1"><a name="STSetDefaultKSP_Precond"></a>static PetscErrorCode STSetDefaultKSP_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line23"> 23: </a>{
+<a name="line25"> 25: </a>  PC             pc;
+<a name="line26"> 26: </a>  PCType         pctype;
+<a name="line27"> 27: </a>  PetscBool      t0,t1;
+
+<a name="line30"> 30: </a>  KSPGetPC(st-&gt;ksp,&amp;pc);
+<a name="line31"> 31: </a>  PCGetType(pc,&amp;pctype);
+<a name="line32"> 32: </a>  <font color="#4169E1">if</font> (!pctype &amp;&amp; st-&gt;A &amp;&amp; st-&gt;A[0]) {
+<a name="line33"> 33: </a>    <font color="#4169E1">if</font> (st-&gt;matmode == <a href="../../../../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_SHELL</a>) {
+<a name="line34"> 34: </a>      PCSetType(pc,PCJACOBI);
+<a name="line35"> 35: </a>    } <font color="#4169E1">else</font> {
+<a name="line36"> 36: </a>      MatHasOperation(st-&gt;A[0],MATOP_DUPLICATE,&amp;t0);
+<a name="line37"> 37: </a>      <font color="#4169E1">if</font> (st-&gt;nmat&gt;1) {
+<a name="line38"> 38: </a>        MatHasOperation(st-&gt;A[0],MATOP_AXPY,&amp;t1);
+<a name="line39"> 39: </a>      } <font color="#4169E1">else</font> t1 = PETSC_TRUE;
+<a name="line40"> 40: </a>      PCSetType(pc,(t0 &amp;&amp; t1)?PCBJACOBI:PCNONE);
+<a name="line41"> 41: </a>    }
+<a name="line42"> 42: </a>  }
+<a name="line43"> 43: </a>  KSPSetErrorIfNotConverged(st-&gt;ksp,PETSC_FALSE);
+<a name="line44"> 44: </a>  <font color="#4169E1">return</font>(0);
+<a name="line45"> 45: </a>}
+
+<a name="line47"> 47: </a><strong><font color="#4169E1"><a name="STPostSolve_Precond"></a>PetscErrorCode STPostSolve_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line48"> 48: </a>{
+<a name="line50"> 50: </a>  ST_PRECOND     *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line53"> 53: </a>  <font color="#4169E1">if</font> (st-&gt;matmode == <a href="../../../../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_INPLACE</a> &amp;&amp; !(ctx-&gt;mat || (PetscAbsScalar(st-&gt;sigma)&gt;=PETSC_MAX_REAL &amp;&amp; st-&gt;nmat&gt;1))) {
+<a name="line54"> 54: </a>    <font color="#4169E1">if</font> (st-&gt;nmat&gt;1) {
+<a name="line55"> 55: </a>      MatAXPY(st-&gt;A[0],st-&gt;sigma,st-&gt;A[1],st-&gt;str);
+<a name="line56"> 56: </a>    } <font color="#4169E1">else</font> {
+<a name="line57"> 57: </a>      MatShift(st-&gt;A[0],st-&gt;sigma);
+<a name="line58"> 58: </a>    }
+<a name="line59"> 59: </a>    st-&gt;Astate[0] = ((PetscObject)st-&gt;A[0])-&gt;state;
+<a name="line60"> 60: </a>    st-&gt;state   = ST_STATE_INITIAL;
+<a name="line61"> 61: </a>    st-&gt;opready = PETSC_FALSE;
+<a name="line62"> 62: </a>  }
+<a name="line63"> 63: </a>  <font color="#4169E1">return</font>(0);
+<a name="line64"> 64: </a>}
+
+<a name="line66"> 66: </a><font color="#B22222">/*</font>
+<a name="line67"> 67: </a><font color="#B22222">   Operator (precond):</font>
+<a name="line68"> 68: </a><font color="#B22222">               Op        P         M</font>
+<a name="line69"> 69: </a><font color="#B22222">   if nmat=1:  ---       A-sI      NULL</font>
+<a name="line70"> 70: </a><font color="#B22222">   if nmat=2:  ---       A-sB      NULL</font>
+<a name="line71"> 71: </a><font color="#B22222">*/</font>
+<a name="line72"> 72: </a><strong><font color="#4169E1"><a name="STComputeOperator_Precond"></a>PetscErrorCode STComputeOperator_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line73"> 73: </a>{
+<a name="line75"> 75: </a>  ST_PRECOND     *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line78"> 78: </a>  <font color="#B22222">/* if the user did not set the shift, use the target value */</font>
+<a name="line79"> 79: </a>  <font color="#4169E1">if</font> (!st-&gt;sigma_set) st-&gt;sigma = st-&gt;defsigma;
+<a name="line80"> 80: </a>  st-&gt;M = NULL;
+
+<a name="line82"> 82: </a>  <font color="#B22222">/* P = A-sigma*B */</font>
+<a name="line83"> 83: </a>  <font color="#4169E1">if</font> (ctx-&gt;mat) {
+<a name="line84"> 84: </a>    PetscObjectReference((PetscObject)ctx-&gt;mat);
+<a name="line85"> 85: </a>    MatDestroy(&amp;st-&gt;P);
+<a name="line86"> 86: </a>    st-&gt;P = ctx-&gt;mat;
+<a name="line87"> 87: </a>  } <font color="#4169E1">else</font> {
+<a name="line88"> 88: </a>    PetscObjectReference((PetscObject)st-&gt;A[1]);
+<a name="line89"> 89: </a>    MatDestroy(&amp;st-&gt;T[0]);
+<a name="line90"> 90: </a>    st-&gt;T[0] = st-&gt;A[1];
+<a name="line91"> 91: </a>    <font color="#4169E1">if</font> (!(PetscAbsScalar(st-&gt;sigma) &lt; PETSC_MAX_REAL) &amp;&amp; st-&gt;nmat&gt;1) {
+<a name="line92"> 92: </a>      PetscObjectReference((PetscObject)st-&gt;T[0]);
+<a name="line93"> 93: </a>      MatDestroy(&amp;st-&gt;P);
+<a name="line94"> 94: </a>      st-&gt;P = st-&gt;T[0];
+<a name="line95"> 95: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (PetscAbsScalar(st-&gt;sigma)&lt;PETSC_MAX_REAL) {
+<a name="line96"> 96: </a>      STMatMAXPY_Private(st,-st-&gt;sigma,0.0,0,NULL,PetscNot(st-&gt;state==ST_STATE_UPDATED),&amp;st-&gt;T[1]);
+<a name="line97"> 97: </a>      PetscObjectReference((PetscObject)st-&gt;T[1]);
+<a name="line98"> 98: </a>      MatDestroy(&amp;st-&gt;P);
+<a name="line99"> 99: </a>      st-&gt;P = st-&gt;T[1];
+<a name="line100">100: </a>    }
+<a name="line101">101: </a>  }
+<a name="line102">102: </a>  <font color="#4169E1">return</font>(0);
+<a name="line103">103: </a>}
+
+<a name="line105">105: </a><strong><font color="#4169E1"><a name="STSetUp_Precond"></a>PetscErrorCode STSetUp_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line106">106: </a>{
+<a name="line108">108: </a>  ST_PRECOND     *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line111">111: </a>  <font color="#4169E1">if</font> (st-&gt;P) {
+<a name="line112">112: </a>    KSPSetOperators(st-&gt;ksp,ctx-&gt;ksphasmat?st-&gt;P:NULL,st-&gt;P);
+<a name="line113">113: </a>    <font color="#B22222">/* NOTE: we do not call KSPSetUp() here because some eigensolvers such as JD require a lazy setup */</font>
+<a name="line114">114: </a>  }
+<a name="line115">115: </a>  <font color="#4169E1">return</font>(0);
+<a name="line116">116: </a>}
+
+<a name="line118">118: </a><strong><font color="#4169E1"><a name="STSetShift_Precond"></a>PetscErrorCode STSetShift_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscScalar newshift)</font></strong>
+<a name="line119">119: </a>{
+<a name="line121">121: </a>  ST_PRECOND     *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line124">124: </a>  <font color="#4169E1">if</font> (st-&gt;transform &amp;&amp; !ctx-&gt;mat) {
+<a name="line125">125: </a>    STMatMAXPY_Private(st,-newshift,-st-&gt;sigma,0,NULL,PETSC_FALSE,&amp;st-&gt;T[1]);
+<a name="line126">126: </a>    <font color="#4169E1">if</font> (st-&gt;P!=st-&gt;T[1]) {
+<a name="line127">127: </a>      PetscObjectReference((PetscObject)st-&gt;T[1]);
+<a name="line128">128: </a>      MatDestroy(&amp;st-&gt;P);
+<a name="line129">129: </a>      st-&gt;P = st-&gt;T[1];
+<a name="line130">130: </a>    }
+<a name="line131">131: </a>  }
+<a name="line132">132: </a>  <font color="#4169E1">if</font> (st-&gt;P) {
+<a name="line133">133: </a>    <font color="#4169E1">if</font> (!st-&gt;ksp) { <a href="../../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;st-&gt;ksp); }
+<a name="line134">134: </a>    KSPSetOperators(st-&gt;ksp,ctx-&gt;ksphasmat?st-&gt;P:NULL,st-&gt;P);
+<a name="line135">135: </a>  }
+<a name="line136">136: </a>  <font color="#4169E1">return</font>(0);
+<a name="line137">137: </a>}
+
+<a name="line139">139: </a><strong><font color="#4169E1"><a name="STPrecondGetMatForPC_Precond"></a>static PetscErrorCode STPrecondGetMatForPC_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Mat *mat)</font></strong>
+<a name="line140">140: </a>{
+<a name="line141">141: </a>  ST_PRECOND *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line144">144: </a>  *mat = ctx-&gt;mat;
+<a name="line145">145: </a>  <font color="#4169E1">return</font>(0);
+<a name="line146">146: </a>}
+
+<a name="line148">148: </a><font color="#B22222">/*@</font>
+<a name="line149">149: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STPrecondGetMatForPC.html#STPrecondGetMatForPC">STPrecondGetMatForPC</a> - Returns the matrix previously set by <a href="../../../../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a>().</font>
+
+<a name="line151">151: </a><font color="#B22222">   Not Collective, but the Mat is shared by all processors that share the <a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a></font>
+
+<a name="line153">153: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line154">154: </a><font color="#B22222">.  st - the spectral transformation context</font>
+
+<a name="line156">156: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line157">157: </a><font color="#B22222">.  mat - the matrix that will be used in constructing the preconditioner or</font>
+<a name="line158">158: </a><font color="#B22222">   NULL if no matrix was set by <a href="../../../../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a>().</font>
+
+<a name="line160">160: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line162">162: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a>()</font>
+<a name="line163">163: </a><font color="#B22222">@*/</font>
+<a name="line164">164: </a><strong><font color="#4169E1"><a name="STPrecondGetMatForPC"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STPrecondGetMatForPC.html#STPrecondGetMatForPC">STPrecondGetMatForPC</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Mat *mat)</font></strong>
+<a name="line165">165: </a>{
+
+<a name="line171">171: </a>  PetscUseMethod(st,<font color="#666666">"STPrecondGetMatForPC_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Mat*),(st,mat));
+<a name="line172">172: </a>  <font color="#4169E1">return</font>(0);
+<a name="line173">173: </a>}
+
+<a name="line175">175: </a><strong><font color="#4169E1"><a name="STPrecondSetMatForPC_Precond"></a>static PetscErrorCode STPrecondSetMatForPC_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Mat mat)</font></strong>
+<a name="line176">176: </a>{
+<a name="line177">177: </a>  ST_PRECOND     *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line181">181: </a>  STCheckNotSeized(st,1);
+<a name="line182">182: </a>  PetscObjectReference((PetscObject)mat);
+<a name="line183">183: </a>  MatDestroy(&amp;ctx-&gt;mat);
+<a name="line184">184: </a>  ctx-&gt;mat     = mat;
+<a name="line185">185: </a>  ctx-&gt;usermat = mat? PETSC_TRUE: PETSC_FALSE;
+<a name="line186">186: </a>  st-&gt;state    = ST_STATE_INITIAL;
+<a name="line187">187: </a>  st-&gt;opready  = PETSC_FALSE;
+<a name="line188">188: </a>  <font color="#4169E1">return</font>(0);
+<a name="line189">189: </a>}
+
+<a name="line191">191: </a><font color="#B22222">/*@</font>
+<a name="line192">192: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a> - Sets the matrix that must be used to build the preconditioner.</font>
+
+<a name="line194">194: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line196">196: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line197">197: </a><font color="#B22222">+  st - the spectral transformation context</font>
+<a name="line198">198: </a><font color="#B22222">-  mat - the matrix that will be used in constructing the preconditioner</font>
+
+<a name="line200">200: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line202">202: </a><font color="#B22222">   Notes:</font>
+<a name="line203">203: </a><font color="#B22222">   This matrix will be passed to the KSP object (via KSPSetOperators) as</font>
+<a name="line204">204: </a><font color="#B22222">   the matrix to be used when constructing the preconditioner.</font>
+<a name="line205">205: </a><font color="#B22222">   If no matrix is set or mat is set to NULL, A - sigma*B will</font>
+<a name="line206">206: </a><font color="#B22222">   be used to build the preconditioner, being sigma the value set by <a href="../../../../../../docs/manualpages/ST/STSetShift.html#STSetShift">STSetShift</a>().</font>
+
+<a name="line208">208: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a>(), <a href="../../../../../../docs/manualpages/ST/STSetShift.html#STSetShift">STSetShift</a>()</font>
+<a name="line209">209: </a><font color="#B22222">@*/</font>
+<a name="line210">210: </a><strong><font color="#4169E1"><a name="STPrecondSetMatForPC"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Mat mat)</font></strong>
+<a name="line211">211: </a>{
+
+<a name="line218">218: </a>  PetscTryMethod(st,<font color="#666666">"STPrecondSetMatForPC_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,Mat),(st,mat));
+<a name="line219">219: </a>  <font color="#4169E1">return</font>(0);
+<a name="line220">220: </a>}
+
+<a name="line222">222: </a><strong><font color="#4169E1"><a name="STPrecondSetKSPHasMat_Precond"></a>static PetscErrorCode STPrecondSetKSPHasMat_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscBool ksphasmat)</font></strong>
+<a name="line223">223: </a>{
+<a name="line224">224: </a>  ST_PRECOND *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line227">227: </a>  <font color="#4169E1">if</font> (ctx-&gt;ksphasmat != ksphasmat) {
+<a name="line228">228: </a>    ctx-&gt;ksphasmat = ksphasmat;
+<a name="line229">229: </a>    st-&gt;state      = ST_STATE_INITIAL;
+<a name="line230">230: </a>  }
+<a name="line231">231: </a>  <font color="#4169E1">return</font>(0);
+<a name="line232">232: </a>}
+
+<a name="line234">234: </a><font color="#B22222">/*@</font>
+<a name="line235">235: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STPrecondSetKSPHasMat.html#STPrecondSetKSPHasMat">STPrecondSetKSPHasMat</a> - Sets a flag indicating that during <a href="../../../../../../docs/manualpages/ST/STSetUp.html#STSetUp">STSetUp</a> the coefficient</font>
+<a name="line236">236: </a><font color="#B22222">   matrix of the KSP linear solver (A) must be set to be the same matrix as the</font>
+<a name="line237">237: </a><font color="#B22222">   preconditioner (P).</font>
+
+<a name="line239">239: </a><font color="#B22222">   Collective on st</font>
+
+<a name="line241">241: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line242">242: </a><font color="#B22222">+  st - the spectral transformation context</font>
+<a name="line243">243: </a><font color="#B22222">-  ksphasmat - the flag</font>
+
+<a name="line245">245: </a><font color="#B22222">   Notes:</font>
+<a name="line246">246: </a><font color="#B22222">   Often, the preconditioner matrix is used only in the PC object, but</font>
+<a name="line247">247: </a><font color="#B22222">   in some solvers this matrix must be provided also as the A-matrix in</font>
+<a name="line248">248: </a><font color="#B22222">   the KSP object.</font>
+
+<a name="line250">250: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line252">252: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STPrecondGetKSPHasMat.html#STPrecondGetKSPHasMat">STPrecondGetKSPHasMat</a>(), <a href="../../../../../../docs/manualpages/ST/STSetShift.html#STSetShift">STSetShift</a>()</font>
+<a name="line253">253: </a><font color="#B22222">@*/</font>
+<a name="line254">254: </a><strong><font color="#4169E1"><a name="STPrecondSetKSPHasMat"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STPrecondSetKSPHasMat.html#STPrecondSetKSPHasMat">STPrecondSetKSPHasMat</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscBool ksphasmat)</font></strong>
+<a name="line255">255: </a>{
+
+<a name="line261">261: </a>  PetscTryMethod(st,<font color="#666666">"STPrecondSetKSPHasMat_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscBool),(st,ksphasmat));
+<a name="line262">262: </a>  <font color="#4169E1">return</font>(0);
+<a name="line263">263: </a>}
+
+<a name="line265">265: </a><strong><font color="#4169E1"><a name="STPrecondGetKSPHasMat_Precond"></a>static PetscErrorCode STPrecondGetKSPHasMat_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscBool *ksphasmat)</font></strong>
+<a name="line266">266: </a>{
+<a name="line267">267: </a>  ST_PRECOND *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line270">270: </a>  *ksphasmat = ctx-&gt;ksphasmat;
+<a name="line271">271: </a>  <font color="#4169E1">return</font>(0);
+<a name="line272">272: </a>}
+
+<a name="line274">274: </a><font color="#B22222">/*@</font>
+<a name="line275">275: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STPrecondGetKSPHasMat.html#STPrecondGetKSPHasMat">STPrecondGetKSPHasMat</a> - Returns the flag indicating if the coefficient</font>
+<a name="line276">276: </a><font color="#B22222">   matrix of the KSP linear system (A) is set to be the same matrix as the</font>
+<a name="line277">277: </a><font color="#B22222">   preconditioner (P).</font>
+
+<a name="line279">279: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line281">281: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line282">282: </a><font color="#B22222">.  st - the spectral transformation context</font>
+
+<a name="line284">284: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line285">285: </a><font color="#B22222">.  ksphasmat - the flag</font>
+
+<a name="line287">287: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line289">289: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STPrecondSetKSPHasMat.html#STPrecondSetKSPHasMat">STPrecondSetKSPHasMat</a>(), <a href="../../../../../../docs/manualpages/ST/STSetShift.html#STSetShift">STSetShift</a>()</font>
+<a name="line290">290: </a><font color="#B22222">@*/</font>
+<a name="line291">291: </a><strong><font color="#4169E1"><a name="STPrecondGetKSPHasMat"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STPrecondGetKSPHasMat.html#STPrecondGetKSPHasMat">STPrecondGetKSPHasMat</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscBool *ksphasmat)</font></strong>
+<a name="line292">292: </a>{
+
+<a name="line298">298: </a>  PetscUseMethod(st,<font color="#666666">"STPrecondGetKSPHasMat_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscBool*),(st,ksphasmat));
+<a name="line299">299: </a>  <font color="#4169E1">return</font>(0);
+<a name="line300">300: </a>}
+
+<a name="line302">302: </a><strong><font color="#4169E1"><a name="STDestroy_Precond"></a>PetscErrorCode STDestroy_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line303">303: </a>{
+<a name="line304">304: </a>  ST_PRECOND     *ctx = (ST_PRECOND*)st-&gt;data;
+
+<a name="line308">308: </a>  MatDestroy(&amp;ctx-&gt;mat);
+<a name="line309">309: </a>  PetscFree(st-&gt;data);
+<a name="line310">310: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondGetMatForPC_C"</font>,NULL);
+<a name="line311">311: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondSetMatForPC_C"</font>,NULL);
+<a name="line312">312: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondGetKSPHasMat_C"</font>,NULL);
+<a name="line313">313: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondSetKSPHasMat_C"</font>,NULL);
+<a name="line314">314: </a>  <font color="#4169E1">return</font>(0);
+<a name="line315">315: </a>}
+
+<a name="line317">317: </a><strong><font color="#4169E1"><a name="STCreate_Precond"></a>SLEPC_EXTERN PetscErrorCode STCreate_Precond(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line318">318: </a>{
+<a name="line320">320: </a>  ST_PRECOND     *ctx;
+
+<a name="line323">323: </a>  PetscNewLog(st,&amp;ctx);
+<a name="line324">324: </a>  st-&gt;data = (void*)ctx;
+
+<a name="line326">326: </a>  st-&gt;usesksp = PETSC_TRUE;
+
+<a name="line328">328: </a>  st-&gt;ops-&gt;apply           = STApply_Generic;
+<a name="line329">329: </a>  st-&gt;ops-&gt;applytrans      = STApplyTranspose_Generic;
+<a name="line330">330: </a>  st-&gt;ops-&gt;setshift        = STSetShift_Precond;
+<a name="line331">331: </a>  st-&gt;ops-&gt;getbilinearform = STGetBilinearForm_Default;
+<a name="line332">332: </a>  st-&gt;ops-&gt;setup           = STSetUp_Precond;
+<a name="line333">333: </a>  st-&gt;ops-&gt;computeoperator = STComputeOperator_Precond;
+<a name="line334">334: </a>  st-&gt;ops-&gt;postsolve       = STPostSolve_Precond;
+<a name="line335">335: </a>  st-&gt;ops-&gt;destroy         = STDestroy_Precond;
+<a name="line336">336: </a>  st-&gt;ops-&gt;setdefaultksp   = STSetDefaultKSP_Precond;
+
+<a name="line338">338: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondGetMatForPC_C"</font>,STPrecondGetMatForPC_Precond);
+<a name="line339">339: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondSetMatForPC_C"</font>,STPrecondSetMatForPC_Precond);
+<a name="line340">340: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondGetKSPHasMat_C"</font>,STPrecondGetKSPHasMat_Precond);
+<a name="line341">341: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STPrecondSetKSPHasMat_C"</font>,STPrecondSetKSPHasMat_Precond);
+<a name="line342">342: </a>  <font color="#4169E1">return</font>(0);
+<a name="line343">343: </a>}
+
+</pre>
+</body>
+
+</html>

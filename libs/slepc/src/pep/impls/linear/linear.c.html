@@ -1,0 +1,1049 @@
+<center><a href="linear.c">Actual source code: linear.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/impls/linear/linear.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:05+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/impls/linear/linear.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Explicit linearization for polynomial eigenproblems</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../include/slepc/private/pepimpl.h.html">&lt;slepc/private/pepimpl.h&gt;</A>
+<a name="line15"> 15: </a><font color="#A020F0">#include </font><font color="#666666">"linear.h"</font><font color="#A020F0"></font>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="MatMult_Linear_Shift"></a>static PetscErrorCode MatMult_Linear_Shift(Mat M,Vec x,Vec y)</font></strong>
+<a name="line18"> 18: </a>{
+<a name="line19"> 19: </a>  PetscErrorCode    ierr;
+<a name="line20"> 20: </a>  PEP_LINEAR        *ctx;
+<a name="line21"> 21: </a>  <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>               pep;
+<a name="line22"> 22: </a>  const PetscScalar *px;
+<a name="line23"> 23: </a>  PetscScalar       *py,a,sigma=0.0;
+<a name="line24"> 24: </a>  PetscInt          nmat,deg,i,m;
+<a name="line25"> 25: </a>  Vec               x1,x2,x3,y1,aux;
+<a name="line26"> 26: </a>  PetscReal         *ca,*cb,*cg;
+<a name="line27"> 27: </a>  PetscBool         flg;
+
+<a name="line30"> 30: </a>  MatShellGetContext(M,(void**)&amp;ctx);
+<a name="line31"> 31: </a>  pep = ctx-&gt;pep;
+<a name="line32"> 32: </a>  <a href="../../../../docs/manualpages/ST/STGetTransform.html#STGetTransform">STGetTransform</a>(pep-&gt;st,&amp;flg);
+<a name="line33"> 33: </a>  <font color="#4169E1">if</font> (!flg) {
+<a name="line34"> 34: </a>    <a href="../../../../docs/manualpages/ST/STGetShift.html#STGetShift">STGetShift</a>(pep-&gt;st,&amp;sigma);
+<a name="line35"> 35: </a>  }
+<a name="line36"> 36: </a>  nmat = pep-&gt;nmat;
+<a name="line37"> 37: </a>  deg = nmat-1;
+<a name="line38"> 38: </a>  m = pep-&gt;nloc;
+<a name="line39"> 39: </a>  ca = pep-&gt;pbc;
+<a name="line40"> 40: </a>  cb = pep-&gt;pbc+nmat;
+<a name="line41"> 41: </a>  cg = pep-&gt;pbc+2*nmat;
+<a name="line42"> 42: </a>  x1=ctx-&gt;w[0];x2=ctx-&gt;w[1];x3=ctx-&gt;w[2];y1=ctx-&gt;w[3];aux=ctx-&gt;w[4];
+
+<a name="line44"> 44: </a>  VecSet(y,0.0);
+<a name="line45"> 45: </a>  VecGetArrayRead(x,&amp;px);
+<a name="line46"> 46: </a>  VecGetArray(y,&amp;py);
+<a name="line47"> 47: </a>  a = 1.0;
+
+<a name="line49"> 49: </a>  <font color="#B22222">/* first block */</font>
+<a name="line50"> 50: </a>  VecPlaceArray(x2,px);
+<a name="line51"> 51: </a>  VecPlaceArray(x3,px+m);
+<a name="line52"> 52: </a>  VecPlaceArray(y1,py);
+<a name="line53"> 53: </a>  VecAXPY(y1,cb[0]-sigma,x2);
+<a name="line54"> 54: </a>  VecAXPY(y1,ca[0],x3);
+<a name="line55"> 55: </a>  VecResetArray(x2);
+<a name="line56"> 56: </a>  VecResetArray(x3);
+<a name="line57"> 57: </a>  VecResetArray(y1);
+
+<a name="line59"> 59: </a>  <font color="#B22222">/* inner blocks */</font>
+<a name="line60"> 60: </a>  <font color="#4169E1">for</font> (i=1;i&lt;deg-1;i++) {
+<a name="line61"> 61: </a>    VecPlaceArray(x1,px+(i-1)*m);
+<a name="line62"> 62: </a>    VecPlaceArray(x2,px+i*m);
+<a name="line63"> 63: </a>    VecPlaceArray(x3,px+(i+1)*m);
+<a name="line64"> 64: </a>    VecPlaceArray(y1,py+i*m);
+<a name="line65"> 65: </a>    VecAXPY(y1,cg[i],x1);
+<a name="line66"> 66: </a>    VecAXPY(y1,cb[i]-sigma,x2);
+<a name="line67"> 67: </a>    VecAXPY(y1,ca[i],x3);
+<a name="line68"> 68: </a>    VecResetArray(x1);
+<a name="line69"> 69: </a>    VecResetArray(x2);
+<a name="line70"> 70: </a>    VecResetArray(x3);
+<a name="line71"> 71: </a>    VecResetArray(y1);
+<a name="line72"> 72: </a>  }
+
+<a name="line74"> 74: </a>  <font color="#B22222">/* last block */</font>
+<a name="line75"> 75: </a>  VecPlaceArray(y1,py+(deg-1)*m);
+<a name="line76"> 76: </a>  <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) {
+<a name="line77"> 77: </a>    VecPlaceArray(x1,px+i*m);
+<a name="line78"> 78: </a>    <a href="../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>(pep-&gt;st,i,x1,aux);
+<a name="line79"> 79: </a>    VecAXPY(y1,a,aux);
+<a name="line80"> 80: </a>    VecResetArray(x1);
+<a name="line81"> 81: </a>    a *= pep-&gt;sfactor;
+<a name="line82"> 82: </a>  }
+<a name="line83"> 83: </a>  VecCopy(y1,aux);
+<a name="line84"> 84: </a>  <a href="../../../../docs/manualpages/ST/STMatSolve.html#STMatSolve">STMatSolve</a>(pep-&gt;st,aux,y1);
+<a name="line85"> 85: </a>  VecScale(y1,-ca[deg-1]/a);
+<a name="line86"> 86: </a>  VecPlaceArray(x1,px+(deg-2)*m);
+<a name="line87"> 87: </a>  VecPlaceArray(x2,px+(deg-1)*m);
+<a name="line88"> 88: </a>  VecAXPY(y1,cg[deg-1],x1);
+<a name="line89"> 89: </a>  VecAXPY(y1,cb[deg-1]-sigma,x2);
+<a name="line90"> 90: </a>  VecResetArray(x1);
+<a name="line91"> 91: </a>  VecResetArray(x2);
+<a name="line92"> 92: </a>  VecResetArray(y1);
+
+<a name="line94"> 94: </a>  VecRestoreArrayRead(x,&amp;px);
+<a name="line95"> 95: </a>  VecRestoreArray(y,&amp;py);
+<a name="line96"> 96: </a>  <font color="#4169E1">return</font>(0);
+<a name="line97"> 97: </a>}
+
+<a name="line99"> 99: </a><strong><font color="#4169E1"><a name="MatMult_Linear_Sinvert"></a>static PetscErrorCode MatMult_Linear_Sinvert(Mat M,Vec x,Vec y)</font></strong>
+<a name="line100">100: </a>{
+<a name="line101">101: </a>  PetscErrorCode    ierr;
+<a name="line102">102: </a>  PEP_LINEAR        *ctx;
+<a name="line103">103: </a>  <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>               pep;
+<a name="line104">104: </a>  const PetscScalar *px;
+<a name="line105">105: </a>  PetscScalar       *py,a,sigma,t=1.0,tp=0.0,tt;
+<a name="line106">106: </a>  PetscInt          nmat,deg,i,m;
+<a name="line107">107: </a>  Vec               x1,y1,y2,y3,aux,aux2;
+<a name="line108">108: </a>  PetscReal         *ca,*cb,*cg;
+
+<a name="line111">111: </a>  MatShellGetContext(M,(void**)&amp;ctx);
+<a name="line112">112: </a>  pep = ctx-&gt;pep;
+<a name="line113">113: </a>  nmat = pep-&gt;nmat;
+<a name="line114">114: </a>  deg = nmat-1;
+<a name="line115">115: </a>  m = pep-&gt;nloc;
+<a name="line116">116: </a>  ca = pep-&gt;pbc;
+<a name="line117">117: </a>  cb = pep-&gt;pbc+nmat;
+<a name="line118">118: </a>  cg = pep-&gt;pbc+2*nmat;
+<a name="line119">119: </a>  x1=ctx-&gt;w[0];y1=ctx-&gt;w[1];y2=ctx-&gt;w[2];y3=ctx-&gt;w[3];aux=ctx-&gt;w[4];aux2=ctx-&gt;w[5];
+<a name="line120">120: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetTarget.html#EPSGetTarget">EPSGetTarget</a>(ctx-&gt;eps,&amp;sigma);
+<a name="line121">121: </a>  VecSet(y,0.0);
+<a name="line122">122: </a>  VecGetArrayRead(x,&amp;px);
+<a name="line123">123: </a>  VecGetArray(y,&amp;py);
+<a name="line124">124: </a>  a = pep-&gt;sfactor;
+
+<a name="line126">126: </a>  <font color="#B22222">/* first block */</font>
+<a name="line127">127: </a>  VecPlaceArray(x1,px);
+<a name="line128">128: </a>  VecPlaceArray(y1,py+m);
+<a name="line129">129: </a>  VecCopy(x1,y1);
+<a name="line130">130: </a>  VecScale(y1,1.0/ca[0]);
+<a name="line131">131: </a>  VecResetArray(x1);
+<a name="line132">132: </a>  VecResetArray(y1);
+
+<a name="line134">134: </a>  <font color="#B22222">/* second block */</font>
+<a name="line135">135: </a>  <font color="#4169E1">if</font> (deg&gt;2) {
+<a name="line136">136: </a>    VecPlaceArray(x1,px+m);
+<a name="line137">137: </a>    VecPlaceArray(y1,py+m);
+<a name="line138">138: </a>    VecPlaceArray(y2,py+2*m);
+<a name="line139">139: </a>    VecCopy(x1,y2);
+<a name="line140">140: </a>    VecAXPY(y2,sigma-cb[1],y1);
+<a name="line141">141: </a>    VecScale(y2,1.0/ca[1]);
+<a name="line142">142: </a>    VecResetArray(x1);
+<a name="line143">143: </a>    VecResetArray(y1);
+<a name="line144">144: </a>    VecResetArray(y2);
+<a name="line145">145: </a>  }
+
+<a name="line147">147: </a>  <font color="#B22222">/* inner blocks */</font>
+<a name="line148">148: </a>  <font color="#4169E1">for</font> (i=2;i&lt;deg-1;i++) {
+<a name="line149">149: </a>    VecPlaceArray(x1,px+i*m);
+<a name="line150">150: </a>    VecPlaceArray(y1,py+(i-1)*m);
+<a name="line151">151: </a>    VecPlaceArray(y2,py+i*m);
+<a name="line152">152: </a>    VecPlaceArray(y3,py+(i+1)*m);
+<a name="line153">153: </a>    VecCopy(x1,y3);
+<a name="line154">154: </a>    VecAXPY(y3,sigma-cb[i],y2);
+<a name="line155">155: </a>    VecAXPY(y3,-cg[i],y1);
+<a name="line156">156: </a>    VecScale(y3,1.0/ca[i]);
+<a name="line157">157: </a>    VecResetArray(x1);
+<a name="line158">158: </a>    VecResetArray(y1);
+<a name="line159">159: </a>    VecResetArray(y2);
+<a name="line160">160: </a>    VecResetArray(y3);
+<a name="line161">161: </a>  }
+
+<a name="line163">163: </a>  <font color="#B22222">/* last block */</font>
+<a name="line164">164: </a>  VecPlaceArray(y1,py);
+<a name="line165">165: </a>  <font color="#4169E1">for</font> (i=0;i&lt;deg-2;i++) {
+<a name="line166">166: </a>    VecPlaceArray(y2,py+(i+1)*m);
+<a name="line167">167: </a>    <a href="../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>(pep-&gt;st,i+1,y2,aux);
+<a name="line168">168: </a>    VecAXPY(y1,a,aux);
+<a name="line169">169: </a>    VecResetArray(y2);
+<a name="line170">170: </a>    a *= pep-&gt;sfactor;
+<a name="line171">171: </a>  }
+<a name="line172">172: </a>  i = deg-2;
+<a name="line173">173: </a>  VecPlaceArray(y2,py+(i+1)*m);
+<a name="line174">174: </a>  VecPlaceArray(y3,py+i*m);
+<a name="line175">175: </a>  VecCopy(y2,aux2);
+<a name="line176">176: </a>  VecAXPY(aux2,cg[i+1]/ca[i+1],y3);
+<a name="line177">177: </a>  <a href="../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>(pep-&gt;st,i+1,aux2,aux);
+<a name="line178">178: </a>  VecAXPY(y1,a,aux);
+<a name="line179">179: </a>  VecResetArray(y2);
+<a name="line180">180: </a>  VecResetArray(y3);
+<a name="line181">181: </a>  a *= pep-&gt;sfactor;
+<a name="line182">182: </a>  i = deg-1;
+<a name="line183">183: </a>  VecPlaceArray(x1,px+i*m);
+<a name="line184">184: </a>  VecPlaceArray(y3,py+i*m);
+<a name="line185">185: </a>  VecCopy(x1,aux2);
+<a name="line186">186: </a>  VecAXPY(aux2,sigma-cb[i],y3);
+<a name="line187">187: </a>  VecScale(aux2,1.0/ca[i]);
+<a name="line188">188: </a>  <a href="../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>(pep-&gt;st,i+1,aux2,aux);
+<a name="line189">189: </a>  VecAXPY(y1,a,aux);
+<a name="line190">190: </a>  VecResetArray(x1);
+<a name="line191">191: </a>  VecResetArray(y3);
+
+<a name="line193">193: </a>  VecCopy(y1,aux);
+<a name="line194">194: </a>  <a href="../../../../docs/manualpages/ST/STMatSolve.html#STMatSolve">STMatSolve</a>(pep-&gt;st,aux,y1);
+<a name="line195">195: </a>  VecScale(y1,-1.0);
+
+<a name="line197">197: </a>  <font color="#B22222">/* final update */</font>
+<a name="line198">198: </a>  <font color="#4169E1">for</font> (i=1;i&lt;deg;i++) {
+<a name="line199">199: </a>    VecPlaceArray(y2,py+i*m);
+<a name="line200">200: </a>    tt = t;
+<a name="line201">201: </a>    t = ((sigma-cb[i-1])*t-cg[i-1]*tp)/ca[i-1]; <font color="#B22222">/* i-th basis polynomial */</font>
+<a name="line202">202: </a>    tp = tt;
+<a name="line203">203: </a>    VecAXPY(y2,t,y1);
+<a name="line204">204: </a>    VecResetArray(y2);
+<a name="line205">205: </a>  }
+<a name="line206">206: </a>  VecResetArray(y1);
+
+<a name="line208">208: </a>  VecRestoreArrayRead(x,&amp;px);
+<a name="line209">209: </a>  VecRestoreArray(y,&amp;py);
+<a name="line210">210: </a>  <font color="#4169E1">return</font>(0);
+<a name="line211">211: </a>}
+
+<a name="line213">213: </a><strong><font color="#4169E1"><a name="BackTransform_Linear"></a>static PetscErrorCode BackTransform_Linear(<a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt n,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line214">214: </a>{
+<a name="line216">216: </a>  PEP_LINEAR     *ctx;
+<a name="line217">217: </a>  <a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a>             stctx;
+
+<a name="line220">220: </a>  <a href="../../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>(st,(void**)&amp;ctx);
+<a name="line221">221: </a>  <a href="../../../../docs/manualpages/PEP/PEPGetST.html#PEPGetST">PEPGetST</a>(ctx-&gt;pep,&amp;stctx);
+<a name="line222">222: </a>  <a href="../../../../docs/manualpages/ST/STBackTransform.html#STBackTransform">STBackTransform</a>(stctx,n,eigr,eigi);
+<a name="line223">223: </a>  <font color="#4169E1">return</font>(0);
+<a name="line224">224: </a>}
+
+<a name="line226">226: </a><font color="#B22222">/*</font>
+<a name="line227">227: </a><font color="#B22222">   Dummy backtransform operation</font>
+<a name="line228">228: </a><font color="#B22222"> */</font>
+<a name="line229">229: </a><strong><font color="#4169E1"><a name="BackTransform_Skip"></a>static PetscErrorCode BackTransform_Skip(<a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt n,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line230">230: </a>{
+<a name="line232">232: </a>  <font color="#4169E1">return</font>(0);
+<a name="line233">233: </a>}
+
+<a name="line235">235: </a><strong><font color="#4169E1"><a name="Apply_Linear"></a>static PetscErrorCode Apply_Linear(<a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec x,Vec y)</font></strong>
+<a name="line236">236: </a>{
+<a name="line238">238: </a>  PEP_LINEAR     *ctx;
+
+<a name="line241">241: </a>  <a href="../../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>(st,(void**)&amp;ctx);
+<a name="line242">242: </a>  MatMult(ctx-&gt;A,x,y);
+<a name="line243">243: </a>  <font color="#4169E1">return</font>(0);
+<a name="line244">244: </a>}
+
+<a name="line246">246: </a><strong><font color="#4169E1"><a name="PEPSetUp_Linear"></a>PetscErrorCode PEPSetUp_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line247">247: </a>{
+<a name="line249">249: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+<a name="line250">250: </a>  <a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+<a name="line251">251: </a>  PetscInt       i=0,deg=pep-&gt;nmat-1;
+<a name="line252">252: </a>  <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPSWhich</a>       which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a>;
+<a name="line253">253: </a>  <a href="../../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPSProblemType</a> ptype;
+<a name="line254">254: </a>  PetscBool      trackall,istrivial,transf,shift,sinv,ks;
+<a name="line255">255: </a>  PetscScalar    sigma,*epsarray,*peparray;
+<a name="line256">256: </a>  Vec            veps,w=NULL;
+<a name="line257">257: </a>  <font color="#B22222">/* function tables */</font>
+<a name="line258">258: </a>  PetscErrorCode (*fcreate[][2])(MPI_Comm,PEP_LINEAR*,Mat*) = {
+<a name="line259">259: </a>    { MatCreateExplicit_Linear_NA, MatCreateExplicit_Linear_NB },
+<a name="line260">260: </a>    { MatCreateExplicit_Linear_SA, MatCreateExplicit_Linear_SB },
+<a name="line261">261: </a>    { MatCreateExplicit_Linear_HA, MatCreateExplicit_Linear_HB },
+<a name="line262">262: </a>  };
+
+<a name="line265">265: </a>  <font color="#4169E1">if</font> (pep-&gt;stopping!=<a href="../../../../docs/manualpages/PEP/PEPStoppingBasic.html#PEPStoppingBasic">PEPStoppingBasic</a>) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"User-defined stopping test not supported"</font>);
+<a name="line266">266: </a>  pep-&gt;lineariz = PETSC_TRUE;
+<a name="line267">267: </a>  <a href="../../../../docs/manualpages/ST/STGetTransform.html#STGetTransform">STGetTransform</a>(pep-&gt;st,&amp;transf);
+<a name="line268">268: </a>  PetscObjectTypeCompare((PetscObject)pep-&gt;st,STSHIFT,&amp;shift);
+<a name="line269">269: </a>  PetscObjectTypeCompare((PetscObject)pep-&gt;st,STSINVERT,&amp;sinv);
+<a name="line270">270: </a>  <font color="#4169E1">if</font> (!shift &amp;&amp; !sinv) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Only STSHIFT and STSINVERT spectral transformations can be used"</font>);
+<a name="line271">271: </a>  <font color="#4169E1">if</font> (!pep-&gt;which) {
+<a name="line272">272: </a>    <font color="#4169E1">if</font> (sinv) pep-&gt;which = <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_MAGNITUDE</a>;
+<a name="line273">273: </a>    <font color="#4169E1">else</font> pep-&gt;which = <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_MAGNITUDE</a>;
+<a name="line274">274: </a>  }
+<a name="line275">275: </a>  <font color="#4169E1">if</font> (pep-&gt;which==<a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_ALL</a>) SETERRQ(PetscObjectComm((PetscObject)pep),1,<font color="#666666">"Wrong value of pep-&gt;which"</font>);
+<a name="line276">276: </a>  <a href="../../../../docs/manualpages/ST/STSetUp.html#STSetUp">STSetUp</a>(pep-&gt;st);
+<a name="line277">277: </a>  <font color="#4169E1">if</font> (!ctx-&gt;eps) { <a href="../../../../docs/manualpages/PEP/PEPLinearGetEPS.html#PEPLinearGetEPS">PEPLinearGetEPS</a>(pep,&amp;ctx-&gt;eps); }
+<a name="line278">278: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(ctx-&gt;eps,&amp;st);
+<a name="line279">279: </a>  <font color="#4169E1">if</font> (!transf &amp;&amp; !ctx-&gt;usereps) { <a href="../../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(ctx-&gt;eps,pep-&gt;target); }
+<a name="line280">280: </a>  <font color="#4169E1">if</font> (sinv &amp;&amp; !transf &amp;&amp; !ctx-&gt;usereps) { <a href="../../../../docs/manualpages/ST/STSetDefaultShift.html#STSetDefaultShift">STSetDefaultShift</a>(st,pep-&gt;target); }
+<a name="line281">281: </a>  <font color="#B22222">/* compute scale factor if not set by user */</font>
+<a name="line282">282: </a>  PEPComputeScaleFactor(pep);
+
+<a name="line284">284: </a>  <font color="#4169E1">if</font> (ctx-&gt;explicitmatrix) {
+<a name="line285">285: </a>    <font color="#4169E1">if</font> (transf) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Explicit matrix option is not implemented with st-transform flag active"</font>);
+<a name="line286">286: </a>    <font color="#4169E1">if</font> (pep-&gt;nmat!=3) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Explicit matrix option only available for quadratic problems"</font>);
+<a name="line287">287: </a>    <font color="#4169E1">if</font> (pep-&gt;basis!=<a href="../../../../docs/manualpages/PEP/PEPBasis.html#PEPBasis">PEP_BASIS_MONOMIAL</a>) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Explicit matrix option not implemented for non-monomial bases"</font>);
+<a name="line288">288: </a>    <font color="#4169E1">if</font> (pep-&gt;scale==<a href="../../../../docs/manualpages/PEP/PEPScale.html#PEPScale">PEP_SCALE_DIAGONAL</a> || pep-&gt;scale==<a href="../../../../docs/manualpages/PEP/PEPScale.html#PEPScale">PEP_SCALE_BOTH</a>) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Diagonal scaling not allowed in PEPLINEAR with explicit matrices"</font>);
+<a name="line289">289: </a>    <font color="#4169E1">if</font> (sinv &amp;&amp; !transf) { <a href="../../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STSINVERT); }
+<a name="line290">290: </a>    <a href="../../../../docs/manualpages/RG/RGPushScale.html#RGPushScale">RGPushScale</a>(pep-&gt;rg,1.0/pep-&gt;sfactor);
+<a name="line291">291: </a>    <a href="../../../../docs/manualpages/ST/STGetMatrixTransformed.html#STGetMatrixTransformed">STGetMatrixTransformed</a>(pep-&gt;st,0,&amp;ctx-&gt;K);
+<a name="line292">292: </a>    <a href="../../../../docs/manualpages/ST/STGetMatrixTransformed.html#STGetMatrixTransformed">STGetMatrixTransformed</a>(pep-&gt;st,1,&amp;ctx-&gt;C);
+<a name="line293">293: </a>    <a href="../../../../docs/manualpages/ST/STGetMatrixTransformed.html#STGetMatrixTransformed">STGetMatrixTransformed</a>(pep-&gt;st,2,&amp;ctx-&gt;M);
+<a name="line294">294: </a>    ctx-&gt;sfactor = pep-&gt;sfactor;
+<a name="line295">295: </a>    ctx-&gt;dsfactor = pep-&gt;dsfactor;
+
+<a name="line297">297: </a>    MatDestroy(&amp;ctx-&gt;A);
+<a name="line298">298: </a>    MatDestroy(&amp;ctx-&gt;B);
+<a name="line299">299: </a>    VecDestroy(&amp;ctx-&gt;w[0]);
+<a name="line300">300: </a>    VecDestroy(&amp;ctx-&gt;w[1]);
+<a name="line301">301: </a>    VecDestroy(&amp;ctx-&gt;w[2]);
+<a name="line302">302: </a>    VecDestroy(&amp;ctx-&gt;w[3]);
+
+<a name="line304">304: </a>    <font color="#4169E1">switch</font> (pep-&gt;problem_type) {
+<a name="line305">305: </a>      <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GENERAL</a>:    i = 0; <font color="#4169E1">break</font>;
+<a name="line306">306: </a>      <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_HERMITIAN</a>:
+<a name="line307">307: </a>      <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_HYPERBOLIC</a>: i = 1; <font color="#4169E1">break</font>;
+<a name="line308">308: </a>      <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GYROSCOPIC</a>: i = 2; <font color="#4169E1">break</font>;
+<a name="line309">309: </a>    }
+
+<a name="line311">311: </a>    (*fcreate[i][0])(PetscObjectComm((PetscObject)pep),ctx,&amp;ctx-&gt;A);
+<a name="line312">312: </a>    (*fcreate[i][1])(PetscObjectComm((PetscObject)pep),ctx,&amp;ctx-&gt;B);
+<a name="line313">313: </a>    PetscLogObjectParent((PetscObject)pep,(PetscObject)ctx-&gt;A);
+<a name="line314">314: </a>    PetscLogObjectParent((PetscObject)pep,(PetscObject)ctx-&gt;B);
+
+<a name="line316">316: </a>  } <font color="#4169E1">else</font> {   <font color="#B22222">/* implicit matrix */</font>
+<a name="line317">317: </a>    <font color="#4169E1">if</font> (pep-&gt;problem_type!=<a href="../../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GENERAL</a>) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Must use the explicit matrix option if problem type is not general"</font>);
+<a name="line318">318: </a>    <font color="#4169E1">if</font> (!((PetscObject)(ctx-&gt;eps))-&gt;type_name) {
+<a name="line319">319: </a>      <a href="../../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(ctx-&gt;eps,EPSKRYLOVSCHUR);
+<a name="line320">320: </a>    } <font color="#4169E1">else</font> {
+<a name="line321">321: </a>      PetscObjectTypeCompare((PetscObject)ctx-&gt;eps,EPSKRYLOVSCHUR,&amp;ks);
+<a name="line322">322: </a>      <font color="#4169E1">if</font> (!ks) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Implicit matrix option only implemented for Krylov-Schur"</font>);
+<a name="line323">323: </a>    }
+<a name="line324">324: </a>    <font color="#4169E1">if</font> (ctx-&gt;alpha!=1.0 || ctx-&gt;beta!=0.0) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Implicit matrix option does not support changing alpha,beta parameters of the linearization"</font>);
+<a name="line325">325: </a>    <a href="../../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,<a href="../../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>);
+<a name="line326">326: </a>    <a href="../../../../docs/manualpages/ST/STShellSetContext.html#STShellSetContext">STShellSetContext</a>(st,(PetscObject)ctx);
+<a name="line327">327: </a>    <font color="#4169E1">if</font> (!transf) { <a href="../../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>(st,BackTransform_Linear); }
+<a name="line328">328: </a>    <font color="#4169E1">else</font> { <a href="../../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>(st,BackTransform_Skip); }
+<a name="line329">329: </a>    <a href="../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(pep-&gt;A[0],&amp;ctx-&gt;w[0],&amp;ctx-&gt;w[1]);
+<a name="line330">330: </a>    <a href="../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(pep-&gt;A[0],&amp;ctx-&gt;w[2],&amp;ctx-&gt;w[3]);
+<a name="line331">331: </a>    MatCreateVecs(pep-&gt;A[0],&amp;ctx-&gt;w[4],&amp;ctx-&gt;w[5]);
+<a name="line332">332: </a>    PetscLogObjectParents(pep,6,ctx-&gt;w);
+<a name="line333">333: </a>    MatCreateShell(PetscObjectComm((PetscObject)pep),deg*pep-&gt;nloc,deg*pep-&gt;nloc,deg*pep-&gt;n,deg*pep-&gt;n,ctx,&amp;ctx-&gt;A);
+<a name="line334">334: </a>    <font color="#4169E1">if</font> (sinv &amp;&amp; !transf) {
+<a name="line335">335: </a>      MatShellSetOperation(ctx-&gt;A,MATOP_MULT,(void(*)(void))MatMult_Linear_Sinvert);
+<a name="line336">336: </a>    } <font color="#4169E1">else</font> {
+<a name="line337">337: </a>      MatShellSetOperation(ctx-&gt;A,MATOP_MULT,(void(*)(void))MatMult_Linear_Shift);
+<a name="line338">338: </a>    }
+<a name="line339">339: </a>    <a href="../../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a>(st,Apply_Linear);
+<a name="line340">340: </a>    PetscLogObjectParent((PetscObject)pep,(PetscObject)ctx-&gt;A);
+<a name="line341">341: </a>    ctx-&gt;pep = pep;
+
+<a name="line343">343: </a>    PEPBasisCoefficients(pep,pep-&gt;pbc);
+<a name="line344">344: </a>    <font color="#4169E1">if</font> (!transf) {
+<a name="line345">345: </a>      PetscMalloc1(pep-&gt;nmat,&amp;pep-&gt;solvematcoeffs);
+<a name="line346">346: </a>      PetscLogObjectMemory((PetscObject)pep,pep-&gt;nmat*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line347">347: </a>      <font color="#4169E1">if</font> (sinv) {
+<a name="line348">348: </a>        PEPEvaluateBasis(pep,pep-&gt;target,0,pep-&gt;solvematcoeffs,NULL);
+<a name="line349">349: </a>      } <font color="#4169E1">else</font> {
+<a name="line350">350: </a>        <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) pep-&gt;solvematcoeffs[i] = 0.0;
+<a name="line351">351: </a>        pep-&gt;solvematcoeffs[deg] = 1.0;
+<a name="line352">352: </a>      }
+<a name="line353">353: </a>      <a href="../../../../docs/manualpages/ST/STScaleShift.html#STScaleShift">STScaleShift</a>(pep-&gt;st,1.0/pep-&gt;sfactor);
+<a name="line354">354: </a>      <a href="../../../../docs/manualpages/RG/RGPushScale.html#RGPushScale">RGPushScale</a>(pep-&gt;rg,1.0/pep-&gt;sfactor);
+<a name="line355">355: </a>    }
+<a name="line356">356: </a>    <font color="#4169E1">if</font> (pep-&gt;sfactor!=1.0) {
+<a name="line357">357: </a>      <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line358">358: </a>        pep-&gt;pbc[pep-&gt;nmat+i] /= pep-&gt;sfactor;
+<a name="line359">359: </a>        pep-&gt;pbc[2*pep-&gt;nmat+i] /= pep-&gt;sfactor*pep-&gt;sfactor;
+<a name="line360">360: </a>      }
+<a name="line361">361: </a>    }
+<a name="line362">362: </a>  }
+
+<a name="line364">364: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(ctx-&gt;eps,ctx-&gt;A,ctx-&gt;B);
+<a name="line365">365: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetProblemType.html#EPSGetProblemType">EPSGetProblemType</a>(ctx-&gt;eps,&amp;ptype);
+<a name="line366">366: </a>  <font color="#4169E1">if</font> (!ptype) {
+<a name="line367">367: </a>    <font color="#4169E1">if</font> (ctx-&gt;explicitmatrix) {
+<a name="line368">368: </a>      <a href="../../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(ctx-&gt;eps,<a href="../../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GNHEP</a>);
+<a name="line369">369: </a>    } <font color="#4169E1">else</font> {
+<a name="line370">370: </a>      <a href="../../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(ctx-&gt;eps,<a href="../../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_NHEP</a>);
+<a name="line371">371: </a>    }
+<a name="line372">372: </a>  }
+<a name="line373">373: </a>  <font color="#4169E1">if</font> (!ctx-&gt;usereps) {
+<a name="line374">374: </a>    <font color="#4169E1">if</font> (transf) which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a>;
+<a name="line375">375: </a>    <font color="#4169E1">else</font> {
+<a name="line376">376: </a>      <font color="#4169E1">switch</font> (pep-&gt;which) {
+<a name="line377">377: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_MAGNITUDE</a>:  which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a>; <font color="#4169E1">break</font>;
+<a name="line378">378: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_SMALLEST_MAGNITUDE</a>: which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_MAGNITUDE</a>; <font color="#4169E1">break</font>;
+<a name="line379">379: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_REAL</a>:       which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>; <font color="#4169E1">break</font>;
+<a name="line380">380: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_SMALLEST_REAL</a>:      which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>; <font color="#4169E1">break</font>;
+<a name="line381">381: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_LARGEST_IMAGINARY</a>:  which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_IMAGINARY</a>; <font color="#4169E1">break</font>;
+<a name="line382">382: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_SMALLEST_IMAGINARY</a>: which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_IMAGINARY</a>; <font color="#4169E1">break</font>;
+<a name="line383">383: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_MAGNITUDE</a>:   which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a>; <font color="#4169E1">break</font>;
+<a name="line384">384: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_REAL</a>:        which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_REAL</a>; <font color="#4169E1">break</font>;
+<a name="line385">385: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_IMAGINARY</a>:   which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_IMAGINARY</a>; <font color="#4169E1">break</font>;
+<a name="line386">386: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_ALL</a>:                which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a>; <font color="#4169E1">break</font>;
+<a name="line387">387: </a>        <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_WHICH_USER</a>:         which = <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_WHICH_USER</a>;
+<a name="line388">388: </a>          <a href="../../../../docs/manualpages/EPS/EPSSetEigenvalueComparison.html#EPSSetEigenvalueComparison">EPSSetEigenvalueComparison</a>(ctx-&gt;eps,pep-&gt;sc-&gt;comparison,pep-&gt;sc-&gt;comparisonctx);
+<a name="line389">389: </a>          <font color="#4169E1">break</font>;
+<a name="line390">390: </a>      }
+<a name="line391">391: </a>    }
+<a name="line392">392: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(ctx-&gt;eps,which);
+
+<a name="line394">394: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(ctx-&gt;eps,pep-&gt;nev,pep-&gt;ncv,pep-&gt;mpd);
+<a name="line395">395: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetTolerances.html#EPSSetTolerances">EPSSetTolerances</a>(ctx-&gt;eps,pep-&gt;tol==PETSC_DEFAULT?SLEPC_DEFAULT_TOL:pep-&gt;tol,pep-&gt;max_it);
+<a name="line396">396: </a>  }
+<a name="line397">397: </a>  <a href="../../../../docs/manualpages/RG/RGIsTrivial.html#RGIsTrivial">RGIsTrivial</a>(pep-&gt;rg,&amp;istrivial);
+<a name="line398">398: </a>  <font color="#4169E1">if</font> (!istrivial) {
+<a name="line399">399: </a>    <font color="#4169E1">if</font> (transf) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"PEPLINEAR does not support a nontrivial region with st-transform"</font>);
+<a name="line400">400: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetRG.html#EPSSetRG">EPSSetRG</a>(ctx-&gt;eps,pep-&gt;rg);
+<a name="line401">401: </a>  }
+<a name="line402">402: </a>  <font color="#B22222">/* Transfer the trackall option from pep to eps */</font>
+<a name="line403">403: </a>  <a href="../../../../docs/manualpages/PEP/PEPGetTrackAll.html#PEPGetTrackAll">PEPGetTrackAll</a>(pep,&amp;trackall);
+<a name="line404">404: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetTrackAll.html#EPSSetTrackAll">EPSSetTrackAll</a>(ctx-&gt;eps,trackall);
+
+<a name="line406">406: </a>  <font color="#B22222">/* temporary change of target */</font>
+<a name="line407">407: </a>  <font color="#4169E1">if</font> (pep-&gt;sfactor!=1.0) {
+<a name="line408">408: </a>    <a href="../../../../docs/manualpages/EPS/EPSGetTarget.html#EPSGetTarget">EPSGetTarget</a>(ctx-&gt;eps,&amp;sigma);
+<a name="line409">409: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(ctx-&gt;eps,sigma/pep-&gt;sfactor);
+<a name="line410">410: </a>  }
+
+<a name="line412">412: </a>  <font color="#B22222">/* process initial vector */</font>
+<a name="line413">413: </a>  <font color="#4169E1">if</font> (pep-&gt;nini&lt;0) {
+<a name="line414">414: </a>    VecCreateMPI(PetscObjectComm((PetscObject)ctx-&gt;eps),deg*pep-&gt;nloc,deg*pep-&gt;n,&amp;veps);
+<a name="line415">415: </a>    VecGetArray(veps,&amp;epsarray);
+<a name="line416">416: </a>    <font color="#4169E1">for</font> (i=0;i&lt;deg;i++) {
+<a name="line417">417: </a>      <font color="#4169E1">if</font> (i&lt;-pep-&gt;nini) {
+<a name="line418">418: </a>        VecGetArray(pep-&gt;IS[i],&amp;peparray);
+<a name="line419">419: </a>        PetscArraycpy(epsarray+i*pep-&gt;nloc,peparray,pep-&gt;nloc);
+<a name="line420">420: </a>        VecRestoreArray(pep-&gt;IS[i],&amp;peparray);
+<a name="line421">421: </a>      } <font color="#4169E1">else</font> {
+<a name="line422">422: </a>        <font color="#4169E1">if</font> (!w) { VecDuplicate(pep-&gt;IS[0],&amp;w); }
+<a name="line423">423: </a>        VecSetRandom(w,NULL);
+<a name="line424">424: </a>        VecGetArray(w,&amp;peparray);
+<a name="line425">425: </a>        PetscArraycpy(epsarray+i*pep-&gt;nloc,peparray,pep-&gt;nloc);
+<a name="line426">426: </a>        VecRestoreArray(w,&amp;peparray);
+<a name="line427">427: </a>      }
+<a name="line428">428: </a>    }
+<a name="line429">429: </a>    VecRestoreArray(veps,&amp;epsarray);
+<a name="line430">430: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetInitialSpace.html#EPSSetInitialSpace">EPSSetInitialSpace</a>(ctx-&gt;eps,1,&amp;veps);
+<a name="line431">431: </a>    VecDestroy(&amp;veps);
+<a name="line432">432: </a>    VecDestroy(&amp;w);
+<a name="line433">433: </a>    SlepcBasisDestroy_Private(&amp;pep-&gt;nini,&amp;pep-&gt;IS);
+<a name="line434">434: </a>  }
+
+<a name="line436">436: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>(ctx-&gt;eps);
+<a name="line437">437: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(ctx-&gt;eps,NULL,&amp;pep-&gt;ncv,&amp;pep-&gt;mpd);
+<a name="line438">438: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetTolerances.html#EPSGetTolerances">EPSGetTolerances</a>(ctx-&gt;eps,NULL,&amp;pep-&gt;max_it);
+<a name="line439">439: </a>  <a href="../../../../docs/manualpages/PEP/PEPAllocateSolution.html#PEPAllocateSolution">PEPAllocateSolution</a>(pep,0);
+<a name="line440">440: </a>  <font color="#4169E1">return</font>(0);
+<a name="line441">441: </a>}
+
+<a name="line443">443: </a><font color="#B22222">/*</font>
+<a name="line444">444: </a><font color="#B22222">   PEPLinearExtract_Residual - Auxiliary routine that copies the solution of the</font>
+<a name="line445">445: </a><font color="#B22222">   linear eigenproblem to the <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> object. The eigenvector of the generalized</font>
+<a name="line446">446: </a><font color="#B22222">   problem is supposed to be</font>
+<a name="line447">447: </a><font color="#B22222">                               z = [  x  ]</font>
+<a name="line448">448: </a><font color="#B22222">                                   [ l*x ]</font>
+<a name="line449">449: </a><font color="#B22222">   The eigenvector is taken from z(1:n) or z(n+1:2*n) depending on the explicitly</font>
+<a name="line450">450: </a><font color="#B22222">   computed residual norm.</font>
+<a name="line451">451: </a><font color="#B22222">   Finally, x is normalized so that ||x||_2 = 1.</font>
+<a name="line452">452: </a><font color="#B22222">*/</font>
+<a name="line453">453: </a><strong><font color="#4169E1"><a name="PEPLinearExtract_Residual"></a>static PetscErrorCode PEPLinearExtract_Residual(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line454">454: </a>{
+<a name="line455">455: </a>  PetscErrorCode    ierr;
+<a name="line456">456: </a>  PetscInt          i,k;
+<a name="line457">457: </a>  const PetscScalar *px;
+<a name="line458">458: </a>  PetscScalar       *er=pep-&gt;eigr,*ei=pep-&gt;eigi;
+<a name="line459">459: </a>  PetscReal         rn1,rn2;
+<a name="line460">460: </a>  Vec               xr,xi=NULL,wr;
+<a name="line461">461: </a>  Mat               A;
+<a name="line462">462: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line463">463: </a>  Vec               wi;
+<a name="line464">464: </a>  const PetscScalar *py;
+<a name="line465">465: </a><font color="#A020F0">#endif</font>
+
+<a name="line468">468: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line469">469: </a>  <a href="../../../../docs/manualpages/PEP/PEPSetWorkVecs.html#PEPSetWorkVecs">PEPSetWorkVecs</a>(pep,2);
+<a name="line470">470: </a><font color="#A020F0">#else</font>
+<a name="line471">471: </a>  <a href="../../../../docs/manualpages/PEP/PEPSetWorkVecs.html#PEPSetWorkVecs">PEPSetWorkVecs</a>(pep,4);
+<a name="line472">472: </a><font color="#A020F0">#endif</font>
+<a name="line473">473: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetOperators.html#EPSGetOperators">EPSGetOperators</a>(eps,&amp;A,NULL);
+<a name="line474">474: </a>  MatCreateVecs(A,&amp;xr,NULL);
+<a name="line475">475: </a>  <a href="../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(pep-&gt;A[0],&amp;wr,NULL);
+<a name="line476">476: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line477">477: </a>  VecDuplicate(xr,&amp;xi);
+<a name="line478">478: </a>  <a href="../../../../docs/manualpages/sys/VecDuplicateEmpty.html#VecDuplicateEmpty">VecDuplicateEmpty</a>(wr,&amp;wi);
+<a name="line479">479: </a><font color="#A020F0">#endif</font>
+<a name="line480">480: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line481">481: </a>    <a href="../../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(eps,i,NULL,NULL,xr,xi);
+<a name="line482">482: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line483">483: </a>    <font color="#4169E1">if</font> (ei[i]!=0.0) {   <font color="#B22222">/* complex conjugate pair */</font>
+<a name="line484">484: </a>      VecGetArrayRead(xr,&amp;px);
+<a name="line485">485: </a>      VecGetArrayRead(xi,&amp;py);
+<a name="line486">486: </a>      VecPlaceArray(wr,px);
+<a name="line487">487: </a>      VecPlaceArray(wi,py);
+<a name="line488">488: </a>      <a href="../../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(wr,wi,PETSC_TRUE,NULL);
+<a name="line489">489: </a>      PEPComputeResidualNorm_Private(pep,er[i],ei[i],wr,wi,pep-&gt;work,&amp;rn1);
+<a name="line490">490: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,wr);
+<a name="line491">491: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i+1,wi);
+<a name="line492">492: </a>      <font color="#4169E1">for</font> (k=1;k&lt;pep-&gt;nmat-1;k++) {
+<a name="line493">493: </a>        VecResetArray(wr);
+<a name="line494">494: </a>        VecResetArray(wi);
+<a name="line495">495: </a>        VecPlaceArray(wr,px+k*pep-&gt;nloc);
+<a name="line496">496: </a>        VecPlaceArray(wi,py+k*pep-&gt;nloc);
+<a name="line497">497: </a>        <a href="../../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(wr,wi,PETSC_TRUE,NULL);
+<a name="line498">498: </a>        PEPComputeResidualNorm_Private(pep,er[i],ei[i],wr,wi,pep-&gt;work,&amp;rn2);
+<a name="line499">499: </a>        <font color="#4169E1">if</font> (rn1&gt;rn2) {
+<a name="line500">500: </a>          <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,wr);
+<a name="line501">501: </a>          <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i+1,wi);
+<a name="line502">502: </a>          rn1 = rn2;
+<a name="line503">503: </a>        }
+<a name="line504">504: </a>      }
+<a name="line505">505: </a>      VecResetArray(wr);
+<a name="line506">506: </a>      VecResetArray(wi);
+<a name="line507">507: </a>      VecRestoreArrayRead(xr,&amp;px);
+<a name="line508">508: </a>      VecRestoreArrayRead(xi,&amp;py);
+<a name="line509">509: </a>      i++;
+<a name="line510">510: </a>    } <font color="#4169E1">else</font>   <font color="#B22222">/* real eigenvalue */</font>
+<a name="line511">511: </a><font color="#A020F0">#endif</font>
+<a name="line512">512: </a>    {
+<a name="line513">513: </a>      VecGetArrayRead(xr,&amp;px);
+<a name="line514">514: </a>      VecPlaceArray(wr,px);
+<a name="line515">515: </a>      <a href="../../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(wr,NULL,PETSC_FALSE,NULL);
+<a name="line516">516: </a>      PEPComputeResidualNorm_Private(pep,er[i],ei[i],wr,NULL,pep-&gt;work,&amp;rn1);
+<a name="line517">517: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,wr);
+<a name="line518">518: </a>      <font color="#4169E1">for</font> (k=1;k&lt;pep-&gt;nmat-1;k++) {
+<a name="line519">519: </a>        VecResetArray(wr);
+<a name="line520">520: </a>        VecPlaceArray(wr,px+k*pep-&gt;nloc);
+<a name="line521">521: </a>        <a href="../../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(wr,NULL,PETSC_FALSE,NULL);
+<a name="line522">522: </a>        PEPComputeResidualNorm_Private(pep,er[i],ei[i],wr,NULL,pep-&gt;work,&amp;rn2);
+<a name="line523">523: </a>        <font color="#4169E1">if</font> (rn1&gt;rn2) {
+<a name="line524">524: </a>          <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,wr);
+<a name="line525">525: </a>          rn1 = rn2;
+<a name="line526">526: </a>        }
+<a name="line527">527: </a>      }
+<a name="line528">528: </a>      VecResetArray(wr);
+<a name="line529">529: </a>      VecRestoreArrayRead(xr,&amp;px);
+<a name="line530">530: </a>    }
+<a name="line531">531: </a>  }
+<a name="line532">532: </a>  VecDestroy(&amp;wr);
+<a name="line533">533: </a>  VecDestroy(&amp;xr);
+<a name="line534">534: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line535">535: </a>  VecDestroy(&amp;wi);
+<a name="line536">536: </a>  VecDestroy(&amp;xi);
+<a name="line537">537: </a><font color="#A020F0">#endif</font>
+<a name="line538">538: </a>  <font color="#4169E1">return</font>(0);
+<a name="line539">539: </a>}
+
+<a name="line541">541: </a><font color="#B22222">/*</font>
+<a name="line542">542: </a><font color="#B22222">   PEPLinearExtract_None - Same as PEPLinearExtract_Norm but always takes</font>
+<a name="line543">543: </a><font color="#B22222">   the first block.</font>
+<a name="line544">544: </a><font color="#B22222">*/</font>
+<a name="line545">545: </a><strong><font color="#4169E1"><a name="PEPLinearExtract_None"></a>static PetscErrorCode PEPLinearExtract_None(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line546">546: </a>{
+<a name="line547">547: </a>  PetscErrorCode    ierr;
+<a name="line548">548: </a>  PetscInt          i;
+<a name="line549">549: </a>  const PetscScalar *px;
+<a name="line550">550: </a>  Mat               A;
+<a name="line551">551: </a>  Vec               xr,xi=NULL,w;
+<a name="line552">552: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line553">553: </a>  PetscScalar       *ei=pep-&gt;eigi;
+<a name="line554">554: </a><font color="#A020F0">#endif</font>
+
+<a name="line557">557: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetOperators.html#EPSGetOperators">EPSGetOperators</a>(eps,&amp;A,NULL);
+<a name="line558">558: </a>  MatCreateVecs(A,&amp;xr,NULL);
+<a name="line559">559: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line560">560: </a>  VecDuplicate(xr,&amp;xi);
+<a name="line561">561: </a><font color="#A020F0">#endif</font>
+<a name="line562">562: </a>  <a href="../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(pep-&gt;A[0],&amp;w,NULL);
+<a name="line563">563: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line564">564: </a>    <a href="../../../../docs/manualpages/EPS/EPSGetEigenvector.html#EPSGetEigenvector">EPSGetEigenvector</a>(eps,i,xr,xi);
+<a name="line565">565: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line566">566: </a>    <font color="#4169E1">if</font> (ei[i]!=0.0) {   <font color="#B22222">/* complex conjugate pair */</font>
+<a name="line567">567: </a>      VecGetArrayRead(xr,&amp;px);
+<a name="line568">568: </a>      VecPlaceArray(w,px);
+<a name="line569">569: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,w);
+<a name="line570">570: </a>      VecResetArray(w);
+<a name="line571">571: </a>      VecRestoreArrayRead(xr,&amp;px);
+<a name="line572">572: </a>      VecGetArrayRead(xi,&amp;px);
+<a name="line573">573: </a>      VecPlaceArray(w,px);
+<a name="line574">574: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i+1,w);
+<a name="line575">575: </a>      VecResetArray(w);
+<a name="line576">576: </a>      VecRestoreArrayRead(xi,&amp;px);
+<a name="line577">577: </a>      i++;
+<a name="line578">578: </a>    } <font color="#4169E1">else</font>   <font color="#B22222">/* real eigenvalue */</font>
+<a name="line579">579: </a><font color="#A020F0">#endif</font>
+<a name="line580">580: </a>    {
+<a name="line581">581: </a>      VecGetArrayRead(xr,&amp;px);
+<a name="line582">582: </a>      VecPlaceArray(w,px);
+<a name="line583">583: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,w);
+<a name="line584">584: </a>      VecResetArray(w);
+<a name="line585">585: </a>      VecRestoreArrayRead(xr,&amp;px);
+<a name="line586">586: </a>    }
+<a name="line587">587: </a>  }
+<a name="line588">588: </a>  VecDestroy(&amp;w);
+<a name="line589">589: </a>  VecDestroy(&amp;xr);
+<a name="line590">590: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line591">591: </a>  VecDestroy(&amp;xi);
+<a name="line592">592: </a><font color="#A020F0">#endif</font>
+<a name="line593">593: </a>  <font color="#4169E1">return</font>(0);
+<a name="line594">594: </a>}
+
+<a name="line596">596: </a><font color="#B22222">/*</font>
+<a name="line597">597: </a><font color="#B22222">   PEPLinearExtract_Norm - Auxiliary routine that copies the solution of the</font>
+<a name="line598">598: </a><font color="#B22222">   linear eigenproblem to the <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> object. The eigenvector of the generalized</font>
+<a name="line599">599: </a><font color="#B22222">   problem is supposed to be</font>
+<a name="line600">600: </a><font color="#B22222">                               z = [  x  ]</font>
+<a name="line601">601: </a><font color="#B22222">                                   [ l*x ]</font>
+<a name="line602">602: </a><font color="#B22222">   If |l|&lt;1.0, the eigenvector is taken from z(1:n), otherwise from z(n+1:2*n).</font>
+<a name="line603">603: </a><font color="#B22222">   Finally, x is normalized so that ||x||_2 = 1.</font>
+<a name="line604">604: </a><font color="#B22222">*/</font>
+<a name="line605">605: </a><strong><font color="#4169E1"><a name="PEPLinearExtract_Norm"></a>static PetscErrorCode PEPLinearExtract_Norm(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line606">606: </a>{
+<a name="line607">607: </a>  PetscErrorCode    ierr;
+<a name="line608">608: </a>  PetscInt          i,offset;
+<a name="line609">609: </a>  const PetscScalar *px;
+<a name="line610">610: </a>  PetscScalar       *er=pep-&gt;eigr;
+<a name="line611">611: </a>  Mat               A;
+<a name="line612">612: </a>  Vec               xr,xi=NULL,w;
+<a name="line613">613: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line614">614: </a>  PetscScalar       *ei=pep-&gt;eigi;
+<a name="line615">615: </a><font color="#A020F0">#endif</font>
+
+<a name="line618">618: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetOperators.html#EPSGetOperators">EPSGetOperators</a>(eps,&amp;A,NULL);
+<a name="line619">619: </a>  MatCreateVecs(A,&amp;xr,NULL);
+<a name="line620">620: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line621">621: </a>  VecDuplicate(xr,&amp;xi);
+<a name="line622">622: </a><font color="#A020F0">#endif</font>
+<a name="line623">623: </a>  <a href="../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(pep-&gt;A[0],&amp;w,NULL);
+<a name="line624">624: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line625">625: </a>    <a href="../../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(eps,i,NULL,NULL,xr,xi);
+<a name="line626">626: </a>    <font color="#4169E1">if</font> (SlepcAbsEigenvalue(er[i],ei[i])&gt;1.0) offset = (pep-&gt;nmat-2)*pep-&gt;nloc;
+<a name="line627">627: </a>    <font color="#4169E1">else</font> offset = 0;
+<a name="line628">628: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line629">629: </a>    <font color="#4169E1">if</font> (ei[i]!=0.0) {   <font color="#B22222">/* complex conjugate pair */</font>
+<a name="line630">630: </a>      VecGetArrayRead(xr,&amp;px);
+<a name="line631">631: </a>      VecPlaceArray(w,px+offset);
+<a name="line632">632: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,w);
+<a name="line633">633: </a>      VecResetArray(w);
+<a name="line634">634: </a>      VecRestoreArrayRead(xr,&amp;px);
+<a name="line635">635: </a>      VecGetArrayRead(xi,&amp;px);
+<a name="line636">636: </a>      VecPlaceArray(w,px+offset);
+<a name="line637">637: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i+1,w);
+<a name="line638">638: </a>      VecResetArray(w);
+<a name="line639">639: </a>      VecRestoreArrayRead(xi,&amp;px);
+<a name="line640">640: </a>      i++;
+<a name="line641">641: </a>    } <font color="#4169E1">else</font> <font color="#B22222">/* real eigenvalue */</font>
+<a name="line642">642: </a><font color="#A020F0">#endif</font>
+<a name="line643">643: </a>    {
+<a name="line644">644: </a>      VecGetArrayRead(xr,&amp;px);
+<a name="line645">645: </a>      VecPlaceArray(w,px+offset);
+<a name="line646">646: </a>      <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,i,w);
+<a name="line647">647: </a>      VecResetArray(w);
+<a name="line648">648: </a>      VecRestoreArrayRead(xr,&amp;px);
+<a name="line649">649: </a>    }
+<a name="line650">650: </a>  }
+<a name="line651">651: </a>  VecDestroy(&amp;w);
+<a name="line652">652: </a>  VecDestroy(&amp;xr);
+<a name="line653">653: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line654">654: </a>  VecDestroy(&amp;xi);
+<a name="line655">655: </a><font color="#A020F0">#endif</font>
+<a name="line656">656: </a>  <font color="#4169E1">return</font>(0);
+<a name="line657">657: </a>}
+
+<a name="line659">659: </a><strong><font color="#4169E1"><a name="PEPExtractVectors_Linear"></a>PetscErrorCode PEPExtractVectors_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line660">660: </a>{
+<a name="line662">662: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line665">665: </a>  <font color="#4169E1">switch</font> (pep-&gt;extract) {
+<a name="line666">666: </a>  <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_NONE</a>:
+<a name="line667">667: </a>    PEPLinearExtract_None(pep,ctx-&gt;eps);
+<a name="line668">668: </a>    <font color="#4169E1">break</font>;
+<a name="line669">669: </a>  <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_NORM</a>:
+<a name="line670">670: </a>    PEPLinearExtract_Norm(pep,ctx-&gt;eps);
+<a name="line671">671: </a>    <font color="#4169E1">break</font>;
+<a name="line672">672: </a>  <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_RESIDUAL</a>:
+<a name="line673">673: </a>    PEPLinearExtract_Residual(pep,ctx-&gt;eps);
+<a name="line674">674: </a>    <font color="#4169E1">break</font>;
+<a name="line675">675: </a>  <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPExtract.html#PEPExtract">PEP_EXTRACT_STRUCTURED</a>:
+<a name="line676">676: </a>    SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Extraction not implemented in this solver"</font>);
+<a name="line677">677: </a>  }
+<a name="line678">678: </a>  <font color="#4169E1">return</font>(0);
+<a name="line679">679: </a>}
+
+<a name="line681">681: </a><strong><font color="#4169E1"><a name="PEPSolve_Linear"></a>PetscErrorCode PEPSolve_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line682">682: </a>{
+<a name="line684">684: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+<a name="line685">685: </a>  PetscScalar    sigma;
+<a name="line686">686: </a>  PetscBool      flg;
+<a name="line687">687: </a>  PetscInt       i;
+
+<a name="line690">690: </a>  <a href="../../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(ctx-&gt;eps);
+<a name="line691">691: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(ctx-&gt;eps,&amp;pep-&gt;nconv);
+<a name="line692">692: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetIterationNumber.html#EPSGetIterationNumber">EPSGetIterationNumber</a>(ctx-&gt;eps,&amp;pep-&gt;its);
+<a name="line693">693: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetConvergedReason.html#EPSGetConvergedReason">EPSGetConvergedReason</a>(ctx-&gt;eps,(<a href="../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a>*)&amp;pep-&gt;reason);
+
+<a name="line695">695: </a>  <font color="#B22222">/* recover eigenvalues */</font>
+<a name="line696">696: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line697">697: </a>    <a href="../../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(ctx-&gt;eps,i,&amp;pep-&gt;eigr[i],&amp;pep-&gt;eigi[i],NULL,NULL);
+<a name="line698">698: </a>    pep-&gt;eigr[i] *= pep-&gt;sfactor;
+<a name="line699">699: </a>    pep-&gt;eigi[i] *= pep-&gt;sfactor;
+<a name="line700">700: </a>  }
+
+<a name="line702">702: </a>  <font color="#B22222">/* restore target */</font>
+<a name="line703">703: </a>  <a href="../../../../docs/manualpages/EPS/EPSGetTarget.html#EPSGetTarget">EPSGetTarget</a>(ctx-&gt;eps,&amp;sigma);
+<a name="line704">704: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(ctx-&gt;eps,sigma*pep-&gt;sfactor);
+
+<a name="line706">706: </a>  <a href="../../../../docs/manualpages/ST/STGetTransform.html#STGetTransform">STGetTransform</a>(pep-&gt;st,&amp;flg);
+<a name="line707">707: </a>  <font color="#4169E1">if</font> (flg &amp;&amp; pep-&gt;ops-&gt;backtransform) {
+<a name="line708">708: </a>    (*pep-&gt;ops-&gt;backtransform)(pep);
+<a name="line709">709: </a>  }
+<a name="line710">710: </a>  <font color="#4169E1">if</font> (pep-&gt;sfactor!=1.0) {
+<a name="line711">711: </a>    <font color="#B22222">/* Restore original values */</font>
+<a name="line712">712: </a>    <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++){
+<a name="line713">713: </a>      pep-&gt;pbc[pep-&gt;nmat+i] *= pep-&gt;sfactor;
+<a name="line714">714: </a>      pep-&gt;pbc[2*pep-&gt;nmat+i] *= pep-&gt;sfactor*pep-&gt;sfactor;
+<a name="line715">715: </a>    }
+<a name="line716">716: </a>    <font color="#4169E1">if</font> (!flg &amp;&amp; !ctx-&gt;explicitmatrix) {
+<a name="line717">717: </a>      <a href="../../../../docs/manualpages/ST/STScaleShift.html#STScaleShift">STScaleShift</a>(pep-&gt;st,pep-&gt;sfactor);
+<a name="line718">718: </a>    }
+<a name="line719">719: </a>  }
+<a name="line720">720: </a>  <font color="#4169E1">if</font> (ctx-&gt;explicitmatrix || !flg) {
+<a name="line721">721: </a>    <a href="../../../../docs/manualpages/RG/RGPopScale.html#RGPopScale">RGPopScale</a>(pep-&gt;rg);
+<a name="line722">722: </a>  }
+<a name="line723">723: </a>  <font color="#4169E1">return</font>(0);
+<a name="line724">724: </a>}
+
+<a name="line726">726: </a><strong><font color="#4169E1"><a name="EPSMonitor_Linear"></a>static PetscErrorCode EPSMonitor_Linear(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt its,PetscInt nconv,PetscScalar *eigr,PetscScalar *eigi,PetscReal *errest,PetscInt nest,void *ctx)</font></strong>
+<a name="line727">727: </a>{
+<a name="line728">728: </a>  <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>            pep = (<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>)ctx;
+
+<a name="line732">732: </a>  PEPMonitor(pep,its,nconv,eigr,eigi,errest,nest);
+<a name="line733">733: </a>  <font color="#4169E1">return</font>(0);
+<a name="line734">734: </a>}
+
+<a name="line736">736: </a><strong><font color="#4169E1"><a name="PEPSetFromOptions_Linear"></a>PetscErrorCode PEPSetFromOptions_Linear(PetscOptionItems *PetscOptionsObject,<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line737">737: </a>{
+<a name="line739">739: </a>  PetscBool      set,val;
+<a name="line740">740: </a>  PetscInt       k;
+<a name="line741">741: </a>  PetscReal      array[2]={0,0};
+<a name="line742">742: </a>  PetscBool      flg;
+<a name="line743">743: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line746">746: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> Linear Options"</font>);
+
+<a name="line748">748: </a>    k = 2;
+<a name="line749">749: </a>    PetscOptionsRealArray(<font color="#666666">"-pep_linear_linearization"</font>,<font color="#666666">"Parameters of the linearization"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEPLinearSetLinearization.html#PEPLinearSetLinearization">PEPLinearSetLinearization</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line750">750: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line751">751: </a>      <a href="../../../../docs/manualpages/PEP/PEPLinearSetLinearization.html#PEPLinearSetLinearization">PEPLinearSetLinearization</a>(pep,array[0],array[1]);
+<a name="line752">752: </a>    }
+
+<a name="line754">754: </a>    PetscOptionsBool(<font color="#666666">"-pep_linear_explicitmatrix"</font>,<font color="#666666">"Use explicit matrix in linearization"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEPLinearSetExplicitMatrix.html#PEPLinearSetExplicitMatrix">PEPLinearSetExplicitMatrix</a>"</font>,ctx-&gt;explicitmatrix,&amp;val,&amp;set);
+<a name="line755">755: </a>    <font color="#4169E1">if</font> (set) { <a href="../../../../docs/manualpages/PEP/PEPLinearSetExplicitMatrix.html#PEPLinearSetExplicitMatrix">PEPLinearSetExplicitMatrix</a>(pep,val); }
+
+<a name="line757">757: </a>  PetscOptionsTail();
+
+<a name="line759">759: </a>  <font color="#4169E1">if</font> (!ctx-&gt;eps) { <a href="../../../../docs/manualpages/PEP/PEPLinearGetEPS.html#PEPLinearGetEPS">PEPLinearGetEPS</a>(pep,&amp;ctx-&gt;eps); }
+<a name="line760">760: </a>  <a href="../../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(ctx-&gt;eps);
+<a name="line761">761: </a>  <font color="#4169E1">return</font>(0);
+<a name="line762">762: </a>}
+
+<a name="line764">764: </a><strong><font color="#4169E1"><a name="PEPLinearSetLinearization_Linear"></a>static PetscErrorCode PEPLinearSetLinearization_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal alpha,PetscReal beta)</font></strong>
+<a name="line765">765: </a>{
+<a name="line766">766: </a>  PEP_LINEAR *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line769">769: </a>  <font color="#4169E1">if</font> (beta==0.0 &amp;&amp; alpha==0.0) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_ARG_WRONG,<font color="#666666">"Parameters alpha and beta cannot be zero simultaneously"</font>);
+<a name="line770">770: </a>  ctx-&gt;alpha = alpha;
+<a name="line771">771: </a>  ctx-&gt;beta  = beta;
+<a name="line772">772: </a>  <font color="#4169E1">return</font>(0);
+<a name="line773">773: </a>}
+
+<a name="line775">775: </a><font color="#B22222">/*@</font>
+<a name="line776">776: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPLinearSetLinearization.html#PEPLinearSetLinearization">PEPLinearSetLinearization</a> - Set the coefficients that define</font>
+<a name="line777">777: </a><font color="#B22222">   the linearization of a quadratic eigenproblem.</font>
+
+<a name="line779">779: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line781">781: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line782">782: </a><font color="#B22222">+  pep   - polynomial eigenvalue solver</font>
+<a name="line783">783: </a><font color="#B22222">.  alpha - first parameter of the linearization</font>
+<a name="line784">784: </a><font color="#B22222">-  beta  - second parameter of the linearization</font>
+
+<a name="line786">786: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line787">787: </a><font color="#B22222">.  -pep_linear_linearization &lt;alpha,beta&gt; - Sets the coefficients</font>
+
+<a name="line789">789: </a><font color="#B22222">   Notes:</font>
+<a name="line790">790: </a><font color="#B22222">   Cannot pass zero for both alpha and beta. The default values are</font>
+<a name="line791">791: </a><font color="#B22222">   alpha=1 and beta=0.</font>
+
+<a name="line793">793: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line795">795: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPLinearGetLinearization.html#PEPLinearGetLinearization">PEPLinearGetLinearization</a>()</font>
+<a name="line796">796: </a><font color="#B22222">@*/</font>
+<a name="line797">797: </a><strong><font color="#4169E1"><a name="PEPLinearSetLinearization"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPLinearSetLinearization.html#PEPLinearSetLinearization">PEPLinearSetLinearization</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal alpha,PetscReal beta)</font></strong>
+<a name="line798">798: </a>{
+
+<a name="line805">805: </a>  PetscTryMethod(pep,<font color="#666666">"PEPLinearSetLinearization_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal,PetscReal),(pep,alpha,beta));
+<a name="line806">806: </a>  <font color="#4169E1">return</font>(0);
+<a name="line807">807: </a>}
+
+<a name="line809">809: </a><strong><font color="#4169E1"><a name="PEPLinearGetLinearization_Linear"></a>static PetscErrorCode PEPLinearGetLinearization_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *alpha,PetscReal *beta)</font></strong>
+<a name="line810">810: </a>{
+<a name="line811">811: </a>  PEP_LINEAR *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line814">814: </a>  <font color="#4169E1">if</font> (alpha) *alpha = ctx-&gt;alpha;
+<a name="line815">815: </a>  <font color="#4169E1">if</font> (beta)  *beta  = ctx-&gt;beta;
+<a name="line816">816: </a>  <font color="#4169E1">return</font>(0);
+<a name="line817">817: </a>}
+
+<a name="line819">819: </a><font color="#B22222">/*@</font>
+<a name="line820">820: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPLinearGetLinearization.html#PEPLinearGetLinearization">PEPLinearGetLinearization</a> - Returns the coefficients that define</font>
+<a name="line821">821: </a><font color="#B22222">   the linearization of a quadratic eigenproblem.</font>
+
+<a name="line823">823: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line825">825: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line826">826: </a><font color="#B22222">.  pep  - polynomial eigenvalue solver</font>
+
+<a name="line828">828: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line829">829: </a><font color="#B22222">+  alpha - the first parameter of the linearization</font>
+<a name="line830">830: </a><font color="#B22222">-  beta  - the second parameter of the linearization</font>
+
+<a name="line832">832: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line834">834: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPLinearSetLinearization.html#PEPLinearSetLinearization">PEPLinearSetLinearization</a>()</font>
+<a name="line835">835: </a><font color="#B22222">@*/</font>
+<a name="line836">836: </a><strong><font color="#4169E1"><a name="PEPLinearGetLinearization"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPLinearGetLinearization.html#PEPLinearGetLinearization">PEPLinearGetLinearization</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *alpha,PetscReal *beta)</font></strong>
+<a name="line837">837: </a>{
+
+<a name="line842">842: </a>  PetscUseMethod(pep,<font color="#666666">"PEPLinearGetLinearization_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal*,PetscReal*),(pep,alpha,beta));
+<a name="line843">843: </a>  <font color="#4169E1">return</font>(0);
+<a name="line844">844: </a>}
+
+<a name="line846">846: </a><strong><font color="#4169E1"><a name="PEPLinearSetExplicitMatrix_Linear"></a>static PetscErrorCode PEPLinearSetExplicitMatrix_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool explicitmatrix)</font></strong>
+<a name="line847">847: </a>{
+<a name="line848">848: </a>  PEP_LINEAR *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line851">851: </a>  <font color="#4169E1">if</font> (ctx-&gt;explicitmatrix != explicitmatrix) {
+<a name="line852">852: </a>    ctx-&gt;explicitmatrix = explicitmatrix;
+<a name="line853">853: </a>    pep-&gt;state = PEP_STATE_INITIAL;
+<a name="line854">854: </a>  }
+<a name="line855">855: </a>  <font color="#4169E1">return</font>(0);
+<a name="line856">856: </a>}
+
+<a name="line858">858: </a><font color="#B22222">/*@</font>
+<a name="line859">859: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPLinearSetExplicitMatrix.html#PEPLinearSetExplicitMatrix">PEPLinearSetExplicitMatrix</a> - Indicate if the matrices A and B for the</font>
+<a name="line860">860: </a><font color="#B22222">   linearization of the problem must be built explicitly.</font>
+
+<a name="line862">862: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line864">864: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line865">865: </a><font color="#B22222">+  pep      - polynomial eigenvalue solver</font>
+<a name="line866">866: </a><font color="#B22222">-  explicit - boolean flag indicating if the matrices are built explicitly</font>
+
+<a name="line868">868: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line869">869: </a><font color="#B22222">.  -pep_linear_explicitmatrix &lt;boolean&gt; - Indicates the boolean flag</font>
+
+<a name="line871">871: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line873">873: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPLinearGetExplicitMatrix.html#PEPLinearGetExplicitMatrix">PEPLinearGetExplicitMatrix</a>()</font>
+<a name="line874">874: </a><font color="#B22222">@*/</font>
+<a name="line875">875: </a><strong><font color="#4169E1"><a name="PEPLinearSetExplicitMatrix"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPLinearSetExplicitMatrix.html#PEPLinearSetExplicitMatrix">PEPLinearSetExplicitMatrix</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool explicitmatrix)</font></strong>
+<a name="line876">876: </a>{
+
+<a name="line882">882: </a>  PetscTryMethod(pep,<font color="#666666">"PEPLinearSetExplicitMatrix_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscBool),(pep,explicitmatrix));
+<a name="line883">883: </a>  <font color="#4169E1">return</font>(0);
+<a name="line884">884: </a>}
+
+<a name="line886">886: </a><strong><font color="#4169E1"><a name="PEPLinearGetExplicitMatrix_Linear"></a>static PetscErrorCode PEPLinearGetExplicitMatrix_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool *explicitmatrix)</font></strong>
+<a name="line887">887: </a>{
+<a name="line888">888: </a>  PEP_LINEAR *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line891">891: </a>  *explicitmatrix = ctx-&gt;explicitmatrix;
+<a name="line892">892: </a>  <font color="#4169E1">return</font>(0);
+<a name="line893">893: </a>}
+
+<a name="line895">895: </a><font color="#B22222">/*@</font>
+<a name="line896">896: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPLinearGetExplicitMatrix.html#PEPLinearGetExplicitMatrix">PEPLinearGetExplicitMatrix</a> - Returns the flag indicating if the matrices</font>
+<a name="line897">897: </a><font color="#B22222">   A and B for the linearization are built explicitly.</font>
+
+<a name="line899">899: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line901">901: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line902">902: </a><font color="#B22222">.  pep  - polynomial eigenvalue solver</font>
+
+<a name="line904">904: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line905">905: </a><font color="#B22222">.  explicitmatrix - the mode flag</font>
+
+<a name="line907">907: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line909">909: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPLinearSetExplicitMatrix.html#PEPLinearSetExplicitMatrix">PEPLinearSetExplicitMatrix</a>()</font>
+<a name="line910">910: </a><font color="#B22222">@*/</font>
+<a name="line911">911: </a><strong><font color="#4169E1"><a name="PEPLinearGetExplicitMatrix"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPLinearGetExplicitMatrix.html#PEPLinearGetExplicitMatrix">PEPLinearGetExplicitMatrix</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool *explicitmatrix)</font></strong>
+<a name="line912">912: </a>{
+
+<a name="line918">918: </a>  PetscUseMethod(pep,<font color="#666666">"PEPLinearGetExplicitMatrix_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscBool*),(pep,explicitmatrix));
+<a name="line919">919: </a>  <font color="#4169E1">return</font>(0);
+<a name="line920">920: </a>}
+
+<a name="line922">922: </a><strong><font color="#4169E1"><a name="PEPLinearSetEPS_Linear"></a>static PetscErrorCode PEPLinearSetEPS_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line923">923: </a>{
+<a name="line925">925: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line928">928: </a>  PetscObjectReference((PetscObject)eps);
+<a name="line929">929: </a>  <a href="../../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;ctx-&gt;eps);
+<a name="line930">930: </a>  ctx-&gt;eps = eps;
+<a name="line931">931: </a>  ctx-&gt;usereps = PETSC_TRUE;
+<a name="line932">932: </a>  PetscLogObjectParent((PetscObject)pep,(PetscObject)ctx-&gt;eps);
+<a name="line933">933: </a>  pep-&gt;state = PEP_STATE_INITIAL;
+<a name="line934">934: </a>  <font color="#4169E1">return</font>(0);
+<a name="line935">935: </a>}
+
+<a name="line937">937: </a><font color="#B22222">/*@</font>
+<a name="line938">938: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPLinearSetEPS.html#PEPLinearSetEPS">PEPLinearSetEPS</a> - Associate an eigensolver object (<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) to the</font>
+<a name="line939">939: </a><font color="#B22222">   polynomial eigenvalue solver.</font>
+
+<a name="line941">941: </a><font color="#B22222">   Collective on pep</font>
+
+<a name="line943">943: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line944">944: </a><font color="#B22222">+  pep - polynomial eigenvalue solver</font>
+<a name="line945">945: </a><font color="#B22222">-  eps - the eigensolver object</font>
+
+<a name="line947">947: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line949">949: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPLinearGetEPS.html#PEPLinearGetEPS">PEPLinearGetEPS</a>()</font>
+<a name="line950">950: </a><font color="#B22222">@*/</font>
+<a name="line951">951: </a><strong><font color="#4169E1"><a name="PEPLinearSetEPS"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPLinearSetEPS.html#PEPLinearSetEPS">PEPLinearSetEPS</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line952">952: </a>{
+
+<a name="line959">959: </a>  PetscTryMethod(pep,<font color="#666666">"PEPLinearSetEPS_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>),(pep,eps));
+<a name="line960">960: </a>  <font color="#4169E1">return</font>(0);
+<a name="line961">961: </a>}
+
+<a name="line963">963: </a><strong><font color="#4169E1"><a name="PEPLinearGetEPS_Linear"></a>static PetscErrorCode PEPLinearGetEPS_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> *eps)</font></strong>
+<a name="line964">964: </a>{
+<a name="line966">966: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line969">969: </a>  <font color="#4169E1">if</font> (!ctx-&gt;eps) {
+<a name="line970">970: </a>    <a href="../../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PetscObjectComm((PetscObject)pep),&amp;ctx-&gt;eps);
+<a name="line971">971: </a>    PetscObjectIncrementTabLevel((PetscObject)ctx-&gt;eps,(PetscObject)pep,1);
+<a name="line972">972: </a>    <a href="../../../../docs/manualpages/EPS/EPSSetOptionsPrefix.html#EPSSetOptionsPrefix">EPSSetOptionsPrefix</a>(ctx-&gt;eps,((PetscObject)pep)-&gt;prefix);
+<a name="line973">973: </a>    <a href="../../../../docs/manualpages/EPS/EPSAppendOptionsPrefix.html#EPSAppendOptionsPrefix">EPSAppendOptionsPrefix</a>(ctx-&gt;eps,<font color="#666666">"pep_linear_"</font>);
+<a name="line974">974: </a>    PetscLogObjectParent((PetscObject)pep,(PetscObject)ctx-&gt;eps);
+<a name="line975">975: </a>    PetscObjectSetOptions((PetscObject)ctx-&gt;eps,((PetscObject)pep)-&gt;options);
+<a name="line976">976: </a>    <a href="../../../../docs/manualpages/EPS/EPSMonitorSet.html#EPSMonitorSet">EPSMonitorSet</a>(ctx-&gt;eps,EPSMonitor_Linear,pep,NULL);
+<a name="line977">977: </a>  }
+<a name="line978">978: </a>  *eps = ctx-&gt;eps;
+<a name="line979">979: </a>  <font color="#4169E1">return</font>(0);
+<a name="line980">980: </a>}
+
+<a name="line982">982: </a><font color="#B22222">/*@</font>
+<a name="line983">983: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPLinearGetEPS.html#PEPLinearGetEPS">PEPLinearGetEPS</a> - Retrieve the eigensolver object (<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>) associated</font>
+<a name="line984">984: </a><font color="#B22222">   to the polynomial eigenvalue solver.</font>
+
+<a name="line986">986: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line988">988: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line989">989: </a><font color="#B22222">.  pep - polynomial eigenvalue solver</font>
+
+<a name="line991">991: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line992">992: </a><font color="#B22222">.  eps - the eigensolver object</font>
+
+<a name="line994">994: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line996">996: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPLinearSetEPS.html#PEPLinearSetEPS">PEPLinearSetEPS</a>()</font>
+<a name="line997">997: </a><font color="#B22222">@*/</font>
+<a name="line998">998: </a><strong><font color="#4169E1"><a name="PEPLinearGetEPS"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPLinearGetEPS.html#PEPLinearGetEPS">PEPLinearGetEPS</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> *eps)</font></strong>
+<a name="line999">999: </a>{
+
+<a name="line1005">1005: </a>  PetscUseMethod(pep,<font color="#666666">"PEPLinearGetEPS_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>*),(pep,eps));
+<a name="line1006">1006: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1007">1007: </a>}
+
+<a name="line1009">1009: </a><strong><font color="#4169E1"><a name="PEPView_Linear"></a>PetscErrorCode PEPView_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line1010">1010: </a>{
+<a name="line1012">1012: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+<a name="line1013">1013: </a>  PetscBool      isascii;
+
+<a name="line1016">1016: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line1017">1017: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line1018">1018: </a>    <font color="#4169E1">if</font> (!ctx-&gt;eps) { <a href="../../../../docs/manualpages/PEP/PEPLinearGetEPS.html#PEPLinearGetEPS">PEPLinearGetEPS</a>(pep,&amp;ctx-&gt;eps); }
+<a name="line1019">1019: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  %s matrices\n"</font>,ctx-&gt;explicitmatrix? <font color="#666666">"explicit"</font>: <font color="#666666">"implicit"</font>);
+<a name="line1020">1020: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  linearization parameters: alpha=%g beta=%g\n"</font>,(double)ctx-&gt;alpha,(double)ctx-&gt;beta);
+<a name="line1021">1021: </a>    PetscViewerASCIIPushTab(viewer);
+<a name="line1022">1022: </a>    <a href="../../../../docs/manualpages/EPS/EPSView.html#EPSView">EPSView</a>(ctx-&gt;eps,viewer);
+<a name="line1023">1023: </a>    PetscViewerASCIIPopTab(viewer);
+<a name="line1024">1024: </a>  }
+<a name="line1025">1025: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1026">1026: </a>}
+
+<a name="line1028">1028: </a><strong><font color="#4169E1"><a name="PEPReset_Linear"></a>PetscErrorCode PEPReset_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line1029">1029: </a>{
+<a name="line1031">1031: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line1034">1034: </a>  <font color="#4169E1">if</font> (!ctx-&gt;eps) { <a href="../../../../docs/manualpages/EPS/EPSReset.html#EPSReset">EPSReset</a>(ctx-&gt;eps); }
+<a name="line1035">1035: </a>  MatDestroy(&amp;ctx-&gt;A);
+<a name="line1036">1036: </a>  MatDestroy(&amp;ctx-&gt;B);
+<a name="line1037">1037: </a>  VecDestroy(&amp;ctx-&gt;w[0]);
+<a name="line1038">1038: </a>  VecDestroy(&amp;ctx-&gt;w[1]);
+<a name="line1039">1039: </a>  VecDestroy(&amp;ctx-&gt;w[2]);
+<a name="line1040">1040: </a>  VecDestroy(&amp;ctx-&gt;w[3]);
+<a name="line1041">1041: </a>  VecDestroy(&amp;ctx-&gt;w[4]);
+<a name="line1042">1042: </a>  VecDestroy(&amp;ctx-&gt;w[5]);
+<a name="line1043">1043: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1044">1044: </a>}
+
+<a name="line1046">1046: </a><strong><font color="#4169E1"><a name="PEPDestroy_Linear"></a>PetscErrorCode PEPDestroy_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line1047">1047: </a>{
+<a name="line1049">1049: </a>  PEP_LINEAR     *ctx = (PEP_LINEAR*)pep-&gt;data;
+
+<a name="line1052">1052: </a>  <a href="../../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;ctx-&gt;eps);
+<a name="line1053">1053: </a>  PetscFree(pep-&gt;data);
+<a name="line1054">1054: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearSetLinearization_C"</font>,NULL);
+<a name="line1055">1055: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearGetLinearization_C"</font>,NULL);
+<a name="line1056">1056: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearSetEPS_C"</font>,NULL);
+<a name="line1057">1057: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearGetEPS_C"</font>,NULL);
+<a name="line1058">1058: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearSetExplicitMatrix_C"</font>,NULL);
+<a name="line1059">1059: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearGetExplicitMatrix_C"</font>,NULL);
+<a name="line1060">1060: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1061">1061: </a>}
+
+<a name="line1063">1063: </a><strong><font color="#4169E1"><a name="PEPCreate_Linear"></a>SLEPC_EXTERN PetscErrorCode PEPCreate_Linear(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line1064">1064: </a>{
+<a name="line1066">1066: </a>  PEP_LINEAR     *ctx;
+
+<a name="line1069">1069: </a>  PetscNewLog(pep,&amp;ctx);
+<a name="line1070">1070: </a>  ctx-&gt;explicitmatrix = PETSC_FALSE;
+<a name="line1071">1071: </a>  pep-&gt;data = (void*)ctx;
+<a name="line1072">1072: </a>  ctx-&gt;alpha = 1.0;
+<a name="line1073">1073: </a>  ctx-&gt;beta  = 0.0;
+
+<a name="line1075">1075: </a>  pep-&gt;ops-&gt;solve          = PEPSolve_Linear;
+<a name="line1076">1076: </a>  pep-&gt;ops-&gt;setup          = PEPSetUp_Linear;
+<a name="line1077">1077: </a>  pep-&gt;ops-&gt;setfromoptions = PEPSetFromOptions_Linear;
+<a name="line1078">1078: </a>  pep-&gt;ops-&gt;destroy        = PEPDestroy_Linear;
+<a name="line1079">1079: </a>  pep-&gt;ops-&gt;reset          = PEPReset_Linear;
+<a name="line1080">1080: </a>  pep-&gt;ops-&gt;view           = PEPView_Linear;
+<a name="line1081">1081: </a>  pep-&gt;ops-&gt;backtransform  = PEPBackTransform_Default;
+<a name="line1082">1082: </a>  pep-&gt;ops-&gt;computevectors = PEPComputeVectors_Default;
+<a name="line1083">1083: </a>  pep-&gt;ops-&gt;extractvectors = PEPExtractVectors_Linear;
+
+<a name="line1085">1085: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearSetLinearization_C"</font>,PEPLinearSetLinearization_Linear);
+<a name="line1086">1086: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearGetLinearization_C"</font>,PEPLinearGetLinearization_Linear);
+<a name="line1087">1087: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearSetEPS_C"</font>,PEPLinearSetEPS_Linear);
+<a name="line1088">1088: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearGetEPS_C"</font>,PEPLinearGetEPS_Linear);
+<a name="line1089">1089: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearSetExplicitMatrix_C"</font>,PEPLinearSetExplicitMatrix_Linear);
+<a name="line1090">1090: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPLinearGetExplicitMatrix_C"</font>,PEPLinearGetExplicitMatrix_Linear);
+<a name="line1091">1091: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1092">1092: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,41 @@
+# -*- mode: makefile -*-
+
+# This makefile is based on PETSc's Makefile.user. You may need to add
+# the directory containing PETSc.pc to the pkg-config path:
+# $ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig
+
+PETSc.pc := $(PETSC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/PETSc.pc
+SLEPc.pc := $(SLEPC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/SLEPc.pc
+
+CC := $(shell pkg-config --variable=ccompiler $(PETSc.pc))
+CXX := $(shell pkg-config --variable=cxxcompiler $(PETSc.pc))
+FC := $(shell pkg-config --variable=fcompiler $(PETSc.pc))
+CFLAGS_OTHER := $(shell pkg-config --cflags-only-other $(PETSc.pc))
+CFLAGS := $(shell pkg-config --variable=cflags_extra $(PETSc.pc)) $(CFLAGS_OTHER)
+CXXFLAGS := $(shell pkg-config --variable=cxxflags_extra $(PETSc.pc)) $(CFLAGS_OTHER)
+FFLAGS := $(shell pkg-config --variable=fflags_extra $(PETSc.pc))
+CPPFLAGS := $(shell pkg-config --cflags-only-I $(SLEPc.pc))
+LDFLAGS := $(shell pkg-config --libs-only-L --libs-only-other $(SLEPc.pc))
+LDFLAGS += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PETSc.pc))%, $(shell pkg-config --libs-only-L $(SLEPc.pc)))
+LDLIBS := $(shell pkg-config --libs-only-l $(SLEPc.pc)) -lm
+
+print:
+	@echo CC=$(CC)
+	@echo CXX=$(CXX)
+	@echo FC=$(FC)
+	@echo CFLAGS=$(CFLAGS)
+	@echo CXXFLAGS=$(CXXFLAGS)
+	@echo FFLAGS=$(FFLAGS)
+	@echo CPPFLAGS=$(CPPFLAGS)
+	@echo LDFLAGS=$(LDFLAGS)
+	@echo LDLIBS=$(LDLIBS)
+
+% : %.F90
+	$(LINK.F) -o $@ $^ $(LDLIBS)
+%.o: %.F90
+	$(COMPILE.F) $(OUTPUT_OPTION) $<
+% : %.cxx
+	$(LINK.cc) -o $@ $^ $(LDLIBS)
+%.o: %.cxx
+	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+

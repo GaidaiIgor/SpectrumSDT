@@ -1,0 +1,122 @@
+<center><a href="ks-symm.c">Actual source code: ks-symm.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/krylov/krylovschur/ks-symm.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:52+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/krylov/krylovschur/ks-symm.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "krylovschur"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Krylov-Schur for symmetric eigenproblems</font>
+<a name="line14"> 14: </a><font color="#B22222">*/</font>
+
+<a name="line16"> 16: </a> #include <A href="../../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line17"> 17: </a><font color="#A020F0">#include </font><font color="#666666">"krylovschur.h"</font><font color="#A020F0"></font>
+
+<a name="line19"> 19: </a><strong><font color="#4169E1"><a name="EPSSolve_KrylovSchur_Symm"></a>PetscErrorCode EPSSolve_KrylovSchur_Symm(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line20"> 20: </a>{
+<a name="line21"> 21: </a>  PetscErrorCode  ierr;
+<a name="line22"> 22: </a>  EPS_KRYLOVSCHUR *ctx = (EPS_KRYLOVSCHUR*)eps-&gt;data;
+<a name="line23"> 23: </a>  PetscInt        k,l,ld,nv,nconv;
+<a name="line24"> 24: </a>  Mat             U,Op;
+<a name="line25"> 25: </a>  PetscReal       *a,*b,beta;
+<a name="line26"> 26: </a>  PetscBool       breakdown;
+
+<a name="line29"> 29: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(eps-&gt;ds,&amp;ld);
+
+<a name="line31"> 31: </a>  <font color="#B22222">/* Get the starting Lanczos vector */</font>
+<a name="line32"> 32: </a>  EPSGetStartVector(eps,0,NULL);
+<a name="line33"> 33: </a>  l = 0;
+
+<a name="line35"> 35: </a>  <font color="#B22222">/* Restart loop */</font>
+<a name="line36"> 36: </a>  <font color="#4169E1">while</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+<a name="line37"> 37: </a>    eps-&gt;its++;
+
+<a name="line39"> 39: </a>    <font color="#B22222">/* Compute an nv-step Lanczos factorization */</font>
+<a name="line40"> 40: </a>    nv = PetscMin(eps-&gt;nconv+eps-&gt;mpd,eps-&gt;ncv);
+<a name="line41"> 41: </a>    <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>,&amp;a);
+<a name="line42"> 42: </a>    b = a + ld;
+<a name="line43"> 43: </a>    <a href="../../../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line44"> 44: </a>    <a href="../../../../../docs/manualpages/BV/BVMatLanczos.html#BVMatLanczos">BVMatLanczos</a>(eps-&gt;V,Op,a,b,eps-&gt;nconv+l,&amp;nv,&amp;breakdown);
+<a name="line45"> 45: </a>    <a href="../../../../../docs/manualpages/ST/STRestoreOperator.html#STRestoreOperator">STRestoreOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line46"> 46: </a>    beta = b[nv-1];
+<a name="line47"> 47: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>,&amp;a);
+<a name="line48"> 48: </a>    <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,nv,0,eps-&gt;nconv,eps-&gt;nconv+l);
+<a name="line49"> 49: </a>    <font color="#4169E1">if</font> (l==0) {
+<a name="line50"> 50: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>);
+<a name="line51"> 51: </a>    } <font color="#4169E1">else</font> {
+<a name="line52"> 52: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line53"> 53: </a>    }
+<a name="line54"> 54: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,eps-&gt;nconv,nv);
+
+<a name="line56"> 56: </a>    <font color="#B22222">/* Solve projected problem */</font>
+<a name="line57"> 57: </a>    <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;ds,eps-&gt;eigr,NULL);
+<a name="line58"> 58: </a>    <font color="#4169E1">if</font> (eps-&gt;arbitrary) { EPSGetArbitraryValues(eps,eps-&gt;rr,eps-&gt;ri); }
+<a name="line59"> 59: </a>    <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;ds,eps-&gt;eigr,NULL,eps-&gt;rr,eps-&gt;ri,NULL);
+<a name="line60"> 60: </a>    <a href="../../../../../docs/manualpages/DS/DSUpdateExtraRow.html#DSUpdateExtraRow">DSUpdateExtraRow</a>(eps-&gt;ds);
+<a name="line61"> 61: </a>    <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;ds,eps-&gt;eigr,NULL);
+
+<a name="line63"> 63: </a>    <font color="#B22222">/* Check convergence */</font>
+<a name="line64"> 64: </a>    EPSKrylovConvergence(eps,PETSC_FALSE,eps-&gt;nconv,nv-eps-&gt;nconv,beta,0.0,1.0,&amp;k);
+<a name="line65"> 65: </a>    (*eps-&gt;stopping)(eps,eps-&gt;its,eps-&gt;max_it,k,eps-&gt;nev,&amp;eps-&gt;reason,eps-&gt;stoppingctx);
+<a name="line66"> 66: </a>    nconv = k;
+
+<a name="line68"> 68: </a>    <font color="#B22222">/* Update l */</font>
+<a name="line69"> 69: </a>    <font color="#4169E1">if</font> (eps-&gt;reason != <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a> || breakdown || k==nv) l = 0;
+<a name="line70"> 70: </a>    <font color="#4169E1">else</font> l = PetscMax(1,(PetscInt)((nv-k)*ctx-&gt;keep));
+<a name="line71"> 71: </a>    <font color="#4169E1">if</font> (!ctx-&gt;lock &amp;&amp; l&gt;0) { l += k; k = 0; } <font color="#B22222">/* non-locking variant: reset no. of converged pairs */</font>
+
+<a name="line73"> 73: </a>    <font color="#4169E1">if</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+<a name="line74"> 74: </a>      <font color="#4169E1">if</font> (breakdown || k==nv) {
+<a name="line75"> 75: </a>        <font color="#B22222">/* Start a new Lanczos factorization */</font>
+<a name="line76"> 76: </a>        PetscInfo2(eps,<font color="#666666">"Breakdown in Krylov-Schur method (it=%D norm=%g)\n"</font>,eps-&gt;its,(double)beta);
+<a name="line77"> 77: </a>        <font color="#4169E1">if</font> (k&lt;eps-&gt;nev) {
+<a name="line78"> 78: </a>          EPSGetStartVector(eps,k,&amp;breakdown);
+<a name="line79"> 79: </a>          <font color="#4169E1">if</font> (breakdown) {
+<a name="line80"> 80: </a>            eps-&gt;reason = <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_BREAKDOWN</a>;
+<a name="line81"> 81: </a>            PetscInfo(eps,<font color="#666666">"Unable to generate more start vectors\n"</font>);
+<a name="line82"> 82: </a>          }
+<a name="line83"> 83: </a>        }
+<a name="line84"> 84: </a>      } <font color="#4169E1">else</font> {
+<a name="line85"> 85: </a>        <font color="#B22222">/* Prepare the Rayleigh quotient for restart */</font>
+<a name="line86"> 86: </a>        <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a>(eps-&gt;ds,k+l);
+<a name="line87"> 87: </a>      }
+<a name="line88"> 88: </a>    }
+<a name="line89"> 89: </a>    <font color="#B22222">/* Update the corresponding vectors V(:,idx) = V*Q(:,idx) */</font>
+<a name="line90"> 90: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line91"> 91: </a>    <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;V,U,eps-&gt;nconv,k+l);
+<a name="line92"> 92: </a>    MatDestroy(&amp;U);
+
+<a name="line94"> 94: </a>    <font color="#B22222">/* Normalize u and append it to V */</font>
+<a name="line95"> 95: </a>    <font color="#4169E1">if</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a> &amp;&amp; !breakdown) {
+<a name="line96"> 96: </a>      <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(eps-&gt;V,nv,k+l);
+<a name="line97"> 97: </a>    }
+
+<a name="line99"> 99: </a>    eps-&gt;nconv = k;
+<a name="line100">100: </a>    EPSMonitor(eps,eps-&gt;its,nconv,eps-&gt;eigr,eps-&gt;eigi,eps-&gt;errest,nv);
+<a name="line101">101: </a>  }
+<a name="line102">102: </a>  <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,eps-&gt;nconv,0,0,0);
+<a name="line103">103: </a>  <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line104">104: </a>  <font color="#4169E1">return</font>(0);
+<a name="line105">105: </a>}
+
+</pre>
+</body>
+
+</html>

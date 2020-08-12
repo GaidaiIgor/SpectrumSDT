@@ -1,0 +1,527 @@
+<center><a href="svec.c">Actual source code: svec.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/impls/svec/svec.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:44+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/impls/svec/svec.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> implemented as a single Vec</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+<a name="line15"> 15: </a><font color="#A020F0">#include </font><font color="#666666">"svec.h"</font><font color="#A020F0"></font>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="BVMult_Svec"></a>PetscErrorCode BVMult_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y,PetscScalar alpha,PetscScalar beta,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,Mat Q)</font></strong>
+<a name="line18"> 18: </a>{
+<a name="line19"> 19: </a>  PetscErrorCode    ierr;
+<a name="line20"> 20: </a>  BV_SVEC           *y = (BV_SVEC*)Y-&gt;data,*x = (BV_SVEC*)X-&gt;data;
+<a name="line21"> 21: </a>  const PetscScalar *px;
+<a name="line22"> 22: </a>  PetscScalar       *py,*q;
+<a name="line23"> 23: </a>  PetscInt          ldq;
+
+<a name="line26"> 26: </a>  VecGetArrayRead(x-&gt;v,&amp;px);
+<a name="line27"> 27: </a>  VecGetArray(y-&gt;v,&amp;py);
+<a name="line28"> 28: </a>  <font color="#4169E1">if</font> (Q) {
+<a name="line29"> 29: </a>    MatGetSize(Q,&amp;ldq,NULL);
+<a name="line30"> 30: </a>    MatDenseGetArray(Q,&amp;q);
+<a name="line31"> 31: </a>    BVMult_BLAS_Private(Y,Y-&gt;n,Y-&gt;k-Y-&gt;l,X-&gt;k-X-&gt;l,ldq,alpha,px+(X-&gt;nc+X-&gt;l)*X-&gt;n,q+Y-&gt;l*ldq+X-&gt;l,beta,py+(Y-&gt;nc+Y-&gt;l)*Y-&gt;n);
+<a name="line32"> 32: </a>    MatDenseRestoreArray(Q,&amp;q);
+<a name="line33"> 33: </a>  } <font color="#4169E1">else</font> {
+<a name="line34"> 34: </a>    BVAXPY_BLAS_Private(Y,Y-&gt;n,Y-&gt;k-Y-&gt;l,alpha,px+(X-&gt;nc+X-&gt;l)*X-&gt;n,beta,py+(Y-&gt;nc+Y-&gt;l)*Y-&gt;n);
+<a name="line35"> 35: </a>  }
+<a name="line36"> 36: </a>  VecRestoreArrayRead(x-&gt;v,&amp;px);
+<a name="line37"> 37: </a>  VecRestoreArray(y-&gt;v,&amp;py);
+<a name="line38"> 38: </a>  <font color="#4169E1">return</font>(0);
+<a name="line39"> 39: </a>}
+
+<a name="line41"> 41: </a><strong><font color="#4169E1"><a name="BVMultVec_Svec"></a>PetscErrorCode BVMultVec_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,PetscScalar alpha,PetscScalar beta,Vec y,PetscScalar *q)</font></strong>
+<a name="line42"> 42: </a>{
+<a name="line44"> 44: </a>  BV_SVEC        *x = (BV_SVEC*)X-&gt;data;
+<a name="line45"> 45: </a>  PetscScalar    *px,*py,*qq=q;
+
+<a name="line48"> 48: </a>  VecGetArray(x-&gt;v,&amp;px);
+<a name="line49"> 49: </a>  VecGetArray(y,&amp;py);
+<a name="line50"> 50: </a>  <font color="#4169E1">if</font> (!q) { VecGetArray(X-&gt;buffer,&amp;qq); }
+<a name="line51"> 51: </a>  BVMultVec_BLAS_Private(X,X-&gt;n,X-&gt;k-X-&gt;l,alpha,px+(X-&gt;nc+X-&gt;l)*X-&gt;n,qq,beta,py);
+<a name="line52"> 52: </a>  <font color="#4169E1">if</font> (!q) { VecRestoreArray(X-&gt;buffer,&amp;qq); }
+<a name="line53"> 53: </a>  VecRestoreArray(x-&gt;v,&amp;px);
+<a name="line54"> 54: </a>  VecRestoreArray(y,&amp;py);
+<a name="line55"> 55: </a>  <font color="#4169E1">return</font>(0);
+<a name="line56"> 56: </a>}
+
+<a name="line58"> 58: </a><strong><font color="#4169E1"><a name="BVMultInPlace_Svec"></a>PetscErrorCode BVMultInPlace_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line59"> 59: </a>{
+<a name="line61"> 61: </a>  BV_SVEC        *ctx = (BV_SVEC*)V-&gt;data;
+<a name="line62"> 62: </a>  PetscScalar    *pv,*q;
+<a name="line63"> 63: </a>  PetscInt       ldq;
+
+<a name="line66"> 66: </a>  MatGetSize(Q,&amp;ldq,NULL);
+<a name="line67"> 67: </a>  VecGetArray(ctx-&gt;v,&amp;pv);
+<a name="line68"> 68: </a>  MatDenseGetArray(Q,&amp;q);
+<a name="line69"> 69: </a>  BVMultInPlace_BLAS_Private(V,V-&gt;n,V-&gt;k-V-&gt;l,ldq,s-V-&gt;l,e-V-&gt;l,pv+(V-&gt;nc+V-&gt;l)*V-&gt;n,q+V-&gt;l*ldq+V-&gt;l,PETSC_FALSE);
+<a name="line70"> 70: </a>  MatDenseRestoreArray(Q,&amp;q);
+<a name="line71"> 71: </a>  VecRestoreArray(ctx-&gt;v,&amp;pv);
+<a name="line72"> 72: </a>  <font color="#4169E1">return</font>(0);
+<a name="line73"> 73: </a>}
+
+<a name="line75"> 75: </a><strong><font color="#4169E1"><a name="BVMultInPlaceTranspose_Svec"></a>PetscErrorCode BVMultInPlaceTranspose_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line76"> 76: </a>{
+<a name="line78"> 78: </a>  BV_SVEC        *ctx = (BV_SVEC*)V-&gt;data;
+<a name="line79"> 79: </a>  PetscScalar    *pv,*q;
+<a name="line80"> 80: </a>  PetscInt       ldq;
+
+<a name="line83"> 83: </a>  MatGetSize(Q,&amp;ldq,NULL);
+<a name="line84"> 84: </a>  VecGetArray(ctx-&gt;v,&amp;pv);
+<a name="line85"> 85: </a>  MatDenseGetArray(Q,&amp;q);
+<a name="line86"> 86: </a>  BVMultInPlace_BLAS_Private(V,V-&gt;n,V-&gt;k-V-&gt;l,ldq,s-V-&gt;l,e-V-&gt;l,pv+(V-&gt;nc+V-&gt;l)*V-&gt;n,q+V-&gt;l*ldq+V-&gt;l,PETSC_TRUE);
+<a name="line87"> 87: </a>  MatDenseRestoreArray(Q,&amp;q);
+<a name="line88"> 88: </a>  VecRestoreArray(ctx-&gt;v,&amp;pv);
+<a name="line89"> 89: </a>  <font color="#4169E1">return</font>(0);
+<a name="line90"> 90: </a>}
+
+<a name="line92"> 92: </a><strong><font color="#4169E1"><a name="BVDot_Svec"></a>PetscErrorCode BVDot_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y,Mat M)</font></strong>
+<a name="line93"> 93: </a>{
+<a name="line94"> 94: </a>  PetscErrorCode    ierr;
+<a name="line95"> 95: </a>  BV_SVEC           *x = (BV_SVEC*)X-&gt;data,*y = (BV_SVEC*)Y-&gt;data;
+<a name="line96"> 96: </a>  const PetscScalar *px,*py;
+<a name="line97"> 97: </a>  PetscScalar       *m;
+<a name="line98"> 98: </a>  PetscInt          ldm;
+
+<a name="line101">101: </a>  MatGetSize(M,&amp;ldm,NULL);
+<a name="line102">102: </a>  VecGetArrayRead(x-&gt;v,&amp;px);
+<a name="line103">103: </a>  VecGetArrayRead(y-&gt;v,&amp;py);
+<a name="line104">104: </a>  MatDenseGetArray(M,&amp;m);
+<a name="line105">105: </a>  BVDot_BLAS_Private(X,Y-&gt;k-Y-&gt;l,X-&gt;k-X-&gt;l,X-&gt;n,ldm,py+(Y-&gt;nc+Y-&gt;l)*Y-&gt;n,px+(X-&gt;nc+X-&gt;l)*X-&gt;n,m+X-&gt;l*ldm+Y-&gt;l,x-&gt;mpi);
+<a name="line106">106: </a>  MatDenseRestoreArray(M,&amp;m);
+<a name="line107">107: </a>  VecRestoreArrayRead(x-&gt;v,&amp;px);
+<a name="line108">108: </a>  VecRestoreArrayRead(y-&gt;v,&amp;py);
+<a name="line109">109: </a>  <font color="#4169E1">return</font>(0);
+<a name="line110">110: </a>}
+
+<a name="line112">112: </a><strong><font color="#4169E1"><a name="BVDotVec_Svec"></a>PetscErrorCode BVDotVec_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,Vec y,PetscScalar *q)</font></strong>
+<a name="line113">113: </a>{
+<a name="line114">114: </a>  PetscErrorCode    ierr;
+<a name="line115">115: </a>  BV_SVEC           *x = (BV_SVEC*)X-&gt;data;
+<a name="line116">116: </a>  const PetscScalar *px,*py;
+<a name="line117">117: </a>  PetscScalar       *qq=q;
+<a name="line118">118: </a>  Vec               z = y;
+
+<a name="line121">121: </a>  <font color="#4169E1">if</font> (X-&gt;matrix) {
+<a name="line122">122: </a>    BV_IPMatMult(X,y);
+<a name="line123">123: </a>    z = X-&gt;Bx;
+<a name="line124">124: </a>  }
+<a name="line125">125: </a>  VecGetArrayRead(x-&gt;v,&amp;px);
+<a name="line126">126: </a>  VecGetArrayRead(z,&amp;py);
+<a name="line127">127: </a>  <font color="#4169E1">if</font> (!q) { VecGetArray(X-&gt;buffer,&amp;qq); }
+<a name="line128">128: </a>  BVDotVec_BLAS_Private(X,X-&gt;n,X-&gt;k-X-&gt;l,px+(X-&gt;nc+X-&gt;l)*X-&gt;n,py,qq,x-&gt;mpi);
+<a name="line129">129: </a>  <font color="#4169E1">if</font> (!q) { VecRestoreArray(X-&gt;buffer,&amp;qq); }
+<a name="line130">130: </a>  VecRestoreArrayRead(z,&amp;py);
+<a name="line131">131: </a>  VecRestoreArrayRead(x-&gt;v,&amp;px);
+<a name="line132">132: </a>  <font color="#4169E1">return</font>(0);
+<a name="line133">133: </a>}
+
+<a name="line135">135: </a><strong><font color="#4169E1"><a name="BVDotVec_Local_Svec"></a>PetscErrorCode BVDotVec_Local_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,Vec y,PetscScalar *m)</font></strong>
+<a name="line136">136: </a>{
+<a name="line138">138: </a>  BV_SVEC        *x = (BV_SVEC*)X-&gt;data;
+<a name="line139">139: </a>  PetscScalar    *px,*py;
+<a name="line140">140: </a>  Vec            z = y;
+
+<a name="line143">143: </a>  <font color="#4169E1">if</font> (X-&gt;matrix) {
+<a name="line144">144: </a>    BV_IPMatMult(X,y);
+<a name="line145">145: </a>    z = X-&gt;Bx;
+<a name="line146">146: </a>  }
+<a name="line147">147: </a>  VecGetArray(x-&gt;v,&amp;px);
+<a name="line148">148: </a>  VecGetArray(z,&amp;py);
+<a name="line149">149: </a>  BVDotVec_BLAS_Private(X,X-&gt;n,X-&gt;k-X-&gt;l,px+(X-&gt;nc+X-&gt;l)*X-&gt;n,py,m,PETSC_FALSE);
+<a name="line150">150: </a>  VecRestoreArray(z,&amp;py);
+<a name="line151">151: </a>  VecRestoreArray(x-&gt;v,&amp;px);
+<a name="line152">152: </a>  <font color="#4169E1">return</font>(0);
+<a name="line153">153: </a>}
+
+<a name="line155">155: </a><strong><font color="#4169E1"><a name="BVScale_Svec"></a>PetscErrorCode BVScale_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscScalar alpha)</font></strong>
+<a name="line156">156: </a>{
+<a name="line158">158: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+<a name="line159">159: </a>  PetscScalar    *array;
+
+<a name="line162">162: </a>  VecGetArray(ctx-&gt;v,&amp;array);
+<a name="line163">163: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line164">164: </a>    BVScale_BLAS_Private(bv,(bv-&gt;k-bv-&gt;l)*bv-&gt;n,array+(bv-&gt;nc+bv-&gt;l)*bv-&gt;n,alpha);
+<a name="line165">165: </a>  } <font color="#4169E1">else</font> {
+<a name="line166">166: </a>    BVScale_BLAS_Private(bv,bv-&gt;n,array+(bv-&gt;nc+j)*bv-&gt;n,alpha);
+<a name="line167">167: </a>  }
+<a name="line168">168: </a>  VecRestoreArray(ctx-&gt;v,&amp;array);
+<a name="line169">169: </a>  <font color="#4169E1">return</font>(0);
+<a name="line170">170: </a>}
+
+<a name="line172">172: </a><strong><font color="#4169E1"><a name="BVNorm_Svec"></a>PetscErrorCode BVNorm_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,NormType type,PetscReal *val)</font></strong>
+<a name="line173">173: </a>{
+<a name="line175">175: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+<a name="line176">176: </a>  PetscScalar    *array;
+
+<a name="line179">179: </a>  VecGetArray(ctx-&gt;v,&amp;array);
+<a name="line180">180: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line181">181: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,bv-&gt;k-bv-&gt;l,array+(bv-&gt;nc+bv-&gt;l)*bv-&gt;n,type,val,ctx-&gt;mpi);
+<a name="line182">182: </a>  } <font color="#4169E1">else</font> {
+<a name="line183">183: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,1,array+(bv-&gt;nc+j)*bv-&gt;n,type,val,ctx-&gt;mpi);
+<a name="line184">184: </a>  }
+<a name="line185">185: </a>  VecRestoreArray(ctx-&gt;v,&amp;array);
+<a name="line186">186: </a>  <font color="#4169E1">return</font>(0);
+<a name="line187">187: </a>}
+
+<a name="line189">189: </a><strong><font color="#4169E1"><a name="BVNorm_Local_Svec"></a>PetscErrorCode BVNorm_Local_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,NormType type,PetscReal *val)</font></strong>
+<a name="line190">190: </a>{
+<a name="line192">192: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+<a name="line193">193: </a>  PetscScalar    *array;
+
+<a name="line196">196: </a>  VecGetArray(ctx-&gt;v,&amp;array);
+<a name="line197">197: </a>  <font color="#4169E1">if</font> (j&lt;0) {
+<a name="line198">198: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,bv-&gt;k-bv-&gt;l,array+(bv-&gt;nc+bv-&gt;l)*bv-&gt;n,type,val,PETSC_FALSE);
+<a name="line199">199: </a>  } <font color="#4169E1">else</font> {
+<a name="line200">200: </a>    BVNorm_LAPACK_Private(bv,bv-&gt;n,1,array+(bv-&gt;nc+j)*bv-&gt;n,type,val,PETSC_FALSE);
+<a name="line201">201: </a>  }
+<a name="line202">202: </a>  VecRestoreArray(ctx-&gt;v,&amp;array);
+<a name="line203">203: </a>  <font color="#4169E1">return</font>(0);
+<a name="line204">204: </a>}
+
+<a name="line206">206: </a><strong><font color="#4169E1"><a name="BVMatMult_Svec"></a>PetscErrorCode BVMatMult_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> W)</font></strong>
+<a name="line207">207: </a>{
+<a name="line209">209: </a>  PetscInt       j;
+<a name="line210">210: </a>  PetscBool      flg;
+<a name="line211">211: </a>  Mat            Vmat,Wmat;
+<a name="line212">212: </a>  Vec            vv,ww;
+
+<a name="line215">215: </a>  MatHasOperation(A,MATOP_MAT_MULT,&amp;flg);
+<a name="line216">216: </a>  <font color="#4169E1">if</font> (V-&gt;vmm &amp;&amp; flg) {
+<a name="line217">217: </a>    <a href="../../../../../../docs/manualpages/BV/BVGetMat.html#BVGetMat">BVGetMat</a>(V,&amp;Vmat);
+<a name="line218">218: </a>    <a href="../../../../../../docs/manualpages/BV/BVGetMat.html#BVGetMat">BVGetMat</a>(W,&amp;Wmat);
+<a name="line219">219: </a>    MatProductCreateWithMat(A,Vmat,NULL,Wmat);
+<a name="line220">220: </a>    MatProductSetType(Wmat,MATPRODUCT_AB);
+<a name="line221">221: </a>    MatProductSetFromOptions(Wmat);
+<a name="line222">222: </a>    MatProductSymbolic(Wmat);
+<a name="line223">223: </a>    MatProductNumeric(Wmat);
+<a name="line224">224: </a>    MatProductClear(Wmat);
+<a name="line225">225: </a>    <a href="../../../../../../docs/manualpages/BV/BVRestoreMat.html#BVRestoreMat">BVRestoreMat</a>(V,&amp;Vmat);
+<a name="line226">226: </a>    <a href="../../../../../../docs/manualpages/BV/BVRestoreMat.html#BVRestoreMat">BVRestoreMat</a>(W,&amp;Wmat);
+<a name="line227">227: </a>  } <font color="#4169E1">else</font> {
+<a name="line228">228: </a>    <font color="#4169E1">for</font> (j=0;j&lt;V-&gt;k-V-&gt;l;j++) {
+<a name="line229">229: </a>      <a href="../../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,V-&gt;l+j,&amp;vv);
+<a name="line230">230: </a>      <a href="../../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(W,W-&gt;l+j,&amp;ww);
+<a name="line231">231: </a>      MatMult(A,vv,ww);
+<a name="line232">232: </a>      <a href="../../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,V-&gt;l+j,&amp;vv);
+<a name="line233">233: </a>      <a href="../../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(W,W-&gt;l+j,&amp;ww);
+<a name="line234">234: </a>    }
+<a name="line235">235: </a>  }
+<a name="line236">236: </a>  <font color="#4169E1">return</font>(0);
+<a name="line237">237: </a>}
+
+<a name="line239">239: </a><strong><font color="#4169E1"><a name="BVCopy_Svec"></a>PetscErrorCode BVCopy_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> W)</font></strong>
+<a name="line240">240: </a>{
+<a name="line242">242: </a>  BV_SVEC        *v = (BV_SVEC*)V-&gt;data,*w = (BV_SVEC*)W-&gt;data;
+<a name="line243">243: </a>  PetscScalar    *pv,*pw,*pvc,*pwc;
+
+<a name="line246">246: </a>  VecGetArray(v-&gt;v,&amp;pv);
+<a name="line247">247: </a>  VecGetArray(w-&gt;v,&amp;pw);
+<a name="line248">248: </a>  pvc = pv+(V-&gt;nc+V-&gt;l)*V-&gt;n;
+<a name="line249">249: </a>  pwc = pw+(W-&gt;nc+W-&gt;l)*W-&gt;n;
+<a name="line250">250: </a>  PetscArraycpy(pwc,pvc,(V-&gt;k-V-&gt;l)*V-&gt;n);
+<a name="line251">251: </a>  VecRestoreArray(v-&gt;v,&amp;pv);
+<a name="line252">252: </a>  VecRestoreArray(w-&gt;v,&amp;pw);
+<a name="line253">253: </a>  <font color="#4169E1">return</font>(0);
+<a name="line254">254: </a>}
+
+<a name="line256">256: </a><strong><font color="#4169E1"><a name="BVCopyColumn_Svec"></a>PetscErrorCode BVCopyColumn_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,PetscInt j,PetscInt i)</font></strong>
+<a name="line257">257: </a>{
+<a name="line259">259: </a>  BV_SVEC        *v = (BV_SVEC*)V-&gt;data;
+<a name="line260">260: </a>  PetscScalar    *pv;
+
+<a name="line263">263: </a>  VecGetArray(v-&gt;v,&amp;pv);
+<a name="line264">264: </a>  PetscArraycpy(pv+(V-&gt;nc+i)*V-&gt;n,pv+(V-&gt;nc+j)*V-&gt;n,V-&gt;n);
+<a name="line265">265: </a>  VecRestoreArray(v-&gt;v,&amp;pv);
+<a name="line266">266: </a>  <font color="#4169E1">return</font>(0);
+<a name="line267">267: </a>}
+
+<a name="line269">269: </a><strong><font color="#4169E1"><a name="BVResize_Svec"></a>PetscErrorCode BVResize_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt m,PetscBool copy)</font></strong>
+<a name="line270">270: </a>{
+<a name="line271">271: </a>  PetscErrorCode    ierr;
+<a name="line272">272: </a>  BV_SVEC           *ctx = (BV_SVEC*)bv-&gt;data;
+<a name="line273">273: </a>  PetscScalar       *pnew;
+<a name="line274">274: </a>  const PetscScalar *pv;
+<a name="line275">275: </a>  PetscInt          bs,lsplit;
+<a name="line276">276: </a>  Vec               vnew,vpar;
+<a name="line277">277: </a>  char              str[50];
+<a name="line278">278: </a>  <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>                parent;
+
+<a name="line281">281: </a>  <font color="#4169E1">if</font> (bv-&gt;issplit==2) {
+<a name="line282">282: </a>    parent = bv-&gt;splitparent;
+<a name="line283">283: </a>    lsplit = parent-&gt;lsplit;
+<a name="line284">284: </a>    vpar = ((BV_SVEC*)parent-&gt;data)-&gt;v;
+<a name="line285">285: </a>    VecGetArrayRead(vpar,&amp;pv);
+<a name="line286">286: </a>    VecResetArray(ctx-&gt;v);
+<a name="line287">287: </a>    VecPlaceArray(ctx-&gt;v,pv+lsplit*bv-&gt;n);
+<a name="line288">288: </a>    VecRestoreArrayRead(vpar,&amp;pv);
+<a name="line289">289: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!bv-&gt;issplit) {
+<a name="line290">290: </a>    VecGetBlockSize(bv-&gt;t,&amp;bs);
+<a name="line291">291: </a>    VecCreate(PetscObjectComm((PetscObject)bv-&gt;t),&amp;vnew);
+<a name="line292">292: </a>    VecSetType(vnew,((PetscObject)bv-&gt;t)-&gt;type_name);
+<a name="line293">293: </a>    VecSetSizes(vnew,m*bv-&gt;n,PETSC_DECIDE);
+<a name="line294">294: </a>    VecSetBlockSize(vnew,bs);
+<a name="line295">295: </a>    PetscLogObjectParent((PetscObject)bv,(PetscObject)vnew);
+<a name="line296">296: </a>    <font color="#4169E1">if</font> (((PetscObject)bv)-&gt;name) {
+<a name="line297">297: </a>      PetscSNPrintf(str,50,<font color="#666666">"%s_0"</font>,((PetscObject)bv)-&gt;name);
+<a name="line298">298: </a>      PetscObjectSetName((PetscObject)vnew,str);
+<a name="line299">299: </a>    }
+<a name="line300">300: </a>    <font color="#4169E1">if</font> (copy) {
+<a name="line301">301: </a>      VecGetArrayRead(ctx-&gt;v,&amp;pv);
+<a name="line302">302: </a>      VecGetArray(vnew,&amp;pnew);
+<a name="line303">303: </a>      PetscArraycpy(pnew,pv,PetscMin(m,bv-&gt;m)*bv-&gt;n);
+<a name="line304">304: </a>      VecRestoreArrayRead(ctx-&gt;v,&amp;pv);
+<a name="line305">305: </a>      VecRestoreArray(vnew,&amp;pnew);
+<a name="line306">306: </a>    }
+<a name="line307">307: </a>    VecDestroy(&amp;ctx-&gt;v);
+<a name="line308">308: </a>    ctx-&gt;v = vnew;
+<a name="line309">309: </a>  }
+<a name="line310">310: </a>  <font color="#4169E1">return</font>(0);
+<a name="line311">311: </a>}
+
+<a name="line313">313: </a><strong><font color="#4169E1"><a name="BVGetColumn_Svec"></a>PetscErrorCode BVGetColumn_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,Vec *v)</font></strong>
+<a name="line314">314: </a>{
+<a name="line316">316: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+<a name="line317">317: </a>  PetscScalar    *pv;
+<a name="line318">318: </a>  PetscInt       l;
+
+<a name="line321">321: </a>  l = BVAvailableVec;
+<a name="line322">322: </a>  VecGetArray(ctx-&gt;v,&amp;pv);
+<a name="line323">323: </a>  VecPlaceArray(bv-&gt;cv[l],pv+(bv-&gt;nc+j)*bv-&gt;n);
+<a name="line324">324: </a>  <font color="#4169E1">return</font>(0);
+<a name="line325">325: </a>}
+
+<a name="line327">327: </a><strong><font color="#4169E1"><a name="BVRestoreColumn_Svec"></a>PetscErrorCode BVRestoreColumn_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,Vec *v)</font></strong>
+<a name="line328">328: </a>{
+<a name="line330">330: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+<a name="line331">331: </a>  PetscInt       l;
+
+<a name="line334">334: </a>  l = (j==bv-&gt;ci[0])? 0: 1;
+<a name="line335">335: </a>  VecResetArray(bv-&gt;cv[l]);
+<a name="line336">336: </a>  VecRestoreArray(ctx-&gt;v,NULL);
+<a name="line337">337: </a>  <font color="#4169E1">return</font>(0);
+<a name="line338">338: </a>}
+
+<a name="line340">340: </a><strong><font color="#4169E1"><a name="BVGetArray_Svec"></a>PetscErrorCode BVGetArray_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscScalar **a)</font></strong>
+<a name="line341">341: </a>{
+<a name="line343">343: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+
+<a name="line346">346: </a>  VecGetArray(ctx-&gt;v,a);
+<a name="line347">347: </a>  <font color="#4169E1">return</font>(0);
+<a name="line348">348: </a>}
+
+<a name="line350">350: </a><strong><font color="#4169E1"><a name="BVRestoreArray_Svec"></a>PetscErrorCode BVRestoreArray_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscScalar **a)</font></strong>
+<a name="line351">351: </a>{
+<a name="line353">353: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+
+<a name="line356">356: </a>  VecRestoreArray(ctx-&gt;v,a);
+<a name="line357">357: </a>  <font color="#4169E1">return</font>(0);
+<a name="line358">358: </a>}
+
+<a name="line360">360: </a><strong><font color="#4169E1"><a name="BVGetArrayRead_Svec"></a>PetscErrorCode BVGetArrayRead_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,const PetscScalar **a)</font></strong>
+<a name="line361">361: </a>{
+<a name="line363">363: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+
+<a name="line366">366: </a>  VecGetArrayRead(ctx-&gt;v,a);
+<a name="line367">367: </a>  <font color="#4169E1">return</font>(0);
+<a name="line368">368: </a>}
+
+<a name="line370">370: </a><strong><font color="#4169E1"><a name="BVRestoreArrayRead_Svec"></a>PetscErrorCode BVRestoreArrayRead_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,const PetscScalar **a)</font></strong>
+<a name="line371">371: </a>{
+<a name="line373">373: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+
+<a name="line376">376: </a>  VecRestoreArrayRead(ctx-&gt;v,a);
+<a name="line377">377: </a>  <font color="#4169E1">return</font>(0);
+<a name="line378">378: </a>}
+
+<a name="line380">380: </a><strong><font color="#4169E1"><a name="BVView_Svec"></a>PetscErrorCode BVView_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscViewer viewer)</font></strong>
+<a name="line381">381: </a>{
+<a name="line382">382: </a>  PetscErrorCode    ierr;
+<a name="line383">383: </a>  BV_SVEC           *ctx = (BV_SVEC*)bv-&gt;data;
+<a name="line384">384: </a>  PetscViewerFormat format;
+<a name="line385">385: </a>  PetscBool         isascii;
+<a name="line386">386: </a>  const char        *bvname,*name;
+
+<a name="line389">389: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line390">390: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line391">391: </a>    PetscViewerGetFormat(viewer,&amp;format);
+<a name="line392">392: </a>    <font color="#4169E1">if</font> (format == PETSC_VIEWER_ASCII_INFO || format == PETSC_VIEWER_ASCII_INFO_DETAIL) <font color="#4169E1">return</font>(0);
+<a name="line393">393: </a>    VecView(ctx-&gt;v,viewer);
+<a name="line394">394: </a>    <font color="#4169E1">if</font> (format == PETSC_VIEWER_ASCII_MATLAB) {
+<a name="line395">395: </a>      PetscObjectGetName((PetscObject)bv,&amp;bvname);
+<a name="line396">396: </a>      PetscObjectGetName((PetscObject)ctx-&gt;v,&amp;name);
+<a name="line397">397: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s=reshape(%s,%D,%D);clear %s\n"</font>,bvname,name,bv-&gt;N,bv-&gt;nc+bv-&gt;m,name);
+<a name="line398">398: </a>      <font color="#4169E1">if</font> (bv-&gt;nc) {
+<a name="line399">399: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"%s=%s(:,%D:end);\n"</font>,bvname,bvname,bv-&gt;nc+1);
+<a name="line400">400: </a>      }
+<a name="line401">401: </a>    }
+<a name="line402">402: </a>  } <font color="#4169E1">else</font> {
+<a name="line403">403: </a>    VecView(ctx-&gt;v,viewer);
+<a name="line404">404: </a>  }
+<a name="line405">405: </a>  <font color="#4169E1">return</font>(0);
+<a name="line406">406: </a>}
+
+<a name="line408">408: </a><strong><font color="#4169E1"><a name="BVDestroy_Svec"></a>PetscErrorCode BVDestroy_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line409">409: </a>{
+<a name="line411">411: </a>  BV_SVEC        *ctx = (BV_SVEC*)bv-&gt;data;
+
+<a name="line414">414: </a>  VecDestroy(&amp;ctx-&gt;v);
+<a name="line415">415: </a>  VecDestroy(&amp;bv-&gt;cv[0]);
+<a name="line416">416: </a>  VecDestroy(&amp;bv-&gt;cv[1]);
+<a name="line417">417: </a>  PetscFree(bv-&gt;data);
+<a name="line418">418: </a>  bv-&gt;cuda = PETSC_FALSE;
+<a name="line419">419: </a>  <font color="#4169E1">return</font>(0);
+<a name="line420">420: </a>}
+
+<a name="line422">422: </a><strong><font color="#4169E1"><a name="BVCreate_Svec"></a>SLEPC_EXTERN PetscErrorCode BVCreate_Svec(<a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line423">423: </a>{
+<a name="line424">424: </a>  PetscErrorCode    ierr;
+<a name="line425">425: </a>  BV_SVEC           *ctx;
+<a name="line426">426: </a>  PetscInt          nloc,N,bs,tglobal=0,tlocal,lsplit;
+<a name="line427">427: </a>  PetscBool         seq;
+<a name="line428">428: </a>  PetscScalar       *aa,*vv;
+<a name="line429">429: </a>  const PetscScalar *array,*ptr;
+<a name="line430">430: </a>  char              str[50];
+<a name="line431">431: </a>  <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>                parent;
+<a name="line432">432: </a>  Vec               vpar;
+<a name="line433">433: </a><font color="#A020F0">#if defined(PETSC_HAVE_CUDA)</font>
+<a name="line434">434: </a>  PetscScalar       *gpuarray,*gptr;
+<a name="line435">435: </a><font color="#A020F0">#endif</font>
+
+<a name="line438">438: </a>  PetscNewLog(bv,&amp;ctx);
+<a name="line439">439: </a>  bv-&gt;data = (void*)ctx;
+
+<a name="line441">441: </a>  PetscObjectTypeCompareAny((PetscObject)bv-&gt;t,&amp;bv-&gt;cuda,VECSEQCUDA,VECMPICUDA,<font color="#666666">""</font>);
+<a name="line442">442: </a>  PetscObjectTypeCompareAny((PetscObject)bv-&gt;t,&amp;ctx-&gt;mpi,VECMPI,VECMPICUDA,<font color="#666666">""</font>);
+
+<a name="line444">444: </a>  PetscObjectTypeCompare((PetscObject)bv-&gt;t,VECSEQ,&amp;seq);
+<a name="line445">445: </a>  <font color="#4169E1">if</font> (!seq &amp;&amp; !ctx-&gt;mpi &amp;&amp; !bv-&gt;cuda) SETERRQ(PetscObjectComm((PetscObject)bv),PETSC_ERR_SUP,<font color="#666666">"BVSVEC does not support the type of the provided template vector"</font>);
+
+<a name="line447">447: </a>  VecGetLocalSize(bv-&gt;t,&amp;nloc);
+<a name="line448">448: </a>  VecGetSize(bv-&gt;t,&amp;N);
+<a name="line449">449: </a>  VecGetBlockSize(bv-&gt;t,&amp;bs);
+<a name="line450">450: </a>  tlocal  = bv-&gt;m*nloc;
+<a name="line451">451: </a>  PetscIntMultError(bv-&gt;m,N,&amp;tglobal);
+
+<a name="line453">453: </a>  <font color="#4169E1">if</font> (bv-&gt;issplit) {
+<a name="line454">454: </a>    <font color="#B22222">/* split <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>: create Vec sharing the memory of the parent <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> */</font>
+<a name="line455">455: </a>    parent = bv-&gt;splitparent;
+<a name="line456">456: </a>    lsplit = parent-&gt;lsplit;
+<a name="line457">457: </a>    vpar = ((BV_SVEC*)parent-&gt;data)-&gt;v;
+<a name="line458">458: </a>    <font color="#4169E1">if</font> (bv-&gt;cuda) {
+<a name="line459">459: </a><font color="#A020F0">#if defined(PETSC_HAVE_CUDA)</font>
+<a name="line460">460: </a>      VecCUDAGetArray(vpar,&amp;gpuarray);
+<a name="line461">461: </a>      gptr = (bv-&gt;issplit==1)? gpuarray: gpuarray+lsplit*nloc;
+<a name="line462">462: </a>      VecCUDARestoreArray(vpar,&amp;gpuarray);
+<a name="line463">463: </a>      <font color="#4169E1">if</font> (ctx-&gt;mpi) {
+<a name="line464">464: </a>        VecCreateMPICUDAWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,tlocal,bv-&gt;m*N,NULL,&amp;ctx-&gt;v);
+<a name="line465">465: </a>      } <font color="#4169E1">else</font> {
+<a name="line466">466: </a>        VecCreateSeqCUDAWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,tlocal,NULL,&amp;ctx-&gt;v);
+<a name="line467">467: </a>      }
+<a name="line468">468: </a>      VecCUDAPlaceArray(ctx-&gt;v,gptr);
+<a name="line469">469: </a><font color="#A020F0">#endif</font>
+<a name="line470">470: </a>    } <font color="#4169E1">else</font> {
+<a name="line471">471: </a>      VecGetArrayRead(vpar,&amp;array);
+<a name="line472">472: </a>      ptr = (bv-&gt;issplit==1)? array: array+lsplit*nloc;
+<a name="line473">473: </a>      VecRestoreArrayRead(vpar,&amp;array);
+<a name="line474">474: </a>      <font color="#4169E1">if</font> (ctx-&gt;mpi) {
+<a name="line475">475: </a>        VecCreateMPIWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,tlocal,bv-&gt;m*N,NULL,&amp;ctx-&gt;v);
+<a name="line476">476: </a>      } <font color="#4169E1">else</font> {
+<a name="line477">477: </a>        VecCreateSeqWithArray(PetscObjectComm((PetscObject)bv-&gt;t),bs,tlocal,NULL,&amp;ctx-&gt;v);
+<a name="line478">478: </a>      }
+<a name="line479">479: </a>      VecPlaceArray(ctx-&gt;v,ptr);
+<a name="line480">480: </a>    }
+<a name="line481">481: </a>  } <font color="#4169E1">else</font> {
+<a name="line482">482: </a>    <font color="#B22222">/* regular <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a>: create Vec to store the <a href="../../../../../../docs/manualpages/BV/BV.html#BV">BV</a> entries */</font>
+<a name="line483">483: </a>    VecCreate(PetscObjectComm((PetscObject)bv-&gt;t),&amp;ctx-&gt;v);
+<a name="line484">484: </a>    VecSetType(ctx-&gt;v,((PetscObject)bv-&gt;t)-&gt;type_name);
+<a name="line485">485: </a>    VecSetSizes(ctx-&gt;v,tlocal,tglobal);
+<a name="line486">486: </a>    VecSetBlockSize(ctx-&gt;v,bs);
+<a name="line487">487: </a>  }
+<a name="line488">488: </a>  PetscLogObjectParent((PetscObject)bv,(PetscObject)ctx-&gt;v);
+<a name="line489">489: </a>  <font color="#4169E1">if</font> (((PetscObject)bv)-&gt;name) {
+<a name="line490">490: </a>    PetscSNPrintf(str,50,<font color="#666666">"%s_0"</font>,((PetscObject)bv)-&gt;name);
+<a name="line491">491: </a>    PetscObjectSetName((PetscObject)ctx-&gt;v,str);
+<a name="line492">492: </a>  }
+
+<a name="line494">494: </a>  <font color="#4169E1">if</font> (bv-&gt;Acreate) {
+<a name="line495">495: </a>    MatDenseGetArray(bv-&gt;Acreate,&amp;aa);
+<a name="line496">496: </a>    VecGetArray(ctx-&gt;v,&amp;vv);
+<a name="line497">497: </a>    PetscArraycpy(vv,aa,tlocal);
+<a name="line498">498: </a>    VecRestoreArray(ctx-&gt;v,&amp;vv);
+<a name="line499">499: </a>    MatDenseRestoreArray(bv-&gt;Acreate,&amp;aa);
+<a name="line500">500: </a>    MatDestroy(&amp;bv-&gt;Acreate);
+<a name="line501">501: </a>  }
+
+<a name="line503">503: </a>  <a href="../../../../../../docs/manualpages/sys/VecDuplicateEmpty.html#VecDuplicateEmpty">VecDuplicateEmpty</a>(bv-&gt;t,&amp;bv-&gt;cv[0]);
+<a name="line504">504: </a>  <a href="../../../../../../docs/manualpages/sys/VecDuplicateEmpty.html#VecDuplicateEmpty">VecDuplicateEmpty</a>(bv-&gt;t,&amp;bv-&gt;cv[1]);
+
+<a name="line506">506: </a>  <font color="#4169E1">if</font> (bv-&gt;cuda) {
+<a name="line507">507: </a><font color="#A020F0">#if defined(PETSC_HAVE_CUDA)</font>
+<a name="line508">508: </a>    bv-&gt;ops-&gt;mult             = BVMult_Svec_CUDA;
+<a name="line509">509: </a>    bv-&gt;ops-&gt;multvec          = BVMultVec_Svec_CUDA;
+<a name="line510">510: </a>    bv-&gt;ops-&gt;multinplace      = BVMultInPlace_Svec_CUDA;
+<a name="line511">511: </a>    bv-&gt;ops-&gt;multinplacetrans = BVMultInPlaceTranspose_Svec_CUDA;
+<a name="line512">512: </a>    bv-&gt;ops-&gt;dot              = BVDot_Svec_CUDA;
+<a name="line513">513: </a>    bv-&gt;ops-&gt;dotvec           = BVDotVec_Svec_CUDA;
+<a name="line514">514: </a>    bv-&gt;ops-&gt;dotvec_local     = BVDotVec_Local_Svec_CUDA;
+<a name="line515">515: </a>    bv-&gt;ops-&gt;scale            = BVScale_Svec_CUDA;
+<a name="line516">516: </a>    bv-&gt;ops-&gt;matmult          = BVMatMult_Svec_CUDA;
+<a name="line517">517: </a>    bv-&gt;ops-&gt;copy             = BVCopy_Svec_CUDA;
+<a name="line518">518: </a>    bv-&gt;ops-&gt;copycolumn       = BVCopyColumn_Svec_CUDA;
+<a name="line519">519: </a>    bv-&gt;ops-&gt;resize           = BVResize_Svec_CUDA;
+<a name="line520">520: </a>    bv-&gt;ops-&gt;getcolumn        = BVGetColumn_Svec_CUDA;
+<a name="line521">521: </a>    bv-&gt;ops-&gt;restorecolumn    = BVRestoreColumn_Svec_CUDA;
+<a name="line522">522: </a>    bv-&gt;ops-&gt;restoresplit     = BVRestoreSplit_Svec_CUDA;
+<a name="line523">523: </a><font color="#A020F0">#endif</font>
+<a name="line524">524: </a>  } <font color="#4169E1">else</font> {
+<a name="line525">525: </a>    bv-&gt;ops-&gt;mult             = BVMult_Svec;
+<a name="line526">526: </a>    bv-&gt;ops-&gt;multvec          = BVMultVec_Svec;
+<a name="line527">527: </a>    bv-&gt;ops-&gt;multinplace      = BVMultInPlace_Svec;
+<a name="line528">528: </a>    bv-&gt;ops-&gt;multinplacetrans = BVMultInPlaceTranspose_Svec;
+<a name="line529">529: </a>    bv-&gt;ops-&gt;dot              = BVDot_Svec;
+<a name="line530">530: </a>    bv-&gt;ops-&gt;dotvec           = BVDotVec_Svec;
+<a name="line531">531: </a>    bv-&gt;ops-&gt;dotvec_local     = BVDotVec_Local_Svec;
+<a name="line532">532: </a>    bv-&gt;ops-&gt;scale            = BVScale_Svec;
+<a name="line533">533: </a>    bv-&gt;ops-&gt;matmult          = BVMatMult_Svec;
+<a name="line534">534: </a>    bv-&gt;ops-&gt;copy             = BVCopy_Svec;
+<a name="line535">535: </a>    bv-&gt;ops-&gt;copycolumn       = BVCopyColumn_Svec;
+<a name="line536">536: </a>    bv-&gt;ops-&gt;resize           = BVResize_Svec;
+<a name="line537">537: </a>    bv-&gt;ops-&gt;getcolumn        = BVGetColumn_Svec;
+<a name="line538">538: </a>    bv-&gt;ops-&gt;restorecolumn    = BVRestoreColumn_Svec;
+<a name="line539">539: </a>  }
+<a name="line540">540: </a>  bv-&gt;ops-&gt;norm             = BVNorm_Svec;
+<a name="line541">541: </a>  bv-&gt;ops-&gt;norm_local       = BVNorm_Local_Svec;
+<a name="line542">542: </a>  bv-&gt;ops-&gt;getarray         = BVGetArray_Svec;
+<a name="line543">543: </a>  bv-&gt;ops-&gt;restorearray     = BVRestoreArray_Svec;
+<a name="line544">544: </a>  bv-&gt;ops-&gt;getarrayread     = BVGetArrayRead_Svec;
+<a name="line545">545: </a>  bv-&gt;ops-&gt;restorearrayread = BVRestoreArrayRead_Svec;
+<a name="line546">546: </a>  bv-&gt;ops-&gt;destroy          = BVDestroy_Svec;
+<a name="line547">547: </a>  <font color="#4169E1">if</font> (!ctx-&gt;mpi) bv-&gt;ops-&gt;view = BVView_Svec;
+<a name="line548">548: </a>  <font color="#4169E1">return</font>(0);
+<a name="line549">549: </a>}
+
+</pre>
+</body>
+
+</html>

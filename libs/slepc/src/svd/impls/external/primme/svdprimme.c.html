@@ -1,0 +1,518 @@
+<center><a href="svdprimme.c">Actual source code: svdprimme.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/svd/impls/external/primme/svdprimme.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:02+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/svd/impls/external/primme/svdprimme.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This file implements a wrapper to the PRIMME <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> solver</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/svdimpl.h.html">&lt;slepc/private/svdimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#A020F0">#include &lt;primme.h&gt;</font>
+
+<a name="line18"> 18: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line19"> 19: </a><font color="#A020F0">#if defined(PETSC_USE_REAL_SINGLE)</font>
+<a name="line20"> 20: </a><strong><font color="#228B22">#define PRIMME_DRIVER cprimme_svds</font></strong>
+<a name="line21"> 21: </a><font color="#A020F0">#else</font>
+<a name="line22"> 22: </a><strong><font color="#228B22">#define PRIMME_DRIVER zprimme_svds</font></strong>
+<a name="line23"> 23: </a><font color="#A020F0">#endif</font>
+<a name="line24"> 24: </a><font color="#A020F0">#else</font>
+<a name="line25"> 25: </a><font color="#A020F0">#if defined(PETSC_USE_REAL_SINGLE)</font>
+<a name="line26"> 26: </a><strong><font color="#228B22">#define PRIMME_DRIVER sprimme_svds</font></strong>
+<a name="line27"> 27: </a><font color="#A020F0">#else</font>
+<a name="line28"> 28: </a><strong><font color="#228B22">#define PRIMME_DRIVER dprimme_svds</font></strong>
+<a name="line29"> 29: </a><font color="#A020F0">#endif</font>
+<a name="line30"> 30: </a><font color="#A020F0">#endif</font>
+
+<a name="line32"> 32: </a><font color="#A020F0">#if defined(PRIMME_VERSION_MAJOR) &amp;&amp; PRIMME_VERSION_MAJOR*100+PRIMME_VERSION_MINOR &gt;= 202</font>
+<a name="line33"> 33: </a><strong><font color="#228B22">#define SLEPC_HAVE_PRIMME2p2</font></strong>
+<a name="line34"> 34: </a><font color="#A020F0">#endif</font>
+
+<a name="line36"> 36: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line37"> 37: </a>  primme_svds_params        primme;   <font color="#B22222">/* param struct */</font>
+<a name="line38"> 38: </a>  PetscInt                  bs;       <font color="#B22222">/* block size */</font>
+<a name="line39"> 39: </a>  primme_svds_preset_method method;   <font color="#B22222">/* primme method */</font>
+<a name="line40"> 40: </a>  <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>                       svd;      <font color="#B22222">/* reference to the solver */</font>
+<a name="line41"> 41: </a>  Vec                       x,y;      <font color="#B22222">/* auxiliary vectors */</font>
+<a name="line42"> 42: </a>} SVD_PRIMME;
+
+<a name="line44"> 44: </a><strong><font color="#4169E1">static void multMatvec_PRIMME(void*,PRIMME_INT*,void*,PRIMME_INT*,int*,int*,struct primme_svds_params*,int*)</font></strong>;
+
+<a name="line46"> 46: </a><strong><font color="#4169E1"><a name="par_GlobalSumReal"></a>static void par_GlobalSumReal(void *sendBuf,void *recvBuf,int *count,primme_svds_params *primme,int *ierr)</font></strong>
+<a name="line47"> 47: </a>{
+<a name="line48"> 48: </a>  <font color="#4169E1">if</font> (sendBuf == recvBuf) {
+<a name="line49"> 49: </a>    *<a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(MPI_IN_PLACE,recvBuf,*count,MPIU_REAL,MPIU_SUM,PetscObjectComm((PetscObject)primme-&gt;commInfo));CHKERRABORT(PetscObjectComm((PetscObject)primme-&gt;commInfo),*ierr);
+<a name="line50"> 50: </a>  } <font color="#4169E1">else</font> {
+<a name="line51"> 51: </a>    *<a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(sendBuf,recvBuf,*count,MPIU_REAL,MPIU_SUM,PetscObjectComm((PetscObject)primme-&gt;commInfo));CHKERRABORT(PetscObjectComm((PetscObject)primme-&gt;commInfo),*ierr);
+<a name="line52"> 52: </a>  }
+<a name="line53"> 53: </a>}
+
+<a name="line55"> 55: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line56"> 56: </a><strong><font color="#4169E1"><a name="par_broadcastReal"></a>static void par_broadcastReal(void *buf,int *count,primme_svds_params *primme,int *ierr)</font></strong>
+<a name="line57"> 57: </a>{
+<a name="line58"> 58: </a>  *<a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(buf,*count,MPIU_REAL,0<font color="#B22222">/*root*/</font>,PetscObjectComm((PetscObject)primme-&gt;commInfo));CHKERRABORT(PetscObjectComm((PetscObject)primme-&gt;commInfo),*ierr);
+<a name="line59"> 59: </a>}
+<a name="line60"> 60: </a><font color="#A020F0">#endif</font>
+
+<a name="line62"> 62: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line63"> 63: </a>static void convTestFun(double *sval,void *leftsvec,void *rightsvec,double *resNorm,
+<a name="line64"> 64: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line65"> 65: </a>                        int *method,
+<a name="line66"> 66: </a><font color="#A020F0">#endif</font>
+<a name="line67"> 67: </a>                        int *isconv,<font color="#4169E1">struct primme_svds_params</font> *primme,int *err)
+<a name="line68"> 68: </a>{
+<a name="line70"> 70: </a>  <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>            svd = (<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>)primme-&gt;commInfo;
+<a name="line71"> 71: </a>  PetscReal      sigma = sval?*sval:0.0;
+<a name="line72"> 72: </a>  PetscReal      r = resNorm?*resNorm:HUGE_VAL,errest;
+
+<a name="line74"> 74: </a>  *err = 1;
+<a name="line75"> 75: </a>  (*svd-&gt;converged)(svd,sigma,r,&amp;errest,svd-&gt;convergedctx);CHKERRABORT(PetscObjectComm((PetscObject)svd),ierr);
+<a name="line76"> 76: </a>  *isconv = (errest&lt;=svd-&gt;tol?1:0);
+<a name="line77"> 77: </a>  *err = 0;
+<a name="line78"> 78: </a>}
+
+<a name="line80"> 80: </a>static void monitorFun(void *basisSvals,int *basisSize,int *basisFlags,int *iblock,int *blockSize,void *basisNorms,int *numConverged,void *lockedSvals,int *numLocked,int *lockedFlags,void *lockedNorms,int *inner_its,void *LSRes,
+<a name="line81"> 81: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line82"> 82: </a>                       const char *msg,double *time,
+<a name="line83"> 83: </a><font color="#A020F0">#endif</font>
+<a name="line84"> 84: </a>                       primme_event *event,int *stage,<font color="#4169E1">struct primme_svds_params</font> *primme,int *err)
+<a name="line85"> 85: </a>{
+
+<a name="line88"> 88: </a>  <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>            svd = (<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>)primme-&gt;commInfo;
+<a name="line89"> 89: </a>  PetscInt       i,k,nerrest;
+
+<a name="line91"> 91: </a>  *err = 1;
+<a name="line92"> 92: </a>  <font color="#4169E1">switch</font> (*event) {
+<a name="line93"> 93: </a>    <font color="#4169E1">case</font> primme_event_outer_iteration:
+<a name="line94"> 94: </a>      <font color="#B22222">/* Update <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> */</font>
+<a name="line95"> 95: </a>      svd-&gt;its = primme-&gt;stats.numOuterIterations;
+<a name="line96"> 96: </a>      <font color="#4169E1">if</font> (numConverged) svd-&gt;nconv = *numConverged;
+<a name="line97"> 97: </a>      k = 0;
+<a name="line98"> 98: </a>      <font color="#4169E1">if</font> (lockedSvals &amp;&amp; numLocked) <font color="#4169E1">for</font> (i=0; i&lt;*numLocked &amp;&amp; k&lt;svd-&gt;ncv; i++) svd-&gt;sigma[k++] = ((PetscReal*)lockedSvals)[i];
+<a name="line99"> 99: </a>      nerrest = k;
+<a name="line100">100: </a>      <font color="#4169E1">if</font> (iblock &amp;&amp; blockSize) {
+<a name="line101">101: </a>        <font color="#4169E1">for</font> (i=0; i&lt;*blockSize &amp;&amp; k+iblock[i]&lt;svd-&gt;ncv; i++) svd-&gt;errest[k+iblock[i]] = ((PetscReal*)basisNorms)[i];
+<a name="line102">102: </a>        nerrest = k+(*blockSize&gt;0?1+iblock[*blockSize-1]:0);
+<a name="line103">103: </a>      }
+<a name="line104">104: </a>      <font color="#4169E1">if</font> (basisSvals &amp;&amp; basisSize) <font color="#4169E1">for</font> (i=0; i&lt;*basisSize &amp;&amp; k&lt;svd-&gt;ncv; i++) svd-&gt;sigma[k++] = ((PetscReal*)basisSvals)[i];
+<a name="line105">105: </a>      <font color="#B22222">/* Show progress */</font>
+<a name="line106">106: </a>      SVDMonitor(svd,svd-&gt;its,numConverged?*numConverged:0,svd-&gt;sigma,svd-&gt;errest,nerrest);CHKERRABORT(PetscObjectComm((PetscObject)svd),ierr);
+<a name="line107">107: </a>      <font color="#4169E1">break</font>;
+<a name="line108">108: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line109">109: </a>    <font color="#4169E1">case</font> primme_event_message:
+<a name="line110">110: </a>      <font color="#B22222">/* Print PRIMME information messages */</font>
+<a name="line111">111: </a>      PetscInfo(svd,msg);CHKERRABORT(PetscObjectComm((PetscObject)svd),ierr);
+<a name="line112">112: </a>      <font color="#4169E1">break</font>;
+<a name="line113">113: </a><font color="#A020F0">#endif</font>
+<a name="line114">114: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line115">115: </a>      <font color="#4169E1">break</font>;
+<a name="line116">116: </a>  }
+<a name="line117">117: </a>  *err = 0;
+<a name="line118">118: </a>}
+<a name="line119">119: </a><font color="#A020F0">#endif </font><font color="#B22222">/* SLEPC_HAVE_PRIMME2p2 */</font><font color="#A020F0"></font>
+
+<a name="line121">121: </a><strong><font color="#4169E1"><a name="multMatvec_PRIMME"></a>static void multMatvec_PRIMME(void *xa,PRIMME_INT *ldx,void *ya,PRIMME_INT *ldy,int *blockSize,int *transpose,struct primme_svds_params *primme,int *ierr)</font></strong>
+<a name="line122">122: </a>{
+<a name="line123">123: </a>  PetscInt   i;
+<a name="line124">124: </a>  SVD_PRIMME *ops = (SVD_PRIMME*)primme-&gt;matrix;
+<a name="line125">125: </a>  Vec        x = ops-&gt;x,y = ops-&gt;y;
+<a name="line126">126: </a>  <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>        svd = ops-&gt;svd;
+
+<a name="line129">129: </a>  <font color="#4169E1">for</font> (i=0;i&lt;*blockSize;i++) {
+<a name="line130">130: </a>    <font color="#4169E1">if</font> (*transpose) {
+<a name="line131">131: </a>      *VecPlaceArray(y,(PetscScalar*)xa+(*ldx)*i);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line132">132: </a>      *VecPlaceArray(x,(PetscScalar*)ya+(*ldy)*i);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line133">133: </a>      *SVDMatMult(svd,PETSC_TRUE,y,x);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line134">134: </a>    } <font color="#4169E1">else</font> {
+<a name="line135">135: </a>      *VecPlaceArray(x,(PetscScalar*)xa+(*ldx)*i);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line136">136: </a>      *VecPlaceArray(y,(PetscScalar*)ya+(*ldy)*i);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line137">137: </a>      *SVDMatMult(svd,PETSC_FALSE,x,y);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line138">138: </a>    }
+<a name="line139">139: </a>    *VecResetArray(x);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line140">140: </a>    *VecResetArray(y);CHKERRABORT(PetscObjectComm((PetscObject)svd),*ierr);
+<a name="line141">141: </a>  }
+<a name="line142">142: </a>  PetscFunctionReturnVoid();
+<a name="line143">143: </a>}
+
+<a name="line145">145: </a><strong><font color="#4169E1"><a name="SVDSetUp_PRIMME"></a>PetscErrorCode SVDSetUp_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line146">146: </a>{
+<a name="line147">147: </a>  PetscErrorCode     ierr;
+<a name="line148">148: </a>  PetscMPIInt        numProcs,procID;
+<a name="line149">149: </a>  PetscInt           n,m,nloc,mloc;
+<a name="line150">150: </a>  SVD_PRIMME         *ops = (SVD_PRIMME*)svd-&gt;data;
+<a name="line151">151: </a>  primme_svds_params *primme = &amp;ops-&gt;primme;
+
+<a name="line154">154: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)svd),&amp;numProcs);
+<a name="line155">155: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)svd),&amp;procID);
+
+<a name="line157">157: </a>  <font color="#B22222">/* Check some constraints and set some default values */</font>
+<a name="line158">158: </a>  SVDMatGetSize(svd,&amp;m,&amp;n);
+<a name="line159">159: </a>  SVDMatGetLocalSize(svd,&amp;mloc,&amp;nloc);
+<a name="line160">160: </a>  SVDSetDimensions_Default(svd);
+<a name="line161">161: </a>  <font color="#4169E1">if</font> (svd-&gt;max_it==PETSC_DEFAULT) svd-&gt;max_it = PETSC_MAX_INT;
+<a name="line162">162: </a>  svd-&gt;leftbasis = PETSC_TRUE;
+<a name="line163">163: </a>  <font color="#4169E1">if</font> (svd-&gt;stopping!=<a href="../../../../../docs/manualpages/SVD/SVDStoppingBasic.html#SVDStoppingBasic">SVDStoppingBasic</a>) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_SUP,<font color="#666666">"External packages do not support user-defined stopping test"</font>);
+<a name="line164">164: </a><font color="#A020F0">#if !defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line165">165: </a>  <font color="#4169E1">if</font> (svd-&gt;converged != SVDConvergedAbsolute) { PetscInfo(svd,<font color="#666666">"Warning: using absolute convergence test\n"</font>); }
+<a name="line166">166: </a><font color="#A020F0">#endif</font>
+
+<a name="line168">168: </a>  <font color="#B22222">/* Transfer SLEPc options to PRIMME options */</font>
+<a name="line169">169: </a>  primme_svds_free(primme);
+<a name="line170">170: </a>  primme_svds_initialize(primme);
+<a name="line171">171: </a>  primme-&gt;m             = m;
+<a name="line172">172: </a>  primme-&gt;n             = n;
+<a name="line173">173: </a>  primme-&gt;mLocal        = mloc;
+<a name="line174">174: </a>  primme-&gt;nLocal        = nloc;
+<a name="line175">175: </a>  primme-&gt;numSvals      = svd-&gt;nsv;
+<a name="line176">176: </a>  primme-&gt;matrix        = ops;
+<a name="line177">177: </a>  primme-&gt;commInfo      = svd;
+<a name="line178">178: </a>  primme-&gt;maxMatvecs    = svd-&gt;max_it;
+<a name="line179">179: </a><font color="#A020F0">#if !defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line180">180: </a>  primme-&gt;eps           = svd-&gt;tol==PETSC_DEFAULT?SLEPC_DEFAULT_TOL:svd-&gt;tol;
+<a name="line181">181: </a><font color="#A020F0">#endif</font>
+<a name="line182">182: </a>  primme-&gt;numProcs      = numProcs;
+<a name="line183">183: </a>  primme-&gt;procID        = procID;
+<a name="line184">184: </a>  primme-&gt;printLevel    = 1;
+<a name="line185">185: </a>  primme-&gt;matrixMatvec  = multMatvec_PRIMME;
+<a name="line186">186: </a>  primme-&gt;globalSumReal = par_GlobalSumReal;
+<a name="line187">187: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line188">188: </a>  primme-&gt;broadcastReal = par_broadcastReal;
+<a name="line189">189: </a><font color="#A020F0">#endif</font>
+<a name="line190">190: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line191">191: </a>  primme-&gt;convTestFun   = convTestFun;
+<a name="line192">192: </a>  primme-&gt;monitorFun    = monitorFun;
+<a name="line193">193: </a><font color="#A020F0">#endif</font>
+<a name="line194">194: </a>  <font color="#4169E1">if</font> (ops-&gt;bs &gt; 0) primme-&gt;maxBlockSize = ops-&gt;bs;
+
+<a name="line196">196: </a>  <font color="#4169E1">switch</font> (svd-&gt;which) {
+<a name="line197">197: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_LARGEST</a>:
+<a name="line198">198: </a>      primme-&gt;target = primme_svds_largest;
+<a name="line199">199: </a>      <font color="#4169E1">break</font>;
+<a name="line200">200: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_SMALLEST</a>:
+<a name="line201">201: </a>      primme-&gt;target = primme_svds_smallest;
+<a name="line202">202: </a>      <font color="#4169E1">break</font>;
+<a name="line203">203: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line204">204: </a>      SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_SUP,<font color="#666666">"'which' value not supported by PRIMME"</font>);
+<a name="line205">205: </a>      <font color="#4169E1">break</font>;
+<a name="line206">206: </a>  }
+
+<a name="line208">208: </a>  <font color="#B22222">/* If user sets mpd or ncv, maxBasisSize is modified */</font>
+<a name="line209">209: </a>  <font color="#4169E1">if</font> (svd-&gt;mpd!=PETSC_DEFAULT) {
+<a name="line210">210: </a>    primme-&gt;maxBasisSize = svd-&gt;mpd;
+<a name="line211">211: </a>    <font color="#4169E1">if</font> (svd-&gt;ncv!=PETSC_DEFAULT) { PetscInfo(svd,<font color="#666666">"Warning: 'ncv' is ignored by PRIMME\n"</font>); }
+<a name="line212">212: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (svd-&gt;ncv!=PETSC_DEFAULT) primme-&gt;maxBasisSize = svd-&gt;ncv;
+
+<a name="line214">214: </a>  <font color="#4169E1">if</font> (primme_svds_set_method(ops-&gt;method,(primme_preset_method)<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPS_PRIMME_DEFAULT_MIN_TIME</a>,PRIMME_DEFAULT_METHOD,primme) &lt; 0) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_SUP,<font color="#666666">"PRIMME method not valid"</font>);
+
+<a name="line216">216: </a>  svd-&gt;mpd = primme-&gt;maxBasisSize;
+<a name="line217">217: </a>  svd-&gt;ncv = (primme-&gt;locking?svd-&gt;nsv:0)+primme-&gt;maxBasisSize;
+<a name="line218">218: </a>  ops-&gt;bs  = primme-&gt;maxBlockSize;
+
+<a name="line220">220: </a>  <font color="#B22222">/* Set workspace */</font>
+<a name="line221">221: </a>  <a href="../../../../../docs/manualpages/SVD/SVDAllocateSolution.html#SVDAllocateSolution">SVDAllocateSolution</a>(svd,0);
+
+<a name="line223">223: </a>  <font color="#B22222">/* Prepare auxiliary vectors */</font>
+<a name="line224">224: </a>  <font color="#4169E1">if</font> (!ops-&gt;x) {
+<a name="line225">225: </a>    <a href="../../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(svd-&gt;A,&amp;ops-&gt;x,&amp;ops-&gt;y);
+<a name="line226">226: </a>    PetscLogObjectParent((PetscObject)svd,(PetscObject)ops-&gt;x);
+<a name="line227">227: </a>    PetscLogObjectParent((PetscObject)svd,(PetscObject)ops-&gt;y);
+<a name="line228">228: </a>  }
+<a name="line229">229: </a>  <font color="#4169E1">return</font>(0);
+<a name="line230">230: </a>}
+
+<a name="line232">232: </a><strong><font color="#4169E1"><a name="SVDSolve_PRIMME"></a>PetscErrorCode SVDSolve_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line233">233: </a>{
+<a name="line235">235: </a>  SVD_PRIMME     *ops = (SVD_PRIMME*)svd-&gt;data;
+<a name="line236">236: </a>  PetscScalar    *svecs, *a;
+<a name="line237">237: </a>  PetscInt       i,ierrprimme;
+<a name="line238">238: </a>  PetscReal      *svals,*rnorms;
+
+<a name="line241">241: </a>  <font color="#B22222">/* Reset some parameters left from previous runs */</font>
+<a name="line242">242: </a>  ops-&gt;primme.aNorm    = 0.0;
+<a name="line243">243: </a>  ops-&gt;primme.initSize = svd-&gt;nini;
+<a name="line244">244: </a>  ops-&gt;primme.iseed[0] = -1;
+<a name="line245">245: </a>  ops-&gt;primme.iseed[1] = -1;
+<a name="line246">246: </a>  ops-&gt;primme.iseed[2] = -1;
+<a name="line247">247: </a>  ops-&gt;primme.iseed[3] = -1;
+
+<a name="line249">249: </a>  <font color="#B22222">/* Allocating left and right singular vectors contiguously */</font>
+<a name="line250">250: </a>  PetscCalloc1(ops-&gt;primme.numSvals*(ops-&gt;primme.mLocal+ops-&gt;primme.nLocal),&amp;svecs);
+<a name="line251">251: </a>  PetscLogObjectMemory((PetscObject)svd,<font color="#4169E1">sizeof</font>(PetscReal)*ops-&gt;primme.numSvals*(ops-&gt;primme.mLocal+ops-&gt;primme.nLocal));
+
+<a name="line253">253: </a>  <font color="#B22222">/* Call PRIMME solver */</font>
+<a name="line254">254: </a>  PetscMalloc2(svd-&gt;ncv,&amp;svals,svd-&gt;ncv,&amp;rnorms);
+<a name="line255">255: </a>  ierrprimme = PRIMME_DRIVER(svals,svecs,rnorms,&amp;ops-&gt;primme);
+<a name="line256">256: </a>  <font color="#4169E1">for</font> (i=0;i&lt;svd-&gt;ncv;i++) svd-&gt;sigma[i] = svals[i];
+<a name="line257">257: </a>  <font color="#4169E1">for</font> (i=0;i&lt;svd-&gt;ncv;i++) svd-&gt;errest[i] = rnorms[i];
+<a name="line258">258: </a>  PetscFree2(svals,rnorms);
+
+<a name="line260">260: </a>  <font color="#B22222">/* Copy left and right singular vectors into svd */</font>
+<a name="line261">261: </a>  <a href="../../../../../docs/manualpages/BV/BVGetArray.html#BVGetArray">BVGetArray</a>(svd-&gt;U,&amp;a);
+<a name="line262">262: </a>  PetscArraycpy(a,svecs,ops-&gt;primme.mLocal*ops-&gt;primme.initSize);
+<a name="line263">263: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreArray.html#BVRestoreArray">BVRestoreArray</a>(svd-&gt;U,&amp;a);
+
+<a name="line265">265: </a>  <a href="../../../../../docs/manualpages/BV/BVGetArray.html#BVGetArray">BVGetArray</a>(svd-&gt;V,&amp;a);
+<a name="line266">266: </a>  PetscArraycpy(a,svecs+ops-&gt;primme.mLocal*ops-&gt;primme.initSize,ops-&gt;primme.nLocal*ops-&gt;primme.initSize);
+<a name="line267">267: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreArray.html#BVRestoreArray">BVRestoreArray</a>(svd-&gt;V,&amp;a);
+
+<a name="line269">269: </a>  PetscFree(svecs);
+
+<a name="line271">271: </a>  svd-&gt;nconv  = ops-&gt;primme.initSize &gt;= 0 ? ops-&gt;primme.initSize : 0;
+<a name="line272">272: </a>  svd-&gt;reason = svd-&gt;nconv &gt;= svd-&gt;nsv ? <a href="../../../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVD_CONVERGED_TOL</a>: <a href="../../../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVD_DIVERGED_ITS</a>;
+<a name="line273">273: </a>  svd-&gt;its    = ops-&gt;primme.stats.numOuterIterations;
+
+<a name="line275">275: </a>  <font color="#B22222">/* Process PRIMME error code */</font>
+<a name="line276">276: </a>  <font color="#4169E1">if</font> (ierrprimme == 0) {
+<a name="line277">277: </a>    <font color="#B22222">/* no error */</font>
+<a name="line278">278: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme%100 == -1) SETERRQ1(PetscObjectComm((PetscObject)svd),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: unexpected error"</font>,ierrprimme);
+<a name="line279">279: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme%100 == -2) SETERRQ1(PetscObjectComm((PetscObject)svd),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: allocation error"</font>,ierrprimme);
+<a name="line280">280: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme%100 == -3) {
+<a name="line281">281: </a>    <font color="#B22222">/* stop by maximum number of iteration or matvecs */</font>
+<a name="line282">282: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme%100 &gt;= -39) SETERRQ1(PetscObjectComm((PetscObject)svd),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: configuration error; check PRIMME's manual"</font>,ierrprimme);
+<a name="line283">283: </a>  <font color="#4169E1">else</font> SETERRQ1(PetscObjectComm((PetscObject)svd),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: runtime error; check PRIMME's manual"</font>,ierrprimme);
+<a name="line284">284: </a>  <font color="#4169E1">return</font>(0);
+<a name="line285">285: </a>}
+
+<a name="line287">287: </a><strong><font color="#4169E1"><a name="SVDReset_PRIMME"></a>PetscErrorCode SVDReset_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line288">288: </a>{
+<a name="line290">290: </a>  SVD_PRIMME     *ops = (SVD_PRIMME*)svd-&gt;data;
+
+<a name="line293">293: </a>  primme_svds_free(&amp;ops-&gt;primme);
+<a name="line294">294: </a>  VecDestroy(&amp;ops-&gt;x);
+<a name="line295">295: </a>  VecDestroy(&amp;ops-&gt;y);
+<a name="line296">296: </a>  <font color="#4169E1">return</font>(0);
+<a name="line297">297: </a>}
+
+<a name="line299">299: </a><strong><font color="#4169E1"><a name="SVDDestroy_PRIMME"></a>PetscErrorCode SVDDestroy_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line300">300: </a>{
+
+<a name="line304">304: </a>  PetscFree(svd-&gt;data);
+<a name="line305">305: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMESetBlockSize_C"</font>,NULL);
+<a name="line306">306: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMEGetBlockSize_C"</font>,NULL);
+<a name="line307">307: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMESetMethod_C"</font>,NULL);
+<a name="line308">308: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMEGetMethod_C"</font>,NULL);
+<a name="line309">309: </a>  <font color="#4169E1">return</font>(0);
+<a name="line310">310: </a>}
+
+<a name="line312">312: </a><strong><font color="#4169E1"><a name="SVDView_PRIMME"></a>PetscErrorCode SVDView_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscViewer viewer)</font></strong>
+<a name="line313">313: </a>{
+<a name="line315">315: </a>  PetscBool      isascii;
+<a name="line316">316: </a>  SVD_PRIMME     *ctx = (SVD_PRIMME*)svd-&gt;data;
+<a name="line317">317: </a>  PetscMPIInt    rank;
+
+<a name="line320">320: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line321">321: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line322">322: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  block size=%D\n"</font>,ctx-&gt;bs);
+<a name="line323">323: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  solver method: %s\n"</font>,SVDPRIMMEMethods[(<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a>)ctx-&gt;method]);
+
+<a name="line325">325: </a>    <font color="#B22222">/* Display PRIMME params */</font>
+<a name="line326">326: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)svd),&amp;rank);
+<a name="line327">327: </a>    <font color="#4169E1">if</font> (!rank) primme_svds_display_params(ctx-&gt;primme);
+<a name="line328">328: </a>  }
+<a name="line329">329: </a>  <font color="#4169E1">return</font>(0);
+<a name="line330">330: </a>}
+
+<a name="line332">332: </a><strong><font color="#4169E1"><a name="SVDSetFromOptions_PRIMME"></a>PetscErrorCode SVDSetFromOptions_PRIMME(PetscOptionItems *PetscOptionsObject,<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line333">333: </a>{
+<a name="line334">334: </a>  PetscErrorCode  ierr;
+<a name="line335">335: </a>  SVD_PRIMME      *ctx = (SVD_PRIMME*)svd-&gt;data;
+<a name="line336">336: </a>  PetscInt        bs;
+<a name="line337">337: </a>  <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a> meth;
+<a name="line338">338: </a>  PetscBool       flg;
+
+<a name="line341">341: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> PRIMME Options"</font>);
+
+<a name="line343">343: </a>    PetscOptionsInt(<font color="#666666">"-svd_primme_blocksize"</font>,<font color="#666666">"Maximum block size"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetBlockSize.html#SVDPRIMMESetBlockSize">SVDPRIMMESetBlockSize</a>"</font>,ctx-&gt;bs,&amp;bs,&amp;flg);
+<a name="line344">344: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetBlockSize.html#SVDPRIMMESetBlockSize">SVDPRIMMESetBlockSize</a>(svd,bs); }
+
+<a name="line346">346: </a>    PetscOptionsEnum(<font color="#666666">"-svd_primme_method"</font>,<font color="#666666">"Method for solving the singular value problem"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetMethod.html#SVDPRIMMESetMethod">SVDPRIMMESetMethod</a>"</font>,SVDPRIMMEMethods,(PetscEnum)ctx-&gt;method,(PetscEnum*)&amp;meth,&amp;flg);
+<a name="line347">347: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetMethod.html#SVDPRIMMESetMethod">SVDPRIMMESetMethod</a>(svd,meth); }
+
+<a name="line349">349: </a>  PetscOptionsTail();
+<a name="line350">350: </a>  <font color="#4169E1">return</font>(0);
+<a name="line351">351: </a>}
+
+<a name="line353">353: </a><strong><font color="#4169E1"><a name="SVDPRIMMESetBlockSize_PRIMME"></a>static PetscErrorCode SVDPRIMMESetBlockSize_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscInt bs)</font></strong>
+<a name="line354">354: </a>{
+<a name="line355">355: </a>  SVD_PRIMME *ops = (SVD_PRIMME*)svd-&gt;data;
+
+<a name="line358">358: </a>  <font color="#4169E1">if</font> (bs == PETSC_DEFAULT) ops-&gt;bs = 0;
+<a name="line359">359: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (bs &lt;= 0) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"PRIMME: block size must be positive"</font>);
+<a name="line360">360: </a>  <font color="#4169E1">else</font> ops-&gt;bs = bs;
+<a name="line361">361: </a>  <font color="#4169E1">return</font>(0);
+<a name="line362">362: </a>}
+
+<a name="line364">364: </a><font color="#B22222">/*@</font>
+<a name="line365">365: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetBlockSize.html#SVDPRIMMESetBlockSize">SVDPRIMMESetBlockSize</a> - The maximum block size that PRIMME will try to use.</font>
+
+<a name="line367">367: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line369">369: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line370">370: </a><font color="#B22222">+  svd - the singular value solver context</font>
+<a name="line371">371: </a><font color="#B22222">-  bs - block size</font>
+
+<a name="line373">373: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line374">374: </a><font color="#B22222">.  -svd_primme_blocksize - Sets the max allowed block size value</font>
+
+<a name="line376">376: </a><font color="#B22222">   Notes:</font>
+<a name="line377">377: </a><font color="#B22222">   If the block size is not set, the value established by primme_svds_initialize</font>
+<a name="line378">378: </a><font color="#B22222">   is used.</font>
+
+<a name="line380">380: </a><font color="#B22222">   The user should set the block size based on the architecture specifics</font>
+<a name="line381">381: </a><font color="#B22222">   of the target computer, as well as any a priori knowledge of multiplicities.</font>
+<a name="line382">382: </a><font color="#B22222">   The code does NOT require bs &gt; 1 to find multiple eigenvalues. For some</font>
+<a name="line383">383: </a><font color="#B22222">   methods, keeping bs = 1 yields the best overall performance.</font>
+
+<a name="line385">385: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line387">387: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEGetBlockSize.html#SVDPRIMMEGetBlockSize">SVDPRIMMEGetBlockSize</a>()</font>
+<a name="line388">388: </a><font color="#B22222">@*/</font>
+<a name="line389">389: </a><strong><font color="#4169E1"><a name="SVDPRIMMESetBlockSize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetBlockSize.html#SVDPRIMMESetBlockSize">SVDPRIMMESetBlockSize</a>(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscInt bs)</font></strong>
+<a name="line390">390: </a>{
+
+<a name="line396">396: </a>  PetscTryMethod(svd,<font color="#666666">"SVDPRIMMESetBlockSize_C"</font>,(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscInt),(svd,bs));
+<a name="line397">397: </a>  <font color="#4169E1">return</font>(0);
+<a name="line398">398: </a>}
+
+<a name="line400">400: </a><strong><font color="#4169E1"><a name="SVDPRIMMEGetBlockSize_PRIMME"></a>static PetscErrorCode SVDPRIMMEGetBlockSize_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscInt *bs)</font></strong>
+<a name="line401">401: </a>{
+<a name="line402">402: </a>  SVD_PRIMME *ops = (SVD_PRIMME*)svd-&gt;data;
+
+<a name="line405">405: </a>  *bs = ops-&gt;bs;
+<a name="line406">406: </a>  <font color="#4169E1">return</font>(0);
+<a name="line407">407: </a>}
+
+<a name="line409">409: </a><font color="#B22222">/*@</font>
+<a name="line410">410: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEGetBlockSize.html#SVDPRIMMEGetBlockSize">SVDPRIMMEGetBlockSize</a> - Get the maximum block size the code will try to use.</font>
+
+<a name="line412">412: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line414">414: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line415">415: </a><font color="#B22222">.  svd - the singular value solver context</font>
+
+<a name="line417">417: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line418">418: </a><font color="#B22222">.  bs - returned block size</font>
+
+<a name="line420">420: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line422">422: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetBlockSize.html#SVDPRIMMESetBlockSize">SVDPRIMMESetBlockSize</a>()</font>
+<a name="line423">423: </a><font color="#B22222">@*/</font>
+<a name="line424">424: </a><strong><font color="#4169E1"><a name="SVDPRIMMEGetBlockSize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEGetBlockSize.html#SVDPRIMMEGetBlockSize">SVDPRIMMEGetBlockSize</a>(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscInt *bs)</font></strong>
+<a name="line425">425: </a>{
+
+<a name="line431">431: </a>  PetscUseMethod(svd,<font color="#666666">"SVDPRIMMEGetBlockSize_C"</font>,(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscInt*),(svd,bs));
+<a name="line432">432: </a>  <font color="#4169E1">return</font>(0);
+<a name="line433">433: </a>}
+
+<a name="line435">435: </a><strong><font color="#4169E1"><a name="SVDPRIMMESetMethod_PRIMME"></a>static PetscErrorCode SVDPRIMMESetMethod_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a> method)</font></strong>
+<a name="line436">436: </a>{
+<a name="line437">437: </a>  SVD_PRIMME *ops = (SVD_PRIMME*)svd-&gt;data;
+
+<a name="line440">440: </a>  ops-&gt;method = (primme_svds_preset_method)method;
+<a name="line441">441: </a>  <font color="#4169E1">return</font>(0);
+<a name="line442">442: </a>}
+
+<a name="line444">444: </a><font color="#B22222">/*@</font>
+<a name="line445">445: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetMethod.html#SVDPRIMMESetMethod">SVDPRIMMESetMethod</a> - Sets the method for the PRIMME <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> solver.</font>
+
+<a name="line447">447: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line449">449: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line450">450: </a><font color="#B22222">+  svd - the singular value solver context</font>
+<a name="line451">451: </a><font color="#B22222">-  method - method that will be used by PRIMME</font>
+
+<a name="line453">453: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line454">454: </a><font color="#B22222">.  -svd_primme_method - Sets the method for the PRIMME <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> solver</font>
+
+<a name="line456">456: </a><font color="#B22222">   Note:</font>
+<a name="line457">457: </a><font color="#B22222">   If not set, the method defaults to <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVD_PRIMME_HYBRID</a>.</font>
+
+<a name="line459">459: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line461">461: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEGetMethod.html#SVDPRIMMEGetMethod">SVDPRIMMEGetMethod</a>(), <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a></font>
+<a name="line462">462: </a><font color="#B22222">@*/</font>
+<a name="line463">463: </a><strong><font color="#4169E1"><a name="SVDPRIMMESetMethod"></a>PetscErrorCode <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetMethod.html#SVDPRIMMESetMethod">SVDPRIMMESetMethod</a>(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a> method)</font></strong>
+<a name="line464">464: </a>{
+
+<a name="line470">470: </a>  PetscTryMethod(svd,<font color="#666666">"SVDPRIMMESetMethod_C"</font>,(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a>),(svd,method));
+<a name="line471">471: </a>  <font color="#4169E1">return</font>(0);
+<a name="line472">472: </a>}
+
+<a name="line474">474: </a><strong><font color="#4169E1"><a name="SVDPRIMMEGetMethod_PRIMME"></a>static PetscErrorCode SVDPRIMMEGetMethod_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a> *method)</font></strong>
+<a name="line475">475: </a>{
+<a name="line476">476: </a>  SVD_PRIMME *ops = (SVD_PRIMME*)svd-&gt;data;
+
+<a name="line479">479: </a>  *method = (<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a>)ops-&gt;method;
+<a name="line480">480: </a>  <font color="#4169E1">return</font>(0);
+<a name="line481">481: </a>}
+
+<a name="line483">483: </a><font color="#B22222">/*@</font>
+<a name="line484">484: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEGetMethod.html#SVDPRIMMEGetMethod">SVDPRIMMEGetMethod</a> - Gets the method for the PRIMME <a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> solver.</font>
+
+<a name="line486">486: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line488">488: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line489">489: </a><font color="#B22222">.  svd - the singular value solver context</font>
+
+<a name="line491">491: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line492">492: </a><font color="#B22222">.  method - method that will be used by PRIMME</font>
+
+<a name="line494">494: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line496">496: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/SVD/SVDPRIMMESetMethod.html#SVDPRIMMESetMethod">SVDPRIMMESetMethod</a>(), <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a></font>
+<a name="line497">497: </a><font color="#B22222">@*/</font>
+<a name="line498">498: </a><strong><font color="#4169E1"><a name="SVDPRIMMEGetMethod"></a>PetscErrorCode <a href="../../../../../docs/manualpages/SVD/SVDPRIMMEGetMethod.html#SVDPRIMMEGetMethod">SVDPRIMMEGetMethod</a>(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a> *method)</font></strong>
+<a name="line499">499: </a>{
+
+<a name="line505">505: </a>  PetscUseMethod(svd,<font color="#666666">"SVDPRIMMEGetMethod_C"</font>,(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a>*),(svd,method));
+<a name="line506">506: </a>  <font color="#4169E1">return</font>(0);
+<a name="line507">507: </a>}
+
+<a name="line509">509: </a><strong><font color="#4169E1"><a name="SVDCreate_PRIMME"></a>SLEPC_EXTERN PetscErrorCode SVDCreate_PRIMME(<a href="../../../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line510">510: </a>{
+<a name="line512">512: </a>  SVD_PRIMME     *primme;
+
+<a name="line515">515: </a>  PetscNewLog(svd,&amp;primme);
+<a name="line516">516: </a>  svd-&gt;data = (void*)primme;
+
+<a name="line518">518: </a>  primme_svds_initialize(&amp;primme-&gt;primme);
+<a name="line519">519: </a>  primme-&gt;bs = 0;
+<a name="line520">520: </a>  primme-&gt;method = (primme_svds_preset_method)<a href="../../../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVD_PRIMME_HYBRID</a>;
+<a name="line521">521: </a>  primme-&gt;svd = svd;
+
+<a name="line523">523: </a>  svd-&gt;ops-&gt;solve          = SVDSolve_PRIMME;
+<a name="line524">524: </a>  svd-&gt;ops-&gt;setup          = SVDSetUp_PRIMME;
+<a name="line525">525: </a>  svd-&gt;ops-&gt;setfromoptions = SVDSetFromOptions_PRIMME;
+<a name="line526">526: </a>  svd-&gt;ops-&gt;destroy        = SVDDestroy_PRIMME;
+<a name="line527">527: </a>  svd-&gt;ops-&gt;reset          = SVDReset_PRIMME;
+<a name="line528">528: </a>  svd-&gt;ops-&gt;view           = SVDView_PRIMME;
+
+<a name="line530">530: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMESetBlockSize_C"</font>,SVDPRIMMESetBlockSize_PRIMME);
+<a name="line531">531: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMEGetBlockSize_C"</font>,SVDPRIMMEGetBlockSize_PRIMME);
+<a name="line532">532: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMESetMethod_C"</font>,SVDPRIMMESetMethod_PRIMME);
+<a name="line533">533: </a>  PetscObjectComposeFunction((PetscObject)svd,<font color="#666666">"SVDPRIMMEGetMethod_C"</font>,SVDPRIMMEGetMethod_PRIMME);
+<a name="line534">534: </a>  <font color="#4169E1">return</font>(0);
+<a name="line535">535: </a>}
+
+</pre>
+</body>
+
+</html>

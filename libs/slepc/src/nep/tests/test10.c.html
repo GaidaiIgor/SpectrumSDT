@@ -1,0 +1,263 @@
+<center><a href="test10.c">Actual source code: test10.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/nep/tests/test10.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:11+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/nep/tests/test10.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Tests multiple calls to <a href="../../../docs/manualpages/NEP/NEPSolve.html#NEPSolve">NEPSolve</a>(). Based on ex22.c.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -tau &lt;tau&gt;, where &lt;tau&gt; is the delay parameter.\n\n"</font>;
+
+<a name="line16"> 16: </a><font color="#B22222">/*</font>
+<a name="line17"> 17: </a><font color="#B22222">   Solve parabolic partial differential equation with time delay tau</font>
+
+<a name="line19"> 19: </a><font color="#B22222">            u_t = u_xx + a*u(t) + b*u(t-tau)</font>
+<a name="line20"> 20: </a><font color="#B22222">            u(0,t) = u(pi,t) = 0</font>
+
+<a name="line22"> 22: </a><font color="#B22222">   with a = 20 and b(x) = -4.1+x*(1-exp(x-pi)).</font>
+
+<a name="line24"> 24: </a><font color="#B22222">   Discretization leads to a DDE of dimension n</font>
+
+<a name="line26"> 26: </a><font color="#B22222">            -u' = A*u(t) + B*u(t-tau)</font>
+
+<a name="line28"> 28: </a><font color="#B22222">   which results in the nonlinear eigenproblem</font>
+
+<a name="line30"> 30: </a><font color="#B22222">            (-lambda*I + A + exp(-tau*lambda)*B)*u = 0</font>
+<a name="line31"> 31: </a><font color="#B22222">*/</font>
+
+<a name="line33"> 33: </a> #include <A href="../../../include/slepcnep.h.html">&lt;slepcnep.h&gt;</A>
+
+<a name="line35"> 35: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line36"> 36: </a>{
+<a name="line37"> 37: </a>  <a href="../../../docs/manualpages/NEP/NEP.html#NEP">NEP</a>            nep;             <font color="#B22222">/* nonlinear eigensolver context */</font>
+<a name="line38"> 38: </a>  Mat            Id,A,B;          <font color="#B22222">/* problem matrices */</font>
+<a name="line39"> 39: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>             f1,f2,f3;        <font color="#B22222">/* functions to define the nonlinear operator */</font>
+<a name="line40"> 40: </a>  Mat            mats[3];
+<a name="line41"> 41: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>             funs[3];
+<a name="line42"> 42: </a>  PetscScalar    coeffs[2],b;
+<a name="line43"> 43: </a>  PetscInt       n=128,Istart,Iend,i;
+<a name="line44"> 44: </a>  PetscReal      tau=0.001,h,a=20,xi;
+
+<a name="line47"> 47: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line48"> 48: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line49"> 49: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-tau"</font>,&amp;tau,NULL);
+<a name="line50"> 50: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n1-D Delay Eigenproblem, n=%D, tau=%g\n\n"</font>,n,(double)tau);
+<a name="line51"> 51: </a>  h = PETSC_PI/(PetscReal)(n+1);
+
+<a name="line53"> 53: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line54"> 54: </a><font color="#B22222">             Create functions that define the split operator</font>
+<a name="line55"> 55: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line57"> 57: </a>  <font color="#B22222">/* f1=-lambda */</font>
+<a name="line58"> 58: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;f1);
+<a name="line59"> 59: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f1,FNRATIONAL);
+<a name="line60"> 60: </a>  coeffs[0] = -1.0; coeffs[1] = 0.0;
+<a name="line61"> 61: </a>  <a href="../../../docs/manualpages/FN/FNRationalSetNumerator.html#FNRationalSetNumerator">FNRationalSetNumerator</a>(f1,2,coeffs);
+
+<a name="line63"> 63: </a>  <font color="#B22222">/* f2=1.0 */</font>
+<a name="line64"> 64: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;f2);
+<a name="line65"> 65: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f2,FNRATIONAL);
+<a name="line66"> 66: </a>  coeffs[0] = 1.0;
+<a name="line67"> 67: </a>  <a href="../../../docs/manualpages/FN/FNRationalSetNumerator.html#FNRationalSetNumerator">FNRationalSetNumerator</a>(f2,1,coeffs);
+
+<a name="line69"> 69: </a>  <font color="#B22222">/* f3=exp(-tau*lambda) */</font>
+<a name="line70"> 70: </a>  <a href="../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,&amp;f3);
+<a name="line71"> 71: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f3,FNEXP);
+<a name="line72"> 72: </a>  <a href="../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(f3,-tau,1.0);
+
+<a name="line74"> 74: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line75"> 75: </a><font color="#B22222">                         Create problem matrices</font>
+<a name="line76"> 76: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line78"> 78: </a>  <font color="#B22222">/* Identity matrix */</font>
+<a name="line79"> 79: </a>  MatCreate(PETSC_COMM_WORLD,&amp;Id);
+<a name="line80"> 80: </a>  MatSetSizes(Id,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line81"> 81: </a>  MatSetFromOptions(Id);
+<a name="line82"> 82: </a>  MatSetUp(Id);
+<a name="line83"> 83: </a>  MatGetOwnershipRange(Id,&amp;Istart,&amp;Iend);
+<a name="line84"> 84: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line85"> 85: </a>    MatSetValue(Id,i,i,1.0,INSERT_VALUES);
+<a name="line86"> 86: </a>  }
+<a name="line87"> 87: </a>  MatAssemblyBegin(Id,MAT_FINAL_ASSEMBLY);
+<a name="line88"> 88: </a>  MatAssemblyEnd(Id,MAT_FINAL_ASSEMBLY);
+<a name="line89"> 89: </a>  MatSetOption(Id,MAT_HERMITIAN,PETSC_TRUE);
+
+<a name="line91"> 91: </a>  <font color="#B22222">/* A = 1/h^2*tridiag(1,-2,1) + a*I */</font>
+<a name="line92"> 92: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line93"> 93: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line94"> 94: </a>  MatSetFromOptions(A);
+<a name="line95"> 95: </a>  MatSetUp(A);
+<a name="line96"> 96: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line97"> 97: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line98"> 98: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,i,i-1,1.0/(h*h),INSERT_VALUES); }
+<a name="line99"> 99: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(A,i,i+1,1.0/(h*h),INSERT_VALUES); }
+<a name="line100">100: </a>    MatSetValue(A,i,i,-2.0/(h*h)+a,INSERT_VALUES);
+<a name="line101">101: </a>  }
+<a name="line102">102: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line103">103: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+<a name="line104">104: </a>  MatSetOption(A,MAT_HERMITIAN,PETSC_TRUE);
+
+<a name="line106">106: </a>  <font color="#B22222">/* B = diag(b(xi)) */</font>
+<a name="line107">107: </a>  MatCreate(PETSC_COMM_WORLD,&amp;B);
+<a name="line108">108: </a>  MatSetSizes(B,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line109">109: </a>  MatSetFromOptions(B);
+<a name="line110">110: </a>  MatSetUp(B);
+<a name="line111">111: </a>  MatGetOwnershipRange(B,&amp;Istart,&amp;Iend);
+<a name="line112">112: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line113">113: </a>    xi = (i+1)*h;
+<a name="line114">114: </a>    b = -4.1+xi*(1.0-PetscExpReal(xi-PETSC_PI));
+<a name="line115">115: </a>    MatSetValue(B,i,i,b,INSERT_VALUES);
+<a name="line116">116: </a>  }
+<a name="line117">117: </a>  MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);
+<a name="line118">118: </a>  MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);
+<a name="line119">119: </a>  MatSetOption(B,MAT_HERMITIAN,PETSC_TRUE);
+
+<a name="line121">121: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line122">122: </a><font color="#B22222">              Create nonlinear eigensolver and set options</font>
+<a name="line123">123: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line125">125: </a>  <a href="../../../docs/manualpages/NEP/NEPCreate.html#NEPCreate">NEPCreate</a>(PETSC_COMM_WORLD,&amp;nep);
+<a name="line126">126: </a>  mats[0] = A;  funs[0] = f2;
+<a name="line127">127: </a>  mats[1] = Id; funs[1] = f1;
+<a name="line128">128: </a>  mats[2] = B;  funs[2] = f3;
+<a name="line129">129: </a>  <a href="../../../docs/manualpages/NEP/NEPSetSplitOperator.html#NEPSetSplitOperator">NEPSetSplitOperator</a>(nep,3,mats,funs,SUBSET_NONZERO_PATTERN);
+<a name="line130">130: </a>  <a href="../../../docs/manualpages/NEP/NEPSetTolerances.html#NEPSetTolerances">NEPSetTolerances</a>(nep,1e-9,PETSC_DEFAULT);
+<a name="line131">131: </a>  <a href="../../../docs/manualpages/NEP/NEPSetFromOptions.html#NEPSetFromOptions">NEPSetFromOptions</a>(nep);
+
+<a name="line133">133: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line134">134: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line135">135: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line137">137: </a>  <a href="../../../docs/manualpages/NEP/NEPSolve.html#NEPSolve">NEPSolve</a>(nep);
+<a name="line138">138: </a>  <a href="../../../docs/manualpages/NEP/NEPErrorView.html#NEPErrorView">NEPErrorView</a>(nep,<a href="../../../docs/manualpages/NEP/NEPErrorType.html#NEPErrorType">NEP_ERROR_RELATIVE</a>,NULL);
+
+<a name="line140">140: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line141">141: </a><font color="#B22222">                   Create problem matrices of size 2*n</font>
+<a name="line142">142: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line144">144: </a>  MatDestroy(&amp;Id);
+<a name="line145">145: </a>  MatDestroy(&amp;A);
+<a name="line146">146: </a>  MatDestroy(&amp;B);
+<a name="line147">147: </a>  n *= 2;
+<a name="line148">148: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n1-D Delay Eigenproblem, n=%D, tau=%g\n\n"</font>,n,(double)tau);
+<a name="line149">149: </a>  h = PETSC_PI/(PetscReal)(n+1);
+
+<a name="line151">151: </a>  <font color="#B22222">/* Identity matrix */</font>
+<a name="line152">152: </a>  MatCreate(PETSC_COMM_WORLD,&amp;Id);
+<a name="line153">153: </a>  MatSetSizes(Id,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line154">154: </a>  MatSetFromOptions(Id);
+<a name="line155">155: </a>  MatSetUp(Id);
+<a name="line156">156: </a>  MatGetOwnershipRange(Id,&amp;Istart,&amp;Iend);
+<a name="line157">157: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line158">158: </a>    MatSetValue(Id,i,i,1.0,INSERT_VALUES);
+<a name="line159">159: </a>  }
+<a name="line160">160: </a>  MatAssemblyBegin(Id,MAT_FINAL_ASSEMBLY);
+<a name="line161">161: </a>  MatAssemblyEnd(Id,MAT_FINAL_ASSEMBLY);
+<a name="line162">162: </a>  MatSetOption(Id,MAT_HERMITIAN,PETSC_TRUE);
+
+<a name="line164">164: </a>  <font color="#B22222">/* A = 1/h^2*tridiag(1,-2,1) + a*I */</font>
+<a name="line165">165: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line166">166: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line167">167: </a>  MatSetFromOptions(A);
+<a name="line168">168: </a>  MatSetUp(A);
+<a name="line169">169: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line170">170: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line171">171: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,i,i-1,1.0/(h*h),INSERT_VALUES); }
+<a name="line172">172: </a>    <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(A,i,i+1,1.0/(h*h),INSERT_VALUES); }
+<a name="line173">173: </a>    MatSetValue(A,i,i,-2.0/(h*h)+a,INSERT_VALUES);
+<a name="line174">174: </a>  }
+<a name="line175">175: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line176">176: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+<a name="line177">177: </a>  MatSetOption(A,MAT_HERMITIAN,PETSC_TRUE);
+
+<a name="line179">179: </a>  <font color="#B22222">/* B = diag(b(xi)) */</font>
+<a name="line180">180: </a>  MatCreate(PETSC_COMM_WORLD,&amp;B);
+<a name="line181">181: </a>  MatSetSizes(B,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line182">182: </a>  MatSetFromOptions(B);
+<a name="line183">183: </a>  MatSetUp(B);
+<a name="line184">184: </a>  MatGetOwnershipRange(B,&amp;Istart,&amp;Iend);
+<a name="line185">185: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line186">186: </a>    xi = (i+1)*h;
+<a name="line187">187: </a>    b = -4.1+xi*(1.0-PetscExpReal(xi-PETSC_PI));
+<a name="line188">188: </a>    MatSetValue(B,i,i,b,INSERT_VALUES);
+<a name="line189">189: </a>  }
+<a name="line190">190: </a>  MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);
+<a name="line191">191: </a>  MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);
+<a name="line192">192: </a>  MatSetOption(B,MAT_HERMITIAN,PETSC_TRUE);
+
+<a name="line194">194: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line195">195: </a><font color="#B22222">       Solve again, calling <a href="../../../docs/manualpages/NEP/NEPReset.html#NEPReset">NEPReset</a>() since matrix size has changed</font>
+<a name="line196">196: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line198">198: </a>  <a href="../../../docs/manualpages/NEP/NEPReset.html#NEPReset">NEPReset</a>(nep);  <font color="#B22222">/* if this is omitted, it will be called in NEPSetSplitOperators() */</font>
+<a name="line199">199: </a>  mats[0] = A;  funs[0] = f2;
+<a name="line200">200: </a>  mats[1] = Id; funs[1] = f1;
+<a name="line201">201: </a>  mats[2] = B;  funs[2] = f3;
+<a name="line202">202: </a>  <a href="../../../docs/manualpages/NEP/NEPSetSplitOperator.html#NEPSetSplitOperator">NEPSetSplitOperator</a>(nep,3,mats,funs,SUBSET_NONZERO_PATTERN);
+<a name="line203">203: </a>  <a href="../../../docs/manualpages/NEP/NEPSolve.html#NEPSolve">NEPSolve</a>(nep);
+<a name="line204">204: </a>  <a href="../../../docs/manualpages/NEP/NEPErrorView.html#NEPErrorView">NEPErrorView</a>(nep,<a href="../../../docs/manualpages/NEP/NEPErrorType.html#NEPErrorType">NEP_ERROR_RELATIVE</a>,NULL);
+
+<a name="line206">206: </a>  <a href="../../../docs/manualpages/NEP/NEPDestroy.html#NEPDestroy">NEPDestroy</a>(&amp;nep);
+<a name="line207">207: </a>  MatDestroy(&amp;Id);
+<a name="line208">208: </a>  MatDestroy(&amp;A);
+<a name="line209">209: </a>  MatDestroy(&amp;B);
+<a name="line210">210: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;f1);
+<a name="line211">211: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;f2);
+<a name="line212">212: </a>  <a href="../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;f3);
+<a name="line213">213: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line214">214: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line215">215: </a>}
+
+<a name="line217">217: </a><font color="#B22222">/*TEST</font>
+
+<a name="line219">219: </a><font color="#B22222">   testset:</font>
+<a name="line220">220: </a><font color="#B22222">      nsize: 2</font>
+<a name="line221">221: </a><font color="#B22222">      requires: !single</font>
+<a name="line222">222: </a><font color="#B22222">      output_file: output/test10_1.out</font>
+<a name="line223">223: </a><font color="#B22222">      test:</font>
+<a name="line224">224: </a><font color="#B22222">         suffix: 1</font>
+<a name="line225">225: </a><font color="#B22222">         args: -nep_type narnoldi -nep_target 0.55</font>
+<a name="line226">226: </a><font color="#B22222">      test:</font>
+<a name="line227">227: </a><font color="#B22222">         suffix: 1_rii</font>
+<a name="line228">228: </a><font color="#B22222">         args: -nep_type rii -nep_target 0.55 -nep_rii_hermitian</font>
+<a name="line229">229: </a><font color="#B22222">      test:</font>
+<a name="line230">230: </a><font color="#B22222">         suffix: 1_narnoldi</font>
+<a name="line231">231: </a><font color="#B22222">         args: -nep_type narnoldi -nep_target 0.55 -nep_narnoldi_lag_preconditioner 2</font>
+<a name="line232">232: </a><font color="#B22222">      test:</font>
+<a name="line233">233: </a><font color="#B22222">         suffix: 1_slp</font>
+<a name="line234">234: </a><font color="#B22222">         args: -nep_type slp -nep_slp_st_pc_type redundant</font>
+<a name="line235">235: </a><font color="#B22222">      test:</font>
+<a name="line236">236: </a><font color="#B22222">         suffix: 1_interpol</font>
+<a name="line237">237: </a><font color="#B22222">         args: -nep_type interpol -rg_type interval -rg_interval_endpoints .5,1,-.1,.1 -nep_target .7 -nep_interpol_st_pc_type redundant</font>
+<a name="line238">238: </a><font color="#B22222">      test:</font>
+<a name="line239">239: </a><font color="#B22222">         suffix: 1_narnoldi_sync</font>
+<a name="line240">240: </a><font color="#B22222">         args: -nep_type narnoldi -ds_parallel synchronized</font>
+
+<a name="line242">242: </a><font color="#B22222">   test:</font>
+<a name="line243">243: </a><font color="#B22222">      suffix: 2</font>
+<a name="line244">244: </a><font color="#B22222">      args: -nep_nev 2 -nep_type interpol -rg_type interval -rg_interval_endpoints .5,15,-.1,.1 -nep_target .7 -nep_interpol_pep_type jd -nep_interpol_st_pc_type sor</font>
+<a name="line245">245: </a><font color="#B22222">      requires: !single</font>
+
+<a name="line247">247: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

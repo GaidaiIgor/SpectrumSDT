@@ -1,0 +1,120 @@
+<center><a href="test13.c">Actual source code: test13.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/svd/tests/test13.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:02+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/svd/tests/test13.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Test interface to external package PRIMME.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = matrix rows.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = matrix columns (defaults to m+2).\n\n"</font>;
+
+<a name="line16"> 16: </a> #include <A href="../../../include/slepcsvd.h.html">&lt;slepcsvd.h&gt;</A>
+
+<a name="line18"> 18: </a><font color="#B22222">/*</font>
+<a name="line19"> 19: </a><font color="#B22222">   This example computes the singular values of a rectangular bidiagonal matrix</font>
+
+<a name="line21"> 21: </a><font color="#B22222">              |  1  2                     |</font>
+<a name="line22"> 22: </a><font color="#B22222">              |     1  2                  |</font>
+<a name="line23"> 23: </a><font color="#B22222">              |        1  2               |</font>
+<a name="line24"> 24: </a><font color="#B22222">          A = |          .  .             |</font>
+<a name="line25"> 25: </a><font color="#B22222">              |             .  .          |</font>
+<a name="line26"> 26: </a><font color="#B22222">              |                1  2       |</font>
+<a name="line27"> 27: </a><font color="#B22222">              |                   1  2    |</font>
+<a name="line28"> 28: </a><font color="#B22222"> */</font>
+
+<a name="line30"> 30: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line31"> 31: </a>{
+<a name="line32"> 32: </a>  Mat             A;
+<a name="line33"> 33: </a>  <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>             svd;
+<a name="line34"> 34: </a>  PetscInt        m=20,n,Istart,Iend,i,k=6,col[2],bs;
+<a name="line35"> 35: </a>  PetscScalar     value[] = { 1, 2 };
+<a name="line36"> 36: </a>  PetscBool       flg;
+<a name="line37"> 37: </a>  <a href="../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVDPRIMMEMethod</a> meth;
+<a name="line38"> 38: </a>  PetscErrorCode  ierr;
+
+<a name="line40"> 40: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line41"> 41: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,NULL);
+<a name="line42"> 42: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,&amp;flg);
+<a name="line43"> 43: </a>  <font color="#4169E1">if</font> (!flg) n=m+2;
+<a name="line44"> 44: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-k"</font>,&amp;k,NULL);
+<a name="line45"> 45: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nRectangular bidiagonal matrix, m=%D n=%D\n\n"</font>,m,n);
+
+<a name="line47"> 47: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line48"> 48: </a><font color="#B22222">        Generate the matrix</font>
+<a name="line49"> 49: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line51"> 51: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line52"> 52: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,m,n);
+<a name="line53"> 53: </a>  MatSetFromOptions(A);
+<a name="line54"> 54: </a>  MatSetUp(A);
+<a name="line55"> 55: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line56"> 56: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line57"> 57: </a>    col[0]=i; col[1]=i+1;
+<a name="line58"> 58: </a>    <font color="#4169E1">if</font> (i&lt;n-1) {
+<a name="line59"> 59: </a>      MatSetValues(A,1,&amp;i,2,col,value,INSERT_VALUES);
+<a name="line60"> 60: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (i==n-1) {
+<a name="line61"> 61: </a>      MatSetValue(A,i,col[0],value[0],INSERT_VALUES);
+<a name="line62"> 62: </a>    }
+<a name="line63"> 63: </a>  }
+<a name="line64"> 64: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line65"> 65: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line67"> 67: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line68"> 68: </a><font color="#B22222">        Compute singular values</font>
+<a name="line69"> 69: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line71"> 71: </a>  <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>(PETSC_COMM_WORLD,&amp;svd);
+<a name="line72"> 72: </a>  <a href="../../../docs/manualpages/SVD/SVDSetOperator.html#SVDSetOperator">SVDSetOperator</a>(svd,A);
+<a name="line73"> 73: </a>  <a href="../../../docs/manualpages/SVD/SVDSetType.html#SVDSetType">SVDSetType</a>(svd,SVDPRIMME);
+<a name="line74"> 74: </a>  <a href="../../../docs/manualpages/SVD/SVDPRIMMESetBlockSize.html#SVDPRIMMESetBlockSize">SVDPRIMMESetBlockSize</a>(svd,4);
+<a name="line75"> 75: </a>  <a href="../../../docs/manualpages/SVD/SVDPRIMMESetMethod.html#SVDPRIMMESetMethod">SVDPRIMMESetMethod</a>(svd,<a href="../../../docs/manualpages/SVD/SVDPRIMMEMethod.html#SVDPRIMMEMethod">SVD_PRIMME_HYBRID</a>);
+<a name="line76"> 76: </a>  <a href="../../../docs/manualpages/SVD/SVDSetFromOptions.html#SVDSetFromOptions">SVDSetFromOptions</a>(svd);
+
+<a name="line78"> 78: </a>  <a href="../../../docs/manualpages/SVD/SVDSolve.html#SVDSolve">SVDSolve</a>(svd);
+<a name="line79"> 79: </a>  <a href="../../../docs/manualpages/SVD/SVDPRIMMEGetBlockSize.html#SVDPRIMMEGetBlockSize">SVDPRIMMEGetBlockSize</a>(svd,&amp;bs);
+<a name="line80"> 80: </a>  <a href="../../../docs/manualpages/SVD/SVDPRIMMEGetMethod.html#SVDPRIMMEGetMethod">SVDPRIMMEGetMethod</a>(svd,&amp;meth);
+<a name="line81"> 81: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" PRIMME: using block size %D, method %s\n"</font>,bs,SVDPRIMMEMethods[meth]);
+
+<a name="line83"> 83: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line84"> 84: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line85"> 85: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line86"> 86: </a>  <a href="../../../docs/manualpages/SVD/SVDErrorView.html#SVDErrorView">SVDErrorView</a>(svd,<a href="../../../docs/manualpages/SVD/SVDErrorType.html#SVDErrorType">SVD_ERROR_RELATIVE</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line87"> 87: </a>  <a href="../../../docs/manualpages/SVD/SVDDestroy.html#SVDDestroy">SVDDestroy</a>(&amp;svd);
+<a name="line88"> 88: </a>  MatDestroy(&amp;A);
+<a name="line89"> 89: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line90"> 90: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line91"> 91: </a>}
+
+<a name="line93"> 93: </a><font color="#B22222">/*TEST</font>
+
+<a name="line95"> 95: </a><font color="#B22222">   build:</font>
+<a name="line96"> 96: </a><font color="#B22222">      requires: primme</font>
+
+<a name="line98"> 98: </a><font color="#B22222">   test:</font>
+<a name="line99"> 99: </a><font color="#B22222">      suffix: 1</font>
+<a name="line100">100: </a><font color="#B22222">      args: -svd_nsv 4</font>
+<a name="line101">101: </a><font color="#B22222">      requires: primme</font>
+
+<a name="line103">103: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,184 @@
+<center><a href="test4f.F">Actual source code: test4f.F</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/svd/tests/test4f.F.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:03+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/svd/tests/test4f.F.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a>!
+<a name="line2">  2: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line3">  3: </a>!  SLEPc - Scalable Library <font color="#4169E1">for</font> Eigenvalue Problem Computations
+<a name="line4">  4: </a>!  Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain
+<a name="line5">  5: </a>!
+<a name="line6">  6: </a>!  This file is part of SLEPc.
+<a name="line7">  7: </a>!  SLEPc is distributed under a 2-clause BSD license (see LICENSE).
+<a name="line8">  8: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line9">  9: </a>!
+<a name="line10"> 10: </a>!  Program usage: mpiexec -n &lt;np&gt; ./test4f [-help] [-n &lt;n&gt;] [-m &lt;m&gt;] [all SLEPc options]
+<a name="line11"> 11: </a>!
+<a name="line12"> 12: </a>!  Description: Singular value decomposition of a bidiagonal matrix.
+<a name="line13"> 13: </a>!
+<a name="line14"> 14: </a>!               |  1  2                     |
+<a name="line15"> 15: </a>!               |     1  2                  |
+<a name="line16"> 16: </a>!               |        1  2               |
+<a name="line17"> 17: </a>!           A = |          .  .             |
+<a name="line18"> 18: </a>!               |             .  .          |
+<a name="line19"> 19: </a>!               |                1  2       |
+<a name="line20"> 20: </a>!               |                   1  2    |
+<a name="line21"> 21: </a>!
+<a name="line22"> 22: </a>!  The command line options are:
+<a name="line23"> 23: </a>!    -m &lt;m&gt;, where &lt;m&gt; = matrix rows.
+<a name="line24"> 24: </a>!    -n &lt;n&gt;, where &lt;n&gt; = matrix columns (defaults to m+2).
+<a name="line25"> 25: </a>!
+<a name="line26"> 26: </a>! ----------------------------------------------------------------------
+<a name="line27"> 27: </a>!
+<a name="line28"> 28: </a>      program main
+<a name="line29"> 29: </a> #include <A href="../../../include/slepc/finclude/slepcsvd.h.html">&lt;slepc/finclude/slepcsvd.h&gt;</A>
+<a name="line30"> 30: </a>      use slepcsvd
+<a name="line31"> 31: </a>      implicit none
+
+<a name="line33"> 33: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line34"> 34: </a>!     Declarations
+<a name="line35"> 35: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line36"> 36: </a>!
+<a name="line37"> 37: </a>      Mat                A, B
+<a name="line38"> 38: </a>      <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>                svd
+<a name="line39"> 39: </a>      <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVDConv</a>            conv;
+<a name="line40"> 40: </a>      <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVDStop</a>            stp;
+<a name="line41"> 41: </a>      <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVDWhich</a>           which;
+<a name="line42"> 42: </a>      <a href="../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVDConvergedReason</a> reason;
+<a name="line43"> 43: </a>      PetscInt           m, n, i, Istart
+<a name="line44"> 44: </a>      PetscInt           col(2), its, Iend
+<a name="line45"> 45: </a>      PetscScalar        val(2)
+<a name="line46"> 46: </a>      PetscMPIInt        rank
+<a name="line47"> 47: </a>      PetscErrorCode     ierr
+<a name="line48"> 48: </a>      PetscBool          flg, tmode
+
+<a name="line50"> 50: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line51"> 51: </a>!     Beginning of program
+<a name="line52"> 52: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line54"> 54: </a>      call <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(PETSC_NULL_CHARACTER,ierr)
+<a name="line55"> 55: </a>      call <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PETSC_COMM_WORLD,rank,ierr)
+<a name="line56"> 56: </a>      m = 20
+<a name="line57"> 57: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,  &amp;
+<a name="line58"> 58: </a>     &amp;                        '-m',m,flg,ierr)
+<a name="line59"> 59: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,  &amp;
+<a name="line60"> 60: </a>     &amp;                        '-n',n,flg,ierr)
+<a name="line61"> 61: </a>      <font color="#4169E1">if</font> (.not. flg) n = m+2
+
+<a name="line63"> 63: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line64"> 64: </a>        write(*,100) m, n
+<a name="line65"> 65: </a>      endif
+<a name="line66"> 66: </a> 100  format (/'Bidiagonal matrix, m =',I3,', n=',I3,' (Fortran)')
+
+<a name="line68"> 68: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line69"> 69: </a>!     Build the Lauchli matrix
+<a name="line70"> 70: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line72"> 72: </a>      call MatCreate(PETSC_COMM_WORLD,A,ierr)
+<a name="line73"> 73: </a>      call MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,m,n,ierr)
+<a name="line74"> 74: </a>      call MatSetFromOptions(A,ierr)
+<a name="line75"> 75: </a>      call MatSetUp(A,ierr)
+
+<a name="line77"> 77: </a>      call MatGetOwnershipRange(A,Istart,Iend,ierr)
+<a name="line78"> 78: </a>      val(1) = 1.0
+<a name="line79"> 79: </a>      val(2) = 2.0
+<a name="line80"> 80: </a>      <font color="#4169E1">do</font> i=Istart,Iend-1
+<a name="line81"> 81: </a>        col(1) = i
+<a name="line82"> 82: </a>        col(2) = i+1
+<a name="line83"> 83: </a>        <font color="#4169E1">if</font> (i .le. n-1) then
+<a name="line84"> 84: </a>          call MatSetValue(A,i,col(1),val(1),INSERT_VALUES,ierr)
+<a name="line85"> 85: </a>        end <font color="#4169E1">if</font>
+<a name="line86"> 86: </a>        <font color="#4169E1">if</font> (i .lt. n-1) then
+<a name="line87"> 87: </a>          call MatSetValue(A,i,col(2),val(2),INSERT_VALUES,ierr)
+<a name="line88"> 88: </a>        end <font color="#4169E1">if</font>
+<a name="line89"> 89: </a>      enddo
+
+<a name="line91"> 91: </a>      call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr)
+<a name="line92"> 92: </a>      call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr)
+
+<a name="line94"> 94: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line95"> 95: </a>!     Compute singular values
+<a name="line96"> 96: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line98"> 98: </a>      call <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>(PETSC_COMM_WORLD,svd,ierr)
+<a name="line99"> 99: </a>      call <a href="../../../docs/manualpages/SVD/SVDSetOperator.html#SVDSetOperator">SVDSetOperator</a>(svd,A,ierr)
+
+<a name="line101">101: </a>!     ** test some interface functions
+<a name="line102">102: </a>      call <a href="../../../docs/manualpages/SVD/SVDGetOperator.html#SVDGetOperator">SVDGetOperator</a>(svd,B,ierr)
+<a name="line103">103: </a>      call MatView(B,PETSC_VIEWER_STDOUT_WORLD,ierr)
+<a name="line104">104: </a>      call <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(svd,<a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_ABS</a>,ierr)
+<a name="line105">105: </a>      call <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>(svd,<a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_BASIC</a>,ierr)
+<a name="line106">106: </a>      call <a href="../../../docs/manualpages/SVD/SVDSetFromOptions.html#SVDSetFromOptions">SVDSetFromOptions</a>(svd,ierr)
+
+<a name="line108">108: </a>!     ** query properties and print them
+<a name="line109">109: </a>      call <a href="../../../docs/manualpages/SVD/SVDGetImplicitTranspose.html#SVDGetImplicitTranspose">SVDGetImplicitTranspose</a>(svd,tmode,ierr)
+<a name="line110">110: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line111">111: </a>        <font color="#4169E1">if</font> (tmode) then
+<a name="line112">112: </a>          write(*,110) 'implicit'
+<a name="line113">113: </a>        <font color="#4169E1">else</font>
+<a name="line114">114: </a>          write(*,110) 'explicit'
+<a name="line115">115: </a>        endif
+<a name="line116">116: </a>      endif
+<a name="line117">117: </a> 110  format (/' Transpose mode is',A9)
+<a name="line118">118: </a>      call <a href="../../../docs/manualpages/SVD/SVDGetConvergenceTest.html#SVDGetConvergenceTest">SVDGetConvergenceTest</a>(svd,conv,ierr)
+<a name="line119">119: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line120">120: </a>        write(*,120) conv
+<a name="line121">121: </a>      endif
+<a name="line122">122: </a> 120  format (' Convergence test is',I2)
+<a name="line123">123: </a>      call <a href="../../../docs/manualpages/SVD/SVDGetStoppingTest.html#SVDGetStoppingTest">SVDGetStoppingTest</a>(svd,stp,ierr)
+<a name="line124">124: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line125">125: </a>        write(*,130) stp
+<a name="line126">126: </a>      endif
+<a name="line127">127: </a> 130  format (' Stopping test is',I2)
+<a name="line128">128: </a>      call <a href="../../../docs/manualpages/SVD/SVDGetWhichSingularTriplets.html#SVDGetWhichSingularTriplets">SVDGetWhichSingularTriplets</a>(svd,which,ierr)
+<a name="line129">129: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line130">130: </a>        <font color="#4169E1">if</font> (which .eq. <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_LARGEST</a>) then
+<a name="line131">131: </a>          write(*,140) 'largest'
+<a name="line132">132: </a>        <font color="#4169E1">else</font>
+<a name="line133">133: </a>          write(*,140) 'smallest'
+<a name="line134">134: </a>        endif
+<a name="line135">135: </a>      endif
+<a name="line136">136: </a> 140  format (' Which =',A9)
+
+<a name="line138">138: </a>!     ** call the solver
+<a name="line139">139: </a>      call <a href="../../../docs/manualpages/SVD/SVDSolve.html#SVDSolve">SVDSolve</a>(svd,ierr)
+<a name="line140">140: </a>      call <a href="../../../docs/manualpages/SVD/SVDGetConvergedReason.html#SVDGetConvergedReason">SVDGetConvergedReason</a>(svd,reason,ierr)
+<a name="line141">141: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line142">142: </a>        write(*,150) reason
+<a name="line143">143: </a>      endif
+<a name="line144">144: </a> 150  format (' Converged reason:',I2)
+<a name="line145">145: </a>      call <a href="../../../docs/manualpages/SVD/SVDGetIterationNumber.html#SVDGetIterationNumber">SVDGetIterationNumber</a>(svd,its,ierr)
+<a name="line146">146: </a>!     <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line147">147: </a>!       write(*,160) its
+<a name="line148">148: </a>!     endif
+<a name="line149">149: </a>!160  format (' Number of iterations of the method:',I4)
+
+<a name="line151">151: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line152">152: </a>!     Display solution and clean up
+<a name="line153">153: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line155">155: </a>      call <a href="../../../docs/manualpages/SVD/SVDErrorView.html#SVDErrorView">SVDErrorView</a>(svd,<a href="../../../docs/manualpages/SVD/SVDErrorType.html#SVDErrorType">SVD_ERROR_RELATIVE</a>,PETSC_NULL_VIEWER,ierr)
+<a name="line156">156: </a>      call <a href="../../../docs/manualpages/SVD/SVDDestroy.html#SVDDestroy">SVDDestroy</a>(svd,ierr)
+<a name="line157">157: </a>      call MatDestroy(A,ierr)
+
+<a name="line159">159: </a>      call <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>(ierr)
+<a name="line160">160: </a>      end
+
+<a name="line162">162: </a>!<font color="#B22222">/*TEST</font>
+<a name="line163">163: </a><font color="#B22222">!</font>
+<a name="line164">164: </a><font color="#B22222">!   test:</font>
+<a name="line165">165: </a><font color="#B22222">!      suffix: 1</font>
+<a name="line166">166: </a><font color="#B22222">!</font>
+<a name="line167">167: </a><font color="#B22222">!TEST*/</font>
+</pre>
+</body>
+
+</html>

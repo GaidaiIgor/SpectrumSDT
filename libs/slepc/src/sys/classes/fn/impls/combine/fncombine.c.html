@@ -1,0 +1,376 @@
+<center><a href="fncombine.c">Actual source code: fncombine.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/fn/impls/combine/fncombine.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:36+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/fn/impls/combine/fncombine.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   A function that is obtained by combining two other functions (either by</font>
+<a name="line12"> 12: </a><font color="#B22222">   addition, multiplication, division or composition)</font>
+
+<a name="line14"> 14: </a><font color="#B22222">      addition:          f(x) = f1(x)+f2(x)</font>
+<a name="line15"> 15: </a><font color="#B22222">      multiplication:    f(x) = f1(x)*f2(x)</font>
+<a name="line16"> 16: </a><font color="#B22222">      division:          f(x) = f1(x)/f2(x)      f(A) = f2(A)\f1(A)</font>
+<a name="line17"> 17: </a><font color="#B22222">      composition:       f(x) = f2(f1(x))</font>
+<a name="line18"> 18: </a><font color="#B22222">*/</font>
+
+<a name="line20"> 20: </a> #include <A href="../../../../../../include/slepc/private/fnimpl.h.html">&lt;slepc/private/fnimpl.h&gt;</A>
+<a name="line21"> 21: </a> #include <A href="../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line23"> 23: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line24"> 24: </a>  <a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>            f1,f2;    <font color="#B22222">/* functions */</font>
+<a name="line25"> 25: </a>  <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FNCombineType</a> comb;     <font color="#B22222">/* how the functions are combined */</font>
+<a name="line26"> 26: </a>} FN_COMBINE;
+
+<a name="line28"> 28: </a><strong><font color="#4169E1"><a name="FNEvaluateFunction_Combine"></a>PetscErrorCode FNEvaluateFunction_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscScalar x,PetscScalar *y)</font></strong>
+<a name="line29"> 29: </a>{
+<a name="line31"> 31: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+<a name="line32"> 32: </a>  PetscScalar    a,b;
+
+<a name="line35"> 35: </a>  <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f1,x,&amp;a);
+<a name="line36"> 36: </a>  <font color="#4169E1">switch</font> (ctx-&gt;comb) {
+<a name="line37"> 37: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_ADD</a>:
+<a name="line38"> 38: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f2,x,&amp;b);
+<a name="line39"> 39: </a>      *y = a+b;
+<a name="line40"> 40: </a>      <font color="#4169E1">break</font>;
+<a name="line41"> 41: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_MULTIPLY</a>:
+<a name="line42"> 42: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f2,x,&amp;b);
+<a name="line43"> 43: </a>      *y = a*b;
+<a name="line44"> 44: </a>      <font color="#4169E1">break</font>;
+<a name="line45"> 45: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_DIVIDE</a>:
+<a name="line46"> 46: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f2,x,&amp;b);
+<a name="line47"> 47: </a>      <font color="#4169E1">if</font> (b==0.0) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Function not defined in the requested value"</font>);
+<a name="line48"> 48: </a>      *y = a/b;
+<a name="line49"> 49: </a>      <font color="#4169E1">break</font>;
+<a name="line50"> 50: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_COMPOSE</a>:
+<a name="line51"> 51: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f2,a,y);
+<a name="line52"> 52: </a>      <font color="#4169E1">break</font>;
+<a name="line53"> 53: </a>  }
+<a name="line54"> 54: </a>  <font color="#4169E1">return</font>(0);
+<a name="line55"> 55: </a>}
+
+<a name="line57"> 57: </a><strong><font color="#4169E1"><a name="FNEvaluateDerivative_Combine"></a>PetscErrorCode FNEvaluateDerivative_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscScalar x,PetscScalar *yp)</font></strong>
+<a name="line58"> 58: </a>{
+<a name="line60"> 60: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+<a name="line61"> 61: </a>  PetscScalar    a,b,ap,bp;
+
+<a name="line64"> 64: </a>  <font color="#4169E1">switch</font> (ctx-&gt;comb) {
+<a name="line65"> 65: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_ADD</a>:
+<a name="line66"> 66: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f1,x,&amp;ap);
+<a name="line67"> 67: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f2,x,&amp;bp);
+<a name="line68"> 68: </a>      *yp = ap+bp;
+<a name="line69"> 69: </a>      <font color="#4169E1">break</font>;
+<a name="line70"> 70: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_MULTIPLY</a>:
+<a name="line71"> 71: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f1,x,&amp;ap);
+<a name="line72"> 72: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f2,x,&amp;bp);
+<a name="line73"> 73: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f1,x,&amp;a);
+<a name="line74"> 74: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f2,x,&amp;b);
+<a name="line75"> 75: </a>      *yp = ap*b+a*bp;
+<a name="line76"> 76: </a>      <font color="#4169E1">break</font>;
+<a name="line77"> 77: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_DIVIDE</a>:
+<a name="line78"> 78: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f1,x,&amp;ap);
+<a name="line79"> 79: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f2,x,&amp;bp);
+<a name="line80"> 80: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f1,x,&amp;a);
+<a name="line81"> 81: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f2,x,&amp;b);
+<a name="line82"> 82: </a>      <font color="#4169E1">if</font> (b==0.0) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Derivative not defined in the requested value"</font>);
+<a name="line83"> 83: </a>      *yp = (ap*b-a*bp)/(b*b);
+<a name="line84"> 84: </a>      <font color="#4169E1">break</font>;
+<a name="line85"> 85: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_COMPOSE</a>:
+<a name="line86"> 86: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f1,x,&amp;a);
+<a name="line87"> 87: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f1,x,&amp;ap);
+<a name="line88"> 88: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f2,a,yp);
+<a name="line89"> 89: </a>      *yp *= ap;
+<a name="line90"> 90: </a>      <font color="#4169E1">break</font>;
+<a name="line91"> 91: </a>  }
+<a name="line92"> 92: </a>  <font color="#4169E1">return</font>(0);
+<a name="line93"> 93: </a>}
+
+<a name="line95"> 95: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMat_Combine"></a>PetscErrorCode FNEvaluateFunctionMat_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Mat B)</font></strong>
+<a name="line96"> 96: </a>{
+<a name="line98"> 98: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+<a name="line99"> 99: </a>  PetscScalar    *Aa,*Ba,*Wa,*Za,one=1.0,zero=0.0;
+<a name="line100">100: </a>  PetscBLASInt   n,ld,ld2,inc=1,*ipiv,info;
+<a name="line101">101: </a>  PetscInt       m;
+<a name="line102">102: </a>  Mat            W,Z;
+
+<a name="line105">105: </a>  FN_AllocateWorkMat(fn,A,&amp;W);
+<a name="line106">106: </a>  MatDenseGetArray(A,&amp;Aa);
+<a name="line107">107: </a>  MatDenseGetArray(B,&amp;Ba);
+<a name="line108">108: </a>  MatDenseGetArray(W,&amp;Wa);
+<a name="line109">109: </a>  MatGetSize(A,&amp;m,NULL);
+<a name="line110">110: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line111">111: </a>  ld  = n;
+<a name="line112">112: </a>  ld2 = ld*ld;
+
+<a name="line114">114: </a>  <font color="#4169E1">switch</font> (ctx-&gt;comb) {
+<a name="line115">115: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_ADD</a>:
+<a name="line116">116: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f1,A,W,PETSC_FALSE);
+<a name="line117">117: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f2,A,B,PETSC_FALSE);
+<a name="line118">118: </a>      PetscStackCallBLAS(<font color="#666666">"BLASaxpy"</font>,BLASaxpy_(&amp;ld2,&amp;one,Wa,&amp;inc,Ba,&amp;inc));
+<a name="line119">119: </a>      PetscLogFlops(1.0*n*n);
+<a name="line120">120: </a>      <font color="#4169E1">break</font>;
+<a name="line121">121: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_MULTIPLY</a>:
+<a name="line122">122: </a>      FN_AllocateWorkMat(fn,A,&amp;Z);
+<a name="line123">123: </a>      MatDenseGetArray(Z,&amp;Za);
+<a name="line124">124: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f1,A,W,PETSC_FALSE);
+<a name="line125">125: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f2,A,Z,PETSC_FALSE);
+<a name="line126">126: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;n,&amp;one,Wa,&amp;ld,Za,&amp;ld,&amp;zero,Ba,&amp;ld));
+<a name="line127">127: </a>      PetscLogFlops(2.0*n*n*n);
+<a name="line128">128: </a>      MatDenseRestoreArray(Z,&amp;Za);
+<a name="line129">129: </a>      FN_FreeWorkMat(fn,&amp;Z);
+<a name="line130">130: </a>      <font color="#4169E1">break</font>;
+<a name="line131">131: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_DIVIDE</a>:
+<a name="line132">132: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f2,A,W,PETSC_FALSE);
+<a name="line133">133: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f1,A,B,PETSC_FALSE);
+<a name="line134">134: </a>      PetscMalloc1(ld,&amp;ipiv);
+<a name="line135">135: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKgesv"</font>,LAPACKgesv_(&amp;n,&amp;n,Wa,&amp;ld,ipiv,Ba,&amp;ld,&amp;info));
+<a name="line136">136: </a>      SlepcCheckLapackInfo(<font color="#666666">"gesv"</font>,info);
+<a name="line137">137: </a>      PetscLogFlops(2.0*n*n*n/3.0+2.0*n*n*n);
+<a name="line138">138: </a>      PetscFree(ipiv);
+<a name="line139">139: </a>      <font color="#4169E1">break</font>;
+<a name="line140">140: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_COMPOSE</a>:
+<a name="line141">141: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f1,A,W,PETSC_FALSE);
+<a name="line142">142: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f2,W,B,PETSC_FALSE);
+<a name="line143">143: </a>      <font color="#4169E1">break</font>;
+<a name="line144">144: </a>  }
+
+<a name="line146">146: </a>  MatDenseRestoreArray(A,&amp;Aa);
+<a name="line147">147: </a>  MatDenseRestoreArray(B,&amp;Ba);
+<a name="line148">148: </a>  MatDenseRestoreArray(W,&amp;Wa);
+<a name="line149">149: </a>  FN_FreeWorkMat(fn,&amp;W);
+<a name="line150">150: </a>  <font color="#4169E1">return</font>(0);
+<a name="line151">151: </a>}
+
+<a name="line153">153: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMatVec_Combine"></a>PetscErrorCode FNEvaluateFunctionMatVec_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Vec v)</font></strong>
+<a name="line154">154: </a>{
+<a name="line156">156: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+<a name="line157">157: </a>  PetscScalar    *va,*Za;
+<a name="line158">158: </a>  PetscBLASInt   n,ld,*ipiv,info,one=1;
+<a name="line159">159: </a>  PetscInt       m;
+<a name="line160">160: </a>  Mat            Z;
+<a name="line161">161: </a>  Vec            w;
+
+<a name="line164">164: </a>  MatGetSize(A,&amp;m,NULL);
+<a name="line165">165: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line166">166: </a>  ld = n;
+
+<a name="line168">168: </a>  <font color="#4169E1">switch</font> (ctx-&gt;comb) {
+<a name="line169">169: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_ADD</a>:
+<a name="line170">170: </a>      VecDuplicate(v,&amp;w);
+<a name="line171">171: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>(ctx-&gt;f1,A,w);
+<a name="line172">172: </a>      <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>(ctx-&gt;f2,A,v);
+<a name="line173">173: </a>      VecAXPY(v,1.0,w);
+<a name="line174">174: </a>      VecDestroy(&amp;w);
+<a name="line175">175: </a>      <font color="#4169E1">break</font>;
+<a name="line176">176: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_MULTIPLY</a>:
+<a name="line177">177: </a>      VecDuplicate(v,&amp;w);
+<a name="line178">178: </a>      FN_AllocateWorkMat(fn,A,&amp;Z);
+<a name="line179">179: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f1,A,Z,PETSC_FALSE);
+<a name="line180">180: </a>      FNEvaluateFunctionMatVec_Private(ctx-&gt;f2,A,w,PETSC_FALSE);
+<a name="line181">181: </a>      MatMult(Z,w,v);
+<a name="line182">182: </a>      FN_FreeWorkMat(fn,&amp;Z);
+<a name="line183">183: </a>      VecDestroy(&amp;w);
+<a name="line184">184: </a>      <font color="#4169E1">break</font>;
+<a name="line185">185: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_DIVIDE</a>:
+<a name="line186">186: </a>      VecDuplicate(v,&amp;w);
+<a name="line187">187: </a>      FN_AllocateWorkMat(fn,A,&amp;Z);
+<a name="line188">188: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f2,A,Z,PETSC_FALSE);
+<a name="line189">189: </a>      FNEvaluateFunctionMatVec_Private(ctx-&gt;f1,A,v,PETSC_FALSE);
+<a name="line190">190: </a>      PetscMalloc1(ld,&amp;ipiv);
+<a name="line191">191: </a>      MatDenseGetArray(Z,&amp;Za);
+<a name="line192">192: </a>      VecGetArray(v,&amp;va);
+<a name="line193">193: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKgesv"</font>,LAPACKgesv_(&amp;n,&amp;one,Za,&amp;ld,ipiv,va,&amp;ld,&amp;info));
+<a name="line194">194: </a>      SlepcCheckLapackInfo(<font color="#666666">"gesv"</font>,info);
+<a name="line195">195: </a>      PetscLogFlops(2.0*n*n*n/3.0+2.0*n*n);
+<a name="line196">196: </a>      VecRestoreArray(v,&amp;va);
+<a name="line197">197: </a>      MatDenseRestoreArray(Z,&amp;Za);
+<a name="line198">198: </a>      PetscFree(ipiv);
+<a name="line199">199: </a>      FN_FreeWorkMat(fn,&amp;Z);
+<a name="line200">200: </a>      VecDestroy(&amp;w);
+<a name="line201">201: </a>      <font color="#4169E1">break</font>;
+<a name="line202">202: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_COMPOSE</a>:
+<a name="line203">203: </a>      FN_AllocateWorkMat(fn,A,&amp;Z);
+<a name="line204">204: </a>      FNEvaluateFunctionMat_Private(ctx-&gt;f1,A,Z,PETSC_FALSE);
+<a name="line205">205: </a>      FNEvaluateFunctionMatVec_Private(ctx-&gt;f2,Z,v,PETSC_FALSE);
+<a name="line206">206: </a>      FN_FreeWorkMat(fn,&amp;Z);
+<a name="line207">207: </a>      <font color="#4169E1">break</font>;
+<a name="line208">208: </a>  }
+<a name="line209">209: </a>  <font color="#4169E1">return</font>(0);
+<a name="line210">210: </a>}
+
+<a name="line212">212: </a><strong><font color="#4169E1"><a name="FNView_Combine"></a>PetscErrorCode FNView_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscViewer viewer)</font></strong>
+<a name="line213">213: </a>{
+<a name="line215">215: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+<a name="line216">216: </a>  PetscBool      isascii;
+
+<a name="line219">219: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line220">220: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line221">221: </a>    <font color="#4169E1">switch</font> (ctx-&gt;comb) {
+<a name="line222">222: </a>      <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_ADD</a>:
+<a name="line223">223: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  Two added functions f1+f2\n"</font>);
+<a name="line224">224: </a>        <font color="#4169E1">break</font>;
+<a name="line225">225: </a>      <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_MULTIPLY</a>:
+<a name="line226">226: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  Two multiplied functions f1*f2\n"</font>);
+<a name="line227">227: </a>        <font color="#4169E1">break</font>;
+<a name="line228">228: </a>      <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_DIVIDE</a>:
+<a name="line229">229: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  A quotient of two functions f1/f2\n"</font>);
+<a name="line230">230: </a>        <font color="#4169E1">break</font>;
+<a name="line231">231: </a>      <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FN_COMBINE_COMPOSE</a>:
+<a name="line232">232: </a>        PetscViewerASCIIPrintf(viewer,<font color="#666666">"  Two composed functions f2(f1(.))\n"</font>);
+<a name="line233">233: </a>        <font color="#4169E1">break</font>;
+<a name="line234">234: </a>    }
+<a name="line235">235: </a>    PetscViewerASCIIPushTab(viewer);
+<a name="line236">236: </a>    <a href="../../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>(ctx-&gt;f1,viewer);
+<a name="line237">237: </a>    <a href="../../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>(ctx-&gt;f2,viewer);
+<a name="line238">238: </a>    PetscViewerASCIIPopTab(viewer);
+<a name="line239">239: </a>  }
+<a name="line240">240: </a>  <font color="#4169E1">return</font>(0);
+<a name="line241">241: </a>}
+
+<a name="line243">243: </a><strong><font color="#4169E1"><a name="FNCombineSetChildren_Combine"></a>static PetscErrorCode FNCombineSetChildren_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FNCombineType</a> comb,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> f1,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> f2)</font></strong>
+<a name="line244">244: </a>{
+<a name="line246">246: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+
+<a name="line249">249: </a>  ctx-&gt;comb = comb;
+<a name="line250">250: </a>  PetscObjectReference((PetscObject)f1);
+<a name="line251">251: </a>  <a href="../../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;ctx-&gt;f1);
+<a name="line252">252: </a>  ctx-&gt;f1 = f1;
+<a name="line253">253: </a>  PetscLogObjectParent((PetscObject)fn,(PetscObject)ctx-&gt;f1);
+<a name="line254">254: </a>  PetscObjectReference((PetscObject)f2);
+<a name="line255">255: </a>  <a href="../../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;ctx-&gt;f2);
+<a name="line256">256: </a>  ctx-&gt;f2 = f2;
+<a name="line257">257: </a>  PetscLogObjectParent((PetscObject)fn,(PetscObject)ctx-&gt;f2);
+<a name="line258">258: </a>  <font color="#4169E1">return</font>(0);
+<a name="line259">259: </a>}
+
+<a name="line261">261: </a><font color="#B22222">/*@</font>
+<a name="line262">262: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/FN/FNCombineSetChildren.html#FNCombineSetChildren">FNCombineSetChildren</a> - Sets the two child functions that constitute this</font>
+<a name="line263">263: </a><font color="#B22222">   combined function, and the way they must be combined.</font>
+
+<a name="line265">265: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line267">267: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line268">268: </a><font color="#B22222">+  fn   - the math function context</font>
+<a name="line269">269: </a><font color="#B22222">.  comb - how to combine the functions (addition, multiplication, division or composition)</font>
+<a name="line270">270: </a><font color="#B22222">.  f1   - first function</font>
+<a name="line271">271: </a><font color="#B22222">-  f2   - second function</font>
+
+<a name="line273">273: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line275">275: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/FN/FNCombineGetChildren.html#FNCombineGetChildren">FNCombineGetChildren</a>()</font>
+<a name="line276">276: </a><font color="#B22222">@*/</font>
+<a name="line277">277: </a><strong><font color="#4169E1"><a name="FNCombineSetChildren"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/FN/FNCombineSetChildren.html#FNCombineSetChildren">FNCombineSetChildren</a>(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FNCombineType</a> comb,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> f1,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> f2)</font></strong>
+<a name="line278">278: </a>{
+
+<a name="line286">286: </a>  PetscTryMethod(fn,<font color="#666666">"FNCombineSetChildren_C"</font>,(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>,<a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FNCombineType</a>,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>),(fn,comb,f1,f2));
+<a name="line287">287: </a>  <font color="#4169E1">return</font>(0);
+<a name="line288">288: </a>}
+
+<a name="line290">290: </a><strong><font color="#4169E1"><a name="FNCombineGetChildren_Combine"></a>static PetscErrorCode FNCombineGetChildren_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FNCombineType</a> *comb,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *f1,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *f2)</font></strong>
+<a name="line291">291: </a>{
+<a name="line293">293: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+
+<a name="line296">296: </a>  <font color="#4169E1">if</font> (comb) *comb = ctx-&gt;comb;
+<a name="line297">297: </a>  <font color="#4169E1">if</font> (f1) {
+<a name="line298">298: </a>    <font color="#4169E1">if</font> (!ctx-&gt;f1) {
+<a name="line299">299: </a>      <a href="../../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PetscObjectComm((PetscObject)fn),&amp;ctx-&gt;f1);
+<a name="line300">300: </a>      PetscLogObjectParent((PetscObject)fn,(PetscObject)ctx-&gt;f1);
+<a name="line301">301: </a>    }
+<a name="line302">302: </a>    *f1 = ctx-&gt;f1;
+<a name="line303">303: </a>  }
+<a name="line304">304: </a>  <font color="#4169E1">if</font> (f2) {
+<a name="line305">305: </a>    <font color="#4169E1">if</font> (!ctx-&gt;f2) {
+<a name="line306">306: </a>      <a href="../../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PetscObjectComm((PetscObject)fn),&amp;ctx-&gt;f2);
+<a name="line307">307: </a>      PetscLogObjectParent((PetscObject)fn,(PetscObject)ctx-&gt;f2);
+<a name="line308">308: </a>    }
+<a name="line309">309: </a>    *f2 = ctx-&gt;f2;
+<a name="line310">310: </a>  }
+<a name="line311">311: </a>  <font color="#4169E1">return</font>(0);
+<a name="line312">312: </a>}
+
+<a name="line314">314: </a><font color="#B22222">/*@</font>
+<a name="line315">315: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/FN/FNCombineGetChildren.html#FNCombineGetChildren">FNCombineGetChildren</a> - Gets the two child functions that constitute this</font>
+<a name="line316">316: </a><font color="#B22222">   combined function, and the way they are combined.</font>
+
+<a name="line318">318: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line320">320: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line321">321: </a><font color="#B22222">.  fn   - the math function context</font>
+
+<a name="line323">323: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line324">324: </a><font color="#B22222">+  comb - how to combine the functions (addition, multiplication, division or composition)</font>
+<a name="line325">325: </a><font color="#B22222">.  f1   - first function</font>
+<a name="line326">326: </a><font color="#B22222">-  f2   - second function</font>
+
+<a name="line328">328: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line330">330: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/FN/FNCombineSetChildren.html#FNCombineSetChildren">FNCombineSetChildren</a>()</font>
+<a name="line331">331: </a><font color="#B22222">@*/</font>
+<a name="line332">332: </a><strong><font color="#4169E1"><a name="FNCombineGetChildren"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/FN/FNCombineGetChildren.html#FNCombineGetChildren">FNCombineGetChildren</a>(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FNCombineType</a> *comb,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *f1,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *f2)</font></strong>
+<a name="line333">333: </a>{
+
+<a name="line338">338: </a>  PetscUseMethod(fn,<font color="#666666">"FNCombineGetChildren_C"</font>,(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>,<a href="../../../../../../docs/manualpages/FN/FNCombineType.html#FNCombineType">FNCombineType</a>*,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>*,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>*),(fn,comb,f1,f2));
+<a name="line339">339: </a>  <font color="#4169E1">return</font>(0);
+<a name="line340">340: </a>}
+
+<a name="line342">342: </a><strong><font color="#4169E1"><a name="FNDuplicate_Combine"></a>PetscErrorCode FNDuplicate_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,MPI_Comm comm,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *newfn)</font></strong>
+<a name="line343">343: </a>{
+<a name="line345">345: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data,*ctx2 = (FN_COMBINE*)(*newfn)-&gt;data;
+
+<a name="line348">348: </a>  ctx2-&gt;comb = ctx-&gt;comb;
+<a name="line349">349: </a>  <a href="../../../../../../docs/manualpages/FN/FNDuplicate.html#FNDuplicate">FNDuplicate</a>(ctx-&gt;f1,comm,&amp;ctx2-&gt;f1);
+<a name="line350">350: </a>  <a href="../../../../../../docs/manualpages/FN/FNDuplicate.html#FNDuplicate">FNDuplicate</a>(ctx-&gt;f2,comm,&amp;ctx2-&gt;f2);
+<a name="line351">351: </a>  <font color="#4169E1">return</font>(0);
+<a name="line352">352: </a>}
+
+<a name="line354">354: </a><strong><font color="#4169E1"><a name="FNDestroy_Combine"></a>PetscErrorCode FNDestroy_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn)</font></strong>
+<a name="line355">355: </a>{
+<a name="line357">357: </a>  FN_COMBINE     *ctx = (FN_COMBINE*)fn-&gt;data;
+
+<a name="line360">360: </a>  <a href="../../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;ctx-&gt;f1);
+<a name="line361">361: </a>  <a href="../../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;ctx-&gt;f2);
+<a name="line362">362: </a>  PetscFree(fn-&gt;data);
+<a name="line363">363: </a>  PetscObjectComposeFunction((PetscObject)fn,<font color="#666666">"FNCombineSetChildren_C"</font>,NULL);
+<a name="line364">364: </a>  PetscObjectComposeFunction((PetscObject)fn,<font color="#666666">"FNCombineGetChildren_C"</font>,NULL);
+<a name="line365">365: </a>  <font color="#4169E1">return</font>(0);
+<a name="line366">366: </a>}
+
+<a name="line368">368: </a><strong><font color="#4169E1"><a name="FNCreate_Combine"></a>SLEPC_EXTERN PetscErrorCode FNCreate_Combine(<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn)</font></strong>
+<a name="line369">369: </a>{
+<a name="line371">371: </a>  FN_COMBINE     *ctx;
+
+<a name="line374">374: </a>  PetscNewLog(fn,&amp;ctx);
+<a name="line375">375: </a>  fn-&gt;data = (void*)ctx;
+
+<a name="line377">377: </a>  fn-&gt;ops-&gt;evaluatefunction          = FNEvaluateFunction_Combine;
+<a name="line378">378: </a>  fn-&gt;ops-&gt;evaluatederivative        = FNEvaluateDerivative_Combine;
+<a name="line379">379: </a>  fn-&gt;ops-&gt;evaluatefunctionmat[0]    = FNEvaluateFunctionMat_Combine;
+<a name="line380">380: </a>  fn-&gt;ops-&gt;evaluatefunctionmatvec[0] = FNEvaluateFunctionMatVec_Combine;
+<a name="line381">381: </a>  fn-&gt;ops-&gt;view                      = FNView_Combine;
+<a name="line382">382: </a>  fn-&gt;ops-&gt;duplicate                 = FNDuplicate_Combine;
+<a name="line383">383: </a>  fn-&gt;ops-&gt;destroy                   = FNDestroy_Combine;
+<a name="line384">384: </a>  PetscObjectComposeFunction((PetscObject)fn,<font color="#666666">"FNCombineSetChildren_C"</font>,FNCombineSetChildren_Combine);
+<a name="line385">385: </a>  PetscObjectComposeFunction((PetscObject)fn,<font color="#666666">"FNCombineGetChildren_C"</font>,FNCombineGetChildren_Combine);
+<a name="line386">386: </a>  <font color="#4169E1">return</font>(0);
+<a name="line387">387: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,225 @@
+# -*- mode: makefile-gmake -*-
+
+include ./lib/slepc/conf/slepc_variables
+
+OBJDIR := $(PETSC_ARCH)/obj
+LIBDIR := $(PETSC_ARCH)/lib
+
+pkgs  := sys eps svd pep nep mfn lme
+spkgs := sys,eps,svd,pep,nep,mfn,lme
+
+# $(call SONAME_FUNCTION,libfoo,abiversion)
+SONAME_FUNCTION ?= $(1).$(SL_LINKER_SUFFIX).$(2)
+# $(call SL_LINKER_FUNCTION,libfoo,abiversion,libversion)
+SL_LINKER_FUNCTION ?= -shared -Wl,-soname,$(call SONAME_FUNCTION,$(notdir $(1)),$(2))
+
+SLEPC_VERSION_MAJOR := $(shell awk '/define SLEPC_VERSION_MAJOR/{print $$3;}' ./include/slepcversion.h)
+SLEPC_VERSION_MINOR := $(shell awk '/define SLEPC_VERSION_MINOR/{print $$3;}' ./include/slepcversion.h)
+SLEPC_VERSION_SUBMINOR := $(shell awk '/define SLEPC_VERSION_SUBMINOR/{print $$3;}' ./include/slepcversion.h)
+SLEPC_VERSION_RELEASE := $(shell awk '/define SLEPC_VERSION_RELEASE/{print $$3;}' ./include/slepcversion.h)
+
+libslepc_abi_version := $(SLEPC_VERSION_MAJOR).$(if $(filter $(SLEPC_VERSION_RELEASE), 0 -2 -3 -4 -5),0)$(SLEPC_VERSION_MINOR)
+libslepc_lib_version := $(libslepc_abi_version).$(SLEPC_VERSION_SUBMINOR)
+soname_function = $(call SONAME_FUNCTION,$(1),$(libslepc_abi_version))
+libname_function = $(call SONAME_FUNCTION,$(1),$(libslepc_lib_version))
+absbasename_all = $(basename $(basename $(basename $(basename $(abspath $(1))))))# arch/lib/libpetsc.so.3.8.0 -> /path/to/arch/lib/libpetsc
+sl_linker_args = $(call SL_LINKER_FUNCTION,$(call absbasename_all,$@),$(libslepc_abi_version),$(libslepc_lib_version))
+
+libslepc_shared  := $(LIBDIR)/libslepc.$(SL_LINKER_SUFFIX)
+libslepc_soname  := $(call soname_function,$(LIBDIR)/libslepc)
+libslepc_libname := $(call libname_function,$(LIBDIR)/libslepc)
+libslepc_static  := $(LIBDIR)/libslepc.$(AR_LIB_SUFFIX)
+libslepcpkgs_shared  := $(foreach pkg, $(pkgs), $(LIBDIR)/libslepc$(pkg).$(SL_LINKER_SUFFIX))
+libslepcpkgs_soname  := $(foreach pkg, $(pkgs), $(call soname_function,$(LIBDIR)/libslepc$(pkg)))
+libslepcpkgs_libname := $(foreach pkg, $(pkgs), $(call libname_function,$(LIBDIR)/libslepc$(pkg)))
+libslepcpkgs_static  := $(foreach pkg, $(pkgs), $(LIBDIR)/libslepc$(pkg).$(AR_LIB_SUFFIX))
+
+ifeq ($(PETSC_WITH_EXTERNAL_LIB),)
+  libslepcall_shared  := $(libslepcpkgs_shared)
+  libslepcall_soname  := $(libslepcpkgs_soname)
+  libslepcall_libname := $(libslepcpkgs_libname)
+  libslepcall_static  := $(libslepcpkgs_static)
+else
+  libslepcall_shared  := $(libslepc_shared)
+  libslepcall_soname  := $(libslepc_soname)
+  libslepcall_libname := $(libslepc_libname)
+  libslepcall_static  := $(libslepc_static)
+endif
+libslepcall := $(if $(filter-out no,$(BUILDSHAREDLIB)),$(libslepcall_shared),$(libslepcall_static))
+
+generated      := $(PETSC_ARCH)/lib/slepc/conf/files
+
+slepc_libs : $(libslepcall)
+.PHONY: slepc_libs
+
+.SECONDEXPANSION:		# to expand $$(@D)/.DIR
+
+# Test framework includes rules and variables relevant to both build and test
+include ./gmakefile.test        # This must be below the slepc_libs target because it includes rules
+
+ifneq ($(INSTALLED_PETSC),)
+  PETSC_ARCH_DIR=
+else
+  PETSC_ARCH_DIR=$(PETSC_ARCH)
+endif
+
+PETSCCONFIGDIR := $(PETSC_DIR)/config
+ifeq ($(wildcard $(PETSCCONFIGDIR)/gmakegen.py),)
+  PETSCCONFIGDIR := $(PETSC_DIR)/share/petsc/examples/config
+endif
+
+$(generated) : $(slepcconf) $(slepcvariables) $(PETSCCONFIGDIR)/gmakegen.py
+	$(PYTHON) $(PETSCCONFIGDIR)/gmakegen.py --petsc-arch=$(PETSC_ARCH_DIR) --pkg-dir=$(SLEPC_DIR) --pkg-name=slepc --pkg-pkgs=$(spkgs) --pkg-arch=$(PETSC_ARCH)
+
+# Skip including generated files (which triggers rebuilding them) when we're just going to clean anyway.
+ifneq ($(filter-out clean check,$(MAKECMDGOALS:clean%=clean)),)
+include $(generated)
+endif
+
+# implies shared libraries with MS compilers
+ifeq ($(PETSC_DLL_EXPORTS),1)
+$(OBJDIR)/%.o : CCPPFLAGS+=-Dslepc_EXPORTS
+$(OBJDIR)/%.o : CXXCPPFLAGS+=-Dslepc_EXPORTS
+endif
+
+langs := F F90 cu cxx c
+concatlang = $(foreach lang, $(langs), $(srcs-$(1).$(lang):src/%.$(lang)=$(OBJDIR)/%.o))
+srcs.o := $(foreach pkg, $(pkgs), $(call concatlang,$(pkg)))
+
+define SHARED_RECIPE_DLL
+  @$(RM) $@ dllcmd.${PETSC_ARCH}
+  @cygpath -w $^ > dllcmd.${PETSC_ARCH}
+  $(call quiet,CLINKER) $(sl_linker_args) -o $@ @dllcmd.${PETSC_ARCH} $(SLEPC_EXTERNAL_LIB) $(PETSC_SNES_LIB)
+  @$(RM) dllcmd.${PETSC_ARCH}
+endef
+
+define SHARED_RECIPE_DEFAULT
+  $(call quiet,CLINKER) $(sl_linker_args) -o $@ $^ $(SLEPC_EXTERNAL_LIB) $(PETSC_SNES_LIB)
+endef
+
+SHARED_RECIPE = $(if $(findstring -LD,$(SL_LINKER_FUNCTION)),$(SHARED_RECIPE_DLL),$(SHARED_RECIPE_DEFAULT))
+
+# with-single-library=1 (default)
+$(libslepc_libname) : $(srcs.o) | $$(@D)/.DIR
+	$(SHARED_RECIPE)
+ifneq ($(DSYMUTIL),true)
+	$(call quiet,DSYMUTIL) $@
+endif
+
+$(libslepc_static) : obj := $(srcs.o)
+
+define ARCHIVE_RECIPE_WIN32FE_LIB
+  @$(RM) $@ $@.args
+  @cygpath -w $^ > $@.args
+  $(call quiet,AR) $(AR_FLAGS) $@ @$@.args
+  @$(RM) $@.args
+endef
+
+define ARCHIVE_RECIPE_DEFAULT
+  @$(RM) $@
+  $(call quiet,AR) $(AR_FLAGS) $@ $^
+  $(call quiet,RANLIB) $@
+endef
+
+%.$(AR_LIB_SUFFIX) : $$(obj) | $$(@D)/.DIR
+	$(if $(findstring win32fe lib,$(AR)),$(ARCHIVE_RECIPE_WIN32FE_LIB),$(ARCHIVE_RECIPE_DEFAULT))
+
+# with-single-library=0
+libpkg = $(foreach pkg, $1, $(LIBDIR)/libslepc$(pkg).$(SL_LINKER_SUFFIX))
+define pkg_template
+  $(LIBDIR)/libslepc$(1).$(AR_LIB_SUFFIX)  : $(call concatlang,$(1))
+  $(call libname_function,$(LIBDIR)/libslepc$(1)) : $(call concatlang,$(1))
+endef
+$(foreach pkg,$(pkgs),$(eval $(call pkg_template,$(pkg))))
+$(call libname_function,$(LIBDIR)/libslepclme) : libdep := $(call libpkg,sys)
+$(call libname_function,$(LIBDIR)/libslepceps) : libdep := $(call libpkg,lme sys)
+$(call libname_function,$(LIBDIR)/libslepcsvd) : libdep := $(call libpkg,eps sys)
+$(call libname_function,$(LIBDIR)/libslepcpep) : libdep := $(call libpkg,eps sys)
+$(call libname_function,$(LIBDIR)/libslepcnep) : libdep := $(call libpkg,pep eps sys)
+$(call libname_function,$(LIBDIR)/libslepcmfn) : libdep := $(call libpkg,sys)
+
+# The package libraries technically depend on each other (not just in an order-only way), but only
+# ABI changes like new or removed symbols requires relinking the dependent libraries.  ABI should
+# only occur when a header is changed, which would trigger recompilation and relinking anyway.
+# RELINK=1 causes dependent libraries to be relinked anyway.
+ifeq ($(RELINK),1)
+  libdep_true = $$(libdep)
+  libdep_order =
+else
+  libdep_true =
+  libdep_order = $$(libdep)
+endif
+$(libslepcpkgs_libname) : $(libdep_true) | $(libdep_order) $$(@D)/.DIR
+	$(SHARED_RECIPE)
+ifneq ($(DSYMUTIL),true)
+	$(call quiet,DSYMUTIL) $@
+endif
+
+%.$(SL_LINKER_SUFFIX) : $(call libname_function,%) | $(call soname_function,%)
+	@ln -sf $(notdir $<) $@
+
+$(call soname_function,%) : $(call libname_function,%)
+	@ln -sf $(notdir $<) $@
+
+.PRECIOUS: $(call soname_function,%)
+
+$(OBJDIR)/%.o : src/%.c | $$(@D)/.DIR
+	$(SLEPC_COMPILE.c) $(abspath $<) -o $@
+
+$(OBJDIR)/%.o : src/%.cxx | $$(@D)/.DIR
+	$(SLEPC_COMPILE.cxx) $(abspath $<) -o $@
+
+$(OBJDIR)/%.o : src/%.cu | $$(@D)/.DIR
+	$(SLEPC_COMPILE.cu) $(abspath $<) -o $@ # Compile first so that if there is an error, it comes from a normal compile
+	@$(SLEPC_GENDEPS.cu) $(abspath $<) -o $(@:%.o=%.d) # Generate the dependencies for later
+
+FCMOD = cd
+$(OBJDIR)/%.o : src/%.F | $$(@D)/.DIR
+ifeq ($(FC_MODULE_OUTPUT_FLAG),)
+	$(call quiet,FCMOD) $(MODDIR) && $(FC) -c $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) $(abspath $<) -o $(abspath $@)
+else
+	$(SLEPC_COMPILE.F) $(abspath $<) -o $@ $(FC_MODULE_OUTPUT_FLAG)$(MODDIR)
+endif
+	-@$(GFORTRAN_DEP_CLEANUP)
+
+$(OBJDIR)/%.o : src/%.F90 | $$(@D)/.DIR
+ifeq ($(FC_MODULE_OUTPUT_FLAG),)
+	$(call quiet,FCMOD) $(MODDIR) && $(FC) -c $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) $(abspath $<) -o $(abspath $@)
+else
+	$(SLEPC_COMPILE.F) $(abspath $<) -o $@ $(FC_MODULE_OUTPUT_FLAG)$(MODDIR)
+endif
+	-@$(GFORTRAN_DEP_CLEANUP)
+
+# Hack: manual dependencies on object files
+$(OBJDIR)/sys/classes/bv/f90-mod/slepcbvmod.o : $(OBJDIR)/sys/f90-mod/slepcsysmod.o
+$(OBJDIR)/sys/classes/fn/f90-mod/slepcfnmod.o : $(OBJDIR)/sys/f90-mod/slepcsysmod.o
+$(OBJDIR)/sys/classes/rg/f90-mod/slepcrgmod.o : $(OBJDIR)/sys/f90-mod/slepcsysmod.o
+$(OBJDIR)/sys/classes/ds/f90-mod/slepcdsmod.o : $(OBJDIR)/sys/classes/fn/f90-mod/slepcfnmod.o
+$(OBJDIR)/sys/classes/st/f90-mod/slepcstmod.o : $(OBJDIR)/sys/classes/bv/f90-mod/slepcbvmod.o
+$(OBJDIR)/mfn/f90-mod/slepcmfnmod.o   : $(OBJDIR)/sys/classes/bv/f90-mod/slepcbvmod.o $(OBJDIR)/sys/classes/fn/f90-mod/slepcfnmod.o
+$(OBJDIR)/lme/f90-mod/slepclmemod.o   : $(OBJDIR)/sys/classes/bv/f90-mod/slepcbvmod.o
+$(OBJDIR)/eps/f90-mod/slepcepsmod.o   : $(OBJDIR)/sys/classes/bv/f90-mod/slepcbvmod.o $(OBJDIR)/sys/classes/fn/f90-mod/slepcfnmod.o $(OBJDIR)/sys/classes/ds/f90-mod/slepcdsmod.o $(OBJDIR)/sys/classes/rg/f90-mod/slepcrgmod.o $(OBJDIR)/sys/classes/st/f90-mod/slepcstmod.o $(OBJDIR)/lme/f90-mod/slepclmemod.o
+$(OBJDIR)/pep/f90-mod/slepcpepmod.o   : $(OBJDIR)/eps/f90-mod/slepcepsmod.o
+$(OBJDIR)/nep/f90-mod/slepcnepmod.o   : $(OBJDIR)/pep/f90-mod/slepcpepmod.o
+$(OBJDIR)/svd/f90-mod/slepcsvdmod.o   : $(OBJDIR)/eps/f90-mod/slepcepsmod.o
+
+# all sources should get recompiled when slepcvariables changes (i.e when configure is rerun or when slepcvariables is manually edited.)
+$(srcs.o) : $(slepcvariables)
+
+.PHONY: clean all print
+
+clean:
+	$(RM) -rf $(OBJDIR) $(LIBDIR)/libslepc* $(MODDIR)/slepc*.mod $(MPIUNI_MOD) $(generated)
+
+# make print VAR=the-variable
+print:
+	@echo $($(VAR))
+
+allobj.d := $(srcs.o:%.o=%.d)
+# Tell make that allobj.d are all up to date.  Without this, the include
+# below has quadratic complexity, taking more than one second for a
+# do-nothing build of PETSc (much worse for larger projects)
+$(allobj.d) : ;
+
+-include $(allobj.d)
+

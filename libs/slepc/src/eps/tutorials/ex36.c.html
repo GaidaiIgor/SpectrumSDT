@@ -1,0 +1,270 @@
+<center><a href="ex36.c">Actual source code: ex36.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tutorials/ex36.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:59+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tutorials/ex36.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Use the matrix exponential to compute rightmost eigenvalues.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"Same problem as ex9.c but with explicitly created matrix. The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = block dimension of the 2x2 block matrix.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -L &lt;L&gt;, where &lt;L&gt; = bifurcation parameter.\n"</font>
+<a name="line15"> 15: </a>  <font color="#666666">"  -alpha &lt;alpha&gt;, -beta &lt;beta&gt;, -delta1 &lt;delta1&gt;,  -delta2 &lt;delta2&gt;,\n"</font>
+<a name="line16"> 16: </a>  <font color="#666666">"       where &lt;alpha&gt; &lt;beta&gt; &lt;delta1&gt; &lt;delta2&gt; = model parameters.\n\n"</font>;
+
+<a name="line18"> 18: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+<a name="line19"> 19: </a> #include <A href="../../../include/slepcmfn.h.html">&lt;slepcmfn.h&gt;</A>
+
+<a name="line21"> 21: </a><font color="#B22222">/*</font>
+<a name="line22"> 22: </a><font color="#B22222">   This example computes the eigenvalues with largest real part of the</font>
+<a name="line23"> 23: </a><font color="#B22222">   following matrix</font>
+
+<a name="line25"> 25: </a><font color="#B22222">        A = [ tau1*T+(beta-1)*I     alpha^2*I</font>
+<a name="line26"> 26: </a><font color="#B22222">                  -beta*I        tau2*T-alpha^2*I ],</font>
+
+<a name="line28"> 28: </a><font color="#B22222">   where</font>
+
+<a name="line30"> 30: </a><font color="#B22222">        T = tridiag{1,-2,1}</font>
+<a name="line31"> 31: </a><font color="#B22222">        h = 1/(n+1)</font>
+<a name="line32"> 32: </a><font color="#B22222">        tau1 = delta1/(h*L)^2</font>
+<a name="line33"> 33: </a><font color="#B22222">        tau2 = delta2/(h*L)^2</font>
+
+<a name="line35"> 35: </a><font color="#B22222">   but it builds A explicitly, as opposed to ex9.c</font>
+<a name="line36"> 36: </a><font color="#B22222"> */</font>
+
+
+<a name="line39"> 39: </a><font color="#B22222">/* Routines for shell spectral transformation */</font>
+<a name="line40"> 40: </a><strong><font color="#4169E1">PetscErrorCode STApply_Exp(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>,Vec,Vec)</font></strong>;
+<a name="line41"> 41: </a><strong><font color="#4169E1">PetscErrorCode STBackTransform_Exp(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt,PetscScalar*,PetscScalar*)</font></strong>;
+
+<a name="line43"> 43: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line44"> 44: </a>{
+<a name="line45"> 45: </a>  Mat            A;               <font color="#B22222">/* operator matrix */</font>
+<a name="line46"> 46: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;             <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line47"> 47: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;              <font color="#B22222">/* spectral transformation context */</font>
+<a name="line48"> 48: </a>  <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a>            mfn;             <font color="#B22222">/* matrix function solver object to compute exp(A)*v */</font>
+<a name="line49"> 49: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>             f;
+<a name="line50"> 50: </a>  <a href="../../../docs/manualpages/EPS/EPSType.html#EPSType">EPSType</a>        type;
+<a name="line51"> 51: </a>  PetscScalar    alpha,beta,tau1,tau2,delta1,delta2,L,h;
+<a name="line52"> 52: </a>  PetscInt       n=30,i,Istart,Iend,nev;
+<a name="line53"> 53: </a>  PetscBool      isShell,terse;
+
+<a name="line56"> 56: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line57"> 57: </a><font color="#A020F0">#if defined(PETSC_HAVE_COMPLEX)</font>
+<a name="line58"> 58: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line59"> 59: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nBrusselator wave model with matrix exponential, n=%D\n\n"</font>,n);
+
+<a name="line61"> 61: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line62"> 62: </a><font color="#B22222">        Generate the matrix</font>
+<a name="line63"> 63: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line65"> 65: </a>  alpha  = 2.0;
+<a name="line66"> 66: </a>  beta   = 5.45;
+<a name="line67"> 67: </a>  delta1 = 0.008;
+<a name="line68"> 68: </a>  delta2 = 0.004;
+<a name="line69"> 69: </a>  L      = 0.51302;
+
+<a name="line71"> 71: </a>  PetscOptionsGetScalar(NULL,NULL,<font color="#666666">"-L"</font>,&amp;L,NULL);
+<a name="line72"> 72: </a>  PetscOptionsGetScalar(NULL,NULL,<font color="#666666">"-alpha"</font>,&amp;alpha,NULL);
+<a name="line73"> 73: </a>  PetscOptionsGetScalar(NULL,NULL,<font color="#666666">"-beta"</font>,&amp;beta,NULL);
+<a name="line74"> 74: </a>  PetscOptionsGetScalar(NULL,NULL,<font color="#666666">"-delta1"</font>,&amp;delta1,NULL);
+<a name="line75"> 75: </a>  PetscOptionsGetScalar(NULL,NULL,<font color="#666666">"-delta2"</font>,&amp;delta2,NULL);
+
+<a name="line77"> 77: </a>  h = 1.0 / (PetscReal)(n+1);
+<a name="line78"> 78: </a>  tau1 = delta1 / ((h*L)*(h*L));
+<a name="line79"> 79: </a>  tau2 = delta2 / ((h*L)*(h*L));
+
+<a name="line81"> 81: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line82"> 82: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,2*n,2*n);
+<a name="line83"> 83: </a>  MatSetFromOptions(A);
+<a name="line84"> 84: </a>  MatSetUp(A);
+
+<a name="line86"> 86: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line87"> 87: </a>  <font color="#4169E1">for</font> (i=Istart;i&lt;Iend;i++) {
+<a name="line88"> 88: </a>    <font color="#4169E1">if</font> (i&lt;n) {  <font color="#B22222">/* upper blocks */</font>
+<a name="line89"> 89: </a>      <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,i,i-1,tau1,INSERT_VALUES); }
+<a name="line90"> 90: </a>      <font color="#4169E1">if</font> (i&lt;n-1) { MatSetValue(A,i,i+1,tau1,INSERT_VALUES); }
+<a name="line91"> 91: </a>      MatSetValue(A,i,i,-2.0*tau1+beta-1.0,INSERT_VALUES);
+<a name="line92"> 92: </a>      MatSetValue(A,i,i+n,alpha*alpha,INSERT_VALUES);
+<a name="line93"> 93: </a>    } <font color="#4169E1">else</font> {  <font color="#B22222">/* lower blocks */</font>
+<a name="line94"> 94: </a>      <font color="#4169E1">if</font> (i&gt;n) { MatSetValue(A,i,i-1,tau2,INSERT_VALUES); }
+<a name="line95"> 95: </a>      <font color="#4169E1">if</font> (i&lt;2*n-1) { MatSetValue(A,i,i+1,tau2,INSERT_VALUES); }
+<a name="line96"> 96: </a>      MatSetValue(A,i,i,-2.0*tau2-alpha*alpha,INSERT_VALUES);
+<a name="line97"> 97: </a>      MatSetValue(A,i,i-n,-beta,INSERT_VALUES);
+<a name="line98"> 98: </a>    }
+<a name="line99"> 99: </a>  }
+<a name="line100">100: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line101">101: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line103">103: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line104">104: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line105">105: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line107">107: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,NULL);
+<a name="line109">109: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_NHEP</a>);
+<a name="line110">110: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>);
+<a name="line111">111: </a>  <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line112">112: </a>  <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,<a href="../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>);
+<a name="line113">113: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line115">115: </a>  <font color="#B22222">/*</font>
+<a name="line116">116: </a><font color="#B22222">     Initialize shell spectral transformation</font>
+<a name="line117">117: </a><font color="#B22222">  */</font>
+<a name="line118">118: </a>  PetscObjectTypeCompare((PetscObject)st,<a href="../../../docs/manualpages/ST/STSHELL.html#STSHELL">STSHELL</a>,&amp;isShell);
+<a name="line119">119: </a>  <font color="#4169E1">if</font> (isShell) {
+
+<a name="line121">121: </a>    <font color="#B22222">/* Create the <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> object to be used by the spectral transform */</font>
+<a name="line122">122: </a>    <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>(PETSC_COMM_WORLD,&amp;mfn);
+<a name="line123">123: </a>    <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>(mfn,A);
+<a name="line124">124: </a>    <a href="../../../docs/manualpages/MFN/MFNGetFN.html#MFNGetFN">MFNGetFN</a>(mfn,&amp;f);
+<a name="line125">125: </a>    <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f,FNEXP);
+<a name="line126">126: </a>    <a href="../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(f,0.03,1.0);  <font color="#B22222">/* this can be set with -fn_scale */</font>
+<a name="line127">127: </a>    <a href="../../../docs/manualpages/MFN/MFNSetFromOptions.html#MFNSetFromOptions">MFNSetFromOptions</a>(mfn);
+
+<a name="line129">129: </a>    <font color="#B22222">/* Set callback functions */</font>
+<a name="line130">130: </a>    <a href="../../../docs/manualpages/ST/STShellSetApply.html#STShellSetApply">STShellSetApply</a>(st,STApply_Exp);
+<a name="line131">131: </a>    <a href="../../../docs/manualpages/ST/STShellSetBackTransform.html#STShellSetBackTransform">STShellSetBackTransform</a>(st,STBackTransform_Exp);
+<a name="line132">132: </a>    <a href="../../../docs/manualpages/ST/STShellSetContext.html#STShellSetContext">STShellSetContext</a>(st,mfn);
+<a name="line133">133: </a>    PetscObjectSetName((PetscObject)st,<font color="#666666">"STEXP"</font>);
+<a name="line134">134: </a>  }
+
+<a name="line136">136: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line137">137: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line138">138: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line140">140: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line141">141: </a>  <a href="../../../docs/manualpages/EPS/EPSGetType.html#EPSGetType">EPSGetType</a>(eps,&amp;type);
+<a name="line142">142: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solution method: %s\n\n"</font>,type);
+<a name="line143">143: </a>  <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(eps,&amp;nev,NULL,NULL);
+<a name="line144">144: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of requested eigenvalues: %D\n"</font>,nev);
+
+<a name="line146">146: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line147">147: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line148">148: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line150">150: </a>  <font color="#B22222">/* show detailed info unless -terse option is given by user */</font>
+<a name="line151">151: </a>  PetscOptionsHasName(NULL,NULL,<font color="#666666">"-terse"</font>,&amp;terse);
+<a name="line152">152: </a>  <font color="#4169E1">if</font> (terse) {
+<a name="line153">153: </a>    <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+<a name="line154">154: </a>  } <font color="#4169E1">else</font> {
+<a name="line155">155: </a>    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INFO_DETAIL);
+<a name="line156">156: </a>    <a href="../../../docs/manualpages/EPS/EPSReasonView.html#EPSReasonView">EPSReasonView</a>(eps,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line157">157: </a>    <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line158">158: </a>    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+<a name="line159">159: </a>  }
+<a name="line160">160: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line161">161: </a>  MatDestroy(&amp;A);
+<a name="line162">162: </a>  <font color="#4169E1">if</font> (isShell) { <a href="../../../docs/manualpages/MFN/MFNDestroy.html#MFNDestroy">MFNDestroy</a>(&amp;mfn); }
+<a name="line163">163: </a><font color="#A020F0">#else</font>
+<a name="line164">164: </a>  SETERRQ(PETSC_COMM_WORLD,1,<font color="#666666">"This example requires C99 complex numbers"</font>);
+<a name="line165">165: </a><font color="#A020F0">#endif</font>
+<a name="line166">166: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line167">167: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line168">168: </a>}
+
+<a name="line170">170: </a><font color="#B22222">/* ------------------------------------------------------------------- */</font>
+<a name="line171">171: </a><font color="#B22222">/*</font>
+<a name="line172">172: </a><font color="#B22222">   STBackTransform_Exp - Undoes the exp(A) transformation by taking logarithms.</font>
+
+<a name="line174">174: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line175">175: </a><font color="#B22222">+  st - spectral transformation context</font>
+<a name="line176">176: </a><font color="#B22222">-  n  - number of eigenvalues to transform</font>
+
+<a name="line178">178: </a><font color="#B22222">   Input/Output Parameters:</font>
+<a name="line179">179: </a><font color="#B22222">+  eigr - pointer to real part of eigenvalues</font>
+<a name="line180">180: </a><font color="#B22222">-  eigi - pointer to imaginary part of eigenvalues</font>
+<a name="line181">181: </a><font color="#B22222">*/</font>
+<a name="line182">182: </a><strong><font color="#4169E1"><a name="STBackTransform_Exp"></a>PetscErrorCode STBackTransform_Exp(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt n,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line183">183: </a>{
+<a name="line184">184: </a><font color="#A020F0">#if defined(PETSC_HAVE_COMPLEX)</font>
+<a name="line186">186: </a>  PetscInt       j;
+<a name="line187">187: </a>  <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a>            mfn;
+<a name="line188">188: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>             fn;
+<a name="line189">189: </a>  PetscScalar    tau,eta;
+<a name="line190">190: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line191">191: </a>  PetscComplex   theta,lambda;
+<a name="line192">192: </a><font color="#A020F0">#endif</font>
+
+<a name="line195">195: </a>  <a href="../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>(st,(void**)&amp;mfn);
+<a name="line196">196: </a>  <a href="../../../docs/manualpages/MFN/MFNGetFN.html#MFNGetFN">MFNGetFN</a>(mfn,&amp;fn);
+<a name="line197">197: </a>  <a href="../../../docs/manualpages/FN/FNGetScale.html#FNGetScale">FNGetScale</a>(fn,&amp;tau,&amp;eta);
+<a name="line198">198: </a>  <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line199">199: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line200">200: </a>    eigr[j] = PetscLogComplex(eigr[j]/eta)/tau;
+<a name="line201">201: </a><font color="#A020F0">#else</font>
+<a name="line202">202: </a>    theta   = PetscCMPLX(eigr[j],eigi[j])/eta;
+<a name="line203">203: </a>    lambda  = PetscLogComplex(theta)/tau;
+<a name="line204">204: </a>    eigr[j] = PetscRealPartComplex(lambda);
+<a name="line205">205: </a>    eigi[j] = PetscImaginaryPartComplex(lambda);
+<a name="line206">206: </a><font color="#A020F0">#endif</font>
+<a name="line207">207: </a>  }
+<a name="line208">208: </a>  <font color="#4169E1">return</font>(0);
+<a name="line209">209: </a><font color="#A020F0">#else</font>
+<a name="line210">210: </a>  <font color="#4169E1">return</font> 0;
+<a name="line211">211: </a><font color="#A020F0">#endif</font>
+<a name="line212">212: </a>}
+
+<a name="line214">214: </a><font color="#B22222">/*</font>
+<a name="line215">215: </a><font color="#B22222">   STApply_Exp - Applies the operator exp(tau*A) to a given vector using an <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> object.</font>
+
+<a name="line217">217: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line218">218: </a><font color="#B22222">+  st - spectral transformation context</font>
+<a name="line219">219: </a><font color="#B22222">-  x  - input vector</font>
+
+<a name="line221">221: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line222">222: </a><font color="#B22222">.  y - output vector</font>
+<a name="line223">223: </a><font color="#B22222">*/</font>
+<a name="line224">224: </a><strong><font color="#4169E1"><a name="STApply_Exp"></a>PetscErrorCode STApply_Exp(<a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec x,Vec y)</font></strong>
+<a name="line225">225: </a>{
+<a name="line226">226: </a>  <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a>            mfn;
+
+<a name="line230">230: </a>  <a href="../../../docs/manualpages/ST/STShellGetContext.html#STShellGetContext">STShellGetContext</a>(st,(void**)&amp;mfn);
+<a name="line231">231: </a>  <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(mfn,x,y);
+<a name="line232">232: </a>  <font color="#4169E1">return</font>(0);
+<a name="line233">233: </a>}
+
+<a name="line235">235: </a><font color="#B22222">/*TEST</font>
+
+<a name="line237">237: </a><font color="#B22222">   testset:</font>
+<a name="line238">238: </a><font color="#B22222">      args: -eps_nev 4 -mfn_ncv 16 -terse</font>
+<a name="line239">239: </a><font color="#B22222">      requires: c99_complex !single</font>
+<a name="line240">240: </a><font color="#B22222">      filter: sed -e "s/-2/+2/g"</font>
+<a name="line241">241: </a><font color="#B22222">      output_file: output/ex36_1.out</font>
+<a name="line242">242: </a><font color="#B22222">      test:</font>
+<a name="line243">243: </a><font color="#B22222">         suffix: 1</font>
+<a name="line244">244: </a><font color="#B22222">         requires: !__float128</font>
+<a name="line245">245: </a><font color="#B22222">      test:</font>
+<a name="line246">246: </a><font color="#B22222">         suffix: 1_quad</font>
+<a name="line247">247: </a><font color="#B22222">         args: -eps_tol 1e-14</font>
+<a name="line248">248: </a><font color="#B22222">         requires: __float128</font>
+
+<a name="line250">250: </a><font color="#B22222">   test:</font>
+<a name="line251">251: </a><font color="#B22222">      suffix: 2</font>
+<a name="line252">252: </a><font color="#B22222">      args: -n 56 -eps_nev 2 -st_type sinvert -eps_target -390 -eps_target_magnitude -eps_type power</font>
+<a name="line253">253: </a><font color="#B22222">      args: -eps_power_shift_type {{constant rayleigh}} -eps_two_sided {{0 1}} -eps_tol 1e-14 -terse</font>
+<a name="line254">254: </a><font color="#B22222">      requires: c99_complex !single</font>
+<a name="line255">255: </a><font color="#B22222">      filter: sed -e "s/[+-]0\.0*i//g"</font>
+<a name="line256">256: </a><font color="#B22222">      output_file: output/ex36_2.out</font>
+
+<a name="line258">258: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

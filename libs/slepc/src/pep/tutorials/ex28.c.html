@@ -1,0 +1,260 @@
+<center><a href="ex28.c">Actual source code: ex28.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/tutorials/ex28.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:07+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/tutorials/ex28.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"A quadratic eigenproblem defined using shell matrices.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x and y dimensions.\n\n"</font>;
+
+<a name="line15"> 15: </a> #include <A href="../../../include/slepcpep.h.html">&lt;slepcpep.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#B22222">/*</font>
+<a name="line18"> 18: </a><font color="#B22222">   User-defined routines</font>
+<a name="line19"> 19: </a><font color="#B22222">*/</font>
+<a name="line20"> 20: </a><strong><font color="#4169E1">PetscErrorCode MatMult_Laplacian2D(Mat A,Vec x,Vec y)</font></strong>;
+<a name="line21"> 21: </a><strong><font color="#4169E1">PetscErrorCode MatGetDiagonal_Laplacian2D(Mat A,Vec diag)</font></strong>;
+<a name="line22"> 22: </a><strong><font color="#4169E1">PetscErrorCode MatMult_Zero(Mat A,Vec x,Vec y)</font></strong>;
+<a name="line23"> 23: </a><strong><font color="#4169E1">PetscErrorCode MatGetDiagonal_Zero(Mat A,Vec diag)</font></strong>;
+<a name="line24"> 24: </a><strong><font color="#4169E1">PetscErrorCode MatMult_Identity(Mat A,Vec x,Vec y)</font></strong>;
+<a name="line25"> 25: </a><strong><font color="#4169E1">PetscErrorCode MatGetDiagonal_Identity(Mat A,Vec diag)</font></strong>;
+
+<a name="line27"> 27: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line28"> 28: </a>{
+<a name="line29"> 29: </a>  Mat            M,C,K,A[3];      <font color="#B22222">/* problem matrices */</font>
+<a name="line30"> 30: </a>  <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>            pep;             <font color="#B22222">/* polynomial eigenproblem solver context */</font>
+<a name="line31"> 31: </a>  <a href="../../../docs/manualpages/PEP/PEPType.html#PEPType">PEPType</a>        type;
+<a name="line32"> 32: </a>  PetscInt       N,n=10,nev;
+<a name="line33"> 33: </a>  PetscMPIInt    size;
+<a name="line34"> 34: </a>  PetscBool      terse;
+<a name="line36"> 36: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+
+<a name="line38"> 38: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line39"> 39: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PETSC_COMM_WORLD,&amp;size);
+<a name="line40"> 40: </a>  <font color="#4169E1">if</font> (size != 1) SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_WRONG_MPI_SIZE,<font color="#666666">"This is a uniprocessor example only"</font>);
+
+<a name="line42"> 42: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line43"> 43: </a>  N = n*n;
+<a name="line44"> 44: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nQuadratic Eigenproblem with shell matrices, N=%D (%Dx%D grid)\n\n"</font>,N,n,n);
+
+<a name="line46"> 46: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line47"> 47: </a><font color="#B22222">     Compute the matrices that define the eigensystem, (k^2*M+k*C+K)x=0</font>
+<a name="line48"> 48: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line50"> 50: </a>  <font color="#B22222">/* K is the 2-D Laplacian */</font>
+<a name="line51"> 51: </a>  MatCreateShell(PETSC_COMM_WORLD,N,N,N,N,&amp;n,&amp;K);
+<a name="line52"> 52: </a>  MatShellSetOperation(K,MATOP_MULT,(void(*)(void))MatMult_Laplacian2D);
+<a name="line53"> 53: </a>  MatShellSetOperation(K,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMult_Laplacian2D);
+<a name="line54"> 54: </a>  MatShellSetOperation(K,MATOP_GET_DIAGONAL,(void(*)(void))MatGetDiagonal_Laplacian2D);
+
+<a name="line56"> 56: </a>  <font color="#B22222">/* C is the zero matrix */</font>
+<a name="line57"> 57: </a>  MatCreateShell(PETSC_COMM_WORLD,N,N,N,N,NULL,&amp;C);
+<a name="line58"> 58: </a>  MatShellSetOperation(C,MATOP_MULT,(void(*)(void))MatMult_Zero);
+<a name="line59"> 59: </a>  MatShellSetOperation(C,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMult_Zero);
+<a name="line60"> 60: </a>  MatShellSetOperation(C,MATOP_GET_DIAGONAL,(void(*)(void))MatGetDiagonal_Zero);
+
+<a name="line62"> 62: </a>  <font color="#B22222">/* M is the identity matrix */</font>
+<a name="line63"> 63: </a>  MatCreateShell(PETSC_COMM_WORLD,N,N,N,N,NULL,&amp;M);
+<a name="line64"> 64: </a>  MatShellSetOperation(M,MATOP_MULT,(void(*)(void))MatMult_Identity);
+<a name="line65"> 65: </a>  MatShellSetOperation(M,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMult_Identity);
+<a name="line66"> 66: </a>  MatShellSetOperation(M,MATOP_GET_DIAGONAL,(void(*)(void))MatGetDiagonal_Identity);
+
+<a name="line68"> 68: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line69"> 69: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line70"> 70: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line72"> 72: </a>  <font color="#B22222">/*</font>
+<a name="line73"> 73: </a><font color="#B22222">     Create eigensolver context</font>
+<a name="line74"> 74: </a><font color="#B22222">  */</font>
+<a name="line75"> 75: </a>  <a href="../../../docs/manualpages/PEP/PEPCreate.html#PEPCreate">PEPCreate</a>(PETSC_COMM_WORLD,&amp;pep);
+
+<a name="line77"> 77: </a>  <font color="#B22222">/*</font>
+<a name="line78"> 78: </a><font color="#B22222">     Set matrices and problem type</font>
+<a name="line79"> 79: </a><font color="#B22222">  */</font>
+<a name="line80"> 80: </a>  A[0] = K; A[1] = C; A[2] = M;
+<a name="line81"> 81: </a>  <a href="../../../docs/manualpages/PEP/PEPSetOperators.html#PEPSetOperators">PEPSetOperators</a>(pep,3,A);
+<a name="line82"> 82: </a>  <a href="../../../docs/manualpages/PEP/PEPGetST.html#PEPGetST">PEPGetST</a>(pep,&amp;st);
+<a name="line83"> 83: </a>  <a href="../../../docs/manualpages/ST/STSetMatMode.html#STSetMatMode">STSetMatMode</a>(st,<a href="../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_SHELL</a>);
+
+<a name="line85"> 85: </a>  <font color="#B22222">/*</font>
+<a name="line86"> 86: </a><font color="#B22222">     Set solver parameters at runtime</font>
+<a name="line87"> 87: </a><font color="#B22222">  */</font>
+<a name="line88"> 88: </a>  <a href="../../../docs/manualpages/PEP/PEPSetFromOptions.html#PEPSetFromOptions">PEPSetFromOptions</a>(pep);
+
+<a name="line90"> 90: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line91"> 91: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line92"> 92: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line94"> 94: </a>  <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(pep);
+
+<a name="line96"> 96: </a>  <font color="#B22222">/*</font>
+<a name="line97"> 97: </a><font color="#B22222">     Optional: Get some information from the solver and display it</font>
+<a name="line98"> 98: </a><font color="#B22222">  */</font>
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/PEP/PEPGetType.html#PEPGetType">PEPGetType</a>(pep,&amp;type);
+<a name="line100">100: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solution method: %s\n\n"</font>,type);
+<a name="line101">101: </a>  <a href="../../../docs/manualpages/PEP/PEPGetDimensions.html#PEPGetDimensions">PEPGetDimensions</a>(pep,&amp;nev,NULL,NULL);
+<a name="line102">102: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of requested eigenvalues: %D\n"</font>,nev);
+
+<a name="line104">104: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line105">105: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line106">106: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line108">108: </a>  <font color="#B22222">/* show detailed info unless -terse option is given by user */</font>
+<a name="line109">109: </a>  PetscOptionsHasName(NULL,NULL,<font color="#666666">"-terse"</font>,&amp;terse);
+<a name="line110">110: </a>  <font color="#4169E1">if</font> (terse) {
+<a name="line111">111: </a>    <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_RELATIVE</a>,NULL);
+<a name="line112">112: </a>  } <font color="#4169E1">else</font> {
+<a name="line113">113: </a>    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INFO_DETAIL);
+<a name="line114">114: </a>    <a href="../../../docs/manualpages/PEP/PEPReasonView.html#PEPReasonView">PEPReasonView</a>(pep,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line115">115: </a>    <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_RELATIVE</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line116">116: </a>    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+<a name="line117">117: </a>  }
+<a name="line118">118: </a>  <a href="../../../docs/manualpages/PEP/PEPDestroy.html#PEPDestroy">PEPDestroy</a>(&amp;pep);
+<a name="line119">119: </a>  MatDestroy(&amp;M);
+<a name="line120">120: </a>  MatDestroy(&amp;C);
+<a name="line121">121: </a>  MatDestroy(&amp;K);
+<a name="line122">122: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line123">123: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line124">124: </a>}
+
+<a name="line126">126: </a><font color="#B22222">/*</font>
+<a name="line127">127: </a><font color="#B22222">    Compute the matrix vector multiplication y&lt;---T*x where T is a nx by nx</font>
+<a name="line128">128: </a><font color="#B22222">    tridiagonal matrix with DD on the diagonal, DL on the subdiagonal, and</font>
+<a name="line129">129: </a><font color="#B22222">    DU on the superdiagonal.</font>
+<a name="line130">130: </a><font color="#B22222"> */</font>
+<a name="line131">131: </a><strong><font color="#4169E1"><a name="tv"></a>static void tv(int nx,const PetscScalar *x,PetscScalar *y)</font></strong>
+<a name="line132">132: </a>{
+<a name="line133">133: </a>  PetscScalar dd,dl,du;
+<a name="line134">134: </a>  int         j;
+
+<a name="line136">136: </a>  dd  = 4.0;
+<a name="line137">137: </a>  dl  = -1.0;
+<a name="line138">138: </a>  du  = -1.0;
+
+<a name="line140">140: </a>  y[0] =  dd*x[0] + du*x[1];
+<a name="line141">141: </a>  <font color="#4169E1">for</font> (j=1;j&lt;nx-1;j++)
+<a name="line142">142: </a>    y[j] = dl*x[j-1] + dd*x[j] + du*x[j+1];
+<a name="line143">143: </a>  y[nx-1] = dl*x[nx-2] + dd*x[nx-1];
+<a name="line144">144: </a>}
+
+<a name="line146">146: </a><font color="#B22222">/*</font>
+<a name="line147">147: </a><font color="#B22222">    Matrix-vector product subroutine for the 2D Laplacian.</font>
+
+<a name="line149">149: </a><font color="#B22222">    The matrix used is the 2 dimensional discrete Laplacian on unit square with</font>
+<a name="line150">150: </a><font color="#B22222">    zero Dirichlet boundary condition.</font>
+
+<a name="line152">152: </a><font color="#B22222">    Computes y &lt;-- A*x, where A is the block tridiagonal matrix</font>
+
+<a name="line154">154: </a><font color="#B22222">                 | T -I          |</font>
+<a name="line155">155: </a><font color="#B22222">                 |-I  T -I       |</font>
+<a name="line156">156: </a><font color="#B22222">             A = |   -I  T       |</font>
+<a name="line157">157: </a><font color="#B22222">                 |        ...  -I|</font>
+<a name="line158">158: </a><font color="#B22222">                 |           -I T|</font>
+
+<a name="line160">160: </a><font color="#B22222">    The subroutine TV is called to compute y&lt;--T*x.</font>
+<a name="line161">161: </a><font color="#B22222"> */</font>
+<a name="line162">162: </a><strong><font color="#4169E1"><a name="MatMult_Laplacian2D"></a>PetscErrorCode MatMult_Laplacian2D(Mat A,Vec x,Vec y)</font></strong>
+<a name="line163">163: </a>{
+<a name="line164">164: </a>  void              *ctx;
+<a name="line165">165: </a>  int               nx,lo,i,j;
+<a name="line166">166: </a>  const PetscScalar *px;
+<a name="line167">167: </a>  PetscScalar       *py;
+<a name="line168">168: </a>  PetscErrorCode    ierr;
+
+<a name="line171">171: </a>  MatShellGetContext(A,&amp;ctx);
+<a name="line172">172: </a>  nx = *(int*)ctx;
+<a name="line173">173: </a>  VecGetArrayRead(x,&amp;px);
+<a name="line174">174: </a>  VecGetArray(y,&amp;py);
+
+<a name="line176">176: </a>  tv(nx,&amp;px[0],&amp;py[0]);
+<a name="line177">177: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nx;i++) py[i] -= px[nx+i];
+
+<a name="line179">179: </a>  <font color="#4169E1">for</font> (j=2;j&lt;nx;j++) {
+<a name="line180">180: </a>    lo = (j-1)*nx;
+<a name="line181">181: </a>    tv(nx,&amp;px[lo],&amp;py[lo]);
+<a name="line182">182: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nx;i++) py[lo+i] -= px[lo-nx+i] + px[lo+nx+i];
+<a name="line183">183: </a>  }
+
+<a name="line185">185: </a>  lo = (nx-1)*nx;
+<a name="line186">186: </a>  tv(nx,&amp;px[lo],&amp;py[lo]);
+<a name="line187">187: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nx;i++) py[lo+i] -= px[lo-nx+i];
+
+<a name="line189">189: </a>  VecRestoreArrayRead(x,&amp;px);
+<a name="line190">190: </a>  VecRestoreArray(y,&amp;py);
+<a name="line191">191: </a>  <font color="#4169E1">return</font>(0);
+<a name="line192">192: </a>}
+
+<a name="line194">194: </a><strong><font color="#4169E1"><a name="MatGetDiagonal_Laplacian2D"></a>PetscErrorCode MatGetDiagonal_Laplacian2D(Mat A,Vec diag)</font></strong>
+<a name="line195">195: </a>{
+
+<a name="line199">199: </a>  VecSet(diag,4.0);
+<a name="line200">200: </a>  <font color="#4169E1">return</font>(0);
+<a name="line201">201: </a>}
+
+<a name="line203">203: </a><font color="#B22222">/*</font>
+<a name="line204">204: </a><font color="#B22222">    Matrix-vector product subroutine for the Null matrix.</font>
+<a name="line205">205: </a><font color="#B22222"> */</font>
+<a name="line206">206: </a><strong><font color="#4169E1"><a name="MatMult_Zero"></a>PetscErrorCode MatMult_Zero(Mat A,Vec x,Vec y)</font></strong>
+<a name="line207">207: </a>{
+
+<a name="line211">211: </a>  VecSet(y,0.0);
+<a name="line212">212: </a>  <font color="#4169E1">return</font>(0);
+<a name="line213">213: </a>}
+
+<a name="line215">215: </a><strong><font color="#4169E1"><a name="MatGetDiagonal_Zero"></a>PetscErrorCode MatGetDiagonal_Zero(Mat A,Vec diag)</font></strong>
+<a name="line216">216: </a>{
+
+<a name="line220">220: </a>  VecSet(diag,0.0);
+<a name="line221">221: </a>  <font color="#4169E1">return</font>(0);
+<a name="line222">222: </a>}
+
+<a name="line224">224: </a><font color="#B22222">/*</font>
+<a name="line225">225: </a><font color="#B22222">    Matrix-vector product subroutine for the Identity matrix.</font>
+<a name="line226">226: </a><font color="#B22222"> */</font>
+<a name="line227">227: </a><strong><font color="#4169E1"><a name="MatMult_Identity"></a>PetscErrorCode MatMult_Identity(Mat A,Vec x,Vec y)</font></strong>
+<a name="line228">228: </a>{
+<a name="line229">229: </a>  PetscErrorCode    ierr;
+
+<a name="line232">232: </a>  VecCopy(x,y);
+<a name="line233">233: </a>  <font color="#4169E1">return</font>(0);
+<a name="line234">234: </a>}
+
+<a name="line236">236: </a><strong><font color="#4169E1"><a name="MatGetDiagonal_Identity"></a>PetscErrorCode MatGetDiagonal_Identity(Mat A,Vec diag)</font></strong>
+<a name="line237">237: </a>{
+
+<a name="line241">241: </a>  VecSet(diag,1.0);
+<a name="line242">242: </a>  <font color="#4169E1">return</font>(0);
+<a name="line243">243: </a>}
+
+<a name="line245">245: </a><font color="#B22222">/*TEST</font>
+
+<a name="line247">247: </a><font color="#B22222">   test:</font>
+<a name="line248">248: </a><font color="#B22222">      suffix: 1</font>
+<a name="line249">249: </a><font color="#B22222">      args: -pep_type {{toar qarnoldi linear}} -pep_nev 4 -terse</font>
+<a name="line250">250: </a><font color="#B22222">      filter: grep -v Solution</font>
+<a name="line251">251: </a><font color="#B22222">      requires: !single</font>
+<a name="line252">252: </a><font color="#B22222">      output_file: output/ex28_1.out</font>
+
+<a name="line254">254: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,536 @@
+<center><a href="ex34.c">Actual source code: ex34.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tutorials/ex34.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:59+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tutorials/ex34.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This is a nonlinear eigenvalue problem. When p=2, it is reduced to a linear Laplace eigenvalue</font>
+<a name="line12"> 12: </a><font color="#B22222">   problem.</font>
+
+<a name="line14"> 14: </a><font color="#B22222">   -\nabla\cdot(|\nabla u|^{p-2} \nabla u) = k |u|^{p-2} u in (0,1)x(0,1),</font>
+
+<a name="line16"> 16: </a><font color="#B22222">   u = 0 on the entire boundary.</font>
+
+<a name="line18"> 18: </a><font color="#B22222">   The code is implemented based on DMPlex using Q1 FEM on a quadrilateral mesh. In this code, we consider p=3.</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   Contributed  by Fande Kong fdkong.jd@gmail.com</font>
+<a name="line21"> 21: </a><font color="#B22222">*/</font>
+
+<a name="line23"> 23: </a>static char help[] = <font color="#666666">"Nonlinear inverse iteration for A(x)*x=lambda*B(x)*x.\n\n"</font>;
+
+
+<a name="line26"> 26: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+<a name="line27"> 27: </a><font color="#A020F0">#include &lt;petscdmplex.h&gt;</font>
+<a name="line28"> 28: </a><font color="#A020F0">#include &lt;petscds.h&gt;</font>
+
+<a name="line30"> 30: </a><strong><font color="#4169E1">PetscErrorCode CreateSquareMesh(MPI_Comm,DM*)</font></strong>;
+<a name="line31"> 31: </a><strong><font color="#4169E1">PetscErrorCode SetupDiscretization(DM)</font></strong>;
+<a name="line32"> 32: </a><strong><font color="#4169E1">PetscErrorCode FormJacobianA(SNES,Vec,Mat,Mat,void*)</font></strong>;
+<a name="line33"> 33: </a><strong><font color="#4169E1">PetscErrorCode FormFunctionA(SNES,Vec,Vec,void*)</font></strong>;
+<a name="line34"> 34: </a><strong><font color="#4169E1">PetscErrorCode MatMult_A(Mat A,Vec x,Vec y)</font></strong>;
+<a name="line35"> 35: </a><strong><font color="#4169E1">PetscErrorCode FormJacobianB(SNES,Vec,Mat,Mat,void*)</font></strong>;
+<a name="line36"> 36: </a><strong><font color="#4169E1">PetscErrorCode FormFunctionB(SNES,Vec,Vec,void*)</font></strong>;
+<a name="line37"> 37: </a><strong><font color="#4169E1">PetscErrorCode MatMult_B(Mat A,Vec x,Vec y)</font></strong>;
+<a name="line38"> 38: </a><strong><font color="#4169E1">PetscErrorCode FormFunctionAB(SNES,Vec,Vec,Vec,void*)</font></strong>;
+<a name="line39"> 39: </a><strong><font color="#4169E1">PetscErrorCode BoundaryGlobalIndex(DM,const char*,IS*)</font></strong>;
+
+<a name="line41"> 41: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line42"> 42: </a>  IS    bdis; <font color="#B22222">/* global indices for boundary DoFs */</font>
+<a name="line43"> 43: </a>  SNES  snes;
+<a name="line44"> 44: </a>} AppCtx;
+
+<a name="line46"> 46: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line47"> 47: </a>{
+<a name="line48"> 48: </a>  DM             dm;
+<a name="line49"> 49: </a>  MPI_Comm       comm;
+<a name="line50"> 50: </a>  AppCtx         user;
+<a name="line51"> 51: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;  <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line52"> 52: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+<a name="line53"> 53: </a>  <a href="../../../docs/manualpages/EPS/EPSType.html#EPSType">EPSType</a>        type;
+<a name="line54"> 54: </a>  Mat            A,B,P;
+<a name="line55"> 55: </a>  Vec            v0;
+<a name="line56"> 56: </a>  PetscContainer container;
+<a name="line57"> 57: </a>  PetscInt       nev,nconv,m,n,M,N;
+<a name="line58"> 58: </a>  PetscBool      nonlin,flg=PETSC_FALSE,update;
+<a name="line59"> 59: </a>  SNES           snes;
+<a name="line60"> 60: </a>  PetscReal      tol,relerr;
+<a name="line61"> 61: </a>  PetscBool      use_shell_matrix=PETSC_FALSE,test_init_sol=PETSC_FALSE;
+
+<a name="line64"> 64: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line65"> 65: </a>  comm = PETSC_COMM_WORLD;
+<a name="line66"> 66: </a>  <font color="#B22222">/* Create a quadrilateral mesh on domain (0,1)x(0,1) */</font>
+<a name="line67"> 67: </a>  CreateSquareMesh(comm,&amp;dm);
+<a name="line68"> 68: </a>  <font color="#B22222">/* Setup basis function */</font>
+<a name="line69"> 69: </a>  SetupDiscretization(dm);
+<a name="line70"> 70: </a>  BoundaryGlobalIndex(dm,<font color="#666666">"marker"</font>,&amp;user.bdis);
+<a name="line71"> 71: </a>  <font color="#B22222">/* Check if we are going to use shell matrices */</font>
+<a name="line72"> 72: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-use_shell_matrix"</font>,&amp;use_shell_matrix,NULL);
+<a name="line73"> 73: </a>  <font color="#4169E1">if</font> (use_shell_matrix) {
+<a name="line74"> 74: </a>    DMCreateMatrix(dm,&amp;P);
+<a name="line75"> 75: </a>    MatGetLocalSize(P,&amp;m,&amp;n);
+<a name="line76"> 76: </a>    MatGetSize(P,&amp;M,&amp;N);
+<a name="line77"> 77: </a>    MatCreateShell(comm,m,n,M,N,&amp;user,&amp;A);
+<a name="line78"> 78: </a>    MatShellSetOperation(A,MATOP_MULT,(void(*)(void))MatMult_A);
+<a name="line79"> 79: </a>    MatCreateShell(comm,m,n,M,N,&amp;user,&amp;B);
+<a name="line80"> 80: </a>    MatShellSetOperation(B,MATOP_MULT,(void(*)(void))MatMult_B);
+<a name="line81"> 81: </a>  } <font color="#4169E1">else</font> {
+<a name="line82"> 82: </a>    DMCreateMatrix(dm,&amp;A);
+<a name="line83"> 83: </a>    MatDuplicate(A,MAT_COPY_VALUES,&amp;B);
+<a name="line84"> 84: </a>  }
+
+<a name="line86"> 86: </a>  <font color="#B22222">/*</font>
+<a name="line87"> 87: </a><font color="#B22222">     Compose callback functions and context that will be needed by the solver</font>
+<a name="line88"> 88: </a><font color="#B22222">  */</font>
+<a name="line89"> 89: </a>  PetscObjectComposeFunction((PetscObject)A,<font color="#666666">"formFunction"</font>,FormFunctionA);
+<a name="line90"> 90: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-form_function_ab"</font>,&amp;flg,NULL);
+<a name="line91"> 91: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line92"> 92: </a>    PetscObjectComposeFunction((PetscObject)A,<font color="#666666">"formFunctionAB"</font>,FormFunctionAB);
+<a name="line93"> 93: </a>  }
+<a name="line94"> 94: </a>  PetscObjectComposeFunction((PetscObject)A,<font color="#666666">"formJacobian"</font>,FormJacobianA);
+<a name="line95"> 95: </a>  PetscObjectComposeFunction((PetscObject)B,<font color="#666666">"formFunction"</font>,FormFunctionB);
+<a name="line96"> 96: </a>  PetscContainerCreate(comm,&amp;container);
+<a name="line97"> 97: </a>  PetscContainerSetPointer(container,&amp;user);
+<a name="line98"> 98: </a>  PetscObjectCompose((PetscObject)A,<font color="#666666">"formFunctionCtx"</font>,(PetscObject)container);
+<a name="line99"> 99: </a>  PetscObjectCompose((PetscObject)A,<font color="#666666">"formJacobianCtx"</font>,(PetscObject)container);
+<a name="line100">100: </a>  PetscObjectCompose((PetscObject)B,<font color="#666666">"formFunctionCtx"</font>,(PetscObject)container);
+<a name="line101">101: </a>  PetscContainerDestroy(&amp;container);
+
+<a name="line103">103: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line104">104: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line105">105: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line107">107: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(comm,&amp;eps);
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,B);
+<a name="line109">109: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GNHEP</a>);
+<a name="line110">110: </a>  <font color="#B22222">/*</font>
+<a name="line111">111: </a><font color="#B22222">     Use nonlinear inverse iteration</font>
+<a name="line112">112: </a><font color="#B22222">  */</font>
+<a name="line113">113: </a>  <a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(eps,EPSPOWER);
+<a name="line114">114: </a>  <a href="../../../docs/manualpages/EPS/EPSPowerSetNonlinear.html#EPSPowerSetNonlinear">EPSPowerSetNonlinear</a>(eps,PETSC_TRUE);
+<a name="line115">115: </a>  <font color="#B22222">/*</font>
+<a name="line116">116: </a><font color="#B22222">    Attach DM to SNES</font>
+<a name="line117">117: </a><font color="#B22222">  */</font>
+<a name="line118">118: </a>  <a href="../../../docs/manualpages/EPS/EPSPowerGetSNES.html#EPSPowerGetSNES">EPSPowerGetSNES</a>(eps,&amp;snes);
+<a name="line119">119: </a>  user.snes = snes;
+<a name="line120">120: </a>  SNESSetDM(snes,dm);
+<a name="line121">121: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line123">123: </a>  <font color="#B22222">/* Set a preconditioning matrix to <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> */</font>
+<a name="line124">124: </a>  <font color="#4169E1">if</font> (use_shell_matrix) {
+<a name="line125">125: </a>    <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line126">126: </a>    <a href="../../../docs/manualpages/ST/STPrecondSetMatForPC.html#STPrecondSetMatForPC">STPrecondSetMatForPC</a>(st,P);
+<a name="line127">127: </a>  }
+
+<a name="line129">129: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line130">130: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line131">131: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line133">133: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+
+<a name="line135">135: </a>  <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(eps,&amp;nconv);
+<a name="line136">136: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-test_init_sol"</font>,&amp;test_init_sol,NULL);
+<a name="line137">137: </a>  <font color="#4169E1">if</font> (nconv &amp;&amp; test_init_sol) {
+<a name="line138">138: </a>    PetscScalar   k;
+<a name="line139">139: </a>    PetscReal     norm0;
+<a name="line140">140: </a>    PetscInt      nits;
+
+<a name="line142">142: </a>    MatCreateVecs(A,&amp;v0,NULL);
+<a name="line143">143: </a>    <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(eps,0,&amp;k,NULL,v0,NULL);
+<a name="line144">144: </a>    <a href="../../../docs/manualpages/EPS/EPSSetInitialSpace.html#EPSSetInitialSpace">EPSSetInitialSpace</a>(eps,1,&amp;v0);
+<a name="line145">145: </a>    VecDestroy(&amp;v0);
+<a name="line146">146: </a>    <font color="#B22222">/* Norm of the previous residual */</font>
+<a name="line147">147: </a>    SNESGetFunctionNorm(snes,&amp;norm0);
+<a name="line148">148: </a>    <font color="#B22222">/* Make the tolerance smaller than the last residual</font>
+<a name="line149">149: </a><font color="#B22222">       SNES will converge right away if the initial is setup correctly */</font>
+<a name="line150">150: </a>    SNESSetTolerances(snes,norm0*1.2,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
+<a name="line151">151: </a>    <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line152">152: </a>    <font color="#B22222">/* Number of Newton iterations supposes to be zero */</font>
+<a name="line153">153: </a>    SNESGetIterationNumber(snes,&amp;nits);
+<a name="line154">154: </a>    <font color="#4169E1">if</font> (nits) {
+<a name="line155">155: </a>      PetscPrintf(comm,<font color="#666666">" Number of Newtoniterations %D should be zero \n"</font>,nits);
+<a name="line156">156: </a>    }
+<a name="line157">157: </a>  }
+
+<a name="line159">159: </a>  <font color="#B22222">/*</font>
+<a name="line160">160: </a><font color="#B22222">     Optional: Get some information from the solver and display it</font>
+<a name="line161">161: </a><font color="#B22222">  */</font>
+<a name="line162">162: </a>  <a href="../../../docs/manualpages/EPS/EPSGetType.html#EPSGetType">EPSGetType</a>(eps,&amp;type);
+<a name="line163">163: </a>  <a href="../../../docs/manualpages/EPS/EPSGetTolerances.html#EPSGetTolerances">EPSGetTolerances</a>(eps,&amp;tol,NULL);
+<a name="line164">164: </a>  <a href="../../../docs/manualpages/EPS/EPSPowerGetNonlinear.html#EPSPowerGetNonlinear">EPSPowerGetNonlinear</a>(eps,&amp;nonlin);
+<a name="line165">165: </a>  <a href="../../../docs/manualpages/EPS/EPSPowerGetUpdate.html#EPSPowerGetUpdate">EPSPowerGetUpdate</a>(eps,&amp;update);
+<a name="line166">166: </a>  PetscPrintf(comm,<font color="#666666">" Solution method: %s%s\n\n"</font>,type,nonlin?(update?<font color="#666666">" (nonlinear with monolithic update)"</font>:<font color="#666666">" (nonlinear)"</font>):<font color="#666666">""</font>);
+<a name="line167">167: </a>  <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(eps,&amp;nev,NULL,NULL);
+<a name="line168">168: </a>  PetscPrintf(comm,<font color="#666666">" Number of requested eigenvalues: %D\n"</font>,nev);
+
+<a name="line170">170: </a>  <font color="#B22222">/* print eigenvalue and error */</font>
+<a name="line171">171: </a>  <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(eps,&amp;nconv);
+<a name="line172">172: </a>  <font color="#4169E1">if</font> (nconv&gt;0) {
+<a name="line173">173: </a>    PetscScalar   k;
+<a name="line174">174: </a>    PetscReal     na,nb;
+<a name="line175">175: </a>    Vec           a,b,eigen;
+<a name="line176">176: </a>    DMCreateGlobalVector(dm,&amp;a);
+<a name="line177">177: </a>    VecDuplicate(a,&amp;b);
+<a name="line178">178: </a>    VecDuplicate(a,&amp;eigen);
+<a name="line179">179: </a>    <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(eps,0,&amp;k,NULL,eigen,NULL);
+<a name="line180">180: </a>    FormFunctionA(snes,eigen,a,&amp;user);
+<a name="line181">181: </a>    FormFunctionB(snes,eigen,b,&amp;user);
+<a name="line182">182: </a>    VecAXPY(a,-k,b);
+<a name="line183">183: </a>    VecNorm(a,NORM_2,&amp;na);
+<a name="line184">184: </a>    VecNorm(b,NORM_2,&amp;nb);
+<a name="line185">185: </a>    relerr = na/(nb*PetscAbsScalar(k));
+<a name="line186">186: </a>    <font color="#4169E1">if</font> (relerr&lt;10*tol) {
+<a name="line187">187: </a>      PetscPrintf(comm,<font color="#666666">"k: %g, relative error below tol\n"</font>,(double)PetscRealPart(k));
+<a name="line188">188: </a>    } <font color="#4169E1">else</font> {
+<a name="line189">189: </a>      PetscPrintf(comm,<font color="#666666">"k: %g, relative error: %g\n"</font>,(double)PetscRealPart(k),(double)relerr);
+<a name="line190">190: </a>    }
+<a name="line191">191: </a>    VecDestroy(&amp;a);
+<a name="line192">192: </a>    VecDestroy(&amp;b);
+<a name="line193">193: </a>    VecDestroy(&amp;eigen);
+<a name="line194">194: </a>  } <font color="#4169E1">else</font> {
+<a name="line195">195: </a>    PetscPrintf(comm,<font color="#666666">"Solver did not converge\n"</font>);
+<a name="line196">196: </a>  }
+
+<a name="line198">198: </a>  MatDestroy(&amp;A);
+<a name="line199">199: </a>  MatDestroy(&amp;B);
+<a name="line200">200: </a>  <font color="#4169E1">if</font> (use_shell_matrix) {
+<a name="line201">201: </a>    MatDestroy(&amp;P);
+<a name="line202">202: </a>  }
+<a name="line203">203: </a>  DMDestroy(&amp;dm);
+<a name="line204">204: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line205">205: </a>  ISDestroy(&amp;user.bdis);
+<a name="line206">206: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line207">207: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line208">208: </a>}
+
+<a name="line210">210: </a><font color="#B22222">/* &lt;|u|u, v&gt; */</font>
+<a name="line211">211: </a><strong><font color="#4169E1"><a name="f0_u"></a>static void f0_u(PetscInt dim, PetscInt Nf, PetscInt NfAux,</font></strong>
+<a name="line212">212: </a><strong><font color="#4169E1">                 const PetscInt uOff[], const PetscInt uOff_x[], const PetscScalar u[], const PetscScalar u_t[], const PetscScalar u_x[],</font></strong>
+<a name="line213">213: </a><strong><font color="#4169E1">                 const PetscInt aOff[], const PetscInt aOff_x[], const PetscScalar a[], const PetscScalar a_t[], const PetscScalar a_x[],</font></strong>
+<a name="line214">214: </a><strong><font color="#4169E1">                 PetscReal t, const PetscReal x[], PetscInt numConstants, const PetscScalar constants[], PetscScalar f0[])</font></strong>
+<a name="line215">215: </a>{
+<a name="line216">216: </a>  PetscScalar cof = PetscAbsScalar(u[0]);
+
+<a name="line218">218: </a>  f0[0] = cof*u[0];
+<a name="line219">219: </a>}
+
+<a name="line221">221: </a><font color="#B22222">/* &lt;|\nabla u| \nabla u, \nabla v&gt; */</font>
+<a name="line222">222: </a><strong><font color="#4169E1"><a name="f1_u"></a>static void f1_u(PetscInt dim, PetscInt Nf, PetscInt NfAux,</font></strong>
+<a name="line223">223: </a><strong><font color="#4169E1">                 const PetscInt uOff[], const PetscInt uOff_x[], const PetscScalar u[], const PetscScalar u_t[], const PetscScalar u_x[],</font></strong>
+<a name="line224">224: </a><strong><font color="#4169E1">                 const PetscInt aOff[], const PetscInt aOff_x[], const PetscScalar a[], const PetscScalar a_t[], const PetscScalar a_x[],</font></strong>
+<a name="line225">225: </a><strong><font color="#4169E1">                 PetscReal t, const PetscReal x[], PetscInt numConstants, const PetscScalar constants[], PetscScalar f1[])</font></strong>
+<a name="line226">226: </a>{
+<a name="line227">227: </a>  PetscInt    d;
+<a name="line228">228: </a>  PetscScalar cof = 0;
+<a name="line229">229: </a>  <font color="#4169E1">for</font> (d = 0; d &lt; dim; ++d)  cof += u_x[d]*u_x[d];
+
+<a name="line231">231: </a>  cof = PetscSqrtScalar(cof);
+
+<a name="line233">233: </a>  <font color="#4169E1">for</font> (d = 0; d &lt; dim; ++d) f1[d] = u_x[d]*cof;
+<a name="line234">234: </a>}
+
+<a name="line236">236: </a><font color="#B22222">/* approximate  Jacobian for   &lt;|u|u, v&gt; */</font>
+<a name="line237">237: </a><strong><font color="#4169E1"><a name="g0_uu"></a>static void g0_uu(PetscInt dim, PetscInt Nf, PetscInt NfAux,</font></strong>
+<a name="line238">238: </a><strong><font color="#4169E1">                  const PetscInt uOff[], const PetscInt uOff_x[], const PetscScalar u[], const PetscScalar u_t[], const PetscScalar u_x[],</font></strong>
+<a name="line239">239: </a><strong><font color="#4169E1">                  const PetscInt aOff[], const PetscInt aOff_x[], const PetscScalar a[], const PetscScalar a_t[], const PetscScalar a_x[],</font></strong>
+<a name="line240">240: </a><strong><font color="#4169E1">                  PetscReal t, PetscReal u_tShift, const PetscReal x[], PetscInt numConstants, const PetscScalar constants[], PetscScalar g0[])</font></strong>
+<a name="line241">241: </a>{
+<a name="line242">242: </a>  g0[0] = 1.0*PetscAbsScalar(u[0]);
+<a name="line243">243: </a>}
+
+<a name="line245">245: </a><font color="#B22222">/* approximate  Jacobian for   &lt;|\nabla u| \nabla u, \nabla v&gt; */</font>
+<a name="line246">246: </a><strong><font color="#4169E1"><a name="g3_uu"></a>static void g3_uu(PetscInt dim, PetscInt Nf, PetscInt NfAux,</font></strong>
+<a name="line247">247: </a><strong><font color="#4169E1">                  const PetscInt uOff[], const PetscInt uOff_x[], const PetscScalar u[], const PetscScalar u_t[], const PetscScalar u_x[],</font></strong>
+<a name="line248">248: </a><strong><font color="#4169E1">                  const PetscInt aOff[], const PetscInt aOff_x[], const PetscScalar a[], const PetscScalar a_t[], const PetscScalar a_x[],</font></strong>
+<a name="line249">249: </a><strong><font color="#4169E1">                  PetscReal t, PetscReal u_tShift, const PetscReal x[], PetscInt numConstants, const PetscScalar constants[], PetscScalar g3[])</font></strong>
+<a name="line250">250: </a>{
+<a name="line251">251: </a>  PetscInt d;
+
+<a name="line253">253: </a>  <font color="#4169E1">for</font> (d = 0; d &lt; dim; ++d) g3[d*dim+d] = 1.0;
+<a name="line254">254: </a>}
+
+<a name="line256">256: </a><strong><font color="#4169E1"><a name="SetupDiscretization"></a>PetscErrorCode SetupDiscretization(DM dm)</font></strong>
+<a name="line257">257: </a>{
+<a name="line258">258: </a>  PetscFE        fe;
+<a name="line259">259: </a>  MPI_Comm       comm;
+
+<a name="line263">263: </a>  <font color="#B22222">/* Create finite element */</font>
+<a name="line264">264: </a>  PetscObjectGetComm((PetscObject)dm,&amp;comm);
+<a name="line265">265: </a>  PetscFECreateDefault(comm,2,1,PETSC_FALSE,NULL,-1,&amp;fe);
+<a name="line266">266: </a>  PetscObjectSetName((PetscObject)fe,<font color="#666666">"u"</font>);
+<a name="line267">267: </a>  DMSetField(dm,0,NULL,(PetscObject)fe);
+<a name="line268">268: </a>  DMCreateDS(dm);
+<a name="line269">269: </a>  PetscFEDestroy(&amp;fe);
+<a name="line270">270: </a>  <font color="#4169E1">return</font>(0);
+<a name="line271">271: </a>}
+
+<a name="line273">273: </a><strong><font color="#4169E1"><a name="CreateSquareMesh"></a>PetscErrorCode CreateSquareMesh(MPI_Comm comm,DM *dm)</font></strong>
+<a name="line274">274: </a>{
+<a name="line275">275: </a>  PetscInt       cells[] = {8,8};
+<a name="line276">276: </a>  PetscInt       dim = 2;
+<a name="line277">277: </a>  DM             pdm;
+<a name="line278">278: </a>  PetscMPIInt    size;
+
+<a name="line282">282: </a>  DMPlexCreateBoxMesh(comm,dim,PETSC_FALSE,cells,NULL,NULL,NULL,PETSC_TRUE,dm);
+<a name="line283">283: </a>  DMSetFromOptions(*dm);
+<a name="line284">284: </a>  DMSetUp(*dm);
+<a name="line285">285: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(comm,&amp;size);
+<a name="line286">286: </a>  <font color="#4169E1">if</font> (size &gt; 1) {
+<a name="line287">287: </a>    DMPlexDistribute(*dm,0,NULL,&amp;pdm);
+<a name="line288">288: </a>    DMDestroy(dm);
+<a name="line289">289: </a>    *dm = pdm;
+<a name="line290">290: </a>  }
+<a name="line291">291: </a>  <font color="#4169E1">return</font>(0);
+<a name="line292">292: </a>}
+
+<a name="line294">294: </a><strong><font color="#4169E1"><a name="BoundaryGlobalIndex"></a>PetscErrorCode BoundaryGlobalIndex(DM dm,const char labelname[],IS *bdis)</font></strong>
+<a name="line295">295: </a>{
+<a name="line296">296: </a>  IS             bdpoints;
+<a name="line297">297: </a>  PetscInt       nindices,*indices,numDof,offset,npoints,i,j;
+<a name="line298">298: </a>  const PetscInt *bdpoints_indices;
+<a name="line299">299: </a>  DMLabel        bdmarker;
+<a name="line300">300: </a>  PetscSection   gsection;
+
+<a name="line304">304: </a>  DMGetGlobalSection(dm,&amp;gsection);
+<a name="line305">305: </a>  DMGetLabel(dm,labelname,&amp;bdmarker);
+<a name="line306">306: </a>  DMLabelGetStratumIS(bdmarker,1,&amp;bdpoints);
+<a name="line307">307: </a>  ISGetLocalSize(bdpoints,&amp;npoints);
+<a name="line308">308: </a>  ISGetIndices(bdpoints,&amp;bdpoints_indices);
+<a name="line309">309: </a>  nindices = 0;
+<a name="line310">310: </a>  <font color="#4169E1">for</font> (i=0;i&lt;npoints;i++) {
+<a name="line311">311: </a>    PetscSectionGetDof(gsection,bdpoints_indices[i],&amp;numDof);
+<a name="line312">312: </a>    <font color="#4169E1">if</font> (numDof&lt;=0) <font color="#4169E1">continue</font>;
+<a name="line313">313: </a>    nindices += numDof;
+<a name="line314">314: </a>  }
+<a name="line315">315: </a>  PetscCalloc1(nindices,&amp;indices);
+<a name="line316">316: </a>  nindices = 0;
+<a name="line317">317: </a>  <font color="#4169E1">for</font> (i=0;i&lt;npoints;i++) {
+<a name="line318">318: </a>    PetscSectionGetDof(gsection,bdpoints_indices[i],&amp;numDof);
+<a name="line319">319: </a>    <font color="#4169E1">if</font> (numDof&lt;=0) <font color="#4169E1">continue</font>;
+<a name="line320">320: </a>    PetscSectionGetOffset(gsection,bdpoints_indices[i],&amp;offset);
+<a name="line321">321: </a>    <font color="#4169E1">for</font> (j=0;j&lt;numDof;j++) indices[nindices++] = offset+j;
+<a name="line322">322: </a>  }
+<a name="line323">323: </a>  ISRestoreIndices(bdpoints,&amp;bdpoints_indices);
+<a name="line324">324: </a>  ISDestroy(&amp;bdpoints);
+<a name="line325">325: </a>  ISCreateGeneral(PetscObjectComm((PetscObject)dm),nindices,indices,PETSC_OWN_POINTER,bdis);
+<a name="line326">326: </a>  <font color="#4169E1">return</font>(0);
+<a name="line327">327: </a>}
+
+<a name="line329">329: </a><strong><font color="#4169E1"><a name="FormJacobian"></a>static PetscErrorCode FormJacobian(SNES snes,Vec X,Mat A,Mat B,void *ctx)</font></strong>
+<a name="line330">330: </a>{
+<a name="line331">331: </a>  DM             dm;
+<a name="line332">332: </a>  Vec            Xloc;
+
+<a name="line336">336: </a>  SNESGetDM(snes,&amp;dm);
+<a name="line337">337: </a>  DMGetLocalVector(dm,&amp;Xloc);
+<a name="line338">338: </a>  VecZeroEntries(Xloc);
+<a name="line339">339: </a>  DMGlobalToLocalBegin(dm,X,INSERT_VALUES,Xloc);
+<a name="line340">340: </a>  DMGlobalToLocalEnd(dm,X,INSERT_VALUES,Xloc);
+<a name="line341">341: </a>  CHKMEMQ;
+<a name="line342">342: </a>  DMPlexSNESComputeJacobianFEM(dm,Xloc,A,B,ctx);
+<a name="line343">343: </a>  <font color="#4169E1">if</font> (A!=B) {
+<a name="line344">344: </a>    MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line345">345: </a>    MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+<a name="line346">346: </a>  }
+<a name="line347">347: </a>  CHKMEMQ;
+<a name="line348">348: </a>  DMRestoreLocalVector(dm,&amp;Xloc);
+<a name="line349">349: </a>  <font color="#4169E1">return</font>(0);
+<a name="line350">350: </a>}
+
+<a name="line352">352: </a><strong><font color="#4169E1"><a name="FormJacobianA"></a>PetscErrorCode FormJacobianA(SNES snes,Vec X,Mat A,Mat B,void *ctx)</font></strong>
+<a name="line353">353: </a>{
+<a name="line355">355: </a>  DM             dm;
+<a name="line356">356: </a>  PetscDS        prob;
+<a name="line357">357: </a>  AppCtx         *userctx = (AppCtx *)ctx;
+
+<a name="line360">360: </a>  MatSetOption(B,MAT_KEEP_NONZERO_PATTERN,PETSC_TRUE);
+<a name="line361">361: </a>  SNESGetDM(snes,&amp;dm);
+<a name="line362">362: </a>  DMGetDS(dm,&amp;prob);
+<a name="line363">363: </a>  PetscDSSetJacobian(prob,0,0,NULL,NULL,NULL,g3_uu);
+<a name="line364">364: </a>  FormJacobian(snes,X,A,B,ctx);
+<a name="line365">365: </a>  MatZeroRowsIS(B,userctx-&gt;bdis,1.0,NULL,NULL);
+<a name="line366">366: </a>  <font color="#4169E1">return</font>(0);
+<a name="line367">367: </a>}
+
+<a name="line369">369: </a><strong><font color="#4169E1"><a name="FormJacobianB"></a>PetscErrorCode FormJacobianB(SNES snes,Vec X,Mat A,Mat B,void *ctx)</font></strong>
+<a name="line370">370: </a>{
+<a name="line372">372: </a>  DM             dm;
+<a name="line373">373: </a>  PetscDS        prob;
+<a name="line374">374: </a>  AppCtx         *userctx = (AppCtx *)ctx;
+
+<a name="line377">377: </a>  MatSetOption(B,MAT_KEEP_NONZERO_PATTERN,PETSC_TRUE);
+<a name="line378">378: </a>  SNESGetDM(snes,&amp;dm);
+<a name="line379">379: </a>  DMGetDS(dm,&amp;prob);
+<a name="line380">380: </a>  PetscDSSetJacobian(prob,0,0,g0_uu,NULL,NULL,NULL);
+<a name="line381">381: </a>  FormJacobian(snes,X,A,B,ctx);
+<a name="line382">382: </a>  MatZeroRowsIS(B,userctx-&gt;bdis,0.0,NULL,NULL);
+<a name="line383">383: </a>  <font color="#4169E1">return</font>(0);
+<a name="line384">384: </a>}
+
+<a name="line386">386: </a><strong><font color="#4169E1"><a name="FormFunctionAB"></a>PetscErrorCode FormFunctionAB(SNES snes,Vec x,Vec Ax,Vec Bx,void *ctx)</font></strong>
+<a name="line387">387: </a>{
+
+<a name="line391">391: </a>  <font color="#B22222">/*</font>
+<a name="line392">392: </a><font color="#B22222">   * In real applications, users should have a generic formFunctionAB which</font>
+<a name="line393">393: </a><font color="#B22222">   * forms Ax and Bx simultaneously for an more efficient calculation.</font>
+<a name="line394">394: </a><font color="#B22222">   * In this example, we just call FormFunctionA+FormFunctionB to mimic how</font>
+<a name="line395">395: </a><font color="#B22222">   * to use FormFunctionAB</font>
+<a name="line396">396: </a><font color="#B22222">   */</font>
+<a name="line397">397: </a>  FormFunctionA(snes,x,Ax,ctx);
+<a name="line398">398: </a>  FormFunctionB(snes,x,Bx,ctx);
+<a name="line399">399: </a>  <font color="#4169E1">return</font>(0);
+<a name="line400">400: </a>}
+
+
+<a name="line403">403: </a><strong><font color="#4169E1"><a name="FormFunction"></a>static PetscErrorCode FormFunction(SNES snes,Vec X,Vec F,void *ctx)</font></strong>
+<a name="line404">404: </a>{
+<a name="line405">405: </a>  DM             dm;
+<a name="line406">406: </a>  Vec            Xloc,Floc;
+
+<a name="line410">410: </a>  SNESGetDM(snes,&amp;dm);
+<a name="line411">411: </a>  DMGetLocalVector(dm,&amp;Xloc);
+<a name="line412">412: </a>  DMGetLocalVector(dm,&amp;Floc);
+<a name="line413">413: </a>  VecZeroEntries(Xloc);
+<a name="line414">414: </a>  VecZeroEntries(Floc);
+<a name="line415">415: </a>  DMGlobalToLocalBegin(dm,X,INSERT_VALUES,Xloc);
+<a name="line416">416: </a>  DMGlobalToLocalEnd(dm,X,INSERT_VALUES,Xloc);
+<a name="line417">417: </a>  CHKMEMQ;
+<a name="line418">418: </a>  DMPlexSNESComputeResidualFEM(dm,Xloc,Floc,ctx);
+<a name="line419">419: </a>  CHKMEMQ;
+<a name="line420">420: </a>  VecZeroEntries(F);
+<a name="line421">421: </a>  DMLocalToGlobalBegin(dm,Floc,ADD_VALUES,F);
+<a name="line422">422: </a>  DMLocalToGlobalEnd(dm,Floc,ADD_VALUES,F);
+<a name="line423">423: </a>  DMRestoreLocalVector(dm,&amp;Xloc);
+<a name="line424">424: </a>  DMRestoreLocalVector(dm,&amp;Floc);
+<a name="line425">425: </a>  <font color="#4169E1">return</font>(0);
+<a name="line426">426: </a>}
+
+<a name="line428">428: </a><strong><font color="#4169E1"><a name="FormFunctionA"></a>PetscErrorCode FormFunctionA(SNES snes,Vec X,Vec F,void *ctx)</font></strong>
+<a name="line429">429: </a>{
+<a name="line431">431: </a>  DM             dm;
+<a name="line432">432: </a>  PetscDS        prob;
+<a name="line433">433: </a>  PetscInt       nindices,iStart,iEnd,i;
+<a name="line434">434: </a>  AppCtx         *userctx = (AppCtx *)ctx;
+<a name="line435">435: </a>  PetscScalar    *array,value;
+<a name="line436">436: </a>  const PetscInt *indices;
+<a name="line437">437: </a>  PetscInt       vecstate;
+
+<a name="line440">440: </a>  SNESGetDM(snes,&amp;dm);
+<a name="line441">441: </a>  DMGetDS(dm,&amp;prob);
+<a name="line442">442: </a>  <font color="#B22222">/* hook functions */</font>
+<a name="line443">443: </a>  PetscDSSetResidual(prob,0,NULL,f1_u);
+<a name="line444">444: </a>  FormFunction(snes,X,F,ctx);
+<a name="line445">445: </a>  <font color="#B22222">/* Boundary condition */</font>
+<a name="line446">446: </a>  VecLockGet(X,&amp;vecstate);
+<a name="line447">447: </a>  <font color="#4169E1">if</font> (vecstate&gt;0) {
+<a name="line448">448: </a>    VecLockReadPop(X);
+<a name="line449">449: </a>  }
+<a name="line450">450: </a>  VecGetOwnershipRange(X,&amp;iStart,&amp;iEnd);
+<a name="line451">451: </a>  VecGetArray(X,&amp;array);
+<a name="line452">452: </a>  ISGetLocalSize(userctx-&gt;bdis,&amp;nindices);
+<a name="line453">453: </a>  ISGetIndices(userctx-&gt;bdis,&amp;indices);
+<a name="line454">454: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nindices;i++) {
+<a name="line455">455: </a>    value = array[indices[i]-iStart] - 0.0;
+<a name="line456">456: </a>    VecSetValue(F,indices[i],value,INSERT_VALUES);
+<a name="line457">457: </a>  }
+<a name="line458">458: </a>  ISRestoreIndices(userctx-&gt;bdis,&amp;indices);
+<a name="line459">459: </a>  VecRestoreArray(X,&amp;array);
+<a name="line460">460: </a>  <font color="#4169E1">if</font> (vecstate&gt;0) {
+<a name="line461">461: </a>    VecLockReadPush(X);
+<a name="line462">462: </a>  }
+<a name="line463">463: </a>  VecAssemblyBegin(F);
+<a name="line464">464: </a>  VecAssemblyEnd(F);
+<a name="line465">465: </a>  <font color="#4169E1">return</font>(0);
+<a name="line466">466: </a>}
+
+<a name="line468">468: </a><strong><font color="#4169E1"><a name="MatMult_A"></a>PetscErrorCode MatMult_A(Mat A,Vec x,Vec y)</font></strong>
+<a name="line469">469: </a>{
+<a name="line471">471: </a>  AppCtx         *userctx;
+
+<a name="line474">474: </a>  MatShellGetContext(A,&amp;userctx);
+<a name="line475">475: </a>  FormFunctionA(userctx-&gt;snes,x,y,userctx);
+<a name="line476">476: </a>  <font color="#4169E1">return</font>(0);
+<a name="line477">477: </a>}
+
+<a name="line479">479: </a><strong><font color="#4169E1"><a name="FormFunctionB"></a>PetscErrorCode FormFunctionB(SNES snes,Vec X,Vec F,void *ctx)</font></strong>
+<a name="line480">480: </a>{
+<a name="line482">482: </a>  DM             dm;
+<a name="line483">483: </a>  PetscDS        prob;
+<a name="line484">484: </a>  PetscInt       nindices,iStart,iEnd,i;
+<a name="line485">485: </a>  AppCtx         *userctx = (AppCtx *)ctx;
+<a name="line486">486: </a>  PetscScalar    value;
+<a name="line487">487: </a>  const PetscInt *indices;
+
+<a name="line490">490: </a>  SNESGetDM(snes,&amp;dm);
+<a name="line491">491: </a>  DMGetDS(dm,&amp;prob);
+<a name="line492">492: </a>  <font color="#B22222">/* hook functions */</font>
+<a name="line493">493: </a>  PetscDSSetResidual(prob,0,f0_u,NULL);
+<a name="line494">494: </a>  FormFunction(snes,X,F,ctx);
+<a name="line495">495: </a>  <font color="#B22222">/* Boundary condition */</font>
+<a name="line496">496: </a>  VecGetOwnershipRange(F,&amp;iStart,&amp;iEnd);
+<a name="line497">497: </a>  ISGetLocalSize(userctx-&gt;bdis,&amp;nindices);
+<a name="line498">498: </a>  ISGetIndices(userctx-&gt;bdis,&amp;indices);
+<a name="line499">499: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nindices;i++) {
+<a name="line500">500: </a>    value = 0.0;
+<a name="line501">501: </a>    VecSetValue(F,indices[i],value,INSERT_VALUES);
+<a name="line502">502: </a>  }
+<a name="line503">503: </a>  ISRestoreIndices(userctx-&gt;bdis,&amp;indices);
+<a name="line504">504: </a>  VecAssemblyBegin(F);
+<a name="line505">505: </a>  VecAssemblyEnd(F);
+<a name="line506">506: </a>  <font color="#4169E1">return</font>(0);
+<a name="line507">507: </a>}
+
+<a name="line509">509: </a><strong><font color="#4169E1"><a name="MatMult_B"></a>PetscErrorCode MatMult_B(Mat B,Vec x,Vec y)</font></strong>
+<a name="line510">510: </a>{
+<a name="line512">512: </a>  AppCtx         *userctx;
+
+<a name="line515">515: </a>  MatShellGetContext(B,&amp;userctx);
+<a name="line516">516: </a>  FormFunctionB(userctx-&gt;snes,x,y,userctx);
+<a name="line517">517: </a>  <font color="#4169E1">return</font>(0);
+<a name="line518">518: </a>}
+
+<a name="line520">520: </a><font color="#B22222">/*TEST</font>
+
+<a name="line522">522: </a><font color="#B22222">   testset:</font>
+<a name="line523">523: </a><font color="#B22222">      requires: double</font>
+<a name="line524">524: </a><font color="#B22222">      args: -petscspace_degree 1 -petscspace_poly_tensor</font>
+<a name="line525">525: </a><font color="#B22222">      output_file: output/ex34_1.out</font>
+<a name="line526">526: </a><font color="#B22222">      test:</font>
+<a name="line527">527: </a><font color="#B22222">         suffix: 1</font>
+<a name="line528">528: </a><font color="#B22222">      test:</font>
+<a name="line529">529: </a><font color="#B22222">         suffix: 2</font>
+<a name="line530">530: </a><font color="#B22222">         args: -eps_power_update -form_function_ab {{0 1}}</font>
+<a name="line531">531: </a><font color="#B22222">         filter: sed -e "s/ with monolithic update//"</font>
+<a name="line532">532: </a><font color="#B22222">      test:</font>
+<a name="line533">533: </a><font color="#B22222">         suffix: 3</font>
+<a name="line534">534: </a><font color="#B22222">         args: -use_shell_matrix -eps_power_snes_mf_operator 1</font>
+<a name="line535">535: </a><font color="#B22222">      test:</font>
+<a name="line536">536: </a><font color="#B22222">         suffix: 4</font>
+<a name="line537">537: </a><font color="#B22222">         args: -use_shell_matrix -eps_power_update -init_eps_power_snes_mf_operator 1 -eps_power_snes_mf_operator 1 -form_function_ab {{0 1}}</font>
+<a name="line538">538: </a><font color="#B22222">         filter: sed -e "s/ with monolithic update//"</font>
+<a name="line539">539: </a><font color="#B22222">      test:</font>
+<a name="line540">540: </a><font color="#B22222">         suffix: 5</font>
+<a name="line541">541: </a><font color="#B22222">         args: -use_shell_matrix -eps_power_update -init_eps_power_snes_mf_operator 1 -eps_power_snes_mf_operator 1 -form_function_ab {{0 1}} -test_init_sol 1</font>
+<a name="line542">542: </a><font color="#B22222">         filter: sed -e "s/ with monolithic update//"</font>
+
+<a name="line544">544: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

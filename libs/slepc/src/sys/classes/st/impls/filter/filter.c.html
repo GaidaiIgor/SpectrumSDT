@@ -1,0 +1,450 @@
+<center><a href="filter.c">Actual source code: filter.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/st/impls/filter/filter.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:47+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/st/impls/filter/filter.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Filter spectral transformation, to encapsulate polynomial filters</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../include/slepc/private/stimpl.h.html">&lt;slepc/private/stimpl.h&gt;</A>
+<a name="line15"> 15: </a><font color="#A020F0">#include </font><font color="#666666">"filter.h"</font><font color="#A020F0"></font>
+
+<a name="line17"> 17: </a><font color="#B22222">/*</font>
+<a name="line18"> 18: </a><font color="#B22222">   Operator (filter):</font>
+<a name="line19"> 19: </a><font color="#B22222">               Op               P         M</font>
+<a name="line20"> 20: </a><font color="#B22222">   if nmat=1:  p(A)             NULL      p(A)</font>
+<a name="line21"> 21: </a><font color="#B22222">*/</font>
+<a name="line22"> 22: </a><strong><font color="#4169E1"><a name="STComputeOperator_Filter"></a>PetscErrorCode STComputeOperator_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line23"> 23: </a>{
+<a name="line25"> 25: </a>  ST_FILTER      *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line28"> 28: </a>  <font color="#4169E1">if</font> (st-&gt;nmat&gt;1) SETERRQ(PetscObjectComm((PetscObject)st),1,<font color="#666666">"Only implemented for standard eigenvalue problem"</font>);
+<a name="line29"> 29: </a>  <font color="#4169E1">if</font> (ctx-&gt;intb &gt;= PETSC_MAX_REAL &amp;&amp; ctx-&gt;inta &lt;= PETSC_MIN_REAL) SETERRQ(PetscObjectComm((PetscObject)st),1,<font color="#666666">"Must pass an interval with <a href="../../../../../../docs/manualpages/ST/STFilterSetInterval.html#STFilterSetInterval">STFilterSetInterval</a>()"</font>);
+<a name="line30"> 30: </a>  <font color="#4169E1">if</font> (ctx-&gt;right == 0.0 &amp;&amp; ctx-&gt;left == 0.0) SETERRQ(PetscObjectComm((PetscObject)st),1,<font color="#666666">"Must pass an approximate numerical range with <a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a>()"</font>);
+<a name="line31"> 31: </a>  <font color="#4169E1">if</font> (ctx-&gt;left &gt; ctx-&gt;inta || ctx-&gt;right &lt; ctx-&gt;intb) SETERRQ4(PetscObjectComm((PetscObject)st),1,<font color="#666666">"The requested interval [%g,%g] must be contained in the numerical range [%g,%g]"</font>,(double)ctx-&gt;inta,(double)ctx-&gt;intb,(double)ctx-&gt;left,(double)ctx-&gt;right);
+<a name="line32"> 32: </a>  <font color="#4169E1">if</font> (!ctx-&gt;polyDegree) ctx-&gt;polyDegree = 100;
+<a name="line33"> 33: </a>  ctx-&gt;frame[0] = ctx-&gt;left;
+<a name="line34"> 34: </a>  ctx-&gt;frame[1] = ctx-&gt;inta;
+<a name="line35"> 35: </a>  ctx-&gt;frame[2] = ctx-&gt;intb;
+<a name="line36"> 36: </a>  ctx-&gt;frame[3] = ctx-&gt;right;
+<a name="line37"> 37: </a>  STFilter_FILTLAN_setFilter(st,&amp;st-&gt;T[0]);
+<a name="line38"> 38: </a>  st-&gt;M = st-&gt;T[0];
+<a name="line39"> 39: </a>  MatDestroy(&amp;st-&gt;P);
+<a name="line40"> 40: </a>  <font color="#4169E1">return</font>(0);
+<a name="line41"> 41: </a>}
+
+<a name="line43"> 43: </a><strong><font color="#4169E1"><a name="STSetUp_Filter"></a>PetscErrorCode STSetUp_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line44"> 44: </a>{
+
+<a name="line48"> 48: </a>  <a href="../../../../../../docs/manualpages/ST/STSetWorkVecs.html#STSetWorkVecs">STSetWorkVecs</a>(st,4);
+<a name="line49"> 49: </a>  <font color="#4169E1">return</font>(0);
+<a name="line50"> 50: </a>}
+
+<a name="line52"> 52: </a><strong><font color="#4169E1"><a name="STSetFromOptions_Filter"></a>PetscErrorCode STSetFromOptions_Filter(PetscOptionItems *PetscOptionsObject,<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line53"> 53: </a>{
+<a name="line55"> 55: </a>  PetscReal      array[2]={0,0};
+<a name="line56"> 56: </a>  PetscInt       k;
+<a name="line57"> 57: </a>  PetscBool      flg;
+
+<a name="line60"> 60: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> Filter Options"</font>);
+
+<a name="line62"> 62: </a>    k = 2;
+<a name="line63"> 63: </a>    PetscOptionsRealArray(<font color="#666666">"-st_filter_interval"</font>,<font color="#666666">"Interval containing the desired eigenvalues (two real values separated with a comma without spaces)"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/ST/STFilterSetInterval.html#STFilterSetInterval">STFilterSetInterval</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line64"> 64: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line65"> 65: </a>      <font color="#4169E1">if</font> (k&lt;2) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_SIZ,<font color="#666666">"Must pass two values in -st_filter_interval (comma-separated without spaces)"</font>);
+<a name="line66"> 66: </a>      <a href="../../../../../../docs/manualpages/ST/STFilterSetInterval.html#STFilterSetInterval">STFilterSetInterval</a>(st,array[0],array[1]);
+<a name="line67"> 67: </a>    }
+<a name="line68"> 68: </a>    k = 2;
+<a name="line69"> 69: </a>    PetscOptionsRealArray(<font color="#666666">"-st_filter_range"</font>,<font color="#666666">"Interval containing all eigenvalues (two real values separated with a comma without spaces)"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line70"> 70: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line71"> 71: </a>      <font color="#4169E1">if</font> (k&lt;2) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_SIZ,<font color="#666666">"Must pass two values in -st_filter_range (comma-separated without spaces)"</font>);
+<a name="line72"> 72: </a>      <a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a>(st,array[0],array[1]);
+<a name="line73"> 73: </a>    }
+<a name="line74"> 74: </a>    PetscOptionsInt(<font color="#666666">"-st_filter_degree"</font>,<font color="#666666">"Degree of filter polynomial"</font>,<font color="#666666">"<a href="../../../../../../docs/manualpages/ST/STFilterSetDegree.html#STFilterSetDegree">STFilterSetDegree</a>"</font>,100,&amp;k,&amp;flg);
+<a name="line75"> 75: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../../docs/manualpages/ST/STFilterSetDegree.html#STFilterSetDegree">STFilterSetDegree</a>(st,k); }
+
+<a name="line77"> 77: </a>  PetscOptionsTail();
+<a name="line78"> 78: </a>  <font color="#4169E1">return</font>(0);
+<a name="line79"> 79: </a>}
+
+<a name="line81"> 81: </a><strong><font color="#4169E1"><a name="STFilterSetInterval_Filter"></a>static PetscErrorCode STFilterSetInterval_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal inta,PetscReal intb)</font></strong>
+<a name="line82"> 82: </a>{
+<a name="line83"> 83: </a>  ST_FILTER *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line86"> 86: </a>  <font color="#4169E1">if</font> (inta&gt;intb) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_WRONG,<font color="#666666">"Badly defined interval, must be inta&lt;intb"</font>);
+<a name="line87"> 87: </a>  <font color="#4169E1">if</font> (ctx-&gt;inta != inta || ctx-&gt;intb != intb) {
+<a name="line88"> 88: </a>    ctx-&gt;inta   = inta;
+<a name="line89"> 89: </a>    ctx-&gt;intb   = intb;
+<a name="line90"> 90: </a>    st-&gt;state   = ST_STATE_INITIAL;
+<a name="line91"> 91: </a>    st-&gt;opready = PETSC_FALSE;
+<a name="line92"> 92: </a>  }
+<a name="line93"> 93: </a>  <font color="#4169E1">return</font>(0);
+<a name="line94"> 94: </a>}
+
+<a name="line96"> 96: </a><font color="#B22222">/*@</font>
+<a name="line97"> 97: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterSetInterval.html#STFilterSetInterval">STFilterSetInterval</a> - Defines the interval containing the desired eigenvalues.</font>
+
+<a name="line99"> 99: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line101">101: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line102">102: </a><font color="#B22222">+  st   - the spectral transformation context</font>
+<a name="line103">103: </a><font color="#B22222">.  inta - left end of the interval</font>
+<a name="line104">104: </a><font color="#B22222">-  intb - right end of the interval</font>
+
+<a name="line106">106: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line107">107: </a><font color="#B22222">.  -st_filter_interval &lt;a,b&gt; - set [a,b] as the interval of interest</font>
+
+<a name="line109">109: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line111">111: </a><font color="#B22222">   Notes:</font>
+<a name="line112">112: </a><font color="#B22222">   The filter will be configured to emphasize eigenvalues contained in the given</font>
+<a name="line113">113: </a><font color="#B22222">   interval, and damp out eigenvalues outside it. If the interval is open, then</font>
+<a name="line114">114: </a><font color="#B22222">   the filter is low- or high-pass, otherwise it is mid-pass.</font>
+
+<a name="line116">116: </a><font color="#B22222">   Common usage is to set the interval in <a href="../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> with <a href="../../../../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>().</font>
+
+<a name="line118">118: </a><font color="#B22222">   The interval must be contained within the numerical range of the matrix, see</font>
+<a name="line119">119: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a>().</font>
+
+<a name="line121">121: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STFilterGetInterval.html#STFilterGetInterval">STFilterGetInterval</a>(), <a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a>(), <a href="../../../../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>()</font>
+<a name="line122">122: </a><font color="#B22222">@*/</font>
+<a name="line123">123: </a><strong><font color="#4169E1"><a name="STFilterSetInterval"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STFilterSetInterval.html#STFilterSetInterval">STFilterSetInterval</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal inta,PetscReal intb)</font></strong>
+<a name="line124">124: </a>{
+
+<a name="line131">131: </a>  PetscTryMethod(st,<font color="#666666">"STFilterSetInterval_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscReal,PetscReal),(st,inta,intb));
+<a name="line132">132: </a>  <font color="#4169E1">return</font>(0);
+<a name="line133">133: </a>}
+
+<a name="line135">135: </a><strong><font color="#4169E1"><a name="STFilterGetInterval_Filter"></a>static PetscErrorCode STFilterGetInterval_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal *inta,PetscReal *intb)</font></strong>
+<a name="line136">136: </a>{
+<a name="line137">137: </a>  ST_FILTER *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line140">140: </a>  <font color="#4169E1">if</font> (inta) *inta = ctx-&gt;inta;
+<a name="line141">141: </a>  <font color="#4169E1">if</font> (intb) *intb = ctx-&gt;intb;
+<a name="line142">142: </a>  <font color="#4169E1">return</font>(0);
+<a name="line143">143: </a>}
+
+<a name="line145">145: </a><font color="#B22222">/*@</font>
+<a name="line146">146: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterGetInterval.html#STFilterGetInterval">STFilterGetInterval</a> - Gets the interval containing the desired eigenvalues.</font>
+
+<a name="line148">148: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line150">150: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line151">151: </a><font color="#B22222">.  st  - the spectral transformation context</font>
+
+<a name="line153">153: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line154">154: </a><font color="#B22222">+  inta - left end of the interval</font>
+<a name="line155">155: </a><font color="#B22222">-  intb - right end of the interval</font>
+
+<a name="line157">157: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line159">159: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STFilterSetInterval.html#STFilterSetInterval">STFilterSetInterval</a>()</font>
+<a name="line160">160: </a><font color="#B22222">@*/</font>
+<a name="line161">161: </a><strong><font color="#4169E1"><a name="STFilterGetInterval"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STFilterGetInterval.html#STFilterGetInterval">STFilterGetInterval</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal *inta,PetscReal *intb)</font></strong>
+<a name="line162">162: </a>{
+
+<a name="line167">167: </a>  PetscUseMethod(st,<font color="#666666">"STFilterGetInterval_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscReal*,PetscReal*),(st,inta,intb));
+<a name="line168">168: </a>  <font color="#4169E1">return</font>(0);
+<a name="line169">169: </a>}
+
+<a name="line171">171: </a><strong><font color="#4169E1"><a name="STFilterSetRange_Filter"></a>static PetscErrorCode STFilterSetRange_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal left,PetscReal right)</font></strong>
+<a name="line172">172: </a>{
+<a name="line173">173: </a>  ST_FILTER *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line176">176: </a>  <font color="#4169E1">if</font> (left&gt;right) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_WRONG,<font color="#666666">"Badly defined interval, must be left&lt;right"</font>);
+<a name="line177">177: </a>  <font color="#4169E1">if</font> (ctx-&gt;left != left || ctx-&gt;right != right) {
+<a name="line178">178: </a>    ctx-&gt;left   = left;
+<a name="line179">179: </a>    ctx-&gt;right  = right;
+<a name="line180">180: </a>    st-&gt;state   = ST_STATE_INITIAL;
+<a name="line181">181: </a>    st-&gt;opready = PETSC_FALSE;
+<a name="line182">182: </a>  }
+<a name="line183">183: </a>  <font color="#4169E1">return</font>(0);
+<a name="line184">184: </a>}
+
+<a name="line186">186: </a><font color="#B22222">/*@</font>
+<a name="line187">187: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a> - Defines the numerical range (or field of values) of the matrix, that is,</font>
+<a name="line188">188: </a><font color="#B22222">   the interval containing all eigenvalues.</font>
+
+<a name="line190">190: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line192">192: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line193">193: </a><font color="#B22222">+  st    - the spectral transformation context</font>
+<a name="line194">194: </a><font color="#B22222">.  left  - left end of the interval</font>
+<a name="line195">195: </a><font color="#B22222">-  right - right end of the interval</font>
+
+<a name="line197">197: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line198">198: </a><font color="#B22222">.  -st_filter_range &lt;a,b&gt; - set [a,b] as the numerical range</font>
+
+<a name="line200">200: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line202">202: </a><font color="#B22222">   Notes:</font>
+<a name="line203">203: </a><font color="#B22222">   The filter will be most effective if the numerical range is tight, that is, left and right</font>
+<a name="line204">204: </a><font color="#B22222">   are good approximations to the leftmost and rightmost eigenvalues, respectively.</font>
+
+<a name="line206">206: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STFilterGetRange.html#STFilterGetRange">STFilterGetRange</a>(), <a href="../../../../../../docs/manualpages/ST/STFilterSetInterval.html#STFilterSetInterval">STFilterSetInterval</a>()</font>
+<a name="line207">207: </a><font color="#B22222">@*/</font>
+<a name="line208">208: </a><strong><font color="#4169E1"><a name="STFilterSetRange"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal left,PetscReal right)</font></strong>
+<a name="line209">209: </a>{
+
+<a name="line216">216: </a>  PetscTryMethod(st,<font color="#666666">"STFilterSetRange_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscReal,PetscReal),(st,left,right));
+<a name="line217">217: </a>  <font color="#4169E1">return</font>(0);
+<a name="line218">218: </a>}
+
+<a name="line220">220: </a><strong><font color="#4169E1"><a name="STFilterGetRange_Filter"></a>static PetscErrorCode STFilterGetRange_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal *left,PetscReal *right)</font></strong>
+<a name="line221">221: </a>{
+<a name="line222">222: </a>  ST_FILTER *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line225">225: </a>  <font color="#4169E1">if</font> (left)  *left  = ctx-&gt;left;
+<a name="line226">226: </a>  <font color="#4169E1">if</font> (right) *right = ctx-&gt;right;
+<a name="line227">227: </a>  <font color="#4169E1">return</font>(0);
+<a name="line228">228: </a>}
+
+<a name="line230">230: </a><font color="#B22222">/*@</font>
+<a name="line231">231: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterGetRange.html#STFilterGetRange">STFilterGetRange</a> - Gets the interval containing all eigenvalues.</font>
+
+<a name="line233">233: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line235">235: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line236">236: </a><font color="#B22222">.  st  - the spectral transformation context</font>
+
+<a name="line238">238: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line239">239: </a><font color="#B22222">+  left  - left end of the interval</font>
+<a name="line240">240: </a><font color="#B22222">-  right - right end of the interval</font>
+
+<a name="line242">242: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line244">244: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STFilterSetRange.html#STFilterSetRange">STFilterSetRange</a>()</font>
+<a name="line245">245: </a><font color="#B22222">@*/</font>
+<a name="line246">246: </a><strong><font color="#4169E1"><a name="STFilterGetRange"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STFilterGetRange.html#STFilterGetRange">STFilterGetRange</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal *left,PetscReal *right)</font></strong>
+<a name="line247">247: </a>{
+
+<a name="line252">252: </a>  PetscUseMethod(st,<font color="#666666">"STFilterGetRange_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscReal*,PetscReal*),(st,left,right));
+<a name="line253">253: </a>  <font color="#4169E1">return</font>(0);
+<a name="line254">254: </a>}
+
+<a name="line256">256: </a><strong><font color="#4169E1"><a name="STFilterSetDegree_Filter"></a>static PetscErrorCode STFilterSetDegree_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt deg)</font></strong>
+<a name="line257">257: </a>{
+<a name="line258">258: </a>  ST_FILTER *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line261">261: </a>  <font color="#4169E1">if</font> (deg == PETSC_DEFAULT || deg == PETSC_DECIDE) {
+<a name="line262">262: </a>    ctx-&gt;polyDegree = 0;
+<a name="line263">263: </a>    st-&gt;state       = ST_STATE_INITIAL;
+<a name="line264">264: </a>    st-&gt;opready     = PETSC_FALSE;
+<a name="line265">265: </a>  } <font color="#4169E1">else</font> {
+<a name="line266">266: </a>    <font color="#4169E1">if</font> (deg&lt;=0) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of degree. Must be &gt; 0"</font>);
+<a name="line267">267: </a>    <font color="#4169E1">if</font> (ctx-&gt;polyDegree != deg) {
+<a name="line268">268: </a>      ctx-&gt;polyDegree = deg;
+<a name="line269">269: </a>      st-&gt;state       = ST_STATE_INITIAL;
+<a name="line270">270: </a>      st-&gt;opready     = PETSC_FALSE;
+<a name="line271">271: </a>    }
+<a name="line272">272: </a>  }
+<a name="line273">273: </a>  <font color="#4169E1">return</font>(0);
+<a name="line274">274: </a>}
+
+<a name="line276">276: </a><font color="#B22222">/*@</font>
+<a name="line277">277: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterSetDegree.html#STFilterSetDegree">STFilterSetDegree</a> - Sets the degree of the filter polynomial.</font>
+
+<a name="line279">279: </a><font color="#B22222">   Logically Collective on st</font>
+
+<a name="line281">281: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line282">282: </a><font color="#B22222">+  st  - the spectral transformation context</font>
+<a name="line283">283: </a><font color="#B22222">-  deg - polynomial degree</font>
+
+<a name="line285">285: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line286">286: </a><font color="#B22222">.  -st_filter_degree &lt;deg&gt; - sets the degree of the filter polynomial</font>
+
+<a name="line288">288: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line290">290: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STFilterGetDegree.html#STFilterGetDegree">STFilterGetDegree</a>()</font>
+<a name="line291">291: </a><font color="#B22222">@*/</font>
+<a name="line292">292: </a><strong><font color="#4169E1"><a name="STFilterSetDegree"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STFilterSetDegree.html#STFilterSetDegree">STFilterSetDegree</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt deg)</font></strong>
+<a name="line293">293: </a>{
+
+<a name="line299">299: </a>  PetscTryMethod(st,<font color="#666666">"STFilterSetDegree_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt),(st,deg));
+<a name="line300">300: </a>  <font color="#4169E1">return</font>(0);
+<a name="line301">301: </a>}
+
+<a name="line303">303: </a><strong><font color="#4169E1"><a name="STFilterGetDegree_Filter"></a>static PetscErrorCode STFilterGetDegree_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt *deg)</font></strong>
+<a name="line304">304: </a>{
+<a name="line305">305: </a>  ST_FILTER *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line308">308: </a>  *deg = ctx-&gt;polyDegree;
+<a name="line309">309: </a>  <font color="#4169E1">return</font>(0);
+<a name="line310">310: </a>}
+
+<a name="line312">312: </a><font color="#B22222">/*@</font>
+<a name="line313">313: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterGetDegree.html#STFilterGetDegree">STFilterGetDegree</a> - Gets the degree of the filter polynomial.</font>
+
+<a name="line315">315: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line317">317: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line318">318: </a><font color="#B22222">.  st  - the spectral transformation context</font>
+
+<a name="line320">320: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line321">321: </a><font color="#B22222">.  deg - polynomial degree</font>
+
+<a name="line323">323: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line325">325: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/ST/STFilterSetDegree.html#STFilterSetDegree">STFilterSetDegree</a>()</font>
+<a name="line326">326: </a><font color="#B22222">@*/</font>
+<a name="line327">327: </a><strong><font color="#4169E1"><a name="STFilterGetDegree"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STFilterGetDegree.html#STFilterGetDegree">STFilterGetDegree</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt *deg)</font></strong>
+<a name="line328">328: </a>{
+
+<a name="line334">334: </a>  PetscUseMethod(st,<font color="#666666">"STFilterGetDegree_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscInt*),(st,deg));
+<a name="line335">335: </a>  <font color="#4169E1">return</font>(0);
+<a name="line336">336: </a>}
+
+<a name="line338">338: </a><strong><font color="#4169E1"><a name="STFilterGetThreshold_Filter"></a>static PetscErrorCode STFilterGetThreshold_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal *gamma)</font></strong>
+<a name="line339">339: </a>{
+<a name="line340">340: </a>  ST_FILTER *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line343">343: </a>  *gamma = ctx-&gt;filterInfo-&gt;yLimit;
+<a name="line344">344: </a>  <font color="#4169E1">return</font>(0);
+<a name="line345">345: </a>}
+
+<a name="line347">347: </a><font color="#B22222">/*@</font>
+<a name="line348">348: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/ST/STFilterGetThreshold.html#STFilterGetThreshold">STFilterGetThreshold</a> - Gets the threshold value gamma such that rho(lambda)&gt;=gamma for</font>
+<a name="line349">349: </a><font color="#B22222">   eigenvalues lambda inside the wanted interval and rho(lambda)&lt;gamma for those outside.</font>
+
+<a name="line351">351: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line353">353: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line354">354: </a><font color="#B22222">.  st  - the spectral transformation context</font>
+
+<a name="line356">356: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line357">357: </a><font color="#B22222">.  gamma - the threshold value</font>
+
+<a name="line359">359: </a><font color="#B22222">   Level: developer</font>
+<a name="line360">360: </a><font color="#B22222">@*/</font>
+<a name="line361">361: </a><strong><font color="#4169E1"><a name="STFilterGetThreshold"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/ST/STFilterGetThreshold.html#STFilterGetThreshold">STFilterGetThreshold</a>(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscReal *gamma)</font></strong>
+<a name="line362">362: </a>{
+
+<a name="line368">368: </a>  PetscUseMethod(st,<font color="#666666">"STFilterGetThreshold_C"</font>,(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a>,PetscReal*),(st,gamma));
+<a name="line369">369: </a>  <font color="#4169E1">return</font>(0);
+<a name="line370">370: </a>}
+
+<a name="line372">372: </a><strong><font color="#4169E1"><a name="STReset_Filter"></a>PetscErrorCode STReset_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line373">373: </a>{
+<a name="line375">375: </a>  ST_FILTER      *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line378">378: </a>  ctx-&gt;left  = 0.0;
+<a name="line379">379: </a>  ctx-&gt;right = 0.0;
+<a name="line380">380: </a>  MatDestroy(&amp;ctx-&gt;T);
+<a name="line381">381: </a>  <font color="#4169E1">return</font>(0);
+<a name="line382">382: </a>}
+
+<a name="line384">384: </a><strong><font color="#4169E1"><a name="STView_Filter"></a>PetscErrorCode STView_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscViewer viewer)</font></strong>
+<a name="line385">385: </a>{
+<a name="line387">387: </a>  ST_FILTER      *ctx = (ST_FILTER*)st-&gt;data;
+<a name="line388">388: </a>  PetscBool      isascii;
+
+<a name="line391">391: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line392">392: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line393">393: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  Filter: interval of desired eigenvalues is [%g,%g]\n"</font>,(double)ctx-&gt;inta,(double)ctx-&gt;intb);
+<a name="line394">394: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  Filter: numerical range is [%g,%g]\n"</font>,(double)ctx-&gt;left,(double)ctx-&gt;right);
+<a name="line395">395: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  Filter: degree of filter polynomial is %D\n"</font>,ctx-&gt;polyDegree);
+<a name="line396">396: </a>    <font color="#4169E1">if</font> (st-&gt;state&gt;=ST_STATE_SETUP) {
+<a name="line397">397: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  Filter: limit to accept eigenvalues: theta=%g\n"</font>,ctx-&gt;filterInfo-&gt;yLimit);
+<a name="line398">398: </a>    }
+<a name="line399">399: </a>  }
+<a name="line400">400: </a>  <font color="#4169E1">return</font>(0);
+<a name="line401">401: </a>}
+
+<a name="line403">403: </a><strong><font color="#4169E1"><a name="STDestroy_Filter"></a>PetscErrorCode STDestroy_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line404">404: </a>{
+<a name="line406">406: </a>  ST_FILTER      *ctx = (ST_FILTER*)st-&gt;data;
+
+<a name="line409">409: </a>  PetscFree(ctx-&gt;opts);
+<a name="line410">410: </a>  PetscFree(ctx-&gt;filterInfo);
+<a name="line411">411: </a>  PetscFree(ctx-&gt;baseFilter);
+<a name="line412">412: </a>  PetscFree(st-&gt;data);
+<a name="line413">413: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterSetInterval_C"</font>,NULL);
+<a name="line414">414: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetInterval_C"</font>,NULL);
+<a name="line415">415: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterSetRange_C"</font>,NULL);
+<a name="line416">416: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetRange_C"</font>,NULL);
+<a name="line417">417: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterSetDegree_C"</font>,NULL);
+<a name="line418">418: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetDegree_C"</font>,NULL);
+<a name="line419">419: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetThreshold_C"</font>,NULL);
+<a name="line420">420: </a>  <font color="#4169E1">return</font>(0);
+<a name="line421">421: </a>}
+
+<a name="line423">423: </a><strong><font color="#4169E1"><a name="STCreate_Filter"></a>SLEPC_EXTERN PetscErrorCode STCreate_Filter(<a href="../../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line424">424: </a>{
+<a name="line426">426: </a>  ST_FILTER      *ctx;
+<a name="line427">427: </a>  FILTLAN_IOP    iop;
+<a name="line428">428: </a>  FILTLAN_PFI    pfi;
+<a name="line430">430: </a>  PetscNewLog(st,&amp;ctx);
+<a name="line431">431: </a>  st-&gt;data = (void*)ctx;
+
+<a name="line433">433: </a>  st-&gt;usesksp = PETSC_FALSE;
+
+<a name="line435">435: </a>  ctx-&gt;inta               = PETSC_MIN_REAL;
+<a name="line436">436: </a>  ctx-&gt;intb               = PETSC_MAX_REAL;
+<a name="line437">437: </a>  ctx-&gt;left               = 0.0;
+<a name="line438">438: </a>  ctx-&gt;right              = 0.0;
+<a name="line439">439: </a>  ctx-&gt;polyDegree         = 0;
+<a name="line440">440: </a>  ctx-&gt;baseDegree         = 10;
+
+<a name="line442">442: </a>  PetscNewLog(st,&amp;iop);
+<a name="line443">443: </a>  ctx-&gt;opts               = iop;
+<a name="line444">444: </a>  iop-&gt;intervalWeights[0] = 100.0;
+<a name="line445">445: </a>  iop-&gt;intervalWeights[1] = 1.0;
+<a name="line446">446: </a>  iop-&gt;intervalWeights[2] = 1.0;
+<a name="line447">447: </a>  iop-&gt;intervalWeights[3] = 1.0;
+<a name="line448">448: </a>  iop-&gt;intervalWeights[4] = 100.0;
+<a name="line449">449: </a>  iop-&gt;transIntervalRatio = 0.6;
+<a name="line450">450: </a>  iop-&gt;reverseInterval    = PETSC_FALSE;
+<a name="line451">451: </a>  iop-&gt;initialPlateau     = 0.1;
+<a name="line452">452: </a>  iop-&gt;plateauShrinkRate  = 1.5;
+<a name="line453">453: </a>  iop-&gt;initialShiftStep   = 0.01;
+<a name="line454">454: </a>  iop-&gt;shiftStepExpanRate = 1.5;
+<a name="line455">455: </a>  iop-&gt;maxInnerIter       = 30;
+<a name="line456">456: </a>  iop-&gt;yLimitTol          = 0.0001;
+<a name="line457">457: </a>  iop-&gt;maxOuterIter       = 50;
+<a name="line458">458: </a>  iop-&gt;numGridPoints      = 200;
+<a name="line459">459: </a>  iop-&gt;yBottomLine        = 0.001;
+<a name="line460">460: </a>  iop-&gt;yRippleLimit       = 0.8;
+
+<a name="line462">462: </a>  PetscNewLog(st,&amp;pfi);
+<a name="line463">463: </a>  ctx-&gt;filterInfo         = pfi;
+
+<a name="line465">465: </a>  st-&gt;ops-&gt;apply           = STApply_Generic;
+<a name="line466">466: </a>  st-&gt;ops-&gt;setup           = STSetUp_Filter;
+<a name="line467">467: </a>  st-&gt;ops-&gt;computeoperator = STComputeOperator_Filter;
+<a name="line468">468: </a>  st-&gt;ops-&gt;setfromoptions  = STSetFromOptions_Filter;
+<a name="line469">469: </a>  st-&gt;ops-&gt;destroy         = STDestroy_Filter;
+<a name="line470">470: </a>  st-&gt;ops-&gt;reset           = STReset_Filter;
+<a name="line471">471: </a>  st-&gt;ops-&gt;view            = STView_Filter;
+
+<a name="line473">473: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterSetInterval_C"</font>,STFilterSetInterval_Filter);
+<a name="line474">474: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetInterval_C"</font>,STFilterGetInterval_Filter);
+<a name="line475">475: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterSetRange_C"</font>,STFilterSetRange_Filter);
+<a name="line476">476: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetRange_C"</font>,STFilterGetRange_Filter);
+<a name="line477">477: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterSetDegree_C"</font>,STFilterSetDegree_Filter);
+<a name="line478">478: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetDegree_C"</font>,STFilterGetDegree_Filter);
+<a name="line479">479: </a>  PetscObjectComposeFunction((PetscObject)st,<font color="#666666">"STFilterGetThreshold_C"</font>,STFilterGetThreshold_Filter);
+<a name="line480">480: </a>  <font color="#4169E1">return</font>(0);
+<a name="line481">481: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,371 @@
+<center><a href="stsles.c">Actual source code: stsles.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/st/interface/stsles.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:46+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/st/interface/stsles.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> interface routines related to the KSP object associated with it</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/stimpl.h.html">&lt;slepc/private/stimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#B22222">/*</font>
+<a name="line17"> 17: </a><font color="#B22222">   This is used to set a default type for the KSP and PC objects.</font>
+<a name="line18"> 18: </a><font color="#B22222">   It is called at <a href="../../../../../docs/manualpages/ST/STSetFromOptions.html#STSetFromOptions">STSetFromOptions</a> (before KSPSetFromOptions)</font>
+<a name="line19"> 19: </a><font color="#B22222">   and also at <a href="../../../../../docs/manualpages/ST/STSetUp.html#STSetUp">STSetUp</a> (in case <a href="../../../../../docs/manualpages/ST/STSetFromOptions.html#STSetFromOptions">STSetFromOptions</a> was not called).</font>
+<a name="line20"> 20: </a><font color="#B22222">*/</font>
+<a name="line21"> 21: </a><strong><font color="#4169E1"><a name="STSetDefaultKSP"></a>PetscErrorCode STSetDefaultKSP(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line22"> 22: </a>{
+
+<a name="line28"> 28: </a>  <font color="#4169E1">if</font> (!st-&gt;ksp) { <a href="../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;st-&gt;ksp); }
+<a name="line29"> 29: </a>  <font color="#4169E1">if</font> (st-&gt;ops-&gt;setdefaultksp) { (*st-&gt;ops-&gt;setdefaultksp)(st); }
+<a name="line30"> 30: </a>  <font color="#4169E1">return</font>(0);
+<a name="line31"> 31: </a>}
+
+<a name="line33"> 33: </a><font color="#B22222">/*</font>
+<a name="line34"> 34: </a><font color="#B22222">   This is done by all <a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> types except PRECOND.</font>
+<a name="line35"> 35: </a><font color="#B22222">   The default is an LU direct solver, or GMRES+Jacobi if matmode=shell.</font>
+<a name="line36"> 36: </a><font color="#B22222">*/</font>
+<a name="line37"> 37: </a><strong><font color="#4169E1"><a name="STSetDefaultKSP_Default"></a>PetscErrorCode STSetDefaultKSP_Default(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line38"> 38: </a>{
+<a name="line40"> 40: </a>  PC             pc;
+<a name="line41"> 41: </a>  PCType         pctype;
+<a name="line42"> 42: </a>  KSPType        ksptype;
+
+<a name="line45"> 45: </a>  KSPGetPC(st-&gt;ksp,&amp;pc);
+<a name="line46"> 46: </a>  KSPGetType(st-&gt;ksp,&amp;ksptype);
+<a name="line47"> 47: </a>  PCGetType(pc,&amp;pctype);
+<a name="line48"> 48: </a>  <font color="#4169E1">if</font> (!pctype &amp;&amp; !ksptype) {
+<a name="line49"> 49: </a>    <font color="#4169E1">if</font> (st-&gt;matmode == <a href="../../../../../docs/manualpages/ST/STMatMode.html#STMatMode">ST_MATMODE_SHELL</a>) {
+<a name="line50"> 50: </a>      KSPSetType(st-&gt;ksp,KSPGMRES);
+<a name="line51"> 51: </a>      PCSetType(pc,PCJACOBI);
+<a name="line52"> 52: </a>    } <font color="#4169E1">else</font> {
+<a name="line53"> 53: </a>      KSPSetType(st-&gt;ksp,KSPPREONLY);
+<a name="line54"> 54: </a>      PCSetType(pc,st-&gt;asymm?PCCHOLESKY:PCLU);
+<a name="line55"> 55: </a>    }
+<a name="line56"> 56: </a>  }
+<a name="line57"> 57: </a>  KSPSetErrorIfNotConverged(st-&gt;ksp,PETSC_TRUE);
+<a name="line58"> 58: </a>  <font color="#4169E1">return</font>(0);
+<a name="line59"> 59: </a>}
+
+<a name="line61"> 61: </a><font color="#B22222">/*@</font>
+<a name="line62"> 62: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a> - Computes the matrix-vector product y = T[k] x, where T[k] is</font>
+<a name="line63"> 63: </a><font color="#B22222">   the k-th matrix of the spectral transformation.</font>
+
+<a name="line65"> 65: </a><font color="#B22222">   Neighbor-wise Collective on st</font>
+
+<a name="line67"> 67: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line68"> 68: </a><font color="#B22222">+  st - the spectral transformation context</font>
+<a name="line69"> 69: </a><font color="#B22222">.  k  - index of matrix to use</font>
+<a name="line70"> 70: </a><font color="#B22222">-  x  - the vector to be multiplied</font>
+
+<a name="line72"> 72: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line73"> 73: </a><font color="#B22222">.  y - the result</font>
+
+<a name="line75"> 75: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line77"> 77: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/ST/STMatMultTranspose.html#STMatMultTranspose">STMatMultTranspose</a>()</font>
+<a name="line78"> 78: </a><font color="#B22222">@*/</font>
+<a name="line79"> 79: </a><strong><font color="#4169E1"><a name="STMatMult"></a>PetscErrorCode <a href="../../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt k,Vec x,Vec y)</font></strong>
+<a name="line80"> 80: </a>{
+
+<a name="line88"> 88: </a>  STCheckMatrices(st,1);
+<a name="line89"> 89: </a>  <font color="#4169E1">if</font> (k&lt;0 || k&gt;=PetscMax(2,st-&gt;nmat)) SETERRQ1(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"k must be between 0 and %D"</font>,st-&gt;nmat);
+<a name="line90"> 90: </a>  <font color="#4169E1">if</font> (x == y) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_IDN,<font color="#666666">"x and y must be different vectors"</font>);
+<a name="line91"> 91: </a>  VecSetErrorIfLocked(y,3);
+
+<a name="line93"> 93: </a>  <font color="#4169E1">if</font> (st-&gt;state!=ST_STATE_SETUP) { <a href="../../../../../docs/manualpages/ST/STSetUp.html#STSetUp">STSetUp</a>(st); }
+<a name="line94"> 94: </a>  VecLockReadPush(x);
+<a name="line95"> 95: </a>  PetscLogEventBegin(ST_MatMult,st,x,y,0);
+<a name="line96"> 96: </a>  <font color="#4169E1">if</font> (!st-&gt;T[k]) {
+<a name="line97"> 97: </a>    <font color="#B22222">/* T[k]=NULL means identity matrix */</font>
+<a name="line98"> 98: </a>    VecCopy(x,y);
+<a name="line99"> 99: </a>  } <font color="#4169E1">else</font> {
+<a name="line100">100: </a>    MatMult(st-&gt;T[k],x,y);
+<a name="line101">101: </a>  }
+<a name="line102">102: </a>  PetscLogEventEnd(ST_MatMult,st,x,y,0);
+<a name="line103">103: </a>  VecLockReadPop(x);
+<a name="line104">104: </a>  <font color="#4169E1">return</font>(0);
+<a name="line105">105: </a>}
+
+<a name="line107">107: </a><font color="#B22222">/*@</font>
+<a name="line108">108: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/STMatMultTranspose.html#STMatMultTranspose">STMatMultTranspose</a> - Computes the matrix-vector product y = T[k]' x, where T[k] is</font>
+<a name="line109">109: </a><font color="#B22222">   the k-th matrix of the spectral transformation.</font>
+
+<a name="line111">111: </a><font color="#B22222">   Neighbor-wise Collective on st</font>
+
+<a name="line113">113: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line114">114: </a><font color="#B22222">+  st - the spectral transformation context</font>
+<a name="line115">115: </a><font color="#B22222">.  k  - index of matrix to use</font>
+<a name="line116">116: </a><font color="#B22222">-  x  - the vector to be multiplied</font>
+
+<a name="line118">118: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line119">119: </a><font color="#B22222">.  y - the result</font>
+
+<a name="line121">121: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line123">123: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/ST/STMatMult.html#STMatMult">STMatMult</a>()</font>
+<a name="line124">124: </a><font color="#B22222">@*/</font>
+<a name="line125">125: </a><strong><font color="#4169E1"><a name="STMatMultTranspose"></a>PetscErrorCode <a href="../../../../../docs/manualpages/ST/STMatMultTranspose.html#STMatMultTranspose">STMatMultTranspose</a>(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,PetscInt k,Vec x,Vec y)</font></strong>
+<a name="line126">126: </a>{
+
+<a name="line134">134: </a>  STCheckMatrices(st,1);
+<a name="line135">135: </a>  <font color="#4169E1">if</font> (k&lt;0 || k&gt;=PetscMax(2,st-&gt;nmat)) SETERRQ1(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"k must be between 0 and %D"</font>,st-&gt;nmat);
+<a name="line136">136: </a>  <font color="#4169E1">if</font> (x == y) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_IDN,<font color="#666666">"x and y must be different vectors"</font>);
+<a name="line137">137: </a>  VecSetErrorIfLocked(y,3);
+
+<a name="line139">139: </a>  <font color="#4169E1">if</font> (st-&gt;state!=ST_STATE_SETUP) { <a href="../../../../../docs/manualpages/ST/STSetUp.html#STSetUp">STSetUp</a>(st); }
+<a name="line140">140: </a>  VecLockReadPush(x);
+<a name="line141">141: </a>  PetscLogEventBegin(ST_MatMultTranspose,st,x,y,0);
+<a name="line142">142: </a>  <font color="#4169E1">if</font> (!st-&gt;T[k]) {
+<a name="line143">143: </a>    <font color="#B22222">/* T[k]=NULL means identity matrix */</font>
+<a name="line144">144: </a>    VecCopy(x,y);
+<a name="line145">145: </a>  } <font color="#4169E1">else</font> {
+<a name="line146">146: </a>    MatMultTranspose(st-&gt;T[k],x,y);
+<a name="line147">147: </a>  }
+<a name="line148">148: </a>  PetscLogEventEnd(ST_MatMultTranspose,st,x,y,0);
+<a name="line149">149: </a>  VecLockReadPop(x);
+<a name="line150">150: </a>  <font color="#4169E1">return</font>(0);
+<a name="line151">151: </a>}
+
+<a name="line153">153: </a><font color="#B22222">/*@</font>
+<a name="line154">154: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/STMatSolve.html#STMatSolve">STMatSolve</a> - Solves P x = b, where P is the preconditioner matrix of</font>
+<a name="line155">155: </a><font color="#B22222">   the spectral transformation, using a KSP object stored internally.</font>
+
+<a name="line157">157: </a><font color="#B22222">   Collective on st</font>
+
+<a name="line159">159: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line160">160: </a><font color="#B22222">+  st - the spectral transformation context</font>
+<a name="line161">161: </a><font color="#B22222">-  b  - right hand side vector</font>
+
+<a name="line163">163: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line164">164: </a><font color="#B22222">.  x - computed solution</font>
+
+<a name="line166">166: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line168">168: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/ST/STMatSolveTranspose.html#STMatSolveTranspose">STMatSolveTranspose</a>()</font>
+<a name="line169">169: </a><font color="#B22222">@*/</font>
+<a name="line170">170: </a><strong><font color="#4169E1"><a name="STMatSolve"></a>PetscErrorCode <a href="../../../../../docs/manualpages/ST/STMatSolve.html#STMatSolve">STMatSolve</a>(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec b,Vec x)</font></strong>
+<a name="line171">171: </a>{
+
+<a name="line178">178: </a>  STCheckMatrices(st,1);
+<a name="line179">179: </a>  <font color="#4169E1">if</font> (x == b) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_IDN,<font color="#666666">"x and b must be different vectors"</font>);
+<a name="line180">180: </a>  VecSetErrorIfLocked(x,3);
+
+<a name="line182">182: </a>  <font color="#4169E1">if</font> (st-&gt;state!=ST_STATE_SETUP) { <a href="../../../../../docs/manualpages/ST/STSetUp.html#STSetUp">STSetUp</a>(st); }
+<a name="line183">183: </a>  VecLockReadPush(b);
+<a name="line184">184: </a>  PetscLogEventBegin(ST_MatSolve,st,b,x,0);
+<a name="line185">185: </a>  <font color="#4169E1">if</font> (!st-&gt;P) {
+<a name="line186">186: </a>    <font color="#B22222">/* P=NULL means identity matrix */</font>
+<a name="line187">187: </a>    VecCopy(b,x);
+<a name="line188">188: </a>  } <font color="#4169E1">else</font> {
+<a name="line189">189: </a>    KSPSolve(st-&gt;ksp,b,x);
+<a name="line190">190: </a>  }
+<a name="line191">191: </a>  PetscLogEventEnd(ST_MatSolve,st,b,x,0);
+<a name="line192">192: </a>  VecLockReadPop(b);
+<a name="line193">193: </a>  <font color="#4169E1">return</font>(0);
+<a name="line194">194: </a>}
+
+<a name="line196">196: </a><font color="#B22222">/*@</font>
+<a name="line197">197: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/STMatSolveTranspose.html#STMatSolveTranspose">STMatSolveTranspose</a> - Solves P' x = b, where P is the preconditioner matrix of</font>
+<a name="line198">198: </a><font color="#B22222">   the spectral transformation, using a KSP object stored internally.</font>
+
+<a name="line200">200: </a><font color="#B22222">   Collective on st</font>
+
+<a name="line202">202: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line203">203: </a><font color="#B22222">.  st - the spectral transformation context</font>
+<a name="line204">204: </a><font color="#B22222">.  b  - right hand side vector</font>
+
+<a name="line206">206: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line207">207: </a><font color="#B22222">.  x - computed solution</font>
+
+<a name="line209">209: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line211">211: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/ST/STMatSolve.html#STMatSolve">STMatSolve</a>()</font>
+<a name="line212">212: </a><font color="#B22222">@*/</font>
+<a name="line213">213: </a><strong><font color="#4169E1"><a name="STMatSolveTranspose"></a>PetscErrorCode <a href="../../../../../docs/manualpages/ST/STMatSolveTranspose.html#STMatSolveTranspose">STMatSolveTranspose</a>(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,Vec b,Vec x)</font></strong>
+<a name="line214">214: </a>{
+
+<a name="line221">221: </a>  STCheckMatrices(st,1);
+<a name="line222">222: </a>  <font color="#4169E1">if</font> (x == b) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_IDN,<font color="#666666">"x and b must be different vectors"</font>);
+<a name="line223">223: </a>  VecSetErrorIfLocked(x,3);
+
+<a name="line225">225: </a>  <font color="#4169E1">if</font> (st-&gt;state!=ST_STATE_SETUP) { <a href="../../../../../docs/manualpages/ST/STSetUp.html#STSetUp">STSetUp</a>(st); }
+<a name="line226">226: </a>  VecLockReadPush(b);
+<a name="line227">227: </a>  PetscLogEventBegin(ST_MatSolveTranspose,st,b,x,0);
+<a name="line228">228: </a>  <font color="#4169E1">if</font> (!st-&gt;P) {
+<a name="line229">229: </a>    <font color="#B22222">/* P=NULL means identity matrix */</font>
+<a name="line230">230: </a>    VecCopy(b,x);
+<a name="line231">231: </a>  } <font color="#4169E1">else</font> {
+<a name="line232">232: </a>    KSPSolveTranspose(st-&gt;ksp,b,x);
+<a name="line233">233: </a>  }
+<a name="line234">234: </a>  PetscLogEventEnd(ST_MatSolveTranspose,st,b,x,0);
+<a name="line235">235: </a>  VecLockReadPop(b);
+<a name="line236">236: </a>  <font color="#4169E1">return</font>(0);
+<a name="line237">237: </a>}
+
+<a name="line239">239: </a><strong><font color="#4169E1"><a name="STCheckFactorPackage"></a>PetscErrorCode STCheckFactorPackage(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st)</font></strong>
+<a name="line240">240: </a>{
+<a name="line242">242: </a>  PC             pc;
+<a name="line243">243: </a>  PetscMPIInt    size;
+<a name="line244">244: </a>  PetscBool      flg;
+<a name="line245">245: </a>  MatSolverType  stype;
+
+<a name="line248">248: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)st),&amp;size);
+<a name="line249">249: </a>  <font color="#4169E1">if</font> (size==1) <font color="#4169E1">return</font>(0);
+<a name="line250">250: </a>  KSPGetPC(st-&gt;ksp,&amp;pc);
+<a name="line251">251: </a>  PCFactorGetMatSolverType(pc,&amp;stype);
+<a name="line252">252: </a>  <font color="#4169E1">if</font> (stype) {   <font color="#B22222">/* currently selected PC is a factorization */</font>
+<a name="line253">253: </a>    PetscStrcmp(stype,MATSOLVERPETSC,&amp;flg);
+<a name="line254">254: </a>    <font color="#4169E1">if</font> (flg) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_SUP,<font color="#666666">"You chose to solve linear systems with a factorization, but in parallel runs you need to select an external package; see the users guide for details"</font>);
+<a name="line255">255: </a>  }
+<a name="line256">256: </a>  <font color="#4169E1">return</font>(0);
+<a name="line257">257: </a>}
+
+<a name="line259">259: </a><font color="#B22222">/*@</font>
+<a name="line260">260: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/STSetKSP.html#STSetKSP">STSetKSP</a> - Sets the KSP object associated with the spectral</font>
+<a name="line261">261: </a><font color="#B22222">   transformation.</font>
+
+<a name="line263">263: </a><font color="#B22222">   Collective on st</font>
+
+<a name="line265">265: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line266">266: </a><font color="#B22222">+  st   - the spectral transformation context</font>
+<a name="line267">267: </a><font color="#B22222">-  ksp  - the linear system context</font>
+
+<a name="line269">269: </a><font color="#B22222">   Level: advanced</font>
+<a name="line270">270: </a><font color="#B22222">@*/</font>
+<a name="line271">271: </a><strong><font color="#4169E1"><a name="STSetKSP"></a>PetscErrorCode <a href="../../../../../docs/manualpages/ST/STSetKSP.html#STSetKSP">STSetKSP</a>(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,KSP ksp)</font></strong>
+<a name="line272">272: </a>{
+
+<a name="line279">279: </a>  STCheckNotSeized(st,1);
+<a name="line280">280: </a>  PetscObjectReference((PetscObject)ksp);
+<a name="line281">281: </a>  KSPDestroy(&amp;st-&gt;ksp);
+<a name="line282">282: </a>  st-&gt;ksp = ksp;
+<a name="line283">283: </a>  PetscLogObjectParent((PetscObject)st,(PetscObject)st-&gt;ksp);
+<a name="line284">284: </a>  <font color="#4169E1">return</font>(0);
+<a name="line285">285: </a>}
+
+<a name="line287">287: </a><font color="#B22222">/*@</font>
+<a name="line288">288: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a> - Gets the KSP object associated with the spectral</font>
+<a name="line289">289: </a><font color="#B22222">   transformation.</font>
+
+<a name="line291">291: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line293">293: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line294">294: </a><font color="#B22222">.  st - the spectral transformation context</font>
+
+<a name="line296">296: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line297">297: </a><font color="#B22222">.  ksp  - the linear system context</font>
+
+<a name="line299">299: </a><font color="#B22222">   Level: intermediate</font>
+<a name="line300">300: </a><font color="#B22222">@*/</font>
+<a name="line301">301: </a><strong><font color="#4169E1"><a name="STGetKSP"></a>PetscErrorCode <a href="../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,KSP* ksp)</font></strong>
+<a name="line302">302: </a>{
+
+<a name="line308">308: </a>  <font color="#4169E1">if</font> (!st-&gt;ksp) {
+<a name="line309">309: </a>    KSPCreate(PetscObjectComm((PetscObject)st),&amp;st-&gt;ksp);
+<a name="line310">310: </a>    PetscObjectIncrementTabLevel((PetscObject)st-&gt;ksp,(PetscObject)st,1);
+<a name="line311">311: </a>    KSPSetOptionsPrefix(st-&gt;ksp,((PetscObject)st)-&gt;prefix);
+<a name="line312">312: </a>    KSPAppendOptionsPrefix(st-&gt;ksp,<font color="#666666">"st_"</font>);
+<a name="line313">313: </a>    PetscLogObjectParent((PetscObject)st,(PetscObject)st-&gt;ksp);
+<a name="line314">314: </a>    PetscObjectSetOptions((PetscObject)st-&gt;ksp,((PetscObject)st)-&gt;options);
+<a name="line315">315: </a>    KSPSetTolerances(st-&gt;ksp,SLEPC_DEFAULT_TOL,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
+<a name="line316">316: </a>  }
+<a name="line317">317: </a>  *ksp = st-&gt;ksp;
+<a name="line318">318: </a>  <font color="#4169E1">return</font>(0);
+<a name="line319">319: </a>}
+
+<a name="line321">321: </a><strong><font color="#4169E1"><a name="STCheckNullSpace_Default"></a>PetscErrorCode STCheckNullSpace_Default(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V)</font></strong>
+<a name="line322">322: </a>{
+<a name="line324">324: </a>  PetscInt       nc,i,c;
+<a name="line325">325: </a>  PetscReal      norm;
+<a name="line326">326: </a>  Vec            *T,w,vi;
+<a name="line327">327: </a>  Mat            A;
+<a name="line328">328: </a>  PC             pc;
+<a name="line329">329: </a>  MatNullSpace   nullsp;
+
+<a name="line332">332: </a>  <a href="../../../../../docs/manualpages/BV/BVGetNumConstraints.html#BVGetNumConstraints">BVGetNumConstraints</a>(V,&amp;nc);
+<a name="line333">333: </a>  PetscMalloc1(nc,&amp;T);
+<a name="line334">334: </a>  <font color="#4169E1">if</font> (!st-&gt;ksp) { <a href="../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;st-&gt;ksp); }
+<a name="line335">335: </a>  KSPGetPC(st-&gt;ksp,&amp;pc);
+<a name="line336">336: </a>  PCGetOperators(pc,&amp;A,NULL);
+<a name="line337">337: </a>  MatCreateVecs(A,NULL,&amp;w);
+<a name="line338">338: </a>  c = 0;
+<a name="line339">339: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nc;i++) {
+<a name="line340">340: </a>    <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,-nc+i,&amp;vi);
+<a name="line341">341: </a>    MatMult(A,vi,w);
+<a name="line342">342: </a>    VecNorm(w,NORM_2,&amp;norm);
+<a name="line343">343: </a>    <font color="#4169E1">if</font> (norm &lt; 1e-8) {
+<a name="line344">344: </a>      PetscInfo2(st,<font color="#666666">"Vector %D norm=%g\n"</font>,i,(double)norm);
+<a name="line345">345: </a>      <a href="../../../../../docs/manualpages/BV/BVCreateVec.html#BVCreateVec">BVCreateVec</a>(V,T+c);
+<a name="line346">346: </a>      VecCopy(vi,T[c]);
+<a name="line347">347: </a>      c++;
+<a name="line348">348: </a>    }
+<a name="line349">349: </a>    <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,-nc+i,&amp;vi);
+<a name="line350">350: </a>  }
+<a name="line351">351: </a>  VecDestroy(&amp;w);
+<a name="line352">352: </a>  <font color="#4169E1">if</font> (c&gt;0) {
+<a name="line353">353: </a>    MatNullSpaceCreate(PetscObjectComm((PetscObject)st),PETSC_FALSE,c,T,&amp;nullsp);
+<a name="line354">354: </a>    MatSetNullSpace(A,nullsp);
+<a name="line355">355: </a>    MatNullSpaceDestroy(&amp;nullsp);
+<a name="line356">356: </a>    VecDestroyVecs(c,&amp;T);
+<a name="line357">357: </a>  } <font color="#4169E1">else</font> {
+<a name="line358">358: </a>    PetscFree(T);
+<a name="line359">359: </a>  }
+<a name="line360">360: </a>  <font color="#4169E1">return</font>(0);
+<a name="line361">361: </a>}
+
+<a name="line363">363: </a><font color="#B22222">/*@</font>
+<a name="line364">364: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/ST/STCheckNullSpace.html#STCheckNullSpace">STCheckNullSpace</a> - Given a basis vectors object, this function tests each</font>
+<a name="line365">365: </a><font color="#B22222">   of its constraint vectors to be a nullspace vector of the coefficient</font>
+<a name="line366">366: </a><font color="#B22222">   matrix of the associated KSP object. All these nullspace vectors are passed</font>
+<a name="line367">367: </a><font color="#B22222">   to the KSP object.</font>
+
+<a name="line369">369: </a><font color="#B22222">   Collective on st</font>
+
+<a name="line371">371: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line372">372: </a><font color="#B22222">+  st - the spectral transformation context</font>
+<a name="line373">373: </a><font color="#B22222">-  V  - basis vectors to be checked</font>
+
+<a name="line375">375: </a><font color="#B22222">   Note:</font>
+<a name="line376">376: </a><font color="#B22222">   This function allows to handle singular pencils and to solve some problems</font>
+<a name="line377">377: </a><font color="#B22222">   in which the nullspace is important (see the users guide for details).</font>
+
+<a name="line379">379: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line381">381: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSSetDeflationSpace.html#EPSSetDeflationSpace">EPSSetDeflationSpace</a>()</font>
+<a name="line382">382: </a><font color="#B22222">@*/</font>
+<a name="line383">383: </a><strong><font color="#4169E1"><a name="STCheckNullSpace"></a>PetscErrorCode <a href="../../../../../docs/manualpages/ST/STCheckNullSpace.html#STCheckNullSpace">STCheckNullSpace</a>(<a href="../../../../../docs/manualpages/ST/ST.html#ST">ST</a> st,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V)</font></strong>
+<a name="line384">384: </a>{
+<a name="line386">386: </a>  PetscInt       nc;
+
+<a name="line393">393: </a>  <font color="#4169E1">if</font> (!st-&gt;state) SETERRQ(PetscObjectComm((PetscObject)st),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Must call STSolve() first"</font>);
+
+<a name="line395">395: </a>  <a href="../../../../../docs/manualpages/BV/BVGetNumConstraints.html#BVGetNumConstraints">BVGetNumConstraints</a>(V,&amp;nc);
+<a name="line396">396: </a>  <font color="#4169E1">if</font> (nc &amp;&amp; st-&gt;ops-&gt;checknullspace) {
+<a name="line397">397: </a>    (*st-&gt;ops-&gt;checknullspace)(st,V);
+<a name="line398">398: </a>  }
+<a name="line399">399: </a>  <font color="#4169E1">return</font>(0);
+<a name="line400">400: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,868 @@
+<center><a href="svdopts.c">Actual source code: svdopts.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/svd/interface/svdopts.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:00+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/svd/interface/svdopts.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> routines for setting solver options</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/svdimpl.h.html">&lt;slepc/private/svdimpl.h&gt;</A>
+<a name="line15"> 15: </a><font color="#A020F0">#include &lt;petscdraw.h&gt;</font>
+
+<a name="line17"> 17: </a><font color="#B22222">/*@</font>
+<a name="line18"> 18: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetImplicitTranspose.html#SVDSetImplicitTranspose">SVDSetImplicitTranspose</a> - Indicates how to handle the transpose of the matrix</font>
+<a name="line19"> 19: </a><font color="#B22222">   associated with the singular value problem.</font>
+
+<a name="line21"> 21: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line23"> 23: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line24"> 24: </a><font color="#B22222">+  svd  - the singular value solver context</font>
+<a name="line25"> 25: </a><font color="#B22222">-  impl - how to handle the transpose (implicitly or not)</font>
+
+<a name="line27"> 27: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line28"> 28: </a><font color="#B22222">.  -svd_implicittranspose - Activate the implicit transpose mode.</font>
+
+<a name="line30"> 30: </a><font color="#B22222">   Notes:</font>
+<a name="line31"> 31: </a><font color="#B22222">   By default, the transpose of the matrix is explicitly built (if the matrix</font>
+<a name="line32"> 32: </a><font color="#B22222">   has defined the MatTranspose operation).</font>
+
+<a name="line34"> 34: </a><font color="#B22222">   If this flag is set to true, the solver does not build the transpose, but</font>
+<a name="line35"> 35: </a><font color="#B22222">   handles it implicitly via MatMultTranspose() (or MatMultHermitianTranspose()</font>
+<a name="line36"> 36: </a><font color="#B22222">   in the complex case) operations. This is likely to be more inefficient</font>
+<a name="line37"> 37: </a><font color="#B22222">   than the default behaviour, both in sequential and in parallel, but</font>
+<a name="line38"> 38: </a><font color="#B22222">   requires less storage.</font>
+
+<a name="line40"> 40: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line42"> 42: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDGetImplicitTranspose.html#SVDGetImplicitTranspose">SVDGetImplicitTranspose</a>(), <a href="../../../docs/manualpages/SVD/SVDSolve.html#SVDSolve">SVDSolve</a>(), <a href="../../../docs/manualpages/SVD/SVDSetOperator.html#SVDSetOperator">SVDSetOperator</a>()</font>
+<a name="line43"> 43: </a><font color="#B22222">@*/</font>
+<a name="line44"> 44: </a><strong><font color="#4169E1"><a name="SVDSetImplicitTranspose"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetImplicitTranspose.html#SVDSetImplicitTranspose">SVDSetImplicitTranspose</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool impl)</font></strong>
+<a name="line45"> 45: </a>{
+<a name="line49"> 49: </a>  <font color="#4169E1">if</font> (svd-&gt;impltrans!=impl) {
+<a name="line50"> 50: </a>    svd-&gt;impltrans = impl;
+<a name="line51"> 51: </a>    svd-&gt;state     = SVD_STATE_INITIAL;
+<a name="line52"> 52: </a>  }
+<a name="line53"> 53: </a>  <font color="#4169E1">return</font>(0);
+<a name="line54"> 54: </a>}
+
+<a name="line56"> 56: </a><font color="#B22222">/*@</font>
+<a name="line57"> 57: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDGetImplicitTranspose.html#SVDGetImplicitTranspose">SVDGetImplicitTranspose</a> - Gets the mode used to handle the transpose</font>
+<a name="line58"> 58: </a><font color="#B22222">   of the matrix associated with the singular value problem.</font>
+
+<a name="line60"> 60: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line62"> 62: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line63"> 63: </a><font color="#B22222">.  svd  - the singular value solver context</font>
+
+<a name="line65"> 65: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line66"> 66: </a><font color="#B22222">.  impl - how to handle the transpose (implicitly or not)</font>
+
+<a name="line68"> 68: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line70"> 70: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetImplicitTranspose.html#SVDSetImplicitTranspose">SVDSetImplicitTranspose</a>(), <a href="../../../docs/manualpages/SVD/SVDSolve.html#SVDSolve">SVDSolve</a>(), <a href="../../../docs/manualpages/SVD/SVDSetOperator.html#SVDSetOperator">SVDSetOperator</a>()</font>
+<a name="line71"> 71: </a><font color="#B22222">@*/</font>
+<a name="line72"> 72: </a><strong><font color="#4169E1"><a name="SVDGetImplicitTranspose"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetImplicitTranspose.html#SVDGetImplicitTranspose">SVDGetImplicitTranspose</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool *impl)</font></strong>
+<a name="line73"> 73: </a>{
+<a name="line77"> 77: </a>  *impl = svd-&gt;impltrans;
+<a name="line78"> 78: </a>  <font color="#4169E1">return</font>(0);
+<a name="line79"> 79: </a>}
+
+<a name="line81"> 81: </a><font color="#B22222">/*@</font>
+<a name="line82"> 82: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetTolerances.html#SVDSetTolerances">SVDSetTolerances</a> - Sets the tolerance and maximum</font>
+<a name="line83"> 83: </a><font color="#B22222">   iteration count used by the default <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> convergence testers.</font>
+
+<a name="line85"> 85: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line87"> 87: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line88"> 88: </a><font color="#B22222">+  svd - the singular value solver context</font>
+<a name="line89"> 89: </a><font color="#B22222">.  tol - the convergence tolerance</font>
+<a name="line90"> 90: </a><font color="#B22222">-  maxits - maximum number of iterations to use</font>
+
+<a name="line92"> 92: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line93"> 93: </a><font color="#B22222">+  -svd_tol &lt;tol&gt; - Sets the convergence tolerance</font>
+<a name="line94"> 94: </a><font color="#B22222">-  -svd_max_it &lt;maxits&gt; - Sets the maximum number of iterations allowed</font>
+
+<a name="line96"> 96: </a><font color="#B22222">   Note:</font>
+<a name="line97"> 97: </a><font color="#B22222">   Use PETSC_DEFAULT for either argument to assign a reasonably good value.</font>
+
+<a name="line99"> 99: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line101">101: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDGetTolerances.html#SVDGetTolerances">SVDGetTolerances</a>()</font>
+<a name="line102">102: </a><font color="#B22222">@*/</font>
+<a name="line103">103: </a><strong><font color="#4169E1"><a name="SVDSetTolerances"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetTolerances.html#SVDSetTolerances">SVDSetTolerances</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscReal tol,PetscInt maxits)</font></strong>
+<a name="line104">104: </a>{
+<a name="line109">109: </a>  <font color="#4169E1">if</font> (tol == PETSC_DEFAULT) {
+<a name="line110">110: </a>    svd-&gt;tol   = PETSC_DEFAULT;
+<a name="line111">111: </a>    svd-&gt;state = SVD_STATE_INITIAL;
+<a name="line112">112: </a>  } <font color="#4169E1">else</font> {
+<a name="line113">113: </a>    <font color="#4169E1">if</font> (tol &lt;= 0.0) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of tol. Must be &gt; 0"</font>);
+<a name="line114">114: </a>    svd-&gt;tol = tol;
+<a name="line115">115: </a>  }
+<a name="line116">116: </a>  <font color="#4169E1">if</font> (maxits == PETSC_DEFAULT || maxits == PETSC_DECIDE) {
+<a name="line117">117: </a>    svd-&gt;max_it = PETSC_DEFAULT;
+<a name="line118">118: </a>    svd-&gt;state  = SVD_STATE_INITIAL;
+<a name="line119">119: </a>  } <font color="#4169E1">else</font> {
+<a name="line120">120: </a>    <font color="#4169E1">if</font> (maxits &lt;= 0) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of maxits. Must be &gt; 0"</font>);
+<a name="line121">121: </a>    svd-&gt;max_it = maxits;
+<a name="line122">122: </a>  }
+<a name="line123">123: </a>  <font color="#4169E1">return</font>(0);
+<a name="line124">124: </a>}
+
+<a name="line126">126: </a><font color="#B22222">/*@C</font>
+<a name="line127">127: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDGetTolerances.html#SVDGetTolerances">SVDGetTolerances</a> - Gets the tolerance and maximum</font>
+<a name="line128">128: </a><font color="#B22222">   iteration count used by the default <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> convergence tests.</font>
+
+<a name="line130">130: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line132">132: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line133">133: </a><font color="#B22222">.  svd - the singular value solver context</font>
+
+<a name="line135">135: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line136">136: </a><font color="#B22222">+  tol - the convergence tolerance</font>
+<a name="line137">137: </a><font color="#B22222">-  maxits - maximum number of iterations</font>
+
+<a name="line139">139: </a><font color="#B22222">   Notes:</font>
+<a name="line140">140: </a><font color="#B22222">   The user can specify NULL for any parameter that is not needed.</font>
+
+<a name="line142">142: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line144">144: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetTolerances.html#SVDSetTolerances">SVDSetTolerances</a>()</font>
+<a name="line145">145: </a><font color="#B22222">@*/</font>
+<a name="line146">146: </a><strong><font color="#4169E1"><a name="SVDGetTolerances"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetTolerances.html#SVDGetTolerances">SVDGetTolerances</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscReal *tol,PetscInt *maxits)</font></strong>
+<a name="line147">147: </a>{
+<a name="line150">150: </a>  <font color="#4169E1">if</font> (tol)    *tol    = svd-&gt;tol;
+<a name="line151">151: </a>  <font color="#4169E1">if</font> (maxits) *maxits = svd-&gt;max_it;
+<a name="line152">152: </a>  <font color="#4169E1">return</font>(0);
+<a name="line153">153: </a>}
+
+<a name="line155">155: </a><font color="#B22222">/*@</font>
+<a name="line156">156: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetDimensions.html#SVDSetDimensions">SVDSetDimensions</a> - Sets the number of singular values to compute</font>
+<a name="line157">157: </a><font color="#B22222">   and the dimension of the subspace.</font>
+
+<a name="line159">159: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line161">161: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line162">162: </a><font color="#B22222">+  svd - the singular value solver context</font>
+<a name="line163">163: </a><font color="#B22222">.  nsv - number of singular values to compute</font>
+<a name="line164">164: </a><font color="#B22222">.  ncv - the maximum dimension of the subspace to be used by the solver</font>
+<a name="line165">165: </a><font color="#B22222">-  mpd - the maximum dimension allowed for the projected problem</font>
+
+<a name="line167">167: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line168">168: </a><font color="#B22222">+  -svd_nsv &lt;nsv&gt; - Sets the number of singular values</font>
+<a name="line169">169: </a><font color="#B22222">.  -svd_ncv &lt;ncv&gt; - Sets the dimension of the subspace</font>
+<a name="line170">170: </a><font color="#B22222">-  -svd_mpd &lt;mpd&gt; - Sets the maximum projected dimension</font>
+
+<a name="line172">172: </a><font color="#B22222">   Notes:</font>
+<a name="line173">173: </a><font color="#B22222">   Use PETSC_DEFAULT for ncv and mpd to assign a reasonably good value, which is</font>
+<a name="line174">174: </a><font color="#B22222">   dependent on the solution method and the number of singular values required.</font>
+
+<a name="line176">176: </a><font color="#B22222">   The parameters ncv and mpd are intimately related, so that the user is advised</font>
+<a name="line177">177: </a><font color="#B22222">   to set one of them at most. Normal usage is that</font>
+<a name="line178">178: </a><font color="#B22222">   (a) in cases where nsv is small, the user sets ncv (a reasonable default is 2*nsv); and</font>
+<a name="line179">179: </a><font color="#B22222">   (b) in cases where nsv is large, the user sets mpd.</font>
+
+<a name="line181">181: </a><font color="#B22222">   The value of ncv should always be between nsv and (nsv+mpd), typically</font>
+<a name="line182">182: </a><font color="#B22222">   ncv=nsv+mpd. If nsv is not too large, mpd=nsv is a reasonable choice, otherwise</font>
+<a name="line183">183: </a><font color="#B22222">   a smaller value should be used.</font>
+
+<a name="line185">185: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line187">187: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDGetDimensions.html#SVDGetDimensions">SVDGetDimensions</a>()</font>
+<a name="line188">188: </a><font color="#B22222">@*/</font>
+<a name="line189">189: </a><strong><font color="#4169E1"><a name="SVDSetDimensions"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetDimensions.html#SVDSetDimensions">SVDSetDimensions</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscInt nsv,PetscInt ncv,PetscInt mpd)</font></strong>
+<a name="line190">190: </a>{
+<a name="line196">196: </a>  <font color="#4169E1">if</font> (nsv&lt;1) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of nsv. Must be &gt; 0"</font>);
+<a name="line197">197: </a>  svd-&gt;nsv = nsv;
+<a name="line198">198: </a>  <font color="#4169E1">if</font> (ncv == PETSC_DEFAULT || ncv == PETSC_DECIDE) {
+<a name="line199">199: </a>    svd-&gt;ncv = PETSC_DEFAULT;
+<a name="line200">200: </a>  } <font color="#4169E1">else</font> {
+<a name="line201">201: </a>    <font color="#4169E1">if</font> (ncv&lt;1) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of ncv. Must be &gt; 0"</font>);
+<a name="line202">202: </a>    svd-&gt;ncv = ncv;
+<a name="line203">203: </a>  }
+<a name="line204">204: </a>  <font color="#4169E1">if</font> (mpd == PETSC_DECIDE || mpd == PETSC_DEFAULT) {
+<a name="line205">205: </a>    svd-&gt;mpd = PETSC_DEFAULT;
+<a name="line206">206: </a>  } <font color="#4169E1">else</font> {
+<a name="line207">207: </a>    <font color="#4169E1">if</font> (mpd&lt;1) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of mpd. Must be &gt; 0"</font>);
+<a name="line208">208: </a>    svd-&gt;mpd = mpd;
+<a name="line209">209: </a>  }
+<a name="line210">210: </a>  svd-&gt;state = SVD_STATE_INITIAL;
+<a name="line211">211: </a>  <font color="#4169E1">return</font>(0);
+<a name="line212">212: </a>}
+
+<a name="line214">214: </a><font color="#B22222">/*@C</font>
+<a name="line215">215: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDGetDimensions.html#SVDGetDimensions">SVDGetDimensions</a> - Gets the number of singular values to compute</font>
+<a name="line216">216: </a><font color="#B22222">   and the dimension of the subspace.</font>
+
+<a name="line218">218: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line220">220: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line221">221: </a><font color="#B22222">.  svd - the singular value context</font>
+
+<a name="line223">223: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line224">224: </a><font color="#B22222">+  nsv - number of singular values to compute</font>
+<a name="line225">225: </a><font color="#B22222">.  ncv - the maximum dimension of the subspace to be used by the solver</font>
+<a name="line226">226: </a><font color="#B22222">-  mpd - the maximum dimension allowed for the projected problem</font>
+
+<a name="line228">228: </a><font color="#B22222">   Notes:</font>
+<a name="line229">229: </a><font color="#B22222">   The user can specify NULL for any parameter that is not needed.</font>
+
+<a name="line231">231: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line233">233: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetDimensions.html#SVDSetDimensions">SVDSetDimensions</a>()</font>
+<a name="line234">234: </a><font color="#B22222">@*/</font>
+<a name="line235">235: </a><strong><font color="#4169E1"><a name="SVDGetDimensions"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetDimensions.html#SVDGetDimensions">SVDGetDimensions</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscInt *nsv,PetscInt *ncv,PetscInt *mpd)</font></strong>
+<a name="line236">236: </a>{
+<a name="line239">239: </a>  <font color="#4169E1">if</font> (nsv) *nsv = svd-&gt;nsv;
+<a name="line240">240: </a>  <font color="#4169E1">if</font> (ncv) *ncv = svd-&gt;ncv;
+<a name="line241">241: </a>  <font color="#4169E1">if</font> (mpd) *mpd = svd-&gt;mpd;
+<a name="line242">242: </a>  <font color="#4169E1">return</font>(0);
+<a name="line243">243: </a>}
+
+<a name="line245">245: </a><font color="#B22222">/*@</font>
+<a name="line246">246: </a><font color="#B22222">    <a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a> - Specifies which singular triplets are</font>
+<a name="line247">247: </a><font color="#B22222">    to be sought.</font>
+
+<a name="line249">249: </a><font color="#B22222">    Logically Collective on svd</font>
+
+<a name="line251">251: </a><font color="#B22222">    Input Parameter:</font>
+<a name="line252">252: </a><font color="#B22222">.   svd - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+
+<a name="line254">254: </a><font color="#B22222">    Output Parameter:</font>
+<a name="line255">255: </a><font color="#B22222">.   which - which singular triplets are to be sought</font>
+
+<a name="line257">257: </a><font color="#B22222">    Possible values:</font>
+<a name="line258">258: </a><font color="#B22222">    The parameter 'which' can have one of these values</font>
+
+<a name="line260">260: </a><font color="#B22222">+     <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_LARGEST</a>  - largest singular values</font>
+<a name="line261">261: </a><font color="#B22222">-     <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_SMALLEST</a> - smallest singular values</font>
+
+<a name="line263">263: </a><font color="#B22222">    Options Database Keys:</font>
+<a name="line264">264: </a><font color="#B22222">+   -svd_largest  - Sets largest singular values</font>
+<a name="line265">265: </a><font color="#B22222">-   -svd_smallest - Sets smallest singular values</font>
+
+<a name="line267">267: </a><font color="#B22222">    Level: intermediate</font>
+
+<a name="line269">269: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDGetWhichSingularTriplets.html#SVDGetWhichSingularTriplets">SVDGetWhichSingularTriplets</a>(), <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVDWhich</a></font>
+<a name="line270">270: </a><font color="#B22222">@*/</font>
+<a name="line271">271: </a><strong><font color="#4169E1"><a name="SVDSetWhichSingularTriplets"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVDWhich</a> which)</font></strong>
+<a name="line272">272: </a>{
+<a name="line276">276: </a>  <font color="#4169E1">switch</font> (which) {
+<a name="line277">277: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_LARGEST</a>:
+<a name="line278">278: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_SMALLEST</a>:
+<a name="line279">279: </a>      <font color="#4169E1">if</font> (svd-&gt;which != which) {
+<a name="line280">280: </a>        svd-&gt;state = SVD_STATE_INITIAL;
+<a name="line281">281: </a>        svd-&gt;which = which;
+<a name="line282">282: </a>      }
+<a name="line283">283: </a>      <font color="#4169E1">break</font>;
+<a name="line284">284: </a><strong><font color="#FF0000">  default:</font></strong>
+<a name="line285">285: </a>    SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid 'which' parameter"</font>);
+<a name="line286">286: </a>  }
+<a name="line287">287: </a>  <font color="#4169E1">return</font>(0);
+<a name="line288">288: </a>}
+
+<a name="line290">290: </a><font color="#B22222">/*@</font>
+<a name="line291">291: </a><font color="#B22222">    <a href="../../../docs/manualpages/SVD/SVDGetWhichSingularTriplets.html#SVDGetWhichSingularTriplets">SVDGetWhichSingularTriplets</a> - Returns which singular triplets are</font>
+<a name="line292">292: </a><font color="#B22222">    to be sought.</font>
+
+<a name="line294">294: </a><font color="#B22222">    Not Collective</font>
+
+<a name="line296">296: </a><font color="#B22222">    Input Parameter:</font>
+<a name="line297">297: </a><font color="#B22222">.   svd - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+
+<a name="line299">299: </a><font color="#B22222">    Output Parameter:</font>
+<a name="line300">300: </a><font color="#B22222">.   which - which singular triplets are to be sought</font>
+
+<a name="line302">302: </a><font color="#B22222">    Notes:</font>
+<a name="line303">303: </a><font color="#B22222">    See <a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>() for possible values of which</font>
+
+<a name="line305">305: </a><font color="#B22222">    Level: intermediate</font>
+
+<a name="line307">307: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>(), <a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVDWhich</a></font>
+<a name="line308">308: </a><font color="#B22222">@*/</font>
+<a name="line309">309: </a><strong><font color="#4169E1"><a name="SVDGetWhichSingularTriplets"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetWhichSingularTriplets.html#SVDGetWhichSingularTriplets">SVDGetWhichSingularTriplets</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVDWhich</a> *which)</font></strong>
+<a name="line310">310: </a>{
+<a name="line314">314: </a>  *which = svd-&gt;which;
+<a name="line315">315: </a>  <font color="#4169E1">return</font>(0);
+<a name="line316">316: </a>}
+
+<a name="line318">318: </a><font color="#B22222">/*@C</font>
+<a name="line319">319: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTestFunction.html#SVDSetConvergenceTestFunction">SVDSetConvergenceTestFunction</a> - Sets a function to compute the error estimate</font>
+<a name="line320">320: </a><font color="#B22222">   used in the convergence test.</font>
+
+<a name="line322">322: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line324">324: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line325">325: </a><font color="#B22222">+  svd     - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+<a name="line326">326: </a><font color="#B22222">.  func    - a pointer to the convergence test function</font>
+<a name="line327">327: </a><font color="#B22222">.  ctx     - context for private data for the convergence routine (may be null)</font>
+<a name="line328">328: </a><font color="#B22222">-  destroy - a routine for destroying the context (may be null)</font>
+
+<a name="line330">330: </a><font color="#B22222">   Calling Sequence of func:</font>
+<a name="line331">331: </a><font color="#B22222">$   func(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscReal sigma,PetscReal res,PetscReal *errest,void *ctx)</font>
+
+<a name="line333">333: </a><font color="#B22222">+   svd    - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+<a name="line334">334: </a><font color="#B22222">.   sigma  - computed singular value</font>
+<a name="line335">335: </a><font color="#B22222">.   res    - residual norm associated to the singular triplet</font>
+<a name="line336">336: </a><font color="#B22222">.   errest - (output) computed error estimate</font>
+<a name="line337">337: </a><font color="#B22222">-   ctx    - optional context, as set by <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTestFunction.html#SVDSetConvergenceTestFunction">SVDSetConvergenceTestFunction</a>()</font>
+
+<a name="line339">339: </a><font color="#B22222">   Note:</font>
+<a name="line340">340: </a><font color="#B22222">   If the error estimate returned by the convergence test function is less than</font>
+<a name="line341">341: </a><font color="#B22222">   the tolerance, then the singular value is accepted as converged.</font>
+
+<a name="line343">343: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line345">345: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(), <a href="../../../docs/manualpages/SVD/SVDSetTolerances.html#SVDSetTolerances">SVDSetTolerances</a>()</font>
+<a name="line346">346: </a><font color="#B22222">@*/</font>
+<a name="line347">347: </a><strong><font color="#4169E1"><a name="SVDSetConvergenceTestFunction"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTestFunction.html#SVDSetConvergenceTestFunction">SVDSetConvergenceTestFunction</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscErrorCode (*func)(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscReal,PetscReal,PetscReal*,void*),void* ctx,PetscErrorCode (*destroy)(void*))</font></strong>
+<a name="line348">348: </a>{
+
+<a name="line353">353: </a>  <font color="#4169E1">if</font> (svd-&gt;convergeddestroy) {
+<a name="line354">354: </a>    (*svd-&gt;convergeddestroy)(svd-&gt;convergedctx);
+<a name="line355">355: </a>  }
+<a name="line356">356: </a>  svd-&gt;convergeduser    = func;
+<a name="line357">357: </a>  svd-&gt;convergeddestroy = destroy;
+<a name="line358">358: </a>  svd-&gt;convergedctx     = ctx;
+<a name="line359">359: </a>  <font color="#4169E1">if</font> (func == SVDConvergedRelative) svd-&gt;conv = <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_REL</a>;
+<a name="line360">360: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (func == SVDConvergedAbsolute) svd-&gt;conv = <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_ABS</a>;
+<a name="line361">361: </a>  <font color="#4169E1">else</font> {
+<a name="line362">362: </a>    svd-&gt;conv      = <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_USER</a>;
+<a name="line363">363: </a>    svd-&gt;converged = svd-&gt;convergeduser;
+<a name="line364">364: </a>  }
+<a name="line365">365: </a>  <font color="#4169E1">return</font>(0);
+<a name="line366">366: </a>}
+
+<a name="line368">368: </a><font color="#B22222">/*@</font>
+<a name="line369">369: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a> - Specifies how to compute the error estimate</font>
+<a name="line370">370: </a><font color="#B22222">   used in the convergence test.</font>
+
+<a name="line372">372: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line374">374: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line375">375: </a><font color="#B22222">+  svd  - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+<a name="line376">376: </a><font color="#B22222">-  conv - the type of convergence test</font>
+
+<a name="line378">378: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line379">379: </a><font color="#B22222">+  -svd_conv_abs  - Sets the absolute convergence test</font>
+<a name="line380">380: </a><font color="#B22222">.  -svd_conv_rel  - Sets the convergence test relative to the singular value</font>
+<a name="line381">381: </a><font color="#B22222">-  -svd_conv_user - Selects the user-defined convergence test</font>
+
+<a name="line383">383: </a><font color="#B22222">   Note:</font>
+<a name="line384">384: </a><font color="#B22222">   The parameter 'conv' can have one of these values</font>
+<a name="line385">385: </a><font color="#B22222">+     <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_ABS</a>  - absolute error ||r||</font>
+<a name="line386">386: </a><font color="#B22222">.     <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_REL</a>  - error relative to the singular value l, ||r||/sigma</font>
+<a name="line387">387: </a><font color="#B22222">-     <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_USER</a> - function set by <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTestFunction.html#SVDSetConvergenceTestFunction">SVDSetConvergenceTestFunction</a>()</font>
+
+<a name="line389">389: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line391">391: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDGetConvergenceTest.html#SVDGetConvergenceTest">SVDGetConvergenceTest</a>(), <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTestFunction.html#SVDSetConvergenceTestFunction">SVDSetConvergenceTestFunction</a>(), <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>(), <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVDConv</a></font>
+<a name="line392">392: </a><font color="#B22222">@*/</font>
+<a name="line393">393: </a><strong><font color="#4169E1"><a name="SVDSetConvergenceTest"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVDConv</a> conv)</font></strong>
+<a name="line394">394: </a>{
+<a name="line398">398: </a>  <font color="#4169E1">switch</font> (conv) {
+<a name="line399">399: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_ABS</a>:  svd-&gt;converged = SVDConvergedAbsolute; <font color="#4169E1">break</font>;
+<a name="line400">400: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_REL</a>:  svd-&gt;converged = SVDConvergedRelative; <font color="#4169E1">break</font>;
+<a name="line401">401: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_USER</a>:
+<a name="line402">402: </a>      <font color="#4169E1">if</font> (!svd-&gt;convergeduser) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ORDER,<font color="#666666">"Must call <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTestFunction.html#SVDSetConvergenceTestFunction">SVDSetConvergenceTestFunction</a>() first"</font>);
+<a name="line403">403: </a>      svd-&gt;converged = svd-&gt;convergeduser;
+<a name="line404">404: </a>      <font color="#4169E1">break</font>;
+<a name="line405">405: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line406">406: </a>      SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid 'conv' value"</font>);
+<a name="line407">407: </a>  }
+<a name="line408">408: </a>  svd-&gt;conv = conv;
+<a name="line409">409: </a>  <font color="#4169E1">return</font>(0);
+<a name="line410">410: </a>}
+
+<a name="line412">412: </a><font color="#B22222">/*@</font>
+<a name="line413">413: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDGetConvergenceTest.html#SVDGetConvergenceTest">SVDGetConvergenceTest</a> - Gets the method used to compute the error estimate</font>
+<a name="line414">414: </a><font color="#B22222">   used in the convergence test.</font>
+
+<a name="line416">416: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line418">418: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line419">419: </a><font color="#B22222">.  svd   - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+
+<a name="line421">421: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line422">422: </a><font color="#B22222">.  conv  - the type of convergence test</font>
+
+<a name="line424">424: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line426">426: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(), <a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVDConv</a></font>
+<a name="line427">427: </a><font color="#B22222">@*/</font>
+<a name="line428">428: </a><strong><font color="#4169E1"><a name="SVDGetConvergenceTest"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetConvergenceTest.html#SVDGetConvergenceTest">SVDGetConvergenceTest</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVDConv</a> *conv)</font></strong>
+<a name="line429">429: </a>{
+<a name="line433">433: </a>  *conv = svd-&gt;conv;
+<a name="line434">434: </a>  <font color="#4169E1">return</font>(0);
+<a name="line435">435: </a>}
+
+<a name="line437">437: </a><font color="#B22222">/*@C</font>
+<a name="line438">438: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetStoppingTestFunction.html#SVDSetStoppingTestFunction">SVDSetStoppingTestFunction</a> - Sets a function to decide when to stop the outer</font>
+<a name="line439">439: </a><font color="#B22222">   iteration of the singular value solver.</font>
+
+<a name="line441">441: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line443">443: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line444">444: </a><font color="#B22222">+  svd     - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+<a name="line445">445: </a><font color="#B22222">.  func    - pointer to the stopping test function</font>
+<a name="line446">446: </a><font color="#B22222">.  ctx     - context for private data for the stopping routine (may be null)</font>
+<a name="line447">447: </a><font color="#B22222">-  destroy - a routine for destroying the context (may be null)</font>
+
+<a name="line449">449: </a><font color="#B22222">   Calling Sequence of func:</font>
+<a name="line450">450: </a><font color="#B22222">$   func(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscInt its,PetscInt max_it,PetscInt nconv,PetscInt nsv,<a href="../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVDConvergedReason</a> *reason,void *ctx)</font>
+
+<a name="line452">452: </a><font color="#B22222">+   svd    - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+<a name="line453">453: </a><font color="#B22222">.   its    - current number of iterations</font>
+<a name="line454">454: </a><font color="#B22222">.   max_it - maximum number of iterations</font>
+<a name="line455">455: </a><font color="#B22222">.   nconv  - number of currently converged singular triplets</font>
+<a name="line456">456: </a><font color="#B22222">.   nsv    - number of requested singular triplets</font>
+<a name="line457">457: </a><font color="#B22222">.   reason - (output) result of the stopping test</font>
+<a name="line458">458: </a><font color="#B22222">-   ctx    - optional context, as set by <a href="../../../docs/manualpages/SVD/SVDSetStoppingTestFunction.html#SVDSetStoppingTestFunction">SVDSetStoppingTestFunction</a>()</font>
+
+<a name="line460">460: </a><font color="#B22222">   Note:</font>
+<a name="line461">461: </a><font color="#B22222">   Normal usage is to first call the default routine <a href="../../../docs/manualpages/SVD/SVDStoppingBasic.html#SVDStoppingBasic">SVDStoppingBasic</a>() and then</font>
+<a name="line462">462: </a><font color="#B22222">   set reason to <a href="../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVD_CONVERGED_USER</a> if some user-defined conditions have been</font>
+<a name="line463">463: </a><font color="#B22222">   met. To let the singular value solver continue iterating, the result must be</font>
+<a name="line464">464: </a><font color="#B22222">   left as <a href="../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVD_CONVERGED_ITERATING</a>.</font>
+
+<a name="line466">466: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line468">468: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>(), <a href="../../../docs/manualpages/SVD/SVDStoppingBasic.html#SVDStoppingBasic">SVDStoppingBasic</a>()</font>
+<a name="line469">469: </a><font color="#B22222">@*/</font>
+<a name="line470">470: </a><strong><font color="#4169E1"><a name="SVDSetStoppingTestFunction"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetStoppingTestFunction.html#SVDSetStoppingTestFunction">SVDSetStoppingTestFunction</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscErrorCode (*func)(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscInt,PetscInt,PetscInt,PetscInt,<a href="../../../docs/manualpages/SVD/SVDConvergedReason.html#SVDConvergedReason">SVDConvergedReason</a>*,void*),void* ctx,PetscErrorCode (*destroy)(void*))</font></strong>
+<a name="line471">471: </a>{
+
+<a name="line476">476: </a>  <font color="#4169E1">if</font> (svd-&gt;stoppingdestroy) {
+<a name="line477">477: </a>    (*svd-&gt;stoppingdestroy)(svd-&gt;stoppingctx);
+<a name="line478">478: </a>  }
+<a name="line479">479: </a>  svd-&gt;stoppinguser    = func;
+<a name="line480">480: </a>  svd-&gt;stoppingdestroy = destroy;
+<a name="line481">481: </a>  svd-&gt;stoppingctx     = ctx;
+<a name="line482">482: </a>  <font color="#4169E1">if</font> (func == <a href="../../../docs/manualpages/SVD/SVDStoppingBasic.html#SVDStoppingBasic">SVDStoppingBasic</a>) svd-&gt;stop = <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_BASIC</a>;
+<a name="line483">483: </a>  <font color="#4169E1">else</font> {
+<a name="line484">484: </a>    svd-&gt;stop     = <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_USER</a>;
+<a name="line485">485: </a>    svd-&gt;stopping = svd-&gt;stoppinguser;
+<a name="line486">486: </a>  }
+<a name="line487">487: </a>  <font color="#4169E1">return</font>(0);
+<a name="line488">488: </a>}
+
+<a name="line490">490: </a><font color="#B22222">/*@</font>
+<a name="line491">491: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a> - Specifies how to decide the termination of the outer</font>
+<a name="line492">492: </a><font color="#B22222">   loop of the singular value solver.</font>
+
+<a name="line494">494: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line496">496: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line497">497: </a><font color="#B22222">+  svd  - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+<a name="line498">498: </a><font color="#B22222">-  stop - the type of stopping test</font>
+
+<a name="line500">500: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line501">501: </a><font color="#B22222">+  -svd_stop_basic - Sets the default stopping test</font>
+<a name="line502">502: </a><font color="#B22222">-  -svd_stop_user  - Selects the user-defined stopping test</font>
+
+<a name="line504">504: </a><font color="#B22222">   Note:</font>
+<a name="line505">505: </a><font color="#B22222">   The parameter 'stop' can have one of these values</font>
+<a name="line506">506: </a><font color="#B22222">+     <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_BASIC</a> - default stopping test</font>
+<a name="line507">507: </a><font color="#B22222">-     <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_USER</a>  - function set by <a href="../../../docs/manualpages/SVD/SVDSetStoppingTestFunction.html#SVDSetStoppingTestFunction">SVDSetStoppingTestFunction</a>()</font>
+
+<a name="line509">509: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line511">511: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDGetStoppingTest.html#SVDGetStoppingTest">SVDGetStoppingTest</a>(), <a href="../../../docs/manualpages/SVD/SVDSetStoppingTestFunction.html#SVDSetStoppingTestFunction">SVDSetStoppingTestFunction</a>(), <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(), <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVDStop</a></font>
+<a name="line512">512: </a><font color="#B22222">@*/</font>
+<a name="line513">513: </a><strong><font color="#4169E1"><a name="SVDSetStoppingTest"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVDStop</a> stop)</font></strong>
+<a name="line514">514: </a>{
+<a name="line518">518: </a>  <font color="#4169E1">switch</font> (stop) {
+<a name="line519">519: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_BASIC</a>: svd-&gt;stopping = <a href="../../../docs/manualpages/SVD/SVDStoppingBasic.html#SVDStoppingBasic">SVDStoppingBasic</a>; <font color="#4169E1">break</font>;
+<a name="line520">520: </a>    <font color="#4169E1">case</font> <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_USER</a>:
+<a name="line521">521: </a>      <font color="#4169E1">if</font> (!svd-&gt;stoppinguser) SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ORDER,<font color="#666666">"Must call <a href="../../../docs/manualpages/SVD/SVDSetStoppingTestFunction.html#SVDSetStoppingTestFunction">SVDSetStoppingTestFunction</a>() first"</font>);
+<a name="line522">522: </a>      svd-&gt;stopping = svd-&gt;stoppinguser;
+<a name="line523">523: </a>      <font color="#4169E1">break</font>;
+<a name="line524">524: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line525">525: </a>      SETERRQ(PetscObjectComm((PetscObject)svd),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid 'stop' value"</font>);
+<a name="line526">526: </a>  }
+<a name="line527">527: </a>  svd-&gt;stop = stop;
+<a name="line528">528: </a>  <font color="#4169E1">return</font>(0);
+<a name="line529">529: </a>}
+
+<a name="line531">531: </a><font color="#B22222">/*@</font>
+<a name="line532">532: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDGetStoppingTest.html#SVDGetStoppingTest">SVDGetStoppingTest</a> - Gets the method used to decide the termination of the outer</font>
+<a name="line533">533: </a><font color="#B22222">   loop of the singular value solver.</font>
+
+<a name="line535">535: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line537">537: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line538">538: </a><font color="#B22222">.  svd   - singular value solver context obtained from <a href="../../../docs/manualpages/SVD/SVDCreate.html#SVDCreate">SVDCreate</a>()</font>
+
+<a name="line540">540: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line541">541: </a><font color="#B22222">.  stop  - the type of stopping test</font>
+
+<a name="line543">543: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line545">545: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>(), <a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVDStop</a></font>
+<a name="line546">546: </a><font color="#B22222">@*/</font>
+<a name="line547">547: </a><strong><font color="#4169E1"><a name="SVDGetStoppingTest"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetStoppingTest.html#SVDGetStoppingTest">SVDGetStoppingTest</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,<a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVDStop</a> *stop)</font></strong>
+<a name="line548">548: </a>{
+<a name="line552">552: </a>  *stop = svd-&gt;stop;
+<a name="line553">553: </a>  <font color="#4169E1">return</font>(0);
+<a name="line554">554: </a>}
+
+<a name="line556">556: </a><font color="#B22222">/*@C</font>
+<a name="line557">557: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDMonitorSetFromOptions.html#SVDMonitorSetFromOptions">SVDMonitorSetFromOptions</a> - Sets a monitor function and viewer appropriate for the type</font>
+<a name="line558">558: </a><font color="#B22222">   indicated by the user.</font>
+
+<a name="line560">560: </a><font color="#B22222">   Collective on svd</font>
+
+<a name="line562">562: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line563">563: </a><font color="#B22222">+  svd      - the singular value solver context</font>
+<a name="line564">564: </a><font color="#B22222">.  name     - the monitor option name</font>
+<a name="line565">565: </a><font color="#B22222">.  help     - message indicating what monitoring is done</font>
+<a name="line566">566: </a><font color="#B22222">.  manual   - manual page for the monitor</font>
+<a name="line567">567: </a><font color="#B22222">.  monitor  - the monitor function, whose context is a PetscViewerAndFormat</font>
+<a name="line568">568: </a><font color="#B22222">-  trackall - whether this monitor tracks all singular values or not</font>
+
+<a name="line570">570: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line572">572: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>(), <a href="../../../docs/manualpages/SVD/SVDSetTrackAll.html#SVDSetTrackAll">SVDSetTrackAll</a>(), <a href="../../../docs/manualpages/SVD/SVDConvMonitorSetFromOptions.html#SVDConvMonitorSetFromOptions">SVDConvMonitorSetFromOptions</a>()</font>
+<a name="line573">573: </a><font color="#B22222">@*/</font>
+<a name="line574">574: </a><strong><font color="#4169E1"><a name="SVDMonitorSetFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDMonitorSetFromOptions.html#SVDMonitorSetFromOptions">SVDMonitorSetFromOptions</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,const char name[],const char help[],const char manual[],PetscErrorCode (*monitor)(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscInt,PetscInt,PetscReal*,PetscReal*,PetscInt,PetscViewerAndFormat*),PetscBool trackall)</font></strong>
+<a name="line575">575: </a>{
+<a name="line576">576: </a>  PetscErrorCode       ierr;
+<a name="line577">577: </a>  PetscBool            flg;
+<a name="line578">578: </a>  PetscViewer          viewer;
+<a name="line579">579: </a>  PetscViewerFormat    format;
+<a name="line580">580: </a>  PetscViewerAndFormat *vf;
+
+<a name="line583">583: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)svd),((PetscObject)svd)-&gt;options,((PetscObject)svd)-&gt;prefix,name,&amp;viewer,&amp;format,&amp;flg);
+<a name="line584">584: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line585">585: </a>    PetscViewerAndFormatCreate(viewer,format,&amp;vf);
+<a name="line586">586: </a>    PetscObjectDereference((PetscObject)viewer);
+<a name="line587">587: </a>    <a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>(svd,(PetscErrorCode (*)(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscInt,PetscInt,PetscReal*,PetscReal*,PetscInt,void*))monitor,vf,(PetscErrorCode (*)(void**))PetscViewerAndFormatDestroy);
+<a name="line588">588: </a>    <font color="#4169E1">if</font> (trackall) {
+<a name="line589">589: </a>      <a href="../../../docs/manualpages/SVD/SVDSetTrackAll.html#SVDSetTrackAll">SVDSetTrackAll</a>(svd,PETSC_TRUE);
+<a name="line590">590: </a>    }
+<a name="line591">591: </a>  }
+<a name="line592">592: </a>  <font color="#4169E1">return</font>(0);
+<a name="line593">593: </a>}
+
+<a name="line595">595: </a><font color="#B22222">/*@C</font>
+<a name="line596">596: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDConvMonitorSetFromOptions.html#SVDConvMonitorSetFromOptions">SVDConvMonitorSetFromOptions</a> - Sets a monitor function and viewer appropriate for the type</font>
+<a name="line597">597: </a><font color="#B22222">   indicated by the user (for monitors that only show iteration numbers of convergence).</font>
+
+<a name="line599">599: </a><font color="#B22222">   Collective on svd</font>
+
+<a name="line601">601: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line602">602: </a><font color="#B22222">+  svd      - the singular value solver context</font>
+<a name="line603">603: </a><font color="#B22222">.  name     - the monitor option name</font>
+<a name="line604">604: </a><font color="#B22222">.  help     - message indicating what monitoring is done</font>
+<a name="line605">605: </a><font color="#B22222">.  manual   - manual page for the monitor</font>
+<a name="line606">606: </a><font color="#B22222">-  monitor  - the monitor function, whose context is a SlepcConvMonitor</font>
+
+<a name="line608">608: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line610">610: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>(), <a href="../../../docs/manualpages/SVD/SVDMonitorSetFromOptions.html#SVDMonitorSetFromOptions">SVDMonitorSetFromOptions</a>()</font>
+<a name="line611">611: </a><font color="#B22222">@*/</font>
+<a name="line612">612: </a><strong><font color="#4169E1"><a name="SVDConvMonitorSetFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDConvMonitorSetFromOptions.html#SVDConvMonitorSetFromOptions">SVDConvMonitorSetFromOptions</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,const char name[],const char help[],const char manual[],PetscErrorCode (*monitor)(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscInt,PetscInt,PetscReal*,PetscReal*,PetscInt,SlepcConvMonitor))</font></strong>
+<a name="line613">613: </a>{
+<a name="line614">614: </a>  PetscErrorCode    ierr;
+<a name="line615">615: </a>  PetscBool         flg;
+<a name="line616">616: </a>  PetscViewer       viewer;
+<a name="line617">617: </a>  PetscViewerFormat format;
+<a name="line618">618: </a>  SlepcConvMonitor  ctx;
+
+<a name="line621">621: </a>  PetscOptionsGetViewer(PetscObjectComm((PetscObject)svd),((PetscObject)svd)-&gt;options,((PetscObject)svd)-&gt;prefix,name,&amp;viewer,&amp;format,&amp;flg);
+<a name="line622">622: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line623">623: </a>    <a href="../../../docs/manualpages/sys/SlepcConvMonitorCreate.html#SlepcConvMonitorCreate">SlepcConvMonitorCreate</a>(viewer,format,&amp;ctx);
+<a name="line624">624: </a>    PetscObjectDereference((PetscObject)viewer);
+<a name="line625">625: </a>    <a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>(svd,(PetscErrorCode (*)(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a>,PetscInt,PetscInt,PetscReal*,PetscReal*,PetscInt,void*))monitor,ctx,(PetscErrorCode (*)(void**))<a href="../../../docs/manualpages/sys/SlepcConvMonitorDestroy.html#SlepcConvMonitorDestroy">SlepcConvMonitorDestroy</a>);
+<a name="line626">626: </a>  }
+<a name="line627">627: </a>  <font color="#4169E1">return</font>(0);
+<a name="line628">628: </a>}
+
+<a name="line630">630: </a><font color="#B22222">/*@</font>
+<a name="line631">631: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetFromOptions.html#SVDSetFromOptions">SVDSetFromOptions</a> - Sets <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> options from the options database.</font>
+<a name="line632">632: </a><font color="#B22222">   This routine must be called before <a href="../../../docs/manualpages/SVD/SVDSetUp.html#SVDSetUp">SVDSetUp</a>() if the user is to be</font>
+<a name="line633">633: </a><font color="#B22222">   allowed to set the solver type.</font>
+
+<a name="line635">635: </a><font color="#B22222">   Collective on svd</font>
+
+<a name="line637">637: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line638">638: </a><font color="#B22222">.  svd - the singular value solver context</font>
+
+<a name="line640">640: </a><font color="#B22222">   Notes:</font>
+<a name="line641">641: </a><font color="#B22222">   To see all options, run your program with the -help option.</font>
+
+<a name="line643">643: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line645">645: </a><font color="#B22222">.seealso:</font>
+<a name="line646">646: </a><font color="#B22222">@*/</font>
+<a name="line647">647: </a><strong><font color="#4169E1"><a name="SVDSetFromOptions"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetFromOptions.html#SVDSetFromOptions">SVDSetFromOptions</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd)</font></strong>
+<a name="line648">648: </a>{
+<a name="line650">650: </a>  char           type[256];
+<a name="line651">651: </a>  PetscBool      set,flg,val,flg1,flg2,flg3;
+<a name="line652">652: </a>  PetscInt       i,j,k;
+<a name="line653">653: </a>  PetscReal      r;
+<a name="line654">654: </a>  PetscDrawLG    lg;
+
+<a name="line658">658: </a>  <a href="../../../docs/manualpages/SVD/SVDRegisterAll.html#SVDRegisterAll">SVDRegisterAll</a>();
+<a name="line659">659: </a>  PetscObjectOptionsBegin((PetscObject)svd);
+<a name="line660">660: </a>    PetscOptionsFList(<font color="#666666">"-svd_type"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> solver method"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetType.html#SVDSetType">SVDSetType</a>"</font>,SVDList,(char*)(((PetscObject)svd)-&gt;type_name?((PetscObject)svd)-&gt;type_name:SVDCROSS),type,256,&amp;flg);
+<a name="line661">661: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line662">662: </a>      <a href="../../../docs/manualpages/SVD/SVDSetType.html#SVDSetType">SVDSetType</a>(svd,type);
+<a name="line663">663: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!((PetscObject)svd)-&gt;type_name) {
+<a name="line664">664: </a>      <a href="../../../docs/manualpages/SVD/SVDSetType.html#SVDSetType">SVDSetType</a>(svd,SVDCROSS);
+<a name="line665">665: </a>    }
+
+<a name="line667">667: </a>    PetscOptionsBool(<font color="#666666">"-svd_implicittranspose"</font>,<font color="#666666">"Handle matrix transpose implicitly"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetImplicitTranspose.html#SVDSetImplicitTranspose">SVDSetImplicitTranspose</a>"</font>,svd-&gt;impltrans,&amp;val,&amp;flg);
+<a name="line668">668: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetImplicitTranspose.html#SVDSetImplicitTranspose">SVDSetImplicitTranspose</a>(svd,val); }
+
+<a name="line670">670: </a>    i = svd-&gt;max_it;
+<a name="line671">671: </a>    PetscOptionsInt(<font color="#666666">"-svd_max_it"</font>,<font color="#666666">"Maximum number of iterations"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetTolerances.html#SVDSetTolerances">SVDSetTolerances</a>"</font>,svd-&gt;max_it,&amp;i,&amp;flg1);
+<a name="line672">672: </a>    r = svd-&gt;tol;
+<a name="line673">673: </a>    PetscOptionsReal(<font color="#666666">"-svd_tol"</font>,<font color="#666666">"Tolerance"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetTolerances.html#SVDSetTolerances">SVDSetTolerances</a>"</font>,svd-&gt;tol==PETSC_DEFAULT?SLEPC_DEFAULT_TOL:svd-&gt;tol,&amp;r,&amp;flg2);
+<a name="line674">674: </a>    <font color="#4169E1">if</font> (flg1 || flg2) { <a href="../../../docs/manualpages/SVD/SVDSetTolerances.html#SVDSetTolerances">SVDSetTolerances</a>(svd,r,i); }
+
+<a name="line676">676: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-svd_conv_rel"</font>,<font color="#666666">"Relative error convergence test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>"</font>,&amp;flg);
+<a name="line677">677: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(svd,<a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_REL</a>); }
+<a name="line678">678: </a>    PetscOptionsBoolGroup(<font color="#666666">"-svd_conv_abs"</font>,<font color="#666666">"Absolute error convergence test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>"</font>,&amp;flg);
+<a name="line679">679: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(svd,<a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_ABS</a>); }
+<a name="line680">680: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-svd_conv_user"</font>,<font color="#666666">"User-defined convergence test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>"</font>,&amp;flg);
+<a name="line681">681: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetConvergenceTest.html#SVDSetConvergenceTest">SVDSetConvergenceTest</a>(svd,<a href="../../../docs/manualpages/SVD/SVDConv.html#SVDConv">SVD_CONV_USER</a>); }
+
+<a name="line683">683: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-svd_stop_basic"</font>,<font color="#666666">"Stop iteration if all singular values converged or max_it reached"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>"</font>,&amp;flg);
+<a name="line684">684: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>(svd,<a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_BASIC</a>); }
+<a name="line685">685: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-svd_stop_user"</font>,<font color="#666666">"User-defined stopping test"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>"</font>,&amp;flg);
+<a name="line686">686: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetStoppingTest.html#SVDSetStoppingTest">SVDSetStoppingTest</a>(svd,<a href="../../../docs/manualpages/SVD/SVDStop.html#SVDStop">SVD_STOP_USER</a>); }
+
+<a name="line688">688: </a>    i = svd-&gt;nsv;
+<a name="line689">689: </a>    PetscOptionsInt(<font color="#666666">"-svd_nsv"</font>,<font color="#666666">"Number of singular values to compute"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetDimensions.html#SVDSetDimensions">SVDSetDimensions</a>"</font>,svd-&gt;nsv,&amp;i,&amp;flg1);
+<a name="line690">690: </a>    j = svd-&gt;ncv;
+<a name="line691">691: </a>    PetscOptionsInt(<font color="#666666">"-svd_ncv"</font>,<font color="#666666">"Number of basis vectors"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetDimensions.html#SVDSetDimensions">SVDSetDimensions</a>"</font>,svd-&gt;ncv,&amp;j,&amp;flg2);
+<a name="line692">692: </a>    k = svd-&gt;mpd;
+<a name="line693">693: </a>    PetscOptionsInt(<font color="#666666">"-svd_mpd"</font>,<font color="#666666">"Maximum dimension of projected problem"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetDimensions.html#SVDSetDimensions">SVDSetDimensions</a>"</font>,svd-&gt;mpd,&amp;k,&amp;flg3);
+<a name="line694">694: </a>    <font color="#4169E1">if</font> (flg1 || flg2 || flg3) { <a href="../../../docs/manualpages/SVD/SVDSetDimensions.html#SVDSetDimensions">SVDSetDimensions</a>(svd,i,j,k); }
+
+<a name="line696">696: </a>    PetscOptionsBoolGroupBegin(<font color="#666666">"-svd_largest"</font>,<font color="#666666">"Compute largest singular values"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>"</font>,&amp;flg);
+<a name="line697">697: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>(svd,<a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_LARGEST</a>); }
+<a name="line698">698: </a>    PetscOptionsBoolGroupEnd(<font color="#666666">"-svd_smallest"</font>,<font color="#666666">"Compute smallest singular values"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>"</font>,&amp;flg);
+<a name="line699">699: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../docs/manualpages/SVD/SVDSetWhichSingularTriplets.html#SVDSetWhichSingularTriplets">SVDSetWhichSingularTriplets</a>(svd,<a href="../../../docs/manualpages/SVD/SVDWhich.html#SVDWhich">SVD_SMALLEST</a>); }
+
+<a name="line701">701: </a>    <font color="#B22222">/* -----------------------------------------------------------------------*/</font>
+<a name="line702">702: </a>    <font color="#B22222">/*</font>
+<a name="line703">703: </a><font color="#B22222">      Cancels all monitors hardwired into code before call to <a href="../../../docs/manualpages/SVD/SVDSetFromOptions.html#SVDSetFromOptions">SVDSetFromOptions</a>()</font>
+<a name="line704">704: </a><font color="#B22222">    */</font>
+<a name="line705">705: </a>    PetscOptionsBool(<font color="#666666">"-svd_monitor_cancel"</font>,<font color="#666666">"Remove any hardwired monitor routines"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDMonitorCancel.html#SVDMonitorCancel">SVDMonitorCancel</a>"</font>,PETSC_FALSE,&amp;flg,&amp;set);
+<a name="line706">706: </a>    <font color="#4169E1">if</font> (set &amp;&amp; flg) {
+<a name="line707">707: </a>      <a href="../../../docs/manualpages/SVD/SVDMonitorCancel.html#SVDMonitorCancel">SVDMonitorCancel</a>(svd);
+<a name="line708">708: </a>    }
+<a name="line709">709: </a>    <font color="#B22222">/*</font>
+<a name="line710">710: </a><font color="#B22222">      Text monitors</font>
+<a name="line711">711: </a><font color="#B22222">    */</font>
+<a name="line712">712: </a>    <a href="../../../docs/manualpages/SVD/SVDMonitorSetFromOptions.html#SVDMonitorSetFromOptions">SVDMonitorSetFromOptions</a>(svd,<font color="#666666">"-svd_monitor"</font>,<font color="#666666">"Monitor first unconverged approximate singular value and error estimate"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDMonitorFirst.html#SVDMonitorFirst">SVDMonitorFirst</a>"</font>,<a href="../../../docs/manualpages/SVD/SVDMonitorFirst.html#SVDMonitorFirst">SVDMonitorFirst</a>,PETSC_FALSE);
+<a name="line713">713: </a>    <a href="../../../docs/manualpages/SVD/SVDConvMonitorSetFromOptions.html#SVDConvMonitorSetFromOptions">SVDConvMonitorSetFromOptions</a>(svd,<font color="#666666">"-svd_monitor_conv"</font>,<font color="#666666">"Monitor approximate singular values and error estimates as they converge"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDMonitorConverged.html#SVDMonitorConverged">SVDMonitorConverged</a>"</font>,<a href="../../../docs/manualpages/SVD/SVDMonitorConverged.html#SVDMonitorConverged">SVDMonitorConverged</a>);
+<a name="line714">714: </a>    <a href="../../../docs/manualpages/SVD/SVDMonitorSetFromOptions.html#SVDMonitorSetFromOptions">SVDMonitorSetFromOptions</a>(svd,<font color="#666666">"-svd_monitor_all"</font>,<font color="#666666">"Monitor approximate singular values and error estimates"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDMonitorAll.html#SVDMonitorAll">SVDMonitorAll</a>"</font>,<a href="../../../docs/manualpages/SVD/SVDMonitorAll.html#SVDMonitorAll">SVDMonitorAll</a>,PETSC_TRUE);
+<a name="line715">715: </a>    <font color="#B22222">/*</font>
+<a name="line716">716: </a><font color="#B22222">      Line graph monitors</font>
+<a name="line717">717: </a><font color="#B22222">    */</font>
+<a name="line718">718: </a>    PetscOptionsBool(<font color="#666666">"-svd_monitor_lg"</font>,<font color="#666666">"Monitor first unconverged approximate singular value and error estimate graphically"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>"</font>,PETSC_FALSE,&amp;flg,&amp;set);
+<a name="line719">719: </a>    <font color="#4169E1">if</font> (set &amp;&amp; flg) {
+<a name="line720">720: </a>      <a href="../../../docs/manualpages/SVD/SVDMonitorLGCreate.html#SVDMonitorLGCreate">SVDMonitorLGCreate</a>(PetscObjectComm((PetscObject)svd),NULL,<font color="#666666">"Error estimates"</font>,PETSC_DECIDE,PETSC_DECIDE,300,300,&amp;lg);
+<a name="line721">721: </a>      <a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>(svd,SVDMonitorLG,lg,(PetscErrorCode (*)(void**))PetscDrawLGDestroy);
+<a name="line722">722: </a>    }
+<a name="line723">723: </a>    PetscOptionsBool(<font color="#666666">"-svd_monitor_lg_all"</font>,<font color="#666666">"Monitor error estimates graphically"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>"</font>,PETSC_FALSE,&amp;flg,&amp;set);
+<a name="line724">724: </a>    <font color="#4169E1">if</font> (set &amp;&amp; flg) {
+<a name="line725">725: </a>      <a href="../../../docs/manualpages/SVD/SVDMonitorLGCreate.html#SVDMonitorLGCreate">SVDMonitorLGCreate</a>(PetscObjectComm((PetscObject)svd),NULL,<font color="#666666">"Error estimates"</font>,PETSC_DECIDE,PETSC_DECIDE,300,300,&amp;lg);
+<a name="line726">726: </a>      <a href="../../../docs/manualpages/SVD/SVDMonitorSet.html#SVDMonitorSet">SVDMonitorSet</a>(svd,SVDMonitorLGAll,lg,(PetscErrorCode (*)(void**))PetscDrawLGDestroy);
+<a name="line727">727: </a>      <a href="../../../docs/manualpages/SVD/SVDSetTrackAll.html#SVDSetTrackAll">SVDSetTrackAll</a>(svd,PETSC_TRUE);
+<a name="line728">728: </a>    }
+
+<a name="line730">730: </a>    <font color="#B22222">/* -----------------------------------------------------------------------*/</font>
+<a name="line731">731: </a>    PetscOptionsName(<font color="#666666">"-svd_view"</font>,<font color="#666666">"Print detailed information on solver used"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDView.html#SVDView">SVDView</a>"</font>,NULL);
+<a name="line732">732: </a>    PetscOptionsName(<font color="#666666">"-svd_view_vectors"</font>,<font color="#666666">"View computed singular vectors"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDVectorsView.html#SVDVectorsView">SVDVectorsView</a>"</font>,NULL);
+<a name="line733">733: </a>    PetscOptionsName(<font color="#666666">"-svd_view_values"</font>,<font color="#666666">"View computed singular values"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDValuesView.html#SVDValuesView">SVDValuesView</a>"</font>,NULL);
+<a name="line734">734: </a>    PetscOptionsName(<font color="#666666">"-svd_converged_reason"</font>,<font color="#666666">"Print reason for convergence, and number of iterations"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDReasonView.html#SVDReasonView">SVDReasonView</a>"</font>,NULL);
+<a name="line735">735: </a>    PetscOptionsName(<font color="#666666">"-svd_error_absolute"</font>,<font color="#666666">"Print absolute errors of each singular triplet"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDErrorView.html#SVDErrorView">SVDErrorView</a>"</font>,NULL);
+<a name="line736">736: </a>    PetscOptionsName(<font color="#666666">"-svd_error_relative"</font>,<font color="#666666">"Print relative errors of each singular triplet"</font>,<font color="#666666">"<a href="../../../docs/manualpages/SVD/SVDErrorView.html#SVDErrorView">SVDErrorView</a>"</font>,NULL);
+
+<a name="line738">738: </a>    <font color="#4169E1">if</font> (svd-&gt;ops-&gt;setfromoptions) {
+<a name="line739">739: </a>      (*svd-&gt;ops-&gt;setfromoptions)(PetscOptionsObject,svd);
+<a name="line740">740: </a>    }
+<a name="line741">741: </a>    PetscObjectProcessOptionsHandlers(PetscOptionsObject,(PetscObject)svd);
+<a name="line742">742: </a>  PetscOptionsEnd();
+
+<a name="line744">744: </a>  <font color="#4169E1">if</font> (!svd-&gt;V) { <a href="../../../docs/manualpages/SVD/SVDGetBV.html#SVDGetBV">SVDGetBV</a>(svd,&amp;svd-&gt;V,NULL); }
+<a name="line745">745: </a>  <a href="../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(svd-&gt;V);
+<a name="line746">746: </a>  <font color="#4169E1">if</font> (!svd-&gt;U) { <a href="../../../docs/manualpages/SVD/SVDGetBV.html#SVDGetBV">SVDGetBV</a>(svd,NULL,&amp;svd-&gt;U); }
+<a name="line747">747: </a>  <a href="../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(svd-&gt;U);
+<a name="line748">748: </a>  <font color="#4169E1">if</font> (!svd-&gt;ds) { <a href="../../../docs/manualpages/SVD/SVDGetDS.html#SVDGetDS">SVDGetDS</a>(svd,&amp;svd-&gt;ds); }
+<a name="line749">749: </a>  <a href="../../../docs/manualpages/DS/DSSetFromOptions.html#DSSetFromOptions">DSSetFromOptions</a>(svd-&gt;ds);
+<a name="line750">750: </a>  <font color="#4169E1">return</font>(0);
+<a name="line751">751: </a>}
+
+<a name="line753">753: </a><font color="#B22222">/*@</font>
+<a name="line754">754: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetTrackAll.html#SVDSetTrackAll">SVDSetTrackAll</a> - Specifies if the solver must compute the residual norm of all</font>
+<a name="line755">755: </a><font color="#B22222">   approximate singular value or not.</font>
+
+<a name="line757">757: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line759">759: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line760">760: </a><font color="#B22222">+  svd      - the singular value solver context</font>
+<a name="line761">761: </a><font color="#B22222">-  trackall - whether to compute all residuals or not</font>
+
+<a name="line763">763: </a><font color="#B22222">   Notes:</font>
+<a name="line764">764: </a><font color="#B22222">   If the user sets trackall=PETSC_TRUE then the solver computes (or estimates)</font>
+<a name="line765">765: </a><font color="#B22222">   the residual norm for each singular value approximation. Computing the residual is</font>
+<a name="line766">766: </a><font color="#B22222">   usually an expensive operation and solvers commonly compute only the residual</font>
+<a name="line767">767: </a><font color="#B22222">   associated to the first unconverged singular value.</font>
+
+<a name="line769">769: </a><font color="#B22222">   The options '-svd_monitor_all' and '-svd_monitor_lg_all' automatically</font>
+<a name="line770">770: </a><font color="#B22222">   activate this option.</font>
+
+<a name="line772">772: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line774">774: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDGetTrackAll.html#SVDGetTrackAll">SVDGetTrackAll</a>()</font>
+<a name="line775">775: </a><font color="#B22222">@*/</font>
+<a name="line776">776: </a><strong><font color="#4169E1"><a name="SVDSetTrackAll"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetTrackAll.html#SVDSetTrackAll">SVDSetTrackAll</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool trackall)</font></strong>
+<a name="line777">777: </a>{
+<a name="line781">781: </a>  svd-&gt;trackall = trackall;
+<a name="line782">782: </a>  <font color="#4169E1">return</font>(0);
+<a name="line783">783: </a>}
+
+<a name="line785">785: </a><font color="#B22222">/*@</font>
+<a name="line786">786: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDGetTrackAll.html#SVDGetTrackAll">SVDGetTrackAll</a> - Returns the flag indicating whether all residual norms must</font>
+<a name="line787">787: </a><font color="#B22222">   be computed or not.</font>
+
+<a name="line789">789: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line791">791: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line792">792: </a><font color="#B22222">.  svd - the singular value solver context</font>
+
+<a name="line794">794: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line795">795: </a><font color="#B22222">.  trackall - the returned flag</font>
+
+<a name="line797">797: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line799">799: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetTrackAll.html#SVDSetTrackAll">SVDSetTrackAll</a>()</font>
+<a name="line800">800: </a><font color="#B22222">@*/</font>
+<a name="line801">801: </a><strong><font color="#4169E1"><a name="SVDGetTrackAll"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetTrackAll.html#SVDGetTrackAll">SVDGetTrackAll</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,PetscBool *trackall)</font></strong>
+<a name="line802">802: </a>{
+<a name="line806">806: </a>  *trackall = svd-&gt;trackall;
+<a name="line807">807: </a>  <font color="#4169E1">return</font>(0);
+<a name="line808">808: </a>}
+
+
+<a name="line811">811: </a><font color="#B22222">/*@C</font>
+<a name="line812">812: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDSetOptionsPrefix.html#SVDSetOptionsPrefix">SVDSetOptionsPrefix</a> - Sets the prefix used for searching for all</font>
+<a name="line813">813: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> options in the database.</font>
+
+<a name="line815">815: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line817">817: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line818">818: </a><font color="#B22222">+  svd - the singular value solver context</font>
+<a name="line819">819: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> option requests</font>
+
+<a name="line821">821: </a><font color="#B22222">   Notes:</font>
+<a name="line822">822: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line823">823: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the</font>
+<a name="line824">824: </a><font color="#B22222">   hyphen.</font>
+
+<a name="line826">826: </a><font color="#B22222">   For example, to distinguish between the runtime options for two</font>
+<a name="line827">827: </a><font color="#B22222">   different <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> contexts, one could call</font>
+<a name="line828">828: </a><font color="#B22222">.vb</font>
+<a name="line829">829: </a><font color="#B22222">      <a href="../../../docs/manualpages/SVD/SVDSetOptionsPrefix.html#SVDSetOptionsPrefix">SVDSetOptionsPrefix</a>(svd1,"svd1_")</font>
+<a name="line830">830: </a><font color="#B22222">      <a href="../../../docs/manualpages/SVD/SVDSetOptionsPrefix.html#SVDSetOptionsPrefix">SVDSetOptionsPrefix</a>(svd2,"svd2_")</font>
+<a name="line831">831: </a><font color="#B22222">.ve</font>
+
+<a name="line833">833: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line835">835: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDAppendOptionsPrefix.html#SVDAppendOptionsPrefix">SVDAppendOptionsPrefix</a>(), <a href="../../../docs/manualpages/SVD/SVDGetOptionsPrefix.html#SVDGetOptionsPrefix">SVDGetOptionsPrefix</a>()</font>
+<a name="line836">836: </a><font color="#B22222">@*/</font>
+<a name="line837">837: </a><strong><font color="#4169E1"><a name="SVDSetOptionsPrefix"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDSetOptionsPrefix.html#SVDSetOptionsPrefix">SVDSetOptionsPrefix</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,const char *prefix)</font></strong>
+<a name="line838">838: </a>{
+
+<a name="line843">843: </a>  <font color="#4169E1">if</font> (!svd-&gt;V) { <a href="../../../docs/manualpages/SVD/SVDGetBV.html#SVDGetBV">SVDGetBV</a>(svd,&amp;svd-&gt;V,&amp;svd-&gt;U); }
+<a name="line844">844: </a>  <a href="../../../docs/manualpages/BV/BVSetOptionsPrefix.html#BVSetOptionsPrefix">BVSetOptionsPrefix</a>(svd-&gt;V,prefix);
+<a name="line845">845: </a>  <a href="../../../docs/manualpages/BV/BVSetOptionsPrefix.html#BVSetOptionsPrefix">BVSetOptionsPrefix</a>(svd-&gt;U,prefix);
+<a name="line846">846: </a>  <font color="#4169E1">if</font> (!svd-&gt;ds) { <a href="../../../docs/manualpages/SVD/SVDGetDS.html#SVDGetDS">SVDGetDS</a>(svd,&amp;svd-&gt;ds); }
+<a name="line847">847: </a>  <a href="../../../docs/manualpages/DS/DSSetOptionsPrefix.html#DSSetOptionsPrefix">DSSetOptionsPrefix</a>(svd-&gt;ds,prefix);
+<a name="line848">848: </a>  PetscObjectSetOptionsPrefix((PetscObject)svd,prefix);
+<a name="line849">849: </a>  <font color="#4169E1">return</font>(0);
+<a name="line850">850: </a>}
+
+<a name="line852">852: </a><font color="#B22222">/*@C</font>
+<a name="line853">853: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDAppendOptionsPrefix.html#SVDAppendOptionsPrefix">SVDAppendOptionsPrefix</a> - Appends to the prefix used for searching for all</font>
+<a name="line854">854: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> options in the database.</font>
+
+<a name="line856">856: </a><font color="#B22222">   Logically Collective on svd</font>
+
+<a name="line858">858: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line859">859: </a><font color="#B22222">+  svd - the singular value solver context</font>
+<a name="line860">860: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> option requests</font>
+
+<a name="line862">862: </a><font color="#B22222">   Notes:</font>
+<a name="line863">863: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line864">864: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the hyphen.</font>
+
+<a name="line866">866: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line868">868: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetOptionsPrefix.html#SVDSetOptionsPrefix">SVDSetOptionsPrefix</a>(), <a href="../../../docs/manualpages/SVD/SVDGetOptionsPrefix.html#SVDGetOptionsPrefix">SVDGetOptionsPrefix</a>()</font>
+<a name="line869">869: </a><font color="#B22222">@*/</font>
+<a name="line870">870: </a><strong><font color="#4169E1"><a name="SVDAppendOptionsPrefix"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDAppendOptionsPrefix.html#SVDAppendOptionsPrefix">SVDAppendOptionsPrefix</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,const char *prefix)</font></strong>
+<a name="line871">871: </a>{
+
+<a name="line876">876: </a>  <font color="#4169E1">if</font> (!svd-&gt;V) { <a href="../../../docs/manualpages/SVD/SVDGetBV.html#SVDGetBV">SVDGetBV</a>(svd,&amp;svd-&gt;V,&amp;svd-&gt;U); }
+<a name="line877">877: </a>  <a href="../../../docs/manualpages/BV/BVAppendOptionsPrefix.html#BVAppendOptionsPrefix">BVAppendOptionsPrefix</a>(svd-&gt;V,prefix);
+<a name="line878">878: </a>  <a href="../../../docs/manualpages/BV/BVAppendOptionsPrefix.html#BVAppendOptionsPrefix">BVAppendOptionsPrefix</a>(svd-&gt;U,prefix);
+<a name="line879">879: </a>  <font color="#4169E1">if</font> (!svd-&gt;ds) { <a href="../../../docs/manualpages/SVD/SVDGetDS.html#SVDGetDS">SVDGetDS</a>(svd,&amp;svd-&gt;ds); }
+<a name="line880">880: </a>  <a href="../../../docs/manualpages/DS/DSAppendOptionsPrefix.html#DSAppendOptionsPrefix">DSAppendOptionsPrefix</a>(svd-&gt;ds,prefix);
+<a name="line881">881: </a>  PetscObjectAppendOptionsPrefix((PetscObject)svd,prefix);
+<a name="line882">882: </a>  <font color="#4169E1">return</font>(0);
+<a name="line883">883: </a>}
+
+<a name="line885">885: </a><font color="#B22222">/*@C</font>
+<a name="line886">886: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVDGetOptionsPrefix.html#SVDGetOptionsPrefix">SVDGetOptionsPrefix</a> - Gets the prefix used for searching for all</font>
+<a name="line887">887: </a><font color="#B22222">   <a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> options in the database.</font>
+
+<a name="line889">889: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line891">891: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line892">892: </a><font color="#B22222">.  svd - the singular value solver context</font>
+
+<a name="line894">894: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line895">895: </a><font color="#B22222">.  prefix - pointer to the prefix string used is returned</font>
+
+<a name="line897">897: </a><font color="#B22222">   Note:</font>
+<a name="line898">898: </a><font color="#B22222">   On the Fortran side, the user should pass in a string 'prefix' of</font>
+<a name="line899">899: </a><font color="#B22222">   sufficient length to hold the prefix.</font>
+
+<a name="line901">901: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line903">903: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/SVD/SVDSetOptionsPrefix.html#SVDSetOptionsPrefix">SVDSetOptionsPrefix</a>(), <a href="../../../docs/manualpages/SVD/SVDAppendOptionsPrefix.html#SVDAppendOptionsPrefix">SVDAppendOptionsPrefix</a>()</font>
+<a name="line904">904: </a><font color="#B22222">@*/</font>
+<a name="line905">905: </a><strong><font color="#4169E1"><a name="SVDGetOptionsPrefix"></a>PetscErrorCode <a href="../../../docs/manualpages/SVD/SVDGetOptionsPrefix.html#SVDGetOptionsPrefix">SVDGetOptionsPrefix</a>(<a href="../../../docs/manualpages/SVD/SVD.html#SVD">SVD</a> svd,const char *prefix[])</font></strong>
+<a name="line906">906: </a>{
+
+<a name="line912">912: </a>  PetscObjectGetOptionsPrefix((PetscObject)svd,prefix);
+<a name="line913">913: </a>  <font color="#4169E1">return</font>(0);
+<a name="line914">914: </a>}
+
+</pre>
+</body>
+
+</html>

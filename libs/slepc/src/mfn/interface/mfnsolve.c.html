@@ -1,0 +1,203 @@
+<center><a href="mfnsolve.c">Actual source code: mfnsolve.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/mfn/interface/mfnsolve.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:13+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/mfn/interface/mfnsolve.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> routines related to the solution process</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/mfnimpl.h.html">&lt;slepc/private/mfnimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><strong><font color="#4169E1"><a name="MFNSolve_Private"></a>static PetscErrorCode MFNSolve_Private(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,Vec b,Vec x)</font></strong>
+<a name="line17"> 17: </a>{
+
+<a name="line21"> 21: </a>  VecSetErrorIfLocked(x,3);
+
+<a name="line23"> 23: </a>  <font color="#B22222">/* call setup */</font>
+<a name="line24"> 24: </a>  <a href="../../../docs/manualpages/MFN/MFNSetUp.html#MFNSetUp">MFNSetUp</a>(mfn);
+<a name="line25"> 25: </a>  mfn-&gt;its = 0;
+
+<a name="line27"> 27: </a>  <a href="../../../docs/manualpages/MFN/MFNViewFromOptions.html#MFNViewFromOptions">MFNViewFromOptions</a>(mfn,NULL,<font color="#666666">"-mfn_view_pre"</font>);
+
+<a name="line29"> 29: </a>  <font color="#B22222">/* check nonzero right-hand side */</font>
+<a name="line30"> 30: </a>  VecNorm(b,NORM_2,&amp;mfn-&gt;bnorm);
+<a name="line31"> 31: </a>  <font color="#4169E1">if</font> (!mfn-&gt;bnorm) SETERRQ(PetscObjectComm((PetscObject)mfn),PETSC_ERR_ARG_WRONG,<font color="#666666">"Cannot pass a zero b vector to <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>()"</font>);
+
+<a name="line33"> 33: </a>  <font color="#B22222">/* call solver */</font>
+<a name="line34"> 34: </a>  PetscLogEventBegin(MFN_Solve,mfn,b,x,0);
+<a name="line35"> 35: </a>  <font color="#4169E1">if</font> (b!=x) { VecLockReadPush(b); }
+<a name="line36"> 36: </a>  (*mfn-&gt;ops-&gt;solve)(mfn,b,x);
+<a name="line37"> 37: </a>  <font color="#4169E1">if</font> (b!=x) { VecLockReadPop(b); }
+<a name="line38"> 38: </a>  PetscLogEventEnd(MFN_Solve,mfn,b,x,0);
+
+<a name="line40"> 40: </a>  <font color="#4169E1">if</font> (!mfn-&gt;reason) SETERRQ(PetscObjectComm((PetscObject)mfn),PETSC_ERR_PLIB,<font color="#666666">"Internal error, solver returned without setting converged reason"</font>);
+
+<a name="line42"> 42: </a>  <font color="#4169E1">if</font> (mfn-&gt;errorifnotconverged &amp;&amp; mfn-&gt;reason &lt; 0) SETERRQ(PetscObjectComm((PetscObject)mfn),PETSC_ERR_NOT_CONVERGED,<font color="#666666">"<a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a> has not converged"</font>);
+
+<a name="line44"> 44: </a>  <font color="#B22222">/* various viewers */</font>
+<a name="line45"> 45: </a>  <a href="../../../docs/manualpages/MFN/MFNViewFromOptions.html#MFNViewFromOptions">MFNViewFromOptions</a>(mfn,NULL,<font color="#666666">"-mfn_view"</font>);
+<a name="line46"> 46: </a>  <a href="../../../docs/manualpages/MFN/MFNReasonViewFromOptions.html#MFNReasonViewFromOptions">MFNReasonViewFromOptions</a>(mfn);
+<a name="line47"> 47: </a>  MatViewFromOptions(mfn-&gt;A,(PetscObject)mfn,<font color="#666666">"-mfn_view_mat"</font>);
+<a name="line48"> 48: </a>  VecViewFromOptions(b,(PetscObject)mfn,<font color="#666666">"-mfn_view_rhs"</font>);
+<a name="line49"> 49: </a>  VecViewFromOptions(x,(PetscObject)mfn,<font color="#666666">"-mfn_view_solution"</font>);
+<a name="line50"> 50: </a>  <font color="#4169E1">return</font>(0);
+<a name="line51"> 51: </a>}
+
+<a name="line53"> 53: </a><font color="#B22222">/*@</font>
+<a name="line54"> 54: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a> - Solves the matrix function problem. Given a vector b, the</font>
+<a name="line55"> 55: </a><font color="#B22222">   vector x = f(A)*b is returned.</font>
+
+<a name="line57"> 57: </a><font color="#B22222">   Collective on mfn</font>
+
+<a name="line59"> 59: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line60"> 60: </a><font color="#B22222">+  mfn - matrix function context obtained from <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>()</font>
+<a name="line61"> 61: </a><font color="#B22222">-  b   - the right hand side vector</font>
+
+<a name="line63"> 63: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line64"> 64: </a><font color="#B22222">.  x   - the solution (this may be the same vector as b, then b will be</font>
+<a name="line65"> 65: </a><font color="#B22222">         overwritten with the answer)</font>
+
+<a name="line67"> 67: </a><font color="#B22222">   Options Database Keys:</font>
+<a name="line68"> 68: </a><font color="#B22222">+  -mfn_view - print information about the solver used</font>
+<a name="line69"> 69: </a><font color="#B22222">.  -mfn_view_mat binary - save the matrix to the default binary viewer</font>
+<a name="line70"> 70: </a><font color="#B22222">.  -mfn_view_rhs binary - save right hand side vector to the default binary viewer</font>
+<a name="line71"> 71: </a><font color="#B22222">.  -mfn_view_solution binary - save computed solution vector to the default binary viewer</font>
+<a name="line72"> 72: </a><font color="#B22222">-  -mfn_converged_reason - print reason for convergence, and number of iterations</font>
+
+<a name="line74"> 74: </a><font color="#B22222">   Notes:</font>
+<a name="line75"> 75: </a><font color="#B22222">   The matrix A is specified with <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>().</font>
+<a name="line76"> 76: </a><font color="#B22222">   The function f is specified with <a href="../../../docs/manualpages/MFN/MFNSetFN.html#MFNSetFN">MFNSetFN</a>().</font>
+
+<a name="line78"> 78: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line80"> 80: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>(), <a href="../../../docs/manualpages/MFN/MFNSetUp.html#MFNSetUp">MFNSetUp</a>(), <a href="../../../docs/manualpages/MFN/MFNDestroy.html#MFNDestroy">MFNDestroy</a>(), <a href="../../../docs/manualpages/MFN/MFNSetTolerances.html#MFNSetTolerances">MFNSetTolerances</a>(),</font>
+<a name="line81"> 81: </a><font color="#B22222">          <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>(), <a href="../../../docs/manualpages/MFN/MFNSetFN.html#MFNSetFN">MFNSetFN</a>()</font>
+<a name="line82"> 82: </a><font color="#B22222">@*/</font>
+<a name="line83"> 83: </a><strong><font color="#4169E1"><a name="MFNSolve"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,Vec b,Vec x)</font></strong>
+<a name="line84"> 84: </a>{
+
+<a name="line93"> 93: </a>  mfn-&gt;transpose_solve = PETSC_FALSE;
+<a name="line94"> 94: </a>  MFNSolve_Private(mfn,b,x);
+<a name="line95"> 95: </a>  <font color="#4169E1">return</font>(0);
+<a name="line96"> 96: </a>}
+
+<a name="line98"> 98: </a><font color="#B22222">/*@</font>
+<a name="line99"> 99: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNSolveTranspose.html#MFNSolveTranspose">MFNSolveTranspose</a> - Solves the transpose matrix function problem. Given a vector b,</font>
+<a name="line100">100: </a><font color="#B22222">   the vector x = f(A^T)*b is returned.</font>
+
+<a name="line102">102: </a><font color="#B22222">   Collective on mfn</font>
+
+<a name="line104">104: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line105">105: </a><font color="#B22222">+  mfn - matrix function context obtained from <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>()</font>
+<a name="line106">106: </a><font color="#B22222">-  b   - the right hand side vector</font>
+
+<a name="line108">108: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line109">109: </a><font color="#B22222">.  x   - the solution (this may be the same vector as b, then b will be</font>
+<a name="line110">110: </a><font color="#B22222">         overwritten with the answer)</font>
+
+<a name="line112">112: </a><font color="#B22222">   Note:</font>
+<a name="line113">113: </a><font color="#B22222">   See available options at <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>().</font>
+
+<a name="line115">115: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line117">117: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>()</font>
+<a name="line118">118: </a><font color="#B22222">@*/</font>
+<a name="line119">119: </a><strong><font color="#4169E1"><a name="MFNSolveTranspose"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNSolveTranspose.html#MFNSolveTranspose">MFNSolveTranspose</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,Vec b,Vec x)</font></strong>
+<a name="line120">120: </a>{
+
+<a name="line129">129: </a>  mfn-&gt;transpose_solve = PETSC_TRUE;
+<a name="line130">130: </a>  <font color="#4169E1">if</font> (!mfn-&gt;AT) { MatCreateTranspose(mfn-&gt;A,&amp;mfn-&gt;AT); }
+<a name="line131">131: </a>  MFNSolve_Private(mfn,b,x);
+<a name="line132">132: </a>  <font color="#4169E1">return</font>(0);
+<a name="line133">133: </a>}
+
+<a name="line135">135: </a><font color="#B22222">/*@</font>
+<a name="line136">136: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNGetIterationNumber.html#MFNGetIterationNumber">MFNGetIterationNumber</a> - Gets the current iteration number. If the</font>
+<a name="line137">137: </a><font color="#B22222">   call to <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>() is complete, then it returns the number of iterations</font>
+<a name="line138">138: </a><font color="#B22222">   carried out by the solution method.</font>
+
+<a name="line140">140: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line142">142: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line143">143: </a><font color="#B22222">.  mfn - the matrix function context</font>
+
+<a name="line145">145: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line146">146: </a><font color="#B22222">.  its - number of iterations</font>
+
+<a name="line148">148: </a><font color="#B22222">   Note:</font>
+<a name="line149">149: </a><font color="#B22222">   During the i-th iteration this call returns i-1. If <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>() is</font>
+<a name="line150">150: </a><font color="#B22222">   complete, then parameter "its" contains either the iteration number at</font>
+<a name="line151">151: </a><font color="#B22222">   which convergence was successfully reached, or failure was detected.</font>
+<a name="line152">152: </a><font color="#B22222">   Call <a href="../../../docs/manualpages/MFN/MFNGetConvergedReason.html#MFNGetConvergedReason">MFNGetConvergedReason</a>() to determine if the solver converged or</font>
+<a name="line153">153: </a><font color="#B22222">   failed and why.</font>
+
+<a name="line155">155: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line157">157: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/MFN/MFNGetConvergedReason.html#MFNGetConvergedReason">MFNGetConvergedReason</a>(), <a href="../../../docs/manualpages/MFN/MFNSetTolerances.html#MFNSetTolerances">MFNSetTolerances</a>()</font>
+<a name="line158">158: </a><font color="#B22222">@*/</font>
+<a name="line159">159: </a><strong><font color="#4169E1"><a name="MFNGetIterationNumber"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNGetIterationNumber.html#MFNGetIterationNumber">MFNGetIterationNumber</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,PetscInt *its)</font></strong>
+<a name="line160">160: </a>{
+<a name="line164">164: </a>  *its = mfn-&gt;its;
+<a name="line165">165: </a>  <font color="#4169E1">return</font>(0);
+<a name="line166">166: </a>}
+
+<a name="line168">168: </a><font color="#B22222">/*@</font>
+<a name="line169">169: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNGetConvergedReason.html#MFNGetConvergedReason">MFNGetConvergedReason</a> - Gets the reason why the <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>() iteration was</font>
+<a name="line170">170: </a><font color="#B22222">   stopped.</font>
+
+<a name="line172">172: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line174">174: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line175">175: </a><font color="#B22222">.  mfn - the matrix function context</font>
+
+<a name="line177">177: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line178">178: </a><font color="#B22222">.  reason - negative value indicates diverged, positive value converged</font>
+
+<a name="line180">180: </a><font color="#B22222">   Notes:</font>
+
+<a name="line182">182: </a><font color="#B22222">   Possible values for reason are</font>
+<a name="line183">183: </a><font color="#B22222">+  <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_CONVERGED_TOL</a> - converged up to tolerance</font>
+<a name="line184">184: </a><font color="#B22222">.  <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_CONVERGED_ITS</a> - solver completed the requested number of steps</font>
+<a name="line185">185: </a><font color="#B22222">.  <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_DIVERGED_ITS</a> - required more than max_it iterations to reach convergence</font>
+<a name="line186">186: </a><font color="#B22222">-  <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_DIVERGED_BREAKDOWN</a> - generic breakdown in method</font>
+
+<a name="line188">188: </a><font color="#B22222">   Can only be called after the call to <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>() is complete.</font>
+
+<a name="line190">190: </a><font color="#B22222">   Basic solvers (e.g. unrestarted Krylov iterations) cannot determine if the</font>
+<a name="line191">191: </a><font color="#B22222">   computation is accurate up to the requested tolerance. In that case, the</font>
+<a name="line192">192: </a><font color="#B22222">   converged reason is set to <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_CONVERGED_ITS</a> if the requested number of steps</font>
+<a name="line193">193: </a><font color="#B22222">   (for instance, the ncv value in unrestarted Krylov methods) have been</font>
+<a name="line194">194: </a><font color="#B22222">   completed successfully.</font>
+
+<a name="line196">196: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line198">198: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/MFN/MFNSetTolerances.html#MFNSetTolerances">MFNSetTolerances</a>(), <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(), <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFNConvergedReason</a>, <a href="../../../docs/manualpages/MFN/MFNSetErrorIfNotConverged.html#MFNSetErrorIfNotConverged">MFNSetErrorIfNotConverged</a>()</font>
+<a name="line199">199: </a><font color="#B22222">@*/</font>
+<a name="line200">200: </a><strong><font color="#4169E1"><a name="MFNGetConvergedReason"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNGetConvergedReason.html#MFNGetConvergedReason">MFNGetConvergedReason</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,<a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFNConvergedReason</a> *reason)</font></strong>
+<a name="line201">201: </a>{
+<a name="line205">205: </a>  *reason = mfn-&gt;reason;
+<a name="line206">206: </a>  <font color="#4169E1">return</font>(0);
+<a name="line207">207: </a>}
+
+</pre>
+</body>
+
+</html>

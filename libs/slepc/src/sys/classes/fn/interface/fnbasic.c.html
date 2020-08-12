@@ -1,0 +1,1011 @@
+<center><a href="fnbasic.c">Actual source code: fnbasic.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/fn/interface/fnbasic.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:36+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/fn/interface/fnbasic.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Basic <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> routines</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/fnimpl.h.html">&lt;slepc/private/fnimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a>PetscFunctionList FNList = 0;
+<a name="line18"> 18: </a>PetscBool         FNRegisterAllCalled = PETSC_FALSE;
+<a name="line19"> 19: </a>PetscClassId      FN_CLASSID = 0;
+<a name="line20"> 20: </a>PetscLogEvent     FN_Evaluate = 0;
+<a name="line21"> 21: </a>static PetscBool  FNPackageInitialized = PETSC_FALSE;
+
+<a name="line23"> 23: </a>const char *FNParallelTypes[] = {<font color="#666666">"REDUNDANT"</font>,<font color="#666666">"SYNCHRONIZED"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FNParallelType</a>"</font>,<font color="#666666">"FN_PARALLEL_"</font>,0};
+
+<a name="line25"> 25: </a><font color="#B22222">/*@C</font>
+<a name="line26"> 26: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNFinalizePackage.html#FNFinalizePackage">FNFinalizePackage</a> - This function destroys everything in the Slepc interface</font>
+<a name="line27"> 27: </a><font color="#B22222">   to the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> package. It is called from <a href="../../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>().</font>
+
+<a name="line29"> 29: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line31"> 31: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>()</font>
+<a name="line32"> 32: </a><font color="#B22222">@*/</font>
+<a name="line33"> 33: </a><strong><font color="#4169E1"><a name="FNFinalizePackage"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNFinalizePackage.html#FNFinalizePackage">FNFinalizePackage</a>(void)</font></strong>
+<a name="line34"> 34: </a>{
+
+<a name="line38"> 38: </a>  PetscFunctionListDestroy(&amp;FNList);
+<a name="line39"> 39: </a>  FNPackageInitialized = PETSC_FALSE;
+<a name="line40"> 40: </a>  FNRegisterAllCalled  = PETSC_FALSE;
+<a name="line41"> 41: </a>  <font color="#4169E1">return</font>(0);
+<a name="line42"> 42: </a>}
+
+<a name="line44"> 44: </a><font color="#B22222">/*@C</font>
+<a name="line45"> 45: </a><font color="#B22222">  <a href="../../../../../docs/manualpages/FN/FNInitializePackage.html#FNInitializePackage">FNInitializePackage</a> - This function initializes everything in the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> package.</font>
+<a name="line46"> 46: </a><font color="#B22222">  It is called from PetscDLLibraryRegister() when using dynamic libraries, and</font>
+<a name="line47"> 47: </a><font color="#B22222">  on the first call to <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>() when using static libraries.</font>
+
+<a name="line49"> 49: </a><font color="#B22222">  Level: developer</font>
+
+<a name="line51"> 51: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>()</font>
+<a name="line52"> 52: </a><font color="#B22222">@*/</font>
+<a name="line53"> 53: </a><strong><font color="#4169E1"><a name="FNInitializePackage"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNInitializePackage.html#FNInitializePackage">FNInitializePackage</a>(void)</font></strong>
+<a name="line54"> 54: </a>{
+<a name="line55"> 55: </a>  char           logList[256];
+<a name="line56"> 56: </a>  PetscBool      opt,pkg;
+<a name="line57"> 57: </a>  PetscClassId   classids[1];
+
+<a name="line61"> 61: </a>  <font color="#4169E1">if</font> (FNPackageInitialized) <font color="#4169E1">return</font>(0);
+<a name="line62"> 62: </a>  FNPackageInitialized = PETSC_TRUE;
+<a name="line63"> 63: </a>  <font color="#B22222">/* Register Classes */</font>
+<a name="line64"> 64: </a>  PetscClassIdRegister(<font color="#666666">"Math Function"</font>,&amp;FN_CLASSID);
+<a name="line65"> 65: </a>  <font color="#B22222">/* Register Constructors */</font>
+<a name="line66"> 66: </a>  <a href="../../../../../docs/manualpages/FN/FNRegisterAll.html#FNRegisterAll">FNRegisterAll</a>();
+<a name="line67"> 67: </a>  <font color="#B22222">/* Register Events */</font>
+<a name="line68"> 68: </a>  PetscLogEventRegister(<font color="#666666">"FNEvaluate"</font>,FN_CLASSID,&amp;FN_Evaluate);
+<a name="line69"> 69: </a>  <font color="#B22222">/* Process Info */</font>
+<a name="line70"> 70: </a>  classids[0] = FN_CLASSID;
+<a name="line71"> 71: </a>  PetscInfoProcessClass(<font color="#666666">"fn"</font>,1,&amp;classids[0]);
+<a name="line72"> 72: </a>  <font color="#B22222">/* Process summary exclusions */</font>
+<a name="line73"> 73: </a>  PetscOptionsGetString(NULL,NULL,<font color="#666666">"-log_exclude"</font>,logList,<font color="#4169E1">sizeof</font>(logList),&amp;opt);
+<a name="line74"> 74: </a>  <font color="#4169E1">if</font> (opt) {
+<a name="line75"> 75: </a>    PetscStrInList(<font color="#666666">"fn"</font>,logList,',',&amp;pkg);
+<a name="line76"> 76: </a>    <font color="#4169E1">if</font> (pkg) { PetscLogEventDeactivateClass(FN_CLASSID); }
+<a name="line77"> 77: </a>  }
+<a name="line78"> 78: </a>  <font color="#B22222">/* Register package finalizer */</font>
+<a name="line79"> 79: </a>  PetscRegisterFinalize(<a href="../../../../../docs/manualpages/FN/FNFinalizePackage.html#FNFinalizePackage">FNFinalizePackage</a>);
+<a name="line80"> 80: </a>  <font color="#4169E1">return</font>(0);
+<a name="line81"> 81: </a>}
+
+<a name="line83"> 83: </a><font color="#B22222">/*@</font>
+<a name="line84"> 84: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a> - Creates an <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> context.</font>
+
+<a name="line86"> 86: </a><font color="#B22222">   Collective</font>
+
+<a name="line88"> 88: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line89"> 89: </a><font color="#B22222">.  comm - MPI communicator</font>
+
+<a name="line91"> 91: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line92"> 92: </a><font color="#B22222">.  newfn - location to put the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> context</font>
+
+<a name="line94"> 94: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line96"> 96: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(), <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a></font>
+<a name="line97"> 97: </a><font color="#B22222">@*/</font>
+<a name="line98"> 98: </a><strong><font color="#4169E1"><a name="FNCreate"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(MPI_Comm comm,<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *newfn)</font></strong>
+<a name="line99"> 99: </a>{
+<a name="line100">100: </a>  <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a>             fn;
+
+<a name="line105">105: </a>  *newfn = 0;
+<a name="line106">106: </a>  <a href="../../../../../docs/manualpages/FN/FNInitializePackage.html#FNInitializePackage">FNInitializePackage</a>();
+<a name="line107">107: </a>  SlepcHeaderCreate(fn,FN_CLASSID,<font color="#666666">"<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a>"</font>,<font color="#666666">"Math Function"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a>"</font>,comm,<a href="../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>,<a href="../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>);
+
+<a name="line109">109: </a>  fn-&gt;alpha    = 1.0;
+<a name="line110">110: </a>  fn-&gt;beta     = 1.0;
+<a name="line111">111: </a>  fn-&gt;method   = 0;
+
+<a name="line113">113: </a>  fn-&gt;nw       = 0;
+<a name="line114">114: </a>  fn-&gt;cw       = 0;
+<a name="line115">115: </a>  fn-&gt;data     = NULL;
+
+<a name="line117">117: </a>  *newfn = fn;
+<a name="line118">118: </a>  <font color="#4169E1">return</font>(0);
+<a name="line119">119: </a>}
+
+<a name="line121">121: </a><font color="#B22222">/*@C</font>
+<a name="line122">122: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNSetOptionsPrefix.html#FNSetOptionsPrefix">FNSetOptionsPrefix</a> - Sets the prefix used for searching for all</font>
+<a name="line123">123: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> options in the database.</font>
+
+<a name="line125">125: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line127">127: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line128">128: </a><font color="#B22222">+  fn - the math function context</font>
+<a name="line129">129: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> option requests</font>
+
+<a name="line131">131: </a><font color="#B22222">   Notes:</font>
+<a name="line132">132: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line133">133: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the</font>
+<a name="line134">134: </a><font color="#B22222">   hyphen.</font>
+
+<a name="line136">136: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line138">138: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNAppendOptionsPrefix.html#FNAppendOptionsPrefix">FNAppendOptionsPrefix</a>()</font>
+<a name="line139">139: </a><font color="#B22222">@*/</font>
+<a name="line140">140: </a><strong><font color="#4169E1"><a name="FNSetOptionsPrefix"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNSetOptionsPrefix.html#FNSetOptionsPrefix">FNSetOptionsPrefix</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,const char *prefix)</font></strong>
+<a name="line141">141: </a>{
+
+<a name="line146">146: </a>  PetscObjectSetOptionsPrefix((PetscObject)fn,prefix);
+<a name="line147">147: </a>  <font color="#4169E1">return</font>(0);
+<a name="line148">148: </a>}
+
+<a name="line150">150: </a><font color="#B22222">/*@C</font>
+<a name="line151">151: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNAppendOptionsPrefix.html#FNAppendOptionsPrefix">FNAppendOptionsPrefix</a> - Appends to the prefix used for searching for all</font>
+<a name="line152">152: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> options in the database.</font>
+
+<a name="line154">154: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line156">156: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line157">157: </a><font color="#B22222">+  fn - the math function context</font>
+<a name="line158">158: </a><font color="#B22222">-  prefix - the prefix string to prepend to all <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> option requests</font>
+
+<a name="line160">160: </a><font color="#B22222">   Notes:</font>
+<a name="line161">161: </a><font color="#B22222">   A hyphen (-) must NOT be given at the beginning of the prefix name.</font>
+<a name="line162">162: </a><font color="#B22222">   The first character of all runtime options is AUTOMATICALLY the hyphen.</font>
+
+<a name="line164">164: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line166">166: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNSetOptionsPrefix.html#FNSetOptionsPrefix">FNSetOptionsPrefix</a>()</font>
+<a name="line167">167: </a><font color="#B22222">@*/</font>
+<a name="line168">168: </a><strong><font color="#4169E1"><a name="FNAppendOptionsPrefix"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNAppendOptionsPrefix.html#FNAppendOptionsPrefix">FNAppendOptionsPrefix</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,const char *prefix)</font></strong>
+<a name="line169">169: </a>{
+
+<a name="line174">174: </a>  PetscObjectAppendOptionsPrefix((PetscObject)fn,prefix);
+<a name="line175">175: </a>  <font color="#4169E1">return</font>(0);
+<a name="line176">176: </a>}
+
+<a name="line178">178: </a><font color="#B22222">/*@C</font>
+<a name="line179">179: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNGetOptionsPrefix.html#FNGetOptionsPrefix">FNGetOptionsPrefix</a> - Gets the prefix used for searching for all</font>
+<a name="line180">180: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> options in the database.</font>
+
+<a name="line182">182: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line184">184: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line185">185: </a><font color="#B22222">.  fn - the math function context</font>
+
+<a name="line187">187: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line188">188: </a><font color="#B22222">.  prefix - pointer to the prefix string used is returned</font>
+
+<a name="line190">190: </a><font color="#B22222">   Note:</font>
+<a name="line191">191: </a><font color="#B22222">   On the Fortran side, the user should pass in a string 'prefix' of</font>
+<a name="line192">192: </a><font color="#B22222">   sufficient length to hold the prefix.</font>
+
+<a name="line194">194: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line196">196: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNSetOptionsPrefix.html#FNSetOptionsPrefix">FNSetOptionsPrefix</a>(), <a href="../../../../../docs/manualpages/FN/FNAppendOptionsPrefix.html#FNAppendOptionsPrefix">FNAppendOptionsPrefix</a>()</font>
+<a name="line197">197: </a><font color="#B22222">@*/</font>
+<a name="line198">198: </a><strong><font color="#4169E1"><a name="FNGetOptionsPrefix"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNGetOptionsPrefix.html#FNGetOptionsPrefix">FNGetOptionsPrefix</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,const char *prefix[])</font></strong>
+<a name="line199">199: </a>{
+
+<a name="line205">205: </a>  PetscObjectGetOptionsPrefix((PetscObject)fn,prefix);
+<a name="line206">206: </a>  <font color="#4169E1">return</font>(0);
+<a name="line207">207: </a>}
+
+<a name="line209">209: </a><font color="#B22222">/*@C</font>
+<a name="line210">210: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a> - Selects the type for the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> object.</font>
+
+<a name="line212">212: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line214">214: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line215">215: </a><font color="#B22222">+  fn   - the math function context</font>
+<a name="line216">216: </a><font color="#B22222">-  type - a known type</font>
+
+<a name="line218">218: </a><font color="#B22222">   Notes:</font>
+<a name="line219">219: </a><font color="#B22222">   The default is FNRATIONAL, which includes polynomials as a particular</font>
+<a name="line220">220: </a><font color="#B22222">   case as well as simple functions such as f(x)=x and f(x)=constant.</font>
+
+<a name="line222">222: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line224">224: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNGetType.html#FNGetType">FNGetType</a>()</font>
+<a name="line225">225: </a><font color="#B22222">@*/</font>
+<a name="line226">226: </a><strong><font color="#4169E1"><a name="FNSetType"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../docs/manualpages/FN/FNType.html#FNType">FNType</a> type)</font></strong>
+<a name="line227">227: </a>{
+<a name="line228">228: </a>  PetscErrorCode ierr,(*r)(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a>);
+<a name="line229">229: </a>  PetscBool      match;
+
+
+<a name="line235">235: </a>  PetscObjectTypeCompare((PetscObject)fn,type,&amp;match);
+<a name="line236">236: </a>  <font color="#4169E1">if</font> (match) <font color="#4169E1">return</font>(0);
+
+<a name="line238">238: </a>   PetscFunctionListFind(FNList,type,&amp;r);
+<a name="line239">239: </a>  <font color="#4169E1">if</font> (!r) SETERRQ1(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_UNKNOWN_TYPE,<font color="#666666">"Unable to find requested <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> type %s"</font>,type);
+
+<a name="line241">241: </a>  <font color="#4169E1">if</font> (fn-&gt;ops-&gt;destroy) { (*fn-&gt;ops-&gt;destroy)(fn); }
+<a name="line242">242: </a>  PetscMemzero(fn-&gt;ops,<font color="#4169E1">sizeof</font>(<font color="#4169E1">struct _FNOps</font>));
+
+<a name="line244">244: </a>  PetscObjectChangeTypeName((PetscObject)fn,type);
+<a name="line245">245: </a>  (*r)(fn);
+<a name="line246">246: </a>  <font color="#4169E1">return</font>(0);
+<a name="line247">247: </a>}
+
+<a name="line249">249: </a><font color="#B22222">/*@C</font>
+<a name="line250">250: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNGetType.html#FNGetType">FNGetType</a> - Gets the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> type name (as a string) from the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> context.</font>
+
+<a name="line252">252: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line254">254: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line255">255: </a><font color="#B22222">.  fn - the math function context</font>
+
+<a name="line257">257: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line258">258: </a><font color="#B22222">.  name - name of the math function</font>
+
+<a name="line260">260: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line262">262: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>()</font>
+<a name="line263">263: </a><font color="#B22222">@*/</font>
+<a name="line264">264: </a><strong><font color="#4169E1"><a name="FNGetType"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNGetType.html#FNGetType">FNGetType</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../docs/manualpages/FN/FNType.html#FNType">FNType</a> *type)</font></strong>
+<a name="line265">265: </a>{
+<a name="line269">269: </a>  *type = ((PetscObject)fn)-&gt;type_name;
+<a name="line270">270: </a>  <font color="#4169E1">return</font>(0);
+<a name="line271">271: </a>}
+
+<a name="line273">273: </a><font color="#B22222">/*@</font>
+<a name="line274">274: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a> - Sets the scaling parameters that define the matematical function.</font>
+
+<a name="line276">276: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line278">278: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line279">279: </a><font color="#B22222">+  fn    - the math function context</font>
+<a name="line280">280: </a><font color="#B22222">.  alpha - inner scaling (argument)</font>
+<a name="line281">281: </a><font color="#B22222">-  beta  - outer scaling (result)</font>
+
+<a name="line283">283: </a><font color="#B22222">   Notes:</font>
+<a name="line284">284: </a><font color="#B22222">   Given a function f(x) specified by the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> type, the scaling parameters can</font>
+<a name="line285">285: </a><font color="#B22222">   be used to realize the function beta*f(alpha*x). So when these values are given,</font>
+<a name="line286">286: </a><font color="#B22222">   the procedure for function evaluation will first multiply the argument by alpha,</font>
+<a name="line287">287: </a><font color="#B22222">   then evaluate the function itself, and finally scale the result by beta.</font>
+<a name="line288">288: </a><font color="#B22222">   Likewise, these values are also considered when evaluating the derivative.</font>
+
+<a name="line290">290: </a><font color="#B22222">   If you want to provide only one of the two scaling factors, set the other</font>
+<a name="line291">291: </a><font color="#B22222">   one to 1.0.</font>
+
+<a name="line293">293: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line295">295: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNGetScale.html#FNGetScale">FNGetScale</a>(), <a href="../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>()</font>
+<a name="line296">296: </a><font color="#B22222">@*/</font>
+<a name="line297">297: </a><strong><font color="#4169E1"><a name="FNSetScale"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscScalar alpha,PetscScalar beta)</font></strong>
+<a name="line298">298: </a>{
+<a name="line303">303: </a>  <font color="#4169E1">if</font> (PetscAbsScalar(alpha)==0.0 || PetscAbsScalar(beta)==0.0) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_WRONG,<font color="#666666">"Scaling factors must be nonzero"</font>);
+<a name="line304">304: </a>  fn-&gt;alpha = alpha;
+<a name="line305">305: </a>  fn-&gt;beta  = beta;
+<a name="line306">306: </a>  <font color="#4169E1">return</font>(0);
+<a name="line307">307: </a>}
+
+<a name="line309">309: </a><font color="#B22222">/*@</font>
+<a name="line310">310: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNGetScale.html#FNGetScale">FNGetScale</a> - Gets the scaling parameters that define the matematical function.</font>
+
+<a name="line312">312: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line314">314: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line315">315: </a><font color="#B22222">.  fn    - the math function context</font>
+
+<a name="line317">317: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line318">318: </a><font color="#B22222">+  alpha - inner scaling (argument)</font>
+<a name="line319">319: </a><font color="#B22222">-  beta  - outer scaling (result)</font>
+
+<a name="line321">321: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line323">323: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>()</font>
+<a name="line324">324: </a><font color="#B22222">@*/</font>
+<a name="line325">325: </a><strong><font color="#4169E1"><a name="FNGetScale"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNGetScale.html#FNGetScale">FNGetScale</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscScalar *alpha,PetscScalar *beta)</font></strong>
+<a name="line326">326: </a>{
+<a name="line329">329: </a>  <font color="#4169E1">if</font> (alpha) *alpha = fn-&gt;alpha;
+<a name="line330">330: </a>  <font color="#4169E1">if</font> (beta)  *beta  = fn-&gt;beta;
+<a name="line331">331: </a>  <font color="#4169E1">return</font>(0);
+<a name="line332">332: </a>}
+
+<a name="line334">334: </a><font color="#B22222">/*@</font>
+<a name="line335">335: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a> - Selects the method to be used to evaluate functions of matrices.</font>
+
+<a name="line337">337: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line339">339: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line340">340: </a><font color="#B22222">+  fn   - the math function context</font>
+<a name="line341">341: </a><font color="#B22222">-  meth - an index indentifying the method</font>
+
+<a name="line343">343: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line344">344: </a><font color="#B22222">.  -fn_method &lt;meth&gt; - Sets the method</font>
+
+<a name="line346">346: </a><font color="#B22222">   Notes:</font>
+<a name="line347">347: </a><font color="#B22222">   In some <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> types there are more than one algorithms available for computing</font>
+<a name="line348">348: </a><font color="#B22222">   matrix functions. In that case, this function allows choosing the wanted method.</font>
+
+<a name="line350">350: </a><font color="#B22222">   If meth is currently set to 0 (the default) and the input argument A of</font>
+<a name="line351">351: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>() is a symmetric/Hermitian matrix, then the computation</font>
+<a name="line352">352: </a><font color="#B22222">   is done via the eigendecomposition of A, rather than with the general algorithm.</font>
+
+<a name="line354">354: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line356">356: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNGetMethod.html#FNGetMethod">FNGetMethod</a>(), <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>()</font>
+<a name="line357">357: </a><font color="#B22222">@*/</font>
+<a name="line358">358: </a><strong><font color="#4169E1"><a name="FNSetMethod"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscInt meth)</font></strong>
+<a name="line359">359: </a>{
+<a name="line363">363: </a>  <font color="#4169E1">if</font> (meth&lt;0) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The method must be a non-negative integer"</font>);
+<a name="line364">364: </a>  <font color="#4169E1">if</font> (meth&gt;FN_MAX_SOLVE) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Too large value for the method"</font>);
+<a name="line365">365: </a>  fn-&gt;method = meth;
+<a name="line366">366: </a>  <font color="#4169E1">return</font>(0);
+<a name="line367">367: </a>}
+
+<a name="line369">369: </a><font color="#B22222">/*@</font>
+<a name="line370">370: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNGetMethod.html#FNGetMethod">FNGetMethod</a> - Gets the method currently used in the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a>.</font>
+
+<a name="line372">372: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line374">374: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line375">375: </a><font color="#B22222">.  fn - the math function context</font>
+
+<a name="line377">377: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line378">378: </a><font color="#B22222">.  meth - identifier of the method</font>
+
+<a name="line380">380: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line382">382: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a>()</font>
+<a name="line383">383: </a><font color="#B22222">@*/</font>
+<a name="line384">384: </a><strong><font color="#4169E1"><a name="FNGetMethod"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNGetMethod.html#FNGetMethod">FNGetMethod</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscInt *meth)</font></strong>
+<a name="line385">385: </a>{
+<a name="line389">389: </a>  *meth = fn-&gt;method;
+<a name="line390">390: </a>  <font color="#4169E1">return</font>(0);
+<a name="line391">391: </a>}
+
+<a name="line393">393: </a><font color="#B22222">/*@</font>
+<a name="line394">394: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNSetParallel.html#FNSetParallel">FNSetParallel</a> - Selects the mode of operation in parallel runs.</font>
+
+<a name="line396">396: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line398">398: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line399">399: </a><font color="#B22222">+  fn    - the math function context</font>
+<a name="line400">400: </a><font color="#B22222">-  pmode - the parallel mode</font>
+
+<a name="line402">402: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line403">403: </a><font color="#B22222">.  -fn_parallel &lt;mode&gt; - Sets the parallel mode, either 'redundant' or 'synchronized'</font>
+
+<a name="line405">405: </a><font color="#B22222">   Notes:</font>
+<a name="line406">406: </a><font color="#B22222">   This is relevant only when the function is evaluated on a matrix, with</font>
+<a name="line407">407: </a><font color="#B22222">   either <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>() or <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>().</font>
+
+<a name="line409">409: </a><font color="#B22222">   In the 'redundant' parallel mode, all processes will make the computation</font>
+<a name="line410">410: </a><font color="#B22222">   redundantly, starting from the same data, and producing the same result.</font>
+<a name="line411">411: </a><font color="#B22222">   This result may be slightly different in the different processes if using a</font>
+<a name="line412">412: </a><font color="#B22222">   multithreaded BLAS library, which may cause issues in ill-conditioned problems.</font>
+
+<a name="line414">414: </a><font color="#B22222">   In the 'synchronized' parallel mode, only the first MPI process performs the</font>
+<a name="line415">415: </a><font color="#B22222">   computation and then the computed matrix is broadcast to the other</font>
+<a name="line416">416: </a><font color="#B22222">   processes in the communicator. This communication is done automatically at</font>
+<a name="line417">417: </a><font color="#B22222">   the end of <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>() or <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>().</font>
+
+<a name="line419">419: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line421">421: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>() or <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>(), <a href="../../../../../docs/manualpages/FN/FNGetParallel.html#FNGetParallel">FNGetParallel</a>()</font>
+<a name="line422">422: </a><font color="#B22222">@*/</font>
+<a name="line423">423: </a><strong><font color="#4169E1"><a name="FNSetParallel"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNSetParallel.html#FNSetParallel">FNSetParallel</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FNParallelType</a> pmode)</font></strong>
+<a name="line424">424: </a>{
+<a name="line428">428: </a>  fn-&gt;pmode = pmode;
+<a name="line429">429: </a>  <font color="#4169E1">return</font>(0);
+<a name="line430">430: </a>}
+
+<a name="line432">432: </a><font color="#B22222">/*@</font>
+<a name="line433">433: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNGetParallel.html#FNGetParallel">FNGetParallel</a> - Gets the mode of operation in parallel runs.</font>
+
+<a name="line435">435: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line437">437: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line438">438: </a><font color="#B22222">.  fn - the math function context</font>
+
+<a name="line440">440: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line441">441: </a><font color="#B22222">.  pmode - the parallel mode</font>
+
+<a name="line443">443: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line445">445: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNSetParallel.html#FNSetParallel">FNSetParallel</a>()</font>
+<a name="line446">446: </a><font color="#B22222">@*/</font>
+<a name="line447">447: </a><strong><font color="#4169E1"><a name="FNGetParallel"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNGetParallel.html#FNGetParallel">FNGetParallel</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FNParallelType</a> *pmode)</font></strong>
+<a name="line448">448: </a>{
+<a name="line452">452: </a>  *pmode = fn-&gt;pmode;
+<a name="line453">453: </a>  <font color="#4169E1">return</font>(0);
+<a name="line454">454: </a>}
+
+<a name="line456">456: </a><font color="#B22222">/*@</font>
+<a name="line457">457: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a> - Computes the value of the function f(x) for a given x.</font>
+
+<a name="line459">459: </a><font color="#B22222">   Not collective</font>
+
+<a name="line461">461: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line462">462: </a><font color="#B22222">+  fn - the math function context</font>
+<a name="line463">463: </a><font color="#B22222">-  x  - the value where the function must be evaluated</font>
+
+<a name="line465">465: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line466">466: </a><font color="#B22222">.  y  - the result of f(x)</font>
+
+<a name="line468">468: </a><font color="#B22222">   Note:</font>
+<a name="line469">469: </a><font color="#B22222">   Scaling factors are taken into account, so the actual function evaluation</font>
+<a name="line470">470: </a><font color="#B22222">   will return beta*f(alpha*x).</font>
+
+<a name="line472">472: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line474">474: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(), <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>(), <a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>()</font>
+<a name="line475">475: </a><font color="#B22222">@*/</font>
+<a name="line476">476: </a><strong><font color="#4169E1"><a name="FNEvaluateFunction"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscScalar x,PetscScalar *y)</font></strong>
+<a name="line477">477: </a>{
+<a name="line479">479: </a>  PetscScalar    xf,yf;
+
+<a name="line485">485: </a>  PetscLogEventBegin(FN_Evaluate,fn,0,0,0);
+<a name="line486">486: </a>  xf = fn-&gt;alpha*x;
+<a name="line487">487: </a>  (*fn-&gt;ops-&gt;evaluatefunction)(fn,xf,&amp;yf);
+<a name="line488">488: </a>  *y = fn-&gt;beta*yf;
+<a name="line489">489: </a>  PetscLogEventEnd(FN_Evaluate,fn,0,0,0);
+<a name="line490">490: </a>  <font color="#4169E1">return</font>(0);
+<a name="line491">491: </a>}
+
+<a name="line493">493: </a><font color="#B22222">/*@</font>
+<a name="line494">494: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a> - Computes the value of the derivative f'(x) for a given x.</font>
+
+<a name="line496">496: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line498">498: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line499">499: </a><font color="#B22222">+  fn - the math function context</font>
+<a name="line500">500: </a><font color="#B22222">-  x  - the value where the derivative must be evaluated</font>
+
+<a name="line502">502: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line503">503: </a><font color="#B22222">.  y  - the result of f'(x)</font>
+
+<a name="line505">505: </a><font color="#B22222">   Note:</font>
+<a name="line506">506: </a><font color="#B22222">   Scaling factors are taken into account, so the actual derivative evaluation will</font>
+<a name="line507">507: </a><font color="#B22222">   return alpha*beta*f'(alpha*x).</font>
+
+<a name="line509">509: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line511">511: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>()</font>
+<a name="line512">512: </a><font color="#B22222">@*/</font>
+<a name="line513">513: </a><strong><font color="#4169E1"><a name="FNEvaluateDerivative"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscScalar x,PetscScalar *y)</font></strong>
+<a name="line514">514: </a>{
+<a name="line516">516: </a>  PetscScalar    xf,yf;
+
+<a name="line522">522: </a>  PetscLogEventBegin(FN_Evaluate,fn,0,0,0);
+<a name="line523">523: </a>  xf = fn-&gt;alpha*x;
+<a name="line524">524: </a>  (*fn-&gt;ops-&gt;evaluatederivative)(fn,xf,&amp;yf);
+<a name="line525">525: </a>  *y = fn-&gt;alpha*fn-&gt;beta*yf;
+<a name="line526">526: </a>  PetscLogEventEnd(FN_Evaluate,fn,0,0,0);
+<a name="line527">527: </a>  <font color="#4169E1">return</font>(0);
+<a name="line528">528: </a>}
+
+<a name="line530">530: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMat_Sym_Private"></a>static PetscErrorCode FNEvaluateFunctionMat_Sym_Private(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscScalar *As,PetscScalar *Bs,PetscInt m,PetscBool firstonly)</font></strong>
+<a name="line531">531: </a>{
+<a name="line533">533: </a>  PetscInt       i,j;
+<a name="line534">534: </a>  PetscBLASInt   n,k,ld,lwork,info;
+<a name="line535">535: </a>  PetscScalar    *Q,*W,*work,a,x,y,one=1.0,zero=0.0;
+<a name="line536">536: </a>  PetscReal      *eig,dummy;
+<a name="line537">537: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line538">538: </a>  PetscReal      *rwork,rdummy;
+<a name="line539">539: </a><font color="#A020F0">#endif</font>
+
+<a name="line542">542: </a>  PetscBLASIntCast(m,&amp;n);
+<a name="line543">543: </a>  ld = n;
+<a name="line544">544: </a>  k = firstonly? 1: n;
+
+<a name="line546">546: </a>  <font color="#B22222">/* workspace query and memory allocation */</font>
+<a name="line547">547: </a>  lwork = -1;
+<a name="line548">548: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line549">549: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKsyev"</font>,LAPACKsyev_(<font color="#666666">"V"</font>,<font color="#666666">"L"</font>,&amp;n,As,&amp;ld,&amp;dummy,&amp;a,&amp;lwork,&amp;rdummy,&amp;info));
+<a name="line550">550: </a>  PetscBLASIntCast((PetscInt)PetscRealPart(a),&amp;lwork);
+<a name="line551">551: </a>  PetscMalloc5(m,&amp;eig,m*m,&amp;Q,m*k,&amp;W,lwork,&amp;work,PetscMax(1,3*m-2),&amp;rwork);
+<a name="line552">552: </a><font color="#A020F0">#else</font>
+<a name="line553">553: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKsyev"</font>,LAPACKsyev_(<font color="#666666">"V"</font>,<font color="#666666">"L"</font>,&amp;n,As,&amp;ld,&amp;dummy,&amp;a,&amp;lwork,&amp;info));
+<a name="line554">554: </a>  PetscBLASIntCast((PetscInt)PetscRealPart(a),&amp;lwork);
+<a name="line555">555: </a>  PetscMalloc4(m,&amp;eig,m*m,&amp;Q,m*k,&amp;W,lwork,&amp;work);
+<a name="line556">556: </a><font color="#A020F0">#endif</font>
+
+<a name="line558">558: </a>  <font color="#B22222">/* compute eigendecomposition */</font>
+<a name="line559">559: </a>  <font color="#4169E1">for</font> (j=0;j&lt;n;j++) <font color="#4169E1">for</font> (i=j;i&lt;n;i++) Q[i+j*ld] = As[i+j*ld];
+<a name="line560">560: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line561">561: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKsyev"</font>,LAPACKsyev_(<font color="#666666">"V"</font>,<font color="#666666">"L"</font>,&amp;n,Q,&amp;ld,eig,work,&amp;lwork,rwork,&amp;info));
+<a name="line562">562: </a><font color="#A020F0">#else</font>
+<a name="line563">563: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKsyev"</font>,LAPACKsyev_(<font color="#666666">"V"</font>,<font color="#666666">"L"</font>,&amp;n,Q,&amp;ld,eig,work,&amp;lwork,&amp;info));
+<a name="line564">564: </a><font color="#A020F0">#endif</font>
+<a name="line565">565: </a>  SlepcCheckLapackInfo(<font color="#666666">"syev"</font>,info);
+
+<a name="line567">567: </a>  <font color="#B22222">/* W = f(Lambda)*Q' */</font>
+<a name="line568">568: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line569">569: </a>    x = fn-&gt;alpha*eig[i];
+<a name="line570">570: </a>    (*fn-&gt;ops-&gt;evaluatefunction)(fn,x,&amp;y);  <font color="#B22222">/* y = f(x) */</font>
+<a name="line571">571: </a>    <font color="#4169E1">for</font> (j=0;j&lt;k;j++) W[i+j*ld] = PetscConj(Q[j+i*ld])*fn-&gt;beta*y;
+<a name="line572">572: </a>  }
+<a name="line573">573: </a>  <font color="#B22222">/* Bs = Q*W */</font>
+<a name="line574">574: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n,&amp;k,&amp;n,&amp;one,Q,&amp;ld,W,&amp;ld,&amp;zero,Bs,&amp;ld));
+<a name="line575">575: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line576">576: </a>  PetscFree5(eig,Q,W,work,rwork);
+<a name="line577">577: </a><font color="#A020F0">#else</font>
+<a name="line578">578: </a>  PetscFree4(eig,Q,W,work);
+<a name="line579">579: </a><font color="#A020F0">#endif</font>
+<a name="line580">580: </a>  PetscLogFlops(9.0*n*n*n+2.0*n*n*n);
+<a name="line581">581: </a>  <font color="#4169E1">return</font>(0);
+<a name="line582">582: </a>}
+
+<a name="line584">584: </a><font color="#B22222">/*</font>
+<a name="line585">585: </a><font color="#B22222">   FNEvaluateFunctionMat_Sym_Default - given a symmetric matrix A,</font>
+<a name="line586">586: </a><font color="#B22222">   compute the matrix function as f(A)=Q*f(D)*Q' where the spectral</font>
+<a name="line587">587: </a><font color="#B22222">   decomposition of A is A=Q*D*Q'</font>
+<a name="line588">588: </a><font color="#B22222">*/</font>
+<a name="line589">589: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMat_Sym_Default"></a>static PetscErrorCode FNEvaluateFunctionMat_Sym_Default(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Mat B)</font></strong>
+<a name="line590">590: </a>{
+<a name="line592">592: </a>  PetscInt       m;
+<a name="line593">593: </a>  PetscScalar    *As,*Bs;
+
+<a name="line596">596: </a>  MatDenseGetArray(A,&amp;As);
+<a name="line597">597: </a>  MatDenseGetArray(B,&amp;Bs);
+<a name="line598">598: </a>  MatGetSize(A,&amp;m,NULL);
+<a name="line599">599: </a>  FNEvaluateFunctionMat_Sym_Private(fn,As,Bs,m,PETSC_FALSE);
+<a name="line600">600: </a>  MatDenseRestoreArray(A,&amp;As);
+<a name="line601">601: </a>  MatDenseRestoreArray(B,&amp;Bs);
+<a name="line602">602: </a>  <font color="#4169E1">return</font>(0);
+<a name="line603">603: </a>}
+
+<a name="line605">605: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMat_Private"></a>PetscErrorCode FNEvaluateFunctionMat_Private(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Mat B,PetscBool sync)</font></strong>
+<a name="line606">606: </a>{
+<a name="line608">608: </a>  PetscBool      set,flg,symm=PETSC_FALSE;
+<a name="line609">609: </a>  PetscInt       m,n;
+<a name="line610">610: </a>  PetscMPIInt    size,rank;
+<a name="line611">611: </a>  PetscScalar    *pF;
+<a name="line612">612: </a>  Mat            M,F;
+
+<a name="line615">615: </a>  <font color="#B22222">/* destination matrix */</font>
+<a name="line616">616: </a>  F = B?B:A;
+
+<a name="line618">618: </a>  <font color="#B22222">/* check symmetry of A */</font>
+<a name="line619">619: </a>  MatIsHermitianKnown(A,&amp;set,&amp;flg);
+<a name="line620">620: </a>  symm = set? flg: PETSC_FALSE;
+
+<a name="line622">622: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)fn),&amp;size);
+<a name="line623">623: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)fn),&amp;rank);
+<a name="line624">624: </a>  <font color="#4169E1">if</font> (size==1 || fn-&gt;pmode==<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FN_PARALLEL_REDUNDANT</a> || (fn-&gt;pmode==<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FN_PARALLEL_SYNCHRONIZED</a> &amp;&amp; !rank)) {
+
+<a name="line626">626: </a>    PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line627">627: </a>    <font color="#4169E1">if</font> (symm &amp;&amp; !fn-&gt;method) {  <font color="#B22222">/* prefer diagonalization */</font>
+<a name="line628">628: </a>      PetscInfo(fn,<font color="#666666">"Computing matrix function via diagonalization\n"</font>);
+<a name="line629">629: </a>      FNEvaluateFunctionMat_Sym_Default(fn,A,F);
+<a name="line630">630: </a>    } <font color="#4169E1">else</font> {
+<a name="line631">631: </a>      <font color="#B22222">/* scale argument */</font>
+<a name="line632">632: </a>      <font color="#4169E1">if</font> (fn-&gt;alpha!=(PetscScalar)1.0) {
+<a name="line633">633: </a>        FN_AllocateWorkMat(fn,A,&amp;M);
+<a name="line634">634: </a>        MatScale(M,fn-&gt;alpha);
+<a name="line635">635: </a>      } <font color="#4169E1">else</font> M = A;
+<a name="line636">636: </a>      <font color="#4169E1">if</font> (fn-&gt;ops-&gt;evaluatefunctionmat[fn-&gt;method]) {
+<a name="line637">637: </a>        (*fn-&gt;ops-&gt;evaluatefunctionmat[fn-&gt;method])(fn,M,F);
+<a name="line638">638: </a>      } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!fn-&gt;method) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_SUP,<font color="#666666">"Matrix functions not implemented in this <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> type"</font>);
+<a name="line639">639: </a>      <font color="#4169E1">else</font> SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The specified method number does not exist for this <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> type"</font>);
+<a name="line640">640: </a>      <font color="#4169E1">if</font> (fn-&gt;alpha!=(PetscScalar)1.0) {
+<a name="line641">641: </a>        FN_FreeWorkMat(fn,&amp;M);
+<a name="line642">642: </a>      }
+<a name="line643">643: </a>      <font color="#B22222">/* scale result */</font>
+<a name="line644">644: </a>      MatScale(F,fn-&gt;beta);
+<a name="line645">645: </a>    }
+<a name="line646">646: </a>    PetscFPTrapPop();
+<a name="line647">647: </a>  }
+<a name="line648">648: </a>  <font color="#4169E1">if</font> (size&gt;1 &amp;&amp; fn-&gt;pmode==<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FN_PARALLEL_SYNCHRONIZED</a> &amp;&amp; sync) {  <font color="#B22222">/* synchronize */</font>
+<a name="line649">649: </a>    MatGetSize(A,&amp;m,&amp;n);
+<a name="line650">650: </a>    MatDenseGetArray(F,&amp;pF);
+<a name="line651">651: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(pF,n*n,MPIU_SCALAR,0,PetscObjectComm((PetscObject)fn));
+<a name="line652">652: </a>    MatDenseRestoreArray(F,&amp;pF);
+<a name="line653">653: </a>  }
+<a name="line654">654: </a>  <font color="#4169E1">return</font>(0);
+<a name="line655">655: </a>}
+
+<a name="line657">657: </a><font color="#B22222">/*@</font>
+<a name="line658">658: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a> - Computes the value of the function f(A) for a given</font>
+<a name="line659">659: </a><font color="#B22222">   matrix A, where the result is also a matrix.</font>
+
+<a name="line661">661: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line663">663: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line664">664: </a><font color="#B22222">+  fn - the math function context</font>
+<a name="line665">665: </a><font color="#B22222">-  A  - matrix on which the function must be evaluated</font>
+
+<a name="line667">667: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line668">668: </a><font color="#B22222">.  B  - (optional) matrix resulting from evaluating f(A)</font>
+
+<a name="line670">670: </a><font color="#B22222">   Notes:</font>
+<a name="line671">671: </a><font color="#B22222">   Matrix A must be a square sequential dense Mat, with all entries equal on</font>
+<a name="line672">672: </a><font color="#B22222">   all processes (otherwise each process will compute different results).</font>
+<a name="line673">673: </a><font color="#B22222">   If matrix B is provided, it must also be a square sequential dense Mat, and</font>
+<a name="line674">674: </a><font color="#B22222">   both matrices must have the same dimensions. If B is NULL (or B=A) then the</font>
+<a name="line675">675: </a><font color="#B22222">   function will perform an in-place computation, overwriting A with f(A).</font>
+
+<a name="line677">677: </a><font color="#B22222">   If A is known to be real symmetric or complex Hermitian then it is</font>
+<a name="line678">678: </a><font color="#B22222">   recommended to set the appropriate flag with MatSetOption(), because</font>
+<a name="line679">679: </a><font color="#B22222">   symmetry can sometimes be exploited by the algorithm.</font>
+
+<a name="line681">681: </a><font color="#B22222">   Scaling factors are taken into account, so the actual function evaluation</font>
+<a name="line682">682: </a><font color="#B22222">   will return beta*f(alpha*A).</font>
+
+<a name="line684">684: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line686">686: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(), <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>(), <a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a>()</font>
+<a name="line687">687: </a><font color="#B22222">@*/</font>
+<a name="line688">688: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMat"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Mat B)</font></strong>
+<a name="line689">689: </a>{
+<a name="line691">691: </a>  PetscBool      match,inplace=PETSC_FALSE;
+<a name="line692">692: </a>  PetscInt       m,n,n1;
+
+<a name="line699">699: </a>  <font color="#4169E1">if</font> (B) {
+<a name="line702">702: </a>  } <font color="#4169E1">else</font> inplace = PETSC_TRUE;
+<a name="line703">703: </a>  PetscObjectTypeCompare((PetscObject)A,MATSEQDENSE,&amp;match);
+<a name="line704">704: </a>  <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_SUP,<font color="#666666">"Mat A must be of type seqdense"</font>);
+<a name="line705">705: </a>  MatGetSize(A,&amp;m,&amp;n);
+<a name="line706">706: </a>  <font color="#4169E1">if</font> (m!=n) SETERRQ2(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat A is not square (has %D rows, %D cols)"</font>,m,n);
+<a name="line707">707: </a>  <font color="#4169E1">if</font> (!inplace) {
+<a name="line708">708: </a>    PetscObjectTypeCompare((PetscObject)B,MATSEQDENSE,&amp;match);
+<a name="line709">709: </a>    <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_SUP,<font color="#666666">"Mat B must be of type seqdense"</font>);
+<a name="line710">710: </a>    n1 = n;
+<a name="line711">711: </a>    MatGetSize(B,&amp;m,&amp;n);
+<a name="line712">712: </a>    <font color="#4169E1">if</font> (m!=n) SETERRQ2(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat B is not square (has %D rows, %D cols)"</font>,m,n);
+<a name="line713">713: </a>    <font color="#4169E1">if</font> (n1!=n) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_SIZ,<font color="#666666">"Matrices A and B must have the same dimension"</font>);
+<a name="line714">714: </a>  }
+
+<a name="line716">716: </a>  <font color="#B22222">/* evaluate matrix function */</font>
+<a name="line717">717: </a>  PetscLogEventBegin(FN_Evaluate,fn,0,0,0);
+<a name="line718">718: </a>  FNEvaluateFunctionMat_Private(fn,A,B,PETSC_TRUE);
+<a name="line719">719: </a>  PetscLogEventEnd(FN_Evaluate,fn,0,0,0);
+<a name="line720">720: </a>  <font color="#4169E1">return</font>(0);
+<a name="line721">721: </a>}
+
+<a name="line723">723: </a><font color="#B22222">/*</font>
+<a name="line724">724: </a><font color="#B22222">   FNEvaluateFunctionMatVec_Default - computes the full matrix f(A)</font>
+<a name="line725">725: </a><font color="#B22222">   and then copies the first column.</font>
+<a name="line726">726: </a><font color="#B22222">*/</font>
+<a name="line727">727: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMatVec_Default"></a>static PetscErrorCode FNEvaluateFunctionMatVec_Default(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Vec v)</font></strong>
+<a name="line728">728: </a>{
+<a name="line730">730: </a>  Mat            F;
+
+<a name="line733">733: </a>  FN_AllocateWorkMat(fn,A,&amp;F);
+<a name="line734">734: </a>  <font color="#4169E1">if</font> (fn-&gt;ops-&gt;evaluatefunctionmat[fn-&gt;method]) {
+<a name="line735">735: </a>    (*fn-&gt;ops-&gt;evaluatefunctionmat[fn-&gt;method])(fn,A,F);
+<a name="line736">736: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!fn-&gt;method) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_SUP,<font color="#666666">"Matrix functions not implemented in this <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> type"</font>);
+<a name="line737">737: </a>  <font color="#4169E1">else</font> SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The specified method number does not exist for this <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> type"</font>);
+<a name="line738">738: </a>  MatGetColumnVector(F,v,0);
+<a name="line739">739: </a>  FN_FreeWorkMat(fn,&amp;F);
+<a name="line740">740: </a>  <font color="#4169E1">return</font>(0);
+<a name="line741">741: </a>}
+
+<a name="line743">743: </a><font color="#B22222">/*</font>
+<a name="line744">744: </a><font color="#B22222">   FNEvaluateFunctionMatVec_Sym_Default - given a symmetric matrix A,</font>
+<a name="line745">745: </a><font color="#B22222">   compute the matrix function as f(A)=Q*f(D)*Q' where the spectral</font>
+<a name="line746">746: </a><font color="#B22222">   decomposition of A is A=Q*D*Q'. Only the first column is computed.</font>
+<a name="line747">747: </a><font color="#B22222">*/</font>
+<a name="line748">748: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMatVec_Sym_Default"></a>static PetscErrorCode FNEvaluateFunctionMatVec_Sym_Default(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Vec v)</font></strong>
+<a name="line749">749: </a>{
+<a name="line751">751: </a>  PetscInt       m;
+<a name="line752">752: </a>  PetscScalar    *As,*vs;
+
+<a name="line755">755: </a>  MatDenseGetArray(A,&amp;As);
+<a name="line756">756: </a>  VecGetArray(v,&amp;vs);
+<a name="line757">757: </a>  MatGetSize(A,&amp;m,NULL);
+<a name="line758">758: </a>  FNEvaluateFunctionMat_Sym_Private(fn,As,vs,m,PETSC_TRUE);
+<a name="line759">759: </a>  MatDenseRestoreArray(A,&amp;As);
+<a name="line760">760: </a>  VecRestoreArray(v,&amp;vs);
+<a name="line761">761: </a>  <font color="#4169E1">return</font>(0);
+<a name="line762">762: </a>}
+
+<a name="line764">764: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMatVec_Private"></a>PetscErrorCode FNEvaluateFunctionMatVec_Private(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Vec v,PetscBool sync)</font></strong>
+<a name="line765">765: </a>{
+<a name="line767">767: </a>  PetscBool      set,flg,symm=PETSC_FALSE;
+<a name="line768">768: </a>  PetscInt       m,n;
+<a name="line769">769: </a>  Mat            M;
+<a name="line770">770: </a>  PetscMPIInt    size,rank;
+<a name="line771">771: </a>  PetscScalar    *pv;
+
+<a name="line774">774: </a>  <font color="#B22222">/* check symmetry of A */</font>
+<a name="line775">775: </a>  MatIsHermitianKnown(A,&amp;set,&amp;flg);
+<a name="line776">776: </a>  symm = set? flg: PETSC_FALSE;
+
+<a name="line778">778: </a>  <font color="#B22222">/* evaluate matrix function */</font>
+<a name="line779">779: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)fn),&amp;size);
+<a name="line780">780: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)fn),&amp;rank);
+<a name="line781">781: </a>  <font color="#4169E1">if</font> (size==1 || fn-&gt;pmode==<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FN_PARALLEL_REDUNDANT</a> || (fn-&gt;pmode==<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FN_PARALLEL_SYNCHRONIZED</a> &amp;&amp; !rank)) {
+<a name="line782">782: </a>    PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line783">783: </a>    <font color="#4169E1">if</font> (symm &amp;&amp; !fn-&gt;method) {  <font color="#B22222">/* prefer diagonalization */</font>
+<a name="line784">784: </a>      PetscInfo(fn,<font color="#666666">"Computing matrix function via diagonalization\n"</font>);
+<a name="line785">785: </a>      FNEvaluateFunctionMatVec_Sym_Default(fn,A,v);
+<a name="line786">786: </a>    } <font color="#4169E1">else</font> {
+<a name="line787">787: </a>      <font color="#B22222">/* scale argument */</font>
+<a name="line788">788: </a>      <font color="#4169E1">if</font> (fn-&gt;alpha!=(PetscScalar)1.0) {
+<a name="line789">789: </a>        FN_AllocateWorkMat(fn,A,&amp;M);
+<a name="line790">790: </a>        MatScale(M,fn-&gt;alpha);
+<a name="line791">791: </a>      } <font color="#4169E1">else</font> M = A;
+<a name="line792">792: </a>      <font color="#4169E1">if</font> (fn-&gt;ops-&gt;evaluatefunctionmatvec[fn-&gt;method]) {
+<a name="line793">793: </a>        (*fn-&gt;ops-&gt;evaluatefunctionmatvec[fn-&gt;method])(fn,M,v);
+<a name="line794">794: </a>      } <font color="#4169E1">else</font> {
+<a name="line795">795: </a>        FNEvaluateFunctionMatVec_Default(fn,M,v);
+<a name="line796">796: </a>      }
+<a name="line797">797: </a>      <font color="#4169E1">if</font> (fn-&gt;alpha!=(PetscScalar)1.0) {
+<a name="line798">798: </a>        FN_FreeWorkMat(fn,&amp;M);
+<a name="line799">799: </a>      }
+<a name="line800">800: </a>      <font color="#B22222">/* scale result */</font>
+<a name="line801">801: </a>      VecScale(v,fn-&gt;beta);
+<a name="line802">802: </a>    }
+<a name="line803">803: </a>    PetscFPTrapPop();
+<a name="line804">804: </a>  }
+
+<a name="line806">806: </a>  <font color="#B22222">/* synchronize */</font>
+<a name="line807">807: </a>  <font color="#4169E1">if</font> (size&gt;1 &amp;&amp; fn-&gt;pmode==<a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FN_PARALLEL_SYNCHRONIZED</a> &amp;&amp; sync) {
+<a name="line808">808: </a>    MatGetSize(A,&amp;m,&amp;n);
+<a name="line809">809: </a>    VecGetArray(v,&amp;pv);
+<a name="line810">810: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(pv,n,MPIU_SCALAR,0,PetscObjectComm((PetscObject)fn));
+<a name="line811">811: </a>    VecRestoreArray(v,&amp;pv);
+<a name="line812">812: </a>  }
+<a name="line813">813: </a>  <font color="#4169E1">return</font>(0);
+<a name="line814">814: </a>}
+
+<a name="line816">816: </a><font color="#B22222">/*@</font>
+<a name="line817">817: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a> - Computes the first column of the matrix f(A)</font>
+<a name="line818">818: </a><font color="#B22222">   for a given matrix A.</font>
+
+<a name="line820">820: </a><font color="#B22222">   Logically Collective on fn</font>
+
+<a name="line822">822: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line823">823: </a><font color="#B22222">+  fn - the math function context</font>
+<a name="line824">824: </a><font color="#B22222">-  A  - matrix on which the function must be evaluated</font>
+
+<a name="line826">826: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line827">827: </a><font color="#B22222">.  v  - vector to hold the first column of f(A)</font>
+
+<a name="line829">829: </a><font color="#B22222">   Notes:</font>
+<a name="line830">830: </a><font color="#B22222">   This operation is similar to <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>() but returns only</font>
+<a name="line831">831: </a><font color="#B22222">   the first column of f(A), hence saving computations in most cases.</font>
+
+<a name="line833">833: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line835">835: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(), <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>(), <a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a>()</font>
+<a name="line836">836: </a><font color="#B22222">@*/</font>
+<a name="line837">837: </a><strong><font color="#4169E1"><a name="FNEvaluateFunctionMatVec"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,Mat A,Vec v)</font></strong>
+<a name="line838">838: </a>{
+<a name="line840">840: </a>  PetscBool      match;
+<a name="line841">841: </a>  PetscInt       m,n;
+
+<a name="line850">850: </a>  PetscObjectTypeCompare((PetscObject)A,MATSEQDENSE,&amp;match);
+<a name="line851">851: </a>  <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_SUP,<font color="#666666">"Mat A must be of type seqdense"</font>);
+<a name="line852">852: </a>  MatGetSize(A,&amp;m,&amp;n);
+<a name="line853">853: </a>  <font color="#4169E1">if</font> (m!=n) SETERRQ2(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat A is not square (has %D rows, %D cols)"</font>,m,n);
+<a name="line854">854: </a>  VecGetSize(v,&amp;m);
+<a name="line855">855: </a>  <font color="#4169E1">if</font> (m!=n) SETERRQ(PetscObjectComm((PetscObject)fn),PETSC_ERR_ARG_SIZ,<font color="#666666">"Matrix A and vector v must have the same size"</font>);
+<a name="line856">856: </a>  PetscLogEventBegin(FN_Evaluate,fn,0,0,0);
+<a name="line857">857: </a>  FNEvaluateFunctionMatVec_Private(fn,A,v,PETSC_TRUE);
+<a name="line858">858: </a>  PetscLogEventEnd(FN_Evaluate,fn,0,0,0);
+<a name="line859">859: </a>  <font color="#4169E1">return</font>(0);
+<a name="line860">860: </a>}
+
+<a name="line862">862: </a><font color="#B22222">/*@</font>
+<a name="line863">863: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNSetFromOptions.html#FNSetFromOptions">FNSetFromOptions</a> - Sets <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> options from the options database.</font>
+
+<a name="line865">865: </a><font color="#B22222">   Collective on fn</font>
+
+<a name="line867">867: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line868">868: </a><font color="#B22222">.  fn - the math function context</font>
+
+<a name="line870">870: </a><font color="#B22222">   Notes:</font>
+<a name="line871">871: </a><font color="#B22222">   To see all options, run your program with the -help option.</font>
+
+<a name="line873">873: </a><font color="#B22222">   Level: beginner</font>
+<a name="line874">874: </a><font color="#B22222">@*/</font>
+<a name="line875">875: </a><strong><font color="#4169E1"><a name="FNSetFromOptions"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNSetFromOptions.html#FNSetFromOptions">FNSetFromOptions</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn)</font></strong>
+<a name="line876">876: </a>{
+<a name="line878">878: </a>  char           type[256];
+<a name="line879">879: </a>  PetscScalar    array[2];
+<a name="line880">880: </a>  PetscInt       k,meth;
+<a name="line881">881: </a>  PetscBool      flg;
+<a name="line882">882: </a>  <a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FNParallelType</a> pmode;
+
+<a name="line886">886: </a>  <a href="../../../../../docs/manualpages/FN/FNRegisterAll.html#FNRegisterAll">FNRegisterAll</a>();
+<a name="line887">887: </a>  PetscObjectOptionsBegin((PetscObject)fn);
+<a name="line888">888: </a>    PetscOptionsFList(<font color="#666666">"-fn_type"</font>,<font color="#666666">"Math function type"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>"</font>,FNList,(char*)(((PetscObject)fn)-&gt;type_name?((PetscObject)fn)-&gt;type_name:FNRATIONAL),type,256,&amp;flg);
+<a name="line889">889: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line890">890: </a>      <a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fn,type);
+<a name="line891">891: </a>    } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (!((PetscObject)fn)-&gt;type_name) {
+<a name="line892">892: </a>      <a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fn,FNRATIONAL);
+<a name="line893">893: </a>    }
+
+<a name="line895">895: </a>    k = 2;
+<a name="line896">896: </a>    array[0] = 0.0; array[1] = 0.0;
+<a name="line897">897: </a>    PetscOptionsScalarArray(<font color="#666666">"-fn_scale"</font>,<font color="#666666">"Scale factors (one or two scalar values separated with a comma without spaces)"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>"</font>,array,&amp;k,&amp;flg);
+<a name="line898">898: </a>    <font color="#4169E1">if</font> (flg) {
+<a name="line899">899: </a>      <font color="#4169E1">if</font> (k&lt;2) array[1] = 1.0;
+<a name="line900">900: </a>      <a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(fn,array[0],array[1]);
+<a name="line901">901: </a>    }
+
+<a name="line903">903: </a>    PetscOptionsInt(<font color="#666666">"-fn_method"</font>,<font color="#666666">"Method to be used for computing matrix functions"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a>"</font>,fn-&gt;method,&amp;meth,&amp;flg);
+<a name="line904">904: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a>(fn,meth); }
+
+<a name="line906">906: </a>    PetscOptionsEnum(<font color="#666666">"-fn_parallel"</font>,<font color="#666666">"Operation mode in parallel runs"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/FN/FNSetParallel.html#FNSetParallel">FNSetParallel</a>"</font>,FNParallelTypes,(PetscEnum)fn-&gt;pmode,(PetscEnum*)&amp;pmode,&amp;flg);
+<a name="line907">907: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/FN/FNSetParallel.html#FNSetParallel">FNSetParallel</a>(fn,pmode); }
+
+<a name="line909">909: </a>    <font color="#4169E1">if</font> (fn-&gt;ops-&gt;setfromoptions) {
+<a name="line910">910: </a>      (*fn-&gt;ops-&gt;setfromoptions)(PetscOptionsObject,fn);
+<a name="line911">911: </a>    }
+<a name="line912">912: </a>    PetscObjectProcessOptionsHandlers(PetscOptionsObject,(PetscObject)fn);
+<a name="line913">913: </a>  PetscOptionsEnd();
+<a name="line914">914: </a>  <font color="#4169E1">return</font>(0);
+<a name="line915">915: </a>}
+
+<a name="line917">917: </a><font color="#B22222">/*@C</font>
+<a name="line918">918: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a> - Prints the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> data structure.</font>
+
+<a name="line920">920: </a><font color="#B22222">   Collective on fn</font>
+
+<a name="line922">922: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line923">923: </a><font color="#B22222">+  fn - the math function context</font>
+<a name="line924">924: </a><font color="#B22222">-  viewer - optional visualization context</font>
+
+<a name="line926">926: </a><font color="#B22222">   Note:</font>
+<a name="line927">927: </a><font color="#B22222">   The available visualization contexts include</font>
+<a name="line928">928: </a><font color="#B22222">+     PETSC_VIEWER_STDOUT_SELF - standard output (default)</font>
+<a name="line929">929: </a><font color="#B22222">-     PETSC_VIEWER_STDOUT_WORLD - synchronized standard</font>
+<a name="line930">930: </a><font color="#B22222">         output where only the first processor opens</font>
+<a name="line931">931: </a><font color="#B22222">         the file.  All other processors send their</font>
+<a name="line932">932: </a><font color="#B22222">         data to the first processor to print.</font>
+
+<a name="line934">934: </a><font color="#B22222">   The user can open an alternative visualization context with</font>
+<a name="line935">935: </a><font color="#B22222">   PetscViewerASCIIOpen() - output to a specified file.</font>
+
+<a name="line937">937: </a><font color="#B22222">   Level: beginner</font>
+<a name="line938">938: </a><font color="#B22222">@*/</font>
+<a name="line939">939: </a><strong><font color="#4169E1"><a name="FNView"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscViewer viewer)</font></strong>
+<a name="line940">940: </a>{
+<a name="line941">941: </a>  PetscBool      isascii;
+<a name="line943">943: </a>  PetscMPIInt    size;
+
+<a name="line947">947: </a>  <font color="#4169E1">if</font> (!viewer) {
+<a name="line948">948: </a>    PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)fn),&amp;viewer);
+<a name="line949">949: </a>  }
+<a name="line952">952: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line953">953: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line954">954: </a>    PetscObjectPrintClassNamePrefixType((PetscObject)fn,viewer);
+<a name="line955">955: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)fn),&amp;size);
+<a name="line956">956: </a>    <font color="#4169E1">if</font> (size&gt;1) {
+<a name="line957">957: </a>      PetscViewerASCIIPrintf(viewer,<font color="#666666">"  parallel operation mode: %s\n"</font>,FNParallelTypes[fn-&gt;pmode]);
+<a name="line958">958: </a>    }
+<a name="line959">959: </a>    <font color="#4169E1">if</font> (fn-&gt;ops-&gt;view) {
+<a name="line960">960: </a>      PetscViewerASCIIPushTab(viewer);
+<a name="line961">961: </a>      (*fn-&gt;ops-&gt;view)(fn,viewer);
+<a name="line962">962: </a>      PetscViewerASCIIPopTab(viewer);
+<a name="line963">963: </a>    }
+<a name="line964">964: </a>  }
+<a name="line965">965: </a>  <font color="#4169E1">return</font>(0);
+<a name="line966">966: </a>}
+
+<a name="line968">968: </a><font color="#B22222">/*@C</font>
+<a name="line969">969: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNViewFromOptions.html#FNViewFromOptions">FNViewFromOptions</a> - View from options</font>
+
+<a name="line971">971: </a><font color="#B22222">   Collective on <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a></font>
+
+<a name="line973">973: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line974">974: </a><font color="#B22222">+  fn   - the math function context</font>
+<a name="line975">975: </a><font color="#B22222">.  obj  - optional object</font>
+<a name="line976">976: </a><font color="#B22222">-  name - command line option</font>
+
+<a name="line978">978: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line980">980: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>(), <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>()</font>
+<a name="line981">981: </a><font color="#B22222">@*/</font>
+<a name="line982">982: </a><strong><font color="#4169E1"><a name="FNViewFromOptions"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNViewFromOptions.html#FNViewFromOptions">FNViewFromOptions</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,PetscObject obj,const char name[])</font></strong>
+<a name="line983">983: </a>{
+
+<a name="line988">988: </a>  PetscObjectViewFromOptions((PetscObject)fn,obj,name);
+<a name="line989">989: </a>  <font color="#4169E1">return</font>(0);
+<a name="line990">990: </a>}
+
+<a name="line992">992: </a><font color="#B22222">/*@</font>
+<a name="line993">993: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNDuplicate.html#FNDuplicate">FNDuplicate</a> - Duplicates a math function, copying all parameters, possibly with a</font>
+<a name="line994">994: </a><font color="#B22222">   different communicator.</font>
+
+<a name="line996">996: </a><font color="#B22222">   Collective on fn</font>
+
+<a name="line998">998: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line999">999: </a><font color="#B22222">+  fn   - the math function context</font>
+<a name="line1000">1000: </a><font color="#B22222">-  comm - MPI communicator</font>
+
+<a name="line1002">1002: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1003">1003: </a><font color="#B22222">.  newfn - location to put the new <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> context</font>
+
+<a name="line1005">1005: </a><font color="#B22222">   Note:</font>
+<a name="line1006">1006: </a><font color="#B22222">   In order to use the same MPI communicator as in the original object,</font>
+<a name="line1007">1007: </a><font color="#B22222">   use PetscObjectComm((PetscObject)fn).</font>
+
+<a name="line1009">1009: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line1011">1011: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>()</font>
+<a name="line1012">1012: </a><font color="#B22222">@*/</font>
+<a name="line1013">1013: </a><strong><font color="#4169E1"><a name="FNDuplicate"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNDuplicate.html#FNDuplicate">FNDuplicate</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn,MPI_Comm comm,<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *newfn)</font></strong>
+<a name="line1014">1014: </a>{
+<a name="line1016">1016: </a>  <a href="../../../../../docs/manualpages/FN/FNType.html#FNType">FNType</a>         type;
+<a name="line1017">1017: </a>  PetscScalar    alpha,beta;
+<a name="line1018">1018: </a>  PetscInt       meth;
+<a name="line1019">1019: </a>  <a href="../../../../../docs/manualpages/FN/FNParallelType.html#FNParallelType">FNParallelType</a> ptype;
+
+<a name="line1025">1025: </a>  <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(comm,newfn);
+<a name="line1026">1026: </a>  <a href="../../../../../docs/manualpages/FN/FNGetType.html#FNGetType">FNGetType</a>(fn,&amp;type);
+<a name="line1027">1027: </a>  <a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(*newfn,type);
+<a name="line1028">1028: </a>  <a href="../../../../../docs/manualpages/FN/FNGetScale.html#FNGetScale">FNGetScale</a>(fn,&amp;alpha,&amp;beta);
+<a name="line1029">1029: </a>  <a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(*newfn,alpha,beta);
+<a name="line1030">1030: </a>  <a href="../../../../../docs/manualpages/FN/FNGetMethod.html#FNGetMethod">FNGetMethod</a>(fn,&amp;meth);
+<a name="line1031">1031: </a>  <a href="../../../../../docs/manualpages/FN/FNSetMethod.html#FNSetMethod">FNSetMethod</a>(*newfn,meth);
+<a name="line1032">1032: </a>  <a href="../../../../../docs/manualpages/FN/FNGetParallel.html#FNGetParallel">FNGetParallel</a>(fn,&amp;ptype);
+<a name="line1033">1033: </a>  <a href="../../../../../docs/manualpages/FN/FNSetParallel.html#FNSetParallel">FNSetParallel</a>(*newfn,ptype);
+<a name="line1034">1034: </a>  <font color="#4169E1">if</font> (fn-&gt;ops-&gt;duplicate) {
+<a name="line1035">1035: </a>    (*fn-&gt;ops-&gt;duplicate)(fn,comm,newfn);
+<a name="line1036">1036: </a>  }
+<a name="line1037">1037: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1038">1038: </a>}
+
+<a name="line1040">1040: </a><font color="#B22222">/*@</font>
+<a name="line1041">1041: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a> - Destroys <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> context that was created with <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>().</font>
+
+<a name="line1043">1043: </a><font color="#B22222">   Collective on fn</font>
+
+<a name="line1045">1045: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1046">1046: </a><font color="#B22222">.  fn - the math function context</font>
+
+<a name="line1048">1048: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line1050">1050: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>()</font>
+<a name="line1051">1051: </a><font color="#B22222">@*/</font>
+<a name="line1052">1052: </a><strong><font color="#4169E1"><a name="FNDestroy"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *fn)</font></strong>
+<a name="line1053">1053: </a>{
+<a name="line1055">1055: </a>  PetscInt       i;
+
+<a name="line1058">1058: </a>  <font color="#4169E1">if</font> (!*fn) <font color="#4169E1">return</font>(0);
+<a name="line1060">1060: </a>  <font color="#4169E1">if</font> (--((PetscObject)(*fn))-&gt;refct &gt; 0) { *fn = 0; <font color="#4169E1">return</font>(0); }
+<a name="line1061">1061: </a>  <font color="#4169E1">if</font> ((*fn)-&gt;ops-&gt;destroy) { (*(*fn)-&gt;ops-&gt;destroy)(*fn); }
+<a name="line1062">1062: </a>  <font color="#4169E1">for</font> (i=0;i&lt;(*fn)-&gt;nw;i++) {
+<a name="line1063">1063: </a>    MatDestroy(&amp;(*fn)-&gt;W[i]);
+<a name="line1064">1064: </a>  }
+<a name="line1065">1065: </a>  PetscHeaderDestroy(fn);
+<a name="line1066">1066: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1067">1067: </a>}
+
+<a name="line1069">1069: </a><font color="#B22222">/*@C</font>
+<a name="line1070">1070: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNRegister.html#FNRegister">FNRegister</a> - Adds a mathematical function to the <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> package.</font>
+
+<a name="line1072">1072: </a><font color="#B22222">   Not collective</font>
+
+<a name="line1074">1074: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1075">1075: </a><font color="#B22222">+  name - name of a new user-defined <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a></font>
+<a name="line1076">1076: </a><font color="#B22222">-  function - routine to create context</font>
+
+<a name="line1078">1078: </a><font color="#B22222">   Notes:</font>
+<a name="line1079">1079: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/FN/FNRegister.html#FNRegister">FNRegister</a>() may be called multiple times to add several user-defined functions.</font>
+
+<a name="line1081">1081: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1083">1083: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/FN/FNRegisterAll.html#FNRegisterAll">FNRegisterAll</a>()</font>
+<a name="line1084">1084: </a><font color="#B22222">@*/</font>
+<a name="line1085">1085: </a><strong><font color="#4169E1"><a name="FNRegister"></a>PetscErrorCode <a href="../../../../../docs/manualpages/FN/FNRegister.html#FNRegister">FNRegister</a>(const char *name,PetscErrorCode (*function)(<a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a>))</font></strong>
+<a name="line1086">1086: </a>{
+
+<a name="line1090">1090: </a>  <a href="../../../../../docs/manualpages/FN/FNInitializePackage.html#FNInitializePackage">FNInitializePackage</a>();
+<a name="line1091">1091: </a>  PetscFunctionListAdd(&amp;FNList,name,function);
+<a name="line1092">1092: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1093">1093: </a>}
+
+</pre>
+</body>
+
+</html>

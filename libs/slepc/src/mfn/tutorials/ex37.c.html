@@ -1,0 +1,147 @@
+<center><a href="ex37.c">Actual source code: ex37.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/mfn/tutorials/ex37.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:14+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/mfn/tutorials/ex37.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Computes exp(t*A)*v for an advection diffusion operator with Peclet number.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;idim&gt;, where &lt;idim&gt; = number of subdivisions of the mesh in each spatial direction.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -t &lt;sval&gt;, where &lt;sval&gt; = scalar value that multiplies the argument.\n"</font>
+<a name="line15"> 15: </a>  <font color="#666666">"  -peclet &lt;sval&gt;, where &lt;sval&gt; = Peclet value.\n"</font>
+<a name="line16"> 16: </a>  <font color="#666666">"  -steps &lt;ival&gt;, where &lt;ival&gt; = number of time steps.\n\n"</font>;
+
+<a name="line18"> 18: </a> #include <A href="../../../include/slepcmfn.h.html">&lt;slepcmfn.h&gt;</A>
+
+<a name="line20"> 20: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line21"> 21: </a>{
+<a name="line22"> 22: </a>  Mat                A;           <font color="#B22222">/* problem matrix */</font>
+<a name="line23"> 23: </a>  <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a>                mfn;
+<a name="line24"> 24: </a>  <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>                 f;
+<a name="line25"> 25: </a>  PetscInt           i,j,Istart,Iend,II,m,n=10,N,steps=5,its,totits=0,ncv,maxit;
+<a name="line26"> 26: </a>  PetscReal          tol,norm,h,h2,peclet=0.5,epsilon=1.0,c,i1h,j1h;
+<a name="line27"> 27: </a>  PetscScalar        t=1e-4,sone=1.0,value,upper,diag,lower;
+<a name="line28"> 28: </a>  Vec                v;
+<a name="line29"> 29: </a>  PetscErrorCode     ierr;
+<a name="line30"> 30: </a>  <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFNConvergedReason</a> reason;
+
+<a name="line32"> 32: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line34"> 34: </a>  PetscOptionsGetScalar(NULL,NULL,<font color="#666666">"-t"</font>,&amp;t,NULL);
+<a name="line35"> 35: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-peclet"</font>,&amp;peclet,NULL);
+<a name="line36"> 36: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line37"> 37: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-steps"</font>,&amp;steps,NULL);
+<a name="line38"> 38: </a>  m = n;
+<a name="line39"> 39: </a>  N = m*n;
+<a name="line40"> 40: </a>  <font color="#B22222">/* interval [0,1], homogeneous Dirichlet boundary conditions */</font>
+<a name="line41"> 41: </a>  h = 1.0/(n+1.0);
+<a name="line42"> 42: </a>  h2 = h*h;
+<a name="line43"> 43: </a>  c = 2.0*epsilon*peclet/h;
+<a name="line44"> 44: </a>  upper = epsilon/h2+c/(2.0*h);
+<a name="line45"> 45: </a>  diag = 2.0*(-2.0*epsilon/h2);
+<a name="line46"> 46: </a>  lower = epsilon/h2-c/(2.0*h);
+
+<a name="line48"> 48: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nAdvection diffusion via y=exp(%g*A), n=%D, steps=%D, Peclet=%g\n\n"</font>,(double)PetscRealPart(t),n,steps,(double)peclet);
+
+<a name="line50"> 50: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line51"> 51: </a><font color="#B22222">                Generate matrix A</font>
+<a name="line52"> 52: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line53"> 53: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line54"> 54: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line55"> 55: </a>  MatSetFromOptions(A);
+<a name="line56"> 56: </a>  MatSetUp(A);
+<a name="line57"> 57: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line58"> 58: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line59"> 59: </a>    i = II/n; j = II-i*n;
+<a name="line60"> 60: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,II,II-n,lower,INSERT_VALUES); }
+<a name="line61"> 61: </a>    <font color="#4169E1">if</font> (i&lt;m-1) { MatSetValue(A,II,II+n,upper,INSERT_VALUES); }
+<a name="line62"> 62: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(A,II,II-1,lower,INSERT_VALUES); }
+<a name="line63"> 63: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(A,II,II+1,upper,INSERT_VALUES); }
+<a name="line64"> 64: </a>    MatSetValue(A,II,II,diag,INSERT_VALUES);
+<a name="line65"> 65: </a>  }
+<a name="line66"> 66: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line67"> 67: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+<a name="line68"> 68: </a>  MatCreateVecs(A,NULL,&amp;v);
+
+<a name="line70"> 70: </a>  <font color="#B22222">/*</font>
+<a name="line71"> 71: </a><font color="#B22222">     Set initial condition v = 256*i^2*(1-i)^2*j^2*(1-j)^2</font>
+<a name="line72"> 72: </a><font color="#B22222">  */</font>
+<a name="line73"> 73: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line74"> 74: </a>    i = II/n; j = II-i*n;
+<a name="line75"> 75: </a>    i1h = (i+1)*h; j1h = (j+1)*h;
+<a name="line76"> 76: </a>    value = 256.0*i1h*i1h*(1.0-i1h)*(1.0-i1h)*(j1h*j1h)*(1.0-j1h)*(1.0-j1h);
+<a name="line77"> 77: </a>    VecSetValue(v,i+j*n,value,INSERT_VALUES);
+<a name="line78"> 78: </a>  }
+<a name="line79"> 79: </a>  VecAssemblyBegin(v);
+<a name="line80"> 80: </a>  VecAssemblyEnd(v);
+
+<a name="line82"> 82: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line83"> 83: </a><font color="#B22222">                Create the solver and set various options</font>
+<a name="line84"> 84: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line85"> 85: </a>  <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>(PETSC_COMM_WORLD,&amp;mfn);
+<a name="line86"> 86: </a>  <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>(mfn,A);
+<a name="line87"> 87: </a>  <a href="../../../docs/manualpages/MFN/MFNGetFN.html#MFNGetFN">MFNGetFN</a>(mfn,&amp;f);
+<a name="line88"> 88: </a>  <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f,FNEXP);
+<a name="line89"> 89: </a>  <a href="../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(f,t,sone);
+<a name="line90"> 90: </a>  <a href="../../../docs/manualpages/MFN/MFNSetFromOptions.html#MFNSetFromOptions">MFNSetFromOptions</a>(mfn);
+
+<a name="line92"> 92: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line93"> 93: </a><font color="#B22222">                      Solve the problem, y=exp(t*A)*v</font>
+<a name="line94"> 94: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+<a name="line95"> 95: </a>  <font color="#4169E1">for</font> (i=0;i&lt;steps;i++) {
+<a name="line96"> 96: </a>    <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(mfn,v,v);
+<a name="line97"> 97: </a>    <a href="../../../docs/manualpages/MFN/MFNGetConvergedReason.html#MFNGetConvergedReason">MFNGetConvergedReason</a>(mfn,&amp;reason);
+<a name="line98"> 98: </a>    <font color="#4169E1">if</font> (reason&lt;0) SETERRQ(PETSC_COMM_WORLD,1,<font color="#666666">"Solver did not converge"</font>);
+<a name="line99"> 99: </a>    <a href="../../../docs/manualpages/MFN/MFNGetIterationNumber.html#MFNGetIterationNumber">MFNGetIterationNumber</a>(mfn,&amp;its);
+<a name="line100">100: </a>    totits += its;
+<a name="line101">101: </a>  }
+
+<a name="line103">103: </a>  <font color="#B22222">/*</font>
+<a name="line104">104: </a><font color="#B22222">     Optional: Get some information from the solver and display it</font>
+<a name="line105">105: </a><font color="#B22222">  */</font>
+<a name="line106">106: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of iterations of the method: %D\n"</font>,totits);
+<a name="line107">107: </a>  <a href="../../../docs/manualpages/MFN/MFNGetDimensions.html#MFNGetDimensions">MFNGetDimensions</a>(mfn,&amp;ncv);
+<a name="line108">108: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Subspace dimension: %D\n"</font>,ncv);
+<a name="line109">109: </a>  <a href="../../../docs/manualpages/MFN/MFNGetTolerances.html#MFNGetTolerances">MFNGetTolerances</a>(mfn,&amp;tol,&amp;maxit);
+<a name="line110">110: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Stopping condition: tol=%.4g, maxit=%D\n"</font>,(double)tol,maxit);
+<a name="line111">111: </a>  VecNorm(v,NORM_2,&amp;norm);
+<a name="line112">112: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Computed vector at time t=%.4g has norm %g\n"</font>,(double)PetscRealPart(t)*steps,(double)norm);
+
+<a name="line114">114: </a>  <font color="#B22222">/*</font>
+<a name="line115">115: </a><font color="#B22222">     Free work space</font>
+<a name="line116">116: </a><font color="#B22222">  */</font>
+<a name="line117">117: </a>  <a href="../../../docs/manualpages/MFN/MFNDestroy.html#MFNDestroy">MFNDestroy</a>(&amp;mfn);
+<a name="line118">118: </a>  MatDestroy(&amp;A);
+<a name="line119">119: </a>  VecDestroy(&amp;v);
+<a name="line120">120: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line121">121: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line122">122: </a>}
+
+<a name="line124">124: </a><font color="#B22222">/*TEST</font>
+
+<a name="line126">126: </a><font color="#B22222">   test:</font>
+<a name="line127">127: </a><font color="#B22222">      suffix: 1</font>
+<a name="line128">128: </a><font color="#B22222">      args: -mfn_tol 1e-6</font>
+
+<a name="line130">130: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

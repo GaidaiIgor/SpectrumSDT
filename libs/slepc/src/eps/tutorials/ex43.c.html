@@ -1,0 +1,183 @@
+<center><a href="ex43.c">Actual source code: ex43.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tutorials/ex43.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:59+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tutorials/ex43.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Generalized eigenproblem, illustrates setting MUMPS options.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The problem is Ax = lambda Bx, with:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"   A = Laplacian operator in 2-D\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"   B = diagonal matrix with all values equal to 4\n\n"</font>
+<a name="line15"> 15: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line16"> 16: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x dimension.\n"</font>
+<a name="line17"> 17: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in y dimension.\n\n"</font>;
+
+<a name="line19"> 19: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line21"> 21: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line22"> 22: </a>{
+<a name="line23"> 23: </a>  Mat            A,B;
+<a name="line24"> 24: </a><font color="#A020F0">#if defined(PETSC_HAVE_MUMPS)</font>
+<a name="line25"> 25: </a>  Mat            K;
+<a name="line26"> 26: </a><font color="#A020F0">#endif</font>
+<a name="line27"> 27: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;
+<a name="line28"> 28: </a>  <a href="../../../docs/manualpages/EPS/EPSType.html#EPSType">EPSType</a>        type;
+<a name="line29"> 29: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;
+<a name="line30"> 30: </a>  KSP            ksp;
+<a name="line31"> 31: </a>  PC             pc;
+<a name="line32"> 32: </a>  PetscInt       N,n=10,m=12,Istart,Iend,II,nev,i,j;
+<a name="line33"> 33: </a>  PetscBool      flag,terse;
+
+<a name="line36"> 36: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line38"> 38: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line39"> 39: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,&amp;flag);
+<a name="line40"> 40: </a>  N = n*m;
+<a name="line41"> 41: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nGeneralized Eigenproblem, N=%D (%Dx%D grid)\n\n"</font>,N,n,m);
+
+<a name="line43"> 43: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line44"> 44: </a><font color="#B22222">     Compute the matrices that define the eigensystem, Ax=kBx</font>
+<a name="line45"> 45: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line47"> 47: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line48"> 48: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line49"> 49: </a>  MatSetFromOptions(A);
+<a name="line50"> 50: </a>  MatSetUp(A);
+
+<a name="line52"> 52: </a>  MatCreate(PETSC_COMM_WORLD,&amp;B);
+<a name="line53"> 53: </a>  MatSetSizes(B,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line54"> 54: </a>  MatSetFromOptions(B);
+<a name="line55"> 55: </a>  MatSetUp(B);
+
+<a name="line57"> 57: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line58"> 58: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line59"> 59: </a>    i = II/n; j = II-i*n;
+<a name="line60"> 60: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,II,II-n,-1.0,INSERT_VALUES); }
+<a name="line61"> 61: </a>    <font color="#4169E1">if</font> (i&lt;m-1) { MatSetValue(A,II,II+n,-1.0,INSERT_VALUES); }
+<a name="line62"> 62: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(A,II,II-1,-1.0,INSERT_VALUES); }
+<a name="line63"> 63: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(A,II,II+1,-1.0,INSERT_VALUES); }
+<a name="line64"> 64: </a>    MatSetValue(A,II,II,4.0,INSERT_VALUES);
+<a name="line65"> 65: </a>    MatSetValue(B,II,II,4.0,INSERT_VALUES);
+<a name="line66"> 66: </a>  }
+
+<a name="line68"> 68: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line69"> 69: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+<a name="line70"> 70: </a>  MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);
+<a name="line71"> 71: </a>  MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);
+
+<a name="line73"> 73: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line74"> 74: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line75"> 75: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line77"> 77: </a>  <font color="#B22222">/*</font>
+<a name="line78"> 78: </a><font color="#B22222">     Create eigensolver context</font>
+<a name="line79"> 79: </a><font color="#B22222">  */</font>
+<a name="line80"> 80: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+
+<a name="line82"> 82: </a>  <font color="#B22222">/*</font>
+<a name="line83"> 83: </a><font color="#B22222">     Set operators. In this case, it is a generalized eigenvalue problem</font>
+<a name="line84"> 84: </a><font color="#B22222">  */</font>
+<a name="line85"> 85: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,B);
+<a name="line86"> 86: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GNHEP</a>);
+
+<a name="line88"> 88: </a>  <font color="#B22222">/*</font>
+<a name="line89"> 89: </a><font color="#B22222">     Set some solver options</font>
+<a name="line90"> 90: </a><font color="#B22222">  */</font>
+<a name="line91"> 91: </a>  <a href="../../../docs/manualpages/EPS/EPSSetTarget.html#EPSSetTarget">EPSSetTarget</a>(eps,1.3);
+<a name="line92"> 92: </a>  <a href="../../../docs/manualpages/EPS/EPSSetDimensions.html#EPSSetDimensions">EPSSetDimensions</a>(eps,2,PETSC_DEFAULT,PETSC_DEFAULT);
+<a name="line93"> 93: </a>  <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line94"> 94: </a>  <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STSINVERT);
+
+<a name="line96"> 96: </a>  <a href="../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;ksp);
+<a name="line97"> 97: </a>  KSPSetType(ksp,KSPPREONLY);
+<a name="line98"> 98: </a>  KSPGetPC(ksp,&amp;pc);
+<a name="line99"> 99: </a>  PCSetType(pc,PCLU);
+
+<a name="line101">101: </a>  <font color="#B22222">/*</font>
+<a name="line102">102: </a><font color="#B22222">     Set MUMPS options if available</font>
+<a name="line103">103: </a><font color="#B22222">  */</font>
+<a name="line104">104: </a><font color="#A020F0">#if defined(PETSC_HAVE_MUMPS)</font>
+<a name="line105">105: </a>  PCFactorSetMatSolverType(pc,MATSOLVERMUMPS);
+<a name="line106">106: </a>  <font color="#B22222">/* the next line is required to force the creation of the <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a> operator and its passing to KSP */</font>
+<a name="line107">107: </a>  <a href="../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(st,NULL);
+<a name="line108">108: </a>  PCFactorSetUpMatSolverType(pc);
+<a name="line109">109: </a>  PCFactorGetMatrix(pc,&amp;K);
+<a name="line110">110: </a>  MatMumpsSetIcntl(K,14,50);
+<a name="line111">111: </a>  MatMumpsSetCntl(K,3,1e-12);
+<a name="line112">112: </a><font color="#A020F0">#endif</font>
+
+<a name="line114">114: </a>  <font color="#B22222">/*</font>
+<a name="line115">115: </a><font color="#B22222">     Let the user change settings at runtime</font>
+<a name="line116">116: </a><font color="#B22222">  */</font>
+<a name="line117">117: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line119">119: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line120">120: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line121">121: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line123">123: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+
+<a name="line125">125: </a>  <font color="#B22222">/*</font>
+<a name="line126">126: </a><font color="#B22222">     Optional: Get some information from the solver and display it</font>
+<a name="line127">127: </a><font color="#B22222">  */</font>
+<a name="line128">128: </a>  <a href="../../../docs/manualpages/EPS/EPSGetType.html#EPSGetType">EPSGetType</a>(eps,&amp;type);
+<a name="line129">129: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solution method: %s\n\n"</font>,type);
+<a name="line130">130: </a>  <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(eps,&amp;nev,NULL,NULL);
+<a name="line131">131: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of requested eigenvalues: %D\n"</font>,nev);
+
+<a name="line133">133: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line134">134: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line135">135: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line137">137: </a>  <font color="#B22222">/* show detailed info unless -terse option is given by user */</font>
+<a name="line138">138: </a>  PetscOptionsHasName(NULL,NULL,<font color="#666666">"-terse"</font>,&amp;terse);
+<a name="line139">139: </a>  <font color="#4169E1">if</font> (terse) {
+<a name="line140">140: </a>    <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+<a name="line141">141: </a>  } <font color="#4169E1">else</font> {
+<a name="line142">142: </a>    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INFO_DETAIL);
+<a name="line143">143: </a>    <a href="../../../docs/manualpages/EPS/EPSReasonView.html#EPSReasonView">EPSReasonView</a>(eps,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line144">144: </a>    <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line145">145: </a>    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+<a name="line146">146: </a>  }
+<a name="line147">147: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line148">148: </a>  MatDestroy(&amp;A);
+<a name="line149">149: </a>  MatDestroy(&amp;B);
+<a name="line150">150: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line151">151: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line152">152: </a>}
+
+<a name="line154">154: </a><font color="#B22222">/*TEST</font>
+
+<a name="line156">156: </a><font color="#B22222">   testset:</font>
+<a name="line157">157: </a><font color="#B22222">      args: -terse</font>
+<a name="line158">158: </a><font color="#B22222">      output_file: output/ex43_1.out</font>
+<a name="line159">159: </a><font color="#B22222">      test:</font>
+<a name="line160">160: </a><font color="#B22222">         suffix: 1</font>
+<a name="line161">161: </a><font color="#B22222">      test:</font>
+<a name="line162">162: </a><font color="#B22222">         suffix: 2</font>
+<a name="line163">163: </a><font color="#B22222">         nsize: 2</font>
+<a name="line164">164: </a><font color="#B22222">         args: -st_pc_factor_mat_solver_type mumps</font>
+<a name="line165">165: </a><font color="#B22222">         requires: mumps</font>
+
+<a name="line167">167: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

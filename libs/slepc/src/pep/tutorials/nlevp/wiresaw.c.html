@@ -1,0 +1,178 @@
+<center><a href="wiresaw.c">Actual source code: wiresaw.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/tutorials/nlevp/wiresaw.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:08+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/tutorials/nlevp/wiresaw.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This example implements two of the problems found at</font>
+<a name="line12"> 12: </a><font color="#B22222">       NLEVP: A Collection of Nonlinear Eigenvalue Problems,</font>
+<a name="line13"> 13: </a><font color="#B22222">       The University of Manchester.</font>
+<a name="line14"> 14: </a><font color="#B22222">   The details of the collection can be found at:</font>
+<a name="line15"> 15: </a><font color="#B22222">       [1] T. Betcke et al., "NLEVP: A Collection of Nonlinear Eigenvalue</font>
+<a name="line16"> 16: </a><font color="#B22222">           Problems", ACM Trans. Math. Software 39(2), Article 7, 2013.</font>
+
+<a name="line18"> 18: </a><font color="#B22222">   WIRESAW1 is a gyroscopic QEP from vibration analysis of a wiresaw,</font>
+<a name="line19"> 19: </a><font color="#B22222">   where the parameter V represents the speed of the wire. When the</font>
+<a name="line20"> 20: </a><font color="#B22222">   parameter eta is nonzero, then it turns into the WIRESAW2 problem</font>
+<a name="line21"> 21: </a><font color="#B22222">   (with added viscous damping, e.g. eta=0.8).</font>
+
+<a name="line23"> 23: </a><font color="#B22222">       [2] S. Wei and I. Kao, "Vibration analysis of wire and frequency</font>
+<a name="line24"> 24: </a><font color="#B22222">           response in the modern wiresaw manufacturing process", J. Sound</font>
+<a name="line25"> 25: </a><font color="#B22222">           Vib. 213(5):1383-1395, 2000.</font>
+<a name="line26"> 26: </a><font color="#B22222">*/</font>
+
+<a name="line28"> 28: </a>static char help[] = <font color="#666666">"Vibration analysis of a wiresaw.\n\n"</font>
+<a name="line29"> 29: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line30"> 30: </a>  <font color="#666666">"  -n &lt;n&gt; ... dimension of the matrices (default 10).\n"</font>
+<a name="line31"> 31: </a>  <font color="#666666">"  -v &lt;value&gt; ... velocity of the wire (default 0.01).\n"</font>
+<a name="line32"> 32: </a>  <font color="#666666">"  -eta &lt;value&gt; ... viscous damping (default 0.0).\n\n"</font>;
+
+<a name="line34"> 34: </a> #include <A href="../../../../include/slepcpep.h.html">&lt;slepcpep.h&gt;</A>
+
+<a name="line36"> 36: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line37"> 37: </a>{
+<a name="line38"> 38: </a>  Mat            M,D,K,A[3];      <font color="#B22222">/* problem matrices */</font>
+<a name="line39"> 39: </a>  <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>            pep;             <font color="#B22222">/* polynomial eigenproblem solver context */</font>
+<a name="line40"> 40: </a>  PetscInt       n=10,Istart,Iend,j,k;
+<a name="line41"> 41: </a>  PetscReal      v=0.01,eta=0.0;
+<a name="line42"> 42: </a>  PetscBool      terse;
+
+<a name="line45"> 45: </a>  <a href="../../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line47"> 47: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line48"> 48: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-v"</font>,&amp;v,NULL);
+<a name="line49"> 49: </a>  PetscOptionsGetReal(NULL,NULL,<font color="#666666">"-eta"</font>,&amp;eta,NULL);
+<a name="line50"> 50: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nVibration analysis of a wiresaw, n=%D v=%g eta=%g\n\n"</font>,n,(double)v,(double)eta);
+
+<a name="line52"> 52: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line53"> 53: </a><font color="#B22222">     Compute the matrices that define the eigensystem, (k^2*M+k*D+K)x=0</font>
+<a name="line54"> 54: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line56"> 56: </a>  <font color="#B22222">/* K is a diagonal matrix */</font>
+<a name="line57"> 57: </a>  MatCreate(PETSC_COMM_WORLD,&amp;K);
+<a name="line58"> 58: </a>  MatSetSizes(K,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line59"> 59: </a>  MatSetFromOptions(K);
+<a name="line60"> 60: </a>  MatSetUp(K);
+
+<a name="line62"> 62: </a>  MatGetOwnershipRange(K,&amp;Istart,&amp;Iend);
+<a name="line63"> 63: </a>  <font color="#4169E1">for</font> (j=Istart;j&lt;Iend;j++) {
+<a name="line64"> 64: </a>    MatSetValue(K,j,j,(j+1)*(j+1)*PETSC_PI*PETSC_PI*(1.0-v*v),INSERT_VALUES);
+<a name="line65"> 65: </a>  }
+
+<a name="line67"> 67: </a>  MatAssemblyBegin(K,MAT_FINAL_ASSEMBLY);
+<a name="line68"> 68: </a>  MatAssemblyEnd(K,MAT_FINAL_ASSEMBLY);
+<a name="line69"> 69: </a>  MatScale(K,0.5);
+
+<a name="line71"> 71: </a>  <font color="#B22222">/* D is a tridiagonal */</font>
+<a name="line72"> 72: </a>  MatCreate(PETSC_COMM_WORLD,&amp;D);
+<a name="line73"> 73: </a>  MatSetSizes(D,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line74"> 74: </a>  MatSetFromOptions(D);
+<a name="line75"> 75: </a>  MatSetUp(D);
+
+<a name="line77"> 77: </a>  MatGetOwnershipRange(D,&amp;Istart,&amp;Iend);
+<a name="line78"> 78: </a>  <font color="#4169E1">for</font> (j=Istart;j&lt;Iend;j++) {
+<a name="line79"> 79: </a>    <font color="#4169E1">for</font> (k=0;k&lt;n;k++) {
+<a name="line80"> 80: </a>      <font color="#4169E1">if</font> ((j+k)%2) {
+<a name="line81"> 81: </a>        MatSetValue(D,j,k,8.0*(j+1)*(k+1)*v/((j+1)*(j+1)-(k+1)*(k+1)),INSERT_VALUES);
+<a name="line82"> 82: </a>      }
+<a name="line83"> 83: </a>    }
+<a name="line84"> 84: </a>  }
+
+<a name="line86"> 86: </a>  MatAssemblyBegin(D,MAT_FINAL_ASSEMBLY);
+<a name="line87"> 87: </a>  MatAssemblyEnd(D,MAT_FINAL_ASSEMBLY);
+<a name="line88"> 88: </a>  MatScale(D,0.5);
+
+<a name="line90"> 90: </a>  <font color="#B22222">/* M is a diagonal matrix */</font>
+<a name="line91"> 91: </a>  MatCreate(PETSC_COMM_WORLD,&amp;M);
+<a name="line92"> 92: </a>  MatSetSizes(M,PETSC_DECIDE,PETSC_DECIDE,n,n);
+<a name="line93"> 93: </a>  MatSetFromOptions(M);
+<a name="line94"> 94: </a>  MatSetUp(M);
+<a name="line95"> 95: </a>  MatGetOwnershipRange(M,&amp;Istart,&amp;Iend);
+<a name="line96"> 96: </a>  <font color="#4169E1">for</font> (j=Istart;j&lt;Iend;j++) {
+<a name="line97"> 97: </a>    MatSetValue(M,j,j,1.0,INSERT_VALUES);
+<a name="line98"> 98: </a>  }
+<a name="line99"> 99: </a>  MatAssemblyBegin(M,MAT_FINAL_ASSEMBLY);
+<a name="line100">100: </a>  MatAssemblyEnd(M,MAT_FINAL_ASSEMBLY);
+<a name="line101">101: </a>  MatScale(M,0.5);
+
+<a name="line103">103: </a>  <font color="#B22222">/* add damping */</font>
+<a name="line104">104: </a>  <font color="#4169E1">if</font> (eta&gt;0.0) {
+<a name="line105">105: </a>    MatAXPY(K,eta,D,DIFFERENT_NONZERO_PATTERN); <font color="#B22222">/* K = K + eta*D */</font>
+<a name="line106">106: </a>    MatShift(D,eta); <font color="#B22222">/* D = D + eta*eye(n) */</font>
+<a name="line107">107: </a>  }
+
+<a name="line109">109: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line110">110: </a><font color="#B22222">                Create the eigensolver and solve the problem</font>
+<a name="line111">111: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line113">113: </a>  <a href="../../../../docs/manualpages/PEP/PEPCreate.html#PEPCreate">PEPCreate</a>(PETSC_COMM_WORLD,&amp;pep);
+<a name="line114">114: </a>  A[0] = K; A[1] = D; A[2] = M;
+<a name="line115">115: </a>  <a href="../../../../docs/manualpages/PEP/PEPSetOperators.html#PEPSetOperators">PEPSetOperators</a>(pep,3,A);
+<a name="line116">116: </a>  <font color="#4169E1">if</font> (eta==0.0) {
+<a name="line117">117: </a>    <a href="../../../../docs/manualpages/PEP/PEPSetProblemType.html#PEPSetProblemType">PEPSetProblemType</a>(pep,<a href="../../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GYROSCOPIC</a>);
+<a name="line118">118: </a>  } <font color="#4169E1">else</font> {
+<a name="line119">119: </a>    <a href="../../../../docs/manualpages/PEP/PEPSetProblemType.html#PEPSetProblemType">PEPSetProblemType</a>(pep,<a href="../../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_GENERAL</a>);
+<a name="line120">120: </a>  }
+<a name="line121">121: </a>  <a href="../../../../docs/manualpages/PEP/PEPSetFromOptions.html#PEPSetFromOptions">PEPSetFromOptions</a>(pep);
+<a name="line122">122: </a>  <a href="../../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(pep);
+
+<a name="line124">124: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line125">125: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line126">126: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line128">128: </a>  <font color="#B22222">/* show detailed info unless -terse option is given by user */</font>
+<a name="line129">129: </a>  PetscOptionsHasName(NULL,NULL,<font color="#666666">"-terse"</font>,&amp;terse);
+<a name="line130">130: </a>  <font color="#4169E1">if</font> (terse) {
+<a name="line131">131: </a>    <a href="../../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,NULL);
+<a name="line132">132: </a>  } <font color="#4169E1">else</font> {
+<a name="line133">133: </a>    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_ASCII_INFO_DETAIL);
+<a name="line134">134: </a>    <a href="../../../../docs/manualpages/PEP/PEPReasonView.html#PEPReasonView">PEPReasonView</a>(pep,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line135">135: </a>    <a href="../../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,PETSC_VIEWER_STDOUT_WORLD);
+<a name="line136">136: </a>    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+<a name="line137">137: </a>  }
+<a name="line138">138: </a>  <a href="../../../../docs/manualpages/PEP/PEPDestroy.html#PEPDestroy">PEPDestroy</a>(&amp;pep);
+<a name="line139">139: </a>  MatDestroy(&amp;M);
+<a name="line140">140: </a>  MatDestroy(&amp;D);
+<a name="line141">141: </a>  MatDestroy(&amp;K);
+<a name="line142">142: </a>  <a href="../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line143">143: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line144">144: </a>}
+
+<a name="line146">146: </a><font color="#B22222">/*TEST</font>
+
+<a name="line148">148: </a><font color="#B22222">   testset:</font>
+<a name="line149">149: </a><font color="#B22222">      args: -pep_nev 4 -terse</font>
+<a name="line150">150: </a><font color="#B22222">      requires: !single</font>
+<a name="line151">151: </a><font color="#B22222">      output_file: output/wiresaw_1.out</font>
+<a name="line152">152: </a><font color="#B22222">      test:</font>
+<a name="line153">153: </a><font color="#B22222">         suffix: 1</font>
+<a name="line154">154: </a><font color="#B22222">         args: -pep_type {{toar qarnoldi}}</font>
+<a name="line155">155: </a><font color="#B22222">      test:</font>
+<a name="line156">156: </a><font color="#B22222">         suffix: 1_linear_h1</font>
+<a name="line157">157: </a><font color="#B22222">         args: -pep_type linear -pep_linear_explicitmatrix -pep_linear_linearization 1,0 -pep_linear_st_ksp_type bcgs -pep_linear_st_pc_type kaczmarz</font>
+<a name="line158">158: </a><font color="#B22222">      test:</font>
+<a name="line159">159: </a><font color="#B22222">         suffix: 1_linear_h2</font>
+<a name="line160">160: </a><font color="#B22222">         args: -pep_type linear -pep_linear_explicitmatrix -pep_linear_linearization 0,1</font>
+
+<a name="line162">162: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

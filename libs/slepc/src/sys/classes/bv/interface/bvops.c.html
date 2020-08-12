@@ -1,0 +1,723 @@
+<center><a href="bvops.c">Actual source code: bvops.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/bv/interface/bvops.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:43+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/bv/interface/bvops.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> operations, except those involving global communication</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/bvimpl.h.html">&lt;slepc/private/bvimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../../include/slepcds.h.html">&lt;slepcds.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#B22222">/*@</font>
+<a name="line18"> 18: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a> - Computes Y = beta*Y + alpha*X*Q.</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   Logically Collective on Y</font>
+
+<a name="line22"> 22: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line23"> 23: </a><font color="#B22222">+  Y,X        - basis vectors</font>
+<a name="line24"> 24: </a><font color="#B22222">.  alpha,beta - scalars</font>
+<a name="line25"> 25: </a><font color="#B22222">-  Q          - (optional) sequential dense matrix</font>
+
+<a name="line27"> 27: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line28"> 28: </a><font color="#B22222">.  Y          - the modified basis vectors</font>
+
+<a name="line30"> 30: </a><font color="#B22222">   Notes:</font>
+<a name="line31"> 31: </a><font color="#B22222">   X and Y must be different objects. The case X=Y can be addressed with</font>
+<a name="line32"> 32: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>().</font>
+
+<a name="line34"> 34: </a><font color="#B22222">   If matrix Q is NULL, then an AXPY operation Y = beta*Y + alpha*X is done</font>
+<a name="line35"> 35: </a><font color="#B22222">   (i.e. results as if Q = identity). If provided,</font>
+<a name="line36"> 36: </a><font color="#B22222">   the matrix Q must be a sequential dense Mat, with all entries equal on</font>
+<a name="line37"> 37: </a><font color="#B22222">   all processes (otherwise each process will compute a different update).</font>
+<a name="line38"> 38: </a><font color="#B22222">   The dimensions of Q must be at least m,n where m is the number of active</font>
+<a name="line39"> 39: </a><font color="#B22222">   columns of X and n is the number of active columns of Y.</font>
+
+<a name="line41"> 41: </a><font color="#B22222">   The leading columns of Y are not modified. Also, if X has leading</font>
+<a name="line42"> 42: </a><font color="#B22222">   columns specified, then these columns do not participate in the computation.</font>
+<a name="line43"> 43: </a><font color="#B22222">   Hence, only rows (resp. columns) of Q starting from lx (resp. ly) are used,</font>
+<a name="line44"> 44: </a><font color="#B22222">   where lx (resp. ly) is the number of leading columns of X (resp. Y).</font>
+
+<a name="line46"> 46: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line48"> 48: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(), <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line49"> 49: </a><font color="#B22222">@*/</font>
+<a name="line50"> 50: </a><strong><font color="#4169E1"><a name="BVMult"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y,PetscScalar alpha,PetscScalar beta,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,Mat Q)</font></strong>
+<a name="line51"> 51: </a>{
+<a name="line53"> 53: </a>  PetscBool      match;
+<a name="line54"> 54: </a>  PetscInt       m,n;
+
+<a name="line63"> 63: </a>  BVCheckSizes(Y,1);
+<a name="line64"> 64: </a>  BVCheckOp(Y,1,mult);
+<a name="line66"> 66: </a>  BVCheckSizes(X,4);
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (X==Y) SETERRQ(PetscObjectComm((PetscObject)Y),PETSC_ERR_ARG_WRONG,<font color="#666666">"X and Y arguments must be different"</font>);
+<a name="line70"> 70: </a>  <font color="#4169E1">if</font> (Q) {
+<a name="line71"> 71: </a>    PetscObjectTypeCompare((PetscObject)Q,MATSEQDENSE,&amp;match);
+<a name="line72"> 72: </a>    <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)Y),PETSC_ERR_SUP,<font color="#666666">"Mat argument must be of type seqdense"</font>);
+<a name="line73"> 73: </a>    MatGetSize(Q,&amp;m,&amp;n);
+<a name="line74"> 74: </a>    <font color="#4169E1">if</font> (m&lt;X-&gt;k) SETERRQ2(PetscObjectComm((PetscObject)Y),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat argument has %D rows, should have at least %D"</font>,m,X-&gt;k);
+<a name="line75"> 75: </a>    <font color="#4169E1">if</font> (n&lt;Y-&gt;k) SETERRQ2(PetscObjectComm((PetscObject)Y),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat argument has %D columns, should have at least %D"</font>,n,Y-&gt;k);
+<a name="line76"> 76: </a>  }
+<a name="line77"> 77: </a>  <font color="#4169E1">if</font> (X-&gt;n!=Y-&gt;n) SETERRQ2(PetscObjectComm((PetscObject)Y),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Mismatching local dimension X %D, Y %D"</font>,X-&gt;n,Y-&gt;n);
+
+<a name="line79"> 79: </a>  PetscLogEventBegin(BV_Mult,X,Y,0,0);
+<a name="line80"> 80: </a>  (*Y-&gt;ops-&gt;mult)(Y,alpha,beta,X,Q);
+<a name="line81"> 81: </a>  PetscLogEventEnd(BV_Mult,X,Y,0,0);
+<a name="line82"> 82: </a>  PetscObjectStateIncrease((PetscObject)Y);
+<a name="line83"> 83: </a>  <font color="#4169E1">return</font>(0);
+<a name="line84"> 84: </a>}
+
+<a name="line86"> 86: </a><font color="#B22222">/*@</font>
+<a name="line87"> 87: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a> - Computes y = beta*y + alpha*X*q.</font>
+
+<a name="line89"> 89: </a><font color="#B22222">   Logically Collective on X</font>
+
+<a name="line91"> 91: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line92"> 92: </a><font color="#B22222">+  X          - a basis vectors object</font>
+<a name="line93"> 93: </a><font color="#B22222">.  alpha,beta - scalars</font>
+<a name="line94"> 94: </a><font color="#B22222">.  y          - a vector</font>
+<a name="line95"> 95: </a><font color="#B22222">-  q          - an array of scalars</font>
+
+<a name="line97"> 97: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line98"> 98: </a><font color="#B22222">.  y          - the modified vector</font>
+
+<a name="line100">100: </a><font color="#B22222">   Notes:</font>
+<a name="line101">101: </a><font color="#B22222">   This operation is the analogue of <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>() but with a <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> and a Vec,</font>
+<a name="line102">102: </a><font color="#B22222">   instead of two <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>. Note that arguments are listed in different order</font>
+<a name="line103">103: </a><font color="#B22222">   with respect to <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>().</font>
+
+<a name="line105">105: </a><font color="#B22222">   If X has leading columns specified, then these columns do not participate</font>
+<a name="line106">106: </a><font color="#B22222">   in the computation.</font>
+
+<a name="line108">108: </a><font color="#B22222">   The length of array q must be equal to the number of active columns of X</font>
+<a name="line109">109: </a><font color="#B22222">   minus the number of leading columns, i.e. the first entry of q multiplies</font>
+<a name="line110">110: </a><font color="#B22222">   the first non-leading column.</font>
+
+<a name="line112">112: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line114">114: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line115">115: </a><font color="#B22222">@*/</font>
+<a name="line116">116: </a><strong><font color="#4169E1"><a name="BVMultVec"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,PetscScalar alpha,PetscScalar beta,Vec y,PetscScalar q[])</font></strong>
+<a name="line117">117: </a>{
+<a name="line119">119: </a>  PetscInt       n,N;
+
+<a name="line128">128: </a>  BVCheckSizes(X,1);
+<a name="line129">129: </a>  BVCheckOp(X,1,multvec);
+
+<a name="line133">133: </a>  VecGetSize(y,&amp;N);
+<a name="line134">134: </a>  VecGetLocalSize(y,&amp;n);
+<a name="line135">135: </a>  <font color="#4169E1">if</font> (N!=X-&gt;N || n!=X-&gt;n) SETERRQ4(PetscObjectComm((PetscObject)X),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Vec sizes (global %D, local %D) do not match <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> sizes (global %D, local %D)"</font>,N,n,X-&gt;N,X-&gt;n);
+
+<a name="line137">137: </a>  PetscLogEventBegin(BV_MultVec,X,y,0,0);
+<a name="line138">138: </a>  (*X-&gt;ops-&gt;multvec)(X,alpha,beta,y,q);
+<a name="line139">139: </a>  PetscLogEventEnd(BV_MultVec,X,y,0,0);
+<a name="line140">140: </a>  <font color="#4169E1">return</font>(0);
+<a name="line141">141: </a>}
+
+<a name="line143">143: </a><font color="#B22222">/*@</font>
+<a name="line144">144: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a> - Computes y = beta*y + alpha*X*q, where y is the j-th column</font>
+<a name="line145">145: </a><font color="#B22222">   of X.</font>
+
+<a name="line147">147: </a><font color="#B22222">   Logically Collective on X</font>
+
+<a name="line149">149: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line150">150: </a><font color="#B22222">+  X          - a basis vectors object</font>
+<a name="line151">151: </a><font color="#B22222">.  alpha,beta - scalars</font>
+<a name="line152">152: </a><font color="#B22222">.  j          - the column index</font>
+<a name="line153">153: </a><font color="#B22222">-  q          - an array of scalars</font>
+
+<a name="line155">155: </a><font color="#B22222">   Notes:</font>
+<a name="line156">156: </a><font color="#B22222">   This operation is equivalent to <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>() but it uses column j of X</font>
+<a name="line157">157: </a><font color="#B22222">   rather than taking a Vec as an argument. The number of active columns of</font>
+<a name="line158">158: </a><font color="#B22222">   X is set to j before the computation, and restored afterwards.</font>
+<a name="line159">159: </a><font color="#B22222">   If X has leading columns specified, then these columns do not participate</font>
+<a name="line160">160: </a><font color="#B22222">   in the computation. Therefore, the length of array q must be equal to j</font>
+<a name="line161">161: </a><font color="#B22222">   minus the number of leading columns.</font>
+
+<a name="line163">163: </a><font color="#B22222">   Developer Notes:</font>
+<a name="line164">164: </a><font color="#B22222">   If q is NULL, then the coefficients are taken from position nc+l of the</font>
+<a name="line165">165: </a><font color="#B22222">   internal buffer vector, see <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>().</font>
+
+<a name="line167">167: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line169">169: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(), <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line170">170: </a><font color="#B22222">@*/</font>
+<a name="line171">171: </a><strong><font color="#4169E1"><a name="BVMultColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> X,PetscScalar alpha,PetscScalar beta,PetscInt j,PetscScalar *q)</font></strong>
+<a name="line172">172: </a>{
+<a name="line174">174: </a>  PetscInt       ksave;
+<a name="line175">175: </a>  Vec            y;
+
+<a name="line183">183: </a>  BVCheckSizes(X,1);
+
+<a name="line185">185: </a>  <font color="#4169E1">if</font> (j&lt;0) SETERRQ(PetscObjectComm((PetscObject)X),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j must be non-negative"</font>);
+<a name="line186">186: </a>  <font color="#4169E1">if</font> (j&gt;=X-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)X),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j=%D but <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> only has %D columns"</font>,j,X-&gt;m);
+
+<a name="line188">188: </a>  PetscLogEventBegin(BV_MultVec,X,0,0,0);
+<a name="line189">189: </a>  ksave = X-&gt;k;
+<a name="line190">190: </a>  X-&gt;k = j;
+<a name="line191">191: </a>  <font color="#4169E1">if</font> (!q &amp;&amp; !X-&gt;buffer) { <a href="../../../../../docs/manualpages/BV/BVGetBufferVec.html#BVGetBufferVec">BVGetBufferVec</a>(X,&amp;X-&gt;buffer); }
+<a name="line192">192: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(X,j,&amp;y);
+<a name="line193">193: </a>  (*X-&gt;ops-&gt;multvec)(X,alpha,beta,y,q);
+<a name="line194">194: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(X,j,&amp;y);
+<a name="line195">195: </a>  X-&gt;k = ksave;
+<a name="line196">196: </a>  PetscLogEventEnd(BV_MultVec,X,0,0,0);
+<a name="line197">197: </a>  PetscObjectStateIncrease((PetscObject)X);
+<a name="line198">198: </a>  <font color="#4169E1">return</font>(0);
+<a name="line199">199: </a>}
+
+<a name="line201">201: </a><font color="#B22222">/*@</font>
+<a name="line202">202: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a> - Update a set of vectors as V(:,s:e-1) = V*Q(:,s:e-1).</font>
+
+<a name="line204">204: </a><font color="#B22222">   Logically Collective on V</font>
+
+<a name="line206">206: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line207">207: </a><font color="#B22222">+  Q - a sequential dense matrix</font>
+<a name="line208">208: </a><font color="#B22222">.  s - first column of V to be overwritten</font>
+<a name="line209">209: </a><font color="#B22222">-  e - first column of V not to be overwritten</font>
+
+<a name="line211">211: </a><font color="#B22222">   Input/Output Parameter:</font>
+<a name="line212">212: </a><font color="#B22222">.  V - basis vectors</font>
+
+<a name="line214">214: </a><font color="#B22222">   Notes:</font>
+<a name="line215">215: </a><font color="#B22222">   The matrix Q must be a sequential dense Mat, with all entries equal on</font>
+<a name="line216">216: </a><font color="#B22222">   all processes (otherwise each process will compute a different update).</font>
+
+<a name="line218">218: </a><font color="#B22222">   This function computes V(:,s:e-1) = V*Q(:,s:e-1), that is, given a set of</font>
+<a name="line219">219: </a><font color="#B22222">   vectors V, columns from s to e-1 are overwritten with columns from s to</font>
+<a name="line220">220: </a><font color="#B22222">   e-1 of the matrix-matrix product V*Q. Only columns s to e-1 of Q are</font>
+<a name="line221">221: </a><font color="#B22222">   referenced.</font>
+
+<a name="line223">223: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line225">225: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(), <a href="../../../../../docs/manualpages/BV/BVMultInPlaceTranspose.html#BVMultInPlaceTranspose">BVMultInPlaceTranspose</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line226">226: </a><font color="#B22222">@*/</font>
+<a name="line227">227: </a><strong><font color="#4169E1"><a name="BVMultInPlace"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line228">228: </a>{
+<a name="line230">230: </a>  PetscBool      match;
+<a name="line231">231: </a>  PetscInt       m,n;
+
+<a name="line239">239: </a>  BVCheckSizes(V,1);
+<a name="line241">241: </a>  PetscObjectTypeCompare((PetscObject)Q,MATSEQDENSE,&amp;match);
+<a name="line242">242: </a>  <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_SUP,<font color="#666666">"Mat argument must be of type seqdense"</font>);
+
+<a name="line244">244: </a>  <font color="#4169E1">if</font> (s&lt;V-&gt;l || s&gt;V-&gt;m) SETERRQ3(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument s has wrong value %D, should be between %D and %D"</font>,s,V-&gt;l,V-&gt;m);
+<a name="line245">245: </a>  <font color="#4169E1">if</font> (e&lt;V-&gt;l || e&gt;V-&gt;m) SETERRQ3(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument e has wrong value %D, should be between %D and %D"</font>,e,V-&gt;l,V-&gt;m);
+<a name="line246">246: </a>  MatGetSize(Q,&amp;m,&amp;n);
+<a name="line247">247: </a>  <font color="#4169E1">if</font> (m&lt;V-&gt;k) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat argument has %D rows, should have at least %D"</font>,m,V-&gt;k);
+<a name="line248">248: </a>  <font color="#4169E1">if</font> (e&gt;n) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat argument only has %D columns, the requested value of e is larger: %D"</font>,n,e);
+<a name="line249">249: </a>  <font color="#4169E1">if</font> (s&gt;=e) <font color="#4169E1">return</font>(0);
+
+<a name="line251">251: </a>  PetscLogEventBegin(BV_MultInPlace,V,Q,0,0);
+<a name="line252">252: </a>  (*V-&gt;ops-&gt;multinplace)(V,Q,s,e);
+<a name="line253">253: </a>  PetscLogEventEnd(BV_MultInPlace,V,Q,0,0);
+<a name="line254">254: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line255">255: </a>  <font color="#4169E1">return</font>(0);
+<a name="line256">256: </a>}
+
+<a name="line258">258: </a><font color="#B22222">/*@</font>
+<a name="line259">259: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMultInPlaceTranspose.html#BVMultInPlaceTranspose">BVMultInPlaceTranspose</a> - Update a set of vectors as V(:,s:e-1) = V*Q'(:,s:e-1).</font>
+
+<a name="line261">261: </a><font color="#B22222">   Logically Collective on V</font>
+
+<a name="line263">263: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line264">264: </a><font color="#B22222">+  Q - a sequential dense matrix</font>
+<a name="line265">265: </a><font color="#B22222">.  s - first column of V to be overwritten</font>
+<a name="line266">266: </a><font color="#B22222">-  e - first column of V not to be overwritten</font>
+
+<a name="line268">268: </a><font color="#B22222">   Input/Output Parameter:</font>
+<a name="line269">269: </a><font color="#B22222">.  V - basis vectors</font>
+
+<a name="line271">271: </a><font color="#B22222">   Notes:</font>
+<a name="line272">272: </a><font color="#B22222">   This is a variant of <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>() where the conjugate transpose</font>
+<a name="line273">273: </a><font color="#B22222">   of Q is used.</font>
+
+<a name="line275">275: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line277">277: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>()</font>
+<a name="line278">278: </a><font color="#B22222">@*/</font>
+<a name="line279">279: </a><strong><font color="#4169E1"><a name="BVMultInPlaceTranspose"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMultInPlaceTranspose.html#BVMultInPlaceTranspose">BVMultInPlaceTranspose</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat Q,PetscInt s,PetscInt e)</font></strong>
+<a name="line280">280: </a>{
+<a name="line282">282: </a>  PetscBool      match;
+<a name="line283">283: </a>  PetscInt       m,n;
+
+<a name="line291">291: </a>  BVCheckSizes(V,1);
+<a name="line293">293: </a>  PetscObjectTypeCompare((PetscObject)Q,MATSEQDENSE,&amp;match);
+<a name="line294">294: </a>  <font color="#4169E1">if</font> (!match) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_SUP,<font color="#666666">"Mat argument must be of type seqdense"</font>);
+
+<a name="line296">296: </a>  <font color="#4169E1">if</font> (s&lt;V-&gt;l || s&gt;V-&gt;m) SETERRQ3(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument s has wrong value %D, should be between %D and %D"</font>,s,V-&gt;l,V-&gt;m);
+<a name="line297">297: </a>  <font color="#4169E1">if</font> (e&lt;V-&gt;l || e&gt;V-&gt;m) SETERRQ3(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument e has wrong value %D, should be between %D and %D"</font>,e,V-&gt;l,V-&gt;m);
+<a name="line298">298: </a>  MatGetSize(Q,&amp;m,&amp;n);
+<a name="line299">299: </a>  <font color="#4169E1">if</font> (n&lt;V-&gt;k) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat argument has %D columns, should have at least %D"</font>,n,V-&gt;k);
+<a name="line300">300: </a>  <font color="#4169E1">if</font> (e&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Mat argument only has %D rows, the requested value of e is larger: %D"</font>,m,e);
+<a name="line301">301: </a>  <font color="#4169E1">if</font> (s&gt;=e || !V-&gt;n) <font color="#4169E1">return</font>(0);
+
+<a name="line303">303: </a>  PetscLogEventBegin(BV_MultInPlace,V,Q,0,0);
+<a name="line304">304: </a>  (*V-&gt;ops-&gt;multinplacetrans)(V,Q,s,e);
+<a name="line305">305: </a>  PetscLogEventEnd(BV_MultInPlace,V,Q,0,0);
+<a name="line306">306: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line307">307: </a>  <font color="#4169E1">return</font>(0);
+<a name="line308">308: </a>}
+
+<a name="line310">310: </a><font color="#B22222">/*@</font>
+<a name="line311">311: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVScale.html#BVScale">BVScale</a> - Multiply the <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> entries by a scalar value.</font>
+
+<a name="line313">313: </a><font color="#B22222">   Logically Collective on bv</font>
+
+<a name="line315">315: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line316">316: </a><font color="#B22222">+  bv    - basis vectors</font>
+<a name="line317">317: </a><font color="#B22222">-  alpha - scaling factor</font>
+
+<a name="line319">319: </a><font color="#B22222">   Note:</font>
+<a name="line320">320: </a><font color="#B22222">   All active columns (except the leading ones) are scaled.</font>
+
+<a name="line322">322: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line324">324: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line325">325: </a><font color="#B22222">@*/</font>
+<a name="line326">326: </a><strong><font color="#4169E1"><a name="BVScale"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVScale.html#BVScale">BVScale</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscScalar alpha)</font></strong>
+<a name="line327">327: </a>{
+
+<a name="line334">334: </a>  BVCheckSizes(bv,1);
+<a name="line335">335: </a>  <font color="#4169E1">if</font> (alpha == (PetscScalar)1.0) <font color="#4169E1">return</font>(0);
+
+<a name="line337">337: </a>  PetscLogEventBegin(BV_Scale,bv,0,0,0);
+<a name="line338">338: </a>  <font color="#4169E1">if</font> (bv-&gt;n) {
+<a name="line339">339: </a>    (*bv-&gt;ops-&gt;scale)(bv,-1,alpha);
+<a name="line340">340: </a>  }
+<a name="line341">341: </a>  PetscLogEventEnd(BV_Scale,bv,0,0,0);
+<a name="line342">342: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line343">343: </a>  <font color="#4169E1">return</font>(0);
+<a name="line344">344: </a>}
+
+<a name="line346">346: </a><font color="#B22222">/*@</font>
+<a name="line347">347: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a> - Scale one column of a <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a>.</font>
+
+<a name="line349">349: </a><font color="#B22222">   Logically Collective on bv</font>
+
+<a name="line351">351: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line352">352: </a><font color="#B22222">+  bv    - basis vectors</font>
+<a name="line353">353: </a><font color="#B22222">.  j     - column number to be scaled</font>
+<a name="line354">354: </a><font color="#B22222">-  alpha - scaling factor</font>
+
+<a name="line356">356: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line358">358: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVScale.html#BVScale">BVScale</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line359">359: </a><font color="#B22222">@*/</font>
+<a name="line360">360: </a><strong><font color="#4169E1"><a name="BVScaleColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j,PetscScalar alpha)</font></strong>
+<a name="line361">361: </a>{
+
+<a name="line369">369: </a>  BVCheckSizes(bv,1);
+
+<a name="line371">371: </a>  <font color="#4169E1">if</font> (j&lt;0 || j&gt;=bv-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument j has wrong value %D, the number of columns is %D"</font>,j,bv-&gt;m);
+<a name="line372">372: </a>  <font color="#4169E1">if</font> (alpha == (PetscScalar)1.0) <font color="#4169E1">return</font>(0);
+
+<a name="line374">374: </a>  PetscLogEventBegin(BV_Scale,bv,0,0,0);
+<a name="line375">375: </a>  <font color="#4169E1">if</font> (bv-&gt;n) {
+<a name="line376">376: </a>    (*bv-&gt;ops-&gt;scale)(bv,j,alpha);
+<a name="line377">377: </a>  }
+<a name="line378">378: </a>  PetscLogEventEnd(BV_Scale,bv,0,0,0);
+<a name="line379">379: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line380">380: </a>  <font color="#4169E1">return</font>(0);
+<a name="line381">381: </a>}
+
+<a name="line383">383: </a><strong><font color="#4169E1"><a name="BVSetRandomColumn_Private"></a>PETSC_STATIC_INLINE PetscErrorCode BVSetRandomColumn_Private(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt k)</font></strong>
+<a name="line384">384: </a>{
+<a name="line386">386: </a>  PetscInt       i,low,high;
+<a name="line387">387: </a>  PetscScalar    *px,t;
+<a name="line388">388: </a>  Vec            x;
+
+<a name="line391">391: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(bv,k,&amp;x);
+<a name="line392">392: </a>  <font color="#4169E1">if</font> (bv-&gt;rrandom) {  <font color="#B22222">/* generate the same vector irrespective of number of processes */</font>
+<a name="line393">393: </a>    VecGetOwnershipRange(x,&amp;low,&amp;high);
+<a name="line394">394: </a>    VecGetArray(x,&amp;px);
+<a name="line395">395: </a>    <font color="#4169E1">for</font> (i=0;i&lt;bv-&gt;N;i++) {
+<a name="line396">396: </a>      PetscRandomGetValue(bv-&gt;rand,&amp;t);
+<a name="line397">397: </a>      <font color="#4169E1">if</font> (i&gt;=low &amp;&amp; i&lt;high) px[i-low] = t;
+<a name="line398">398: </a>    }
+<a name="line399">399: </a>    VecRestoreArray(x,&amp;px);
+<a name="line400">400: </a>  } <font color="#4169E1">else</font> {
+<a name="line401">401: </a>    VecSetRandom(x,bv-&gt;rand);
+<a name="line402">402: </a>  }
+<a name="line403">403: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(bv,k,&amp;x);
+<a name="line404">404: </a>  <font color="#4169E1">return</font>(0);
+<a name="line405">405: </a>}
+
+<a name="line407">407: </a><font color="#B22222">/*@</font>
+<a name="line408">408: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVSetRandom.html#BVSetRandom">BVSetRandom</a> - Set the columns of a <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> to random numbers.</font>
+
+<a name="line410">410: </a><font color="#B22222">   Logically Collective on bv</font>
+
+<a name="line412">412: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line413">413: </a><font color="#B22222">.  bv - basis vectors</font>
+
+<a name="line415">415: </a><font color="#B22222">   Note:</font>
+<a name="line416">416: </a><font color="#B22222">   All active columns (except the leading ones) are modified.</font>
+
+<a name="line418">418: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line420">420: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVSetRandomContext.html#BVSetRandomContext">BVSetRandomContext</a>(), <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVSetRandomCond.html#BVSetRandomCond">BVSetRandomCond</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line421">421: </a><font color="#B22222">@*/</font>
+<a name="line422">422: </a><strong><font color="#4169E1"><a name="BVSetRandom"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVSetRandom.html#BVSetRandom">BVSetRandom</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv)</font></strong>
+<a name="line423">423: </a>{
+<a name="line425">425: </a>  PetscInt       k;
+
+<a name="line430">430: </a>  BVCheckSizes(bv,1);
+
+<a name="line432">432: </a>  <a href="../../../../../docs/manualpages/BV/BVGetRandomContext.html#BVGetRandomContext">BVGetRandomContext</a>(bv,&amp;bv-&gt;rand);
+<a name="line433">433: </a>  PetscLogEventBegin(BV_SetRandom,bv,0,0,0);
+<a name="line434">434: </a>  <font color="#4169E1">for</font> (k=bv-&gt;l;k&lt;bv-&gt;k;k++) {
+<a name="line435">435: </a>    BVSetRandomColumn_Private(bv,k);
+<a name="line436">436: </a>  }
+<a name="line437">437: </a>  PetscLogEventEnd(BV_SetRandom,bv,0,0,0);
+<a name="line438">438: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line439">439: </a>  <font color="#4169E1">return</font>(0);
+<a name="line440">440: </a>}
+
+<a name="line442">442: </a><font color="#B22222">/*@</font>
+<a name="line443">443: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a> - Set one column of a <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> to random numbers.</font>
+
+<a name="line445">445: </a><font color="#B22222">   Logically Collective on bv</font>
+
+<a name="line447">447: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line448">448: </a><font color="#B22222">+  bv - basis vectors</font>
+<a name="line449">449: </a><font color="#B22222">-  j  - column number to be set</font>
+
+<a name="line451">451: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line453">453: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVSetRandomContext.html#BVSetRandomContext">BVSetRandomContext</a>(), <a href="../../../../../docs/manualpages/BV/BVSetRandom.html#BVSetRandom">BVSetRandom</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line454">454: </a><font color="#B22222">@*/</font>
+<a name="line455">455: </a><strong><font color="#4169E1"><a name="BVSetRandomColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscInt j)</font></strong>
+<a name="line456">456: </a>{
+
+<a name="line463">463: </a>  BVCheckSizes(bv,1);
+<a name="line464">464: </a>  <font color="#4169E1">if</font> (j&lt;0 || j&gt;=bv-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)bv),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Argument j has wrong value %D, the number of columns is %D"</font>,j,bv-&gt;m);
+
+<a name="line466">466: </a>  <a href="../../../../../docs/manualpages/BV/BVGetRandomContext.html#BVGetRandomContext">BVGetRandomContext</a>(bv,&amp;bv-&gt;rand);
+<a name="line467">467: </a>  PetscLogEventBegin(BV_SetRandom,bv,0,0,0);
+<a name="line468">468: </a>  BVSetRandomColumn_Private(bv,j);
+<a name="line469">469: </a>  PetscLogEventEnd(BV_SetRandom,bv,0,0,0);
+<a name="line470">470: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line471">471: </a>  <font color="#4169E1">return</font>(0);
+<a name="line472">472: </a>}
+
+<a name="line474">474: </a><font color="#B22222">/*@</font>
+<a name="line475">475: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVSetRandomCond.html#BVSetRandomCond">BVSetRandomCond</a> - Set the columns of a <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> to random numbers, in a way that</font>
+<a name="line476">476: </a><font color="#B22222">   the generated matrix has a given condition number.</font>
+
+<a name="line478">478: </a><font color="#B22222">   Logically Collective on bv</font>
+
+<a name="line480">480: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line481">481: </a><font color="#B22222">+  bv    - basis vectors</font>
+<a name="line482">482: </a><font color="#B22222">-  condn - condition number</font>
+
+<a name="line484">484: </a><font color="#B22222">   Note:</font>
+<a name="line485">485: </a><font color="#B22222">   All active columns (except the leading ones) are modified.</font>
+
+<a name="line487">487: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line489">489: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVSetRandomContext.html#BVSetRandomContext">BVSetRandomContext</a>(), <a href="../../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>()</font>
+<a name="line490">490: </a><font color="#B22222">@*/</font>
+<a name="line491">491: </a><strong><font color="#4169E1"><a name="BVSetRandomCond"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVSetRandomCond.html#BVSetRandomCond">BVSetRandomCond</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> bv,PetscReal condn)</font></strong>
+<a name="line492">492: </a>{
+<a name="line494">494: </a>  PetscInt       k,i;
+<a name="line495">495: </a>  PetscScalar    *eig,*d;
+<a name="line496">496: </a>  <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a>             ds;
+<a name="line497">497: </a>  Mat            A,X,Xt,M,G;
+
+<a name="line502">502: </a>  BVCheckSizes(bv,1);
+
+<a name="line504">504: </a>  <a href="../../../../../docs/manualpages/BV/BVGetRandomContext.html#BVGetRandomContext">BVGetRandomContext</a>(bv,&amp;bv-&gt;rand);
+<a name="line505">505: </a>  PetscLogEventBegin(BV_SetRandom,bv,0,0,0);
+<a name="line506">506: </a>  <font color="#B22222">/* B = rand(n,k) */</font>
+<a name="line507">507: </a>  <font color="#4169E1">for</font> (k=bv-&gt;l;k&lt;bv-&gt;k;k++) {
+<a name="line508">508: </a>    BVSetRandomColumn_Private(bv,k);
+<a name="line509">509: </a>  }
+<a name="line510">510: </a>  <a href="../../../../../docs/manualpages/DS/DSCreate.html#DSCreate">DSCreate</a>(PetscObjectComm((PetscObject)bv),&amp;ds);
+<a name="line511">511: </a>  <a href="../../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(ds,DSHEP);
+<a name="line512">512: </a>  <a href="../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(ds,bv-&gt;m);
+<a name="line513">513: </a>  <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(ds,bv-&gt;k,0,bv-&gt;l,bv-&gt;k);
+<a name="line514">514: </a>  <font color="#B22222">/* [V,S] = eig(B'*B) */</font>
+<a name="line515">515: </a>  <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line516">516: </a>  <a href="../../../../../docs/manualpages/BV/BVDot.html#BVDot">BVDot</a>(bv,bv,A);
+<a name="line517">517: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line518">518: </a>  PetscMalloc1(bv-&gt;m,&amp;eig);
+<a name="line519">519: </a>  <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(ds,eig,NULL);
+<a name="line520">520: </a>  <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(ds,eig,NULL);
+<a name="line521">521: </a>  <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line522">522: </a>  <font color="#B22222">/* M = diag(linspace(1/condn,1,n)./sqrt(diag(S)))' */</font>
+<a name="line523">523: </a>  MatCreateSeqDense(PETSC_COMM_SELF,bv-&gt;k,bv-&gt;k,NULL,&amp;M);
+<a name="line524">524: </a>  MatZeroEntries(M);
+<a name="line525">525: </a>  MatDenseGetArray(M,&amp;d);
+<a name="line526">526: </a>  <font color="#4169E1">for</font> (i=0;i&lt;bv-&gt;k;i++) d[i+i*bv-&gt;m] = (1.0/condn+(1.0-1.0/condn)/(bv-&gt;k-1)*i)/PetscSqrtScalar(eig[i]);
+<a name="line527">527: </a>  MatDenseRestoreArray(M,&amp;d);
+<a name="line528">528: </a>  <font color="#B22222">/* G = X*M*X' */</font>
+<a name="line529">529: </a>  MatCreateSeqDense(PETSC_COMM_SELF,bv-&gt;k,bv-&gt;k,NULL,&amp;Xt);
+<a name="line530">530: </a>  <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;X);
+<a name="line531">531: </a>  MatTranspose(X,MAT_REUSE_MATRIX,&amp;Xt);
+<a name="line532">532: </a>  MatProductCreate(Xt,M,NULL,&amp;G);
+<a name="line533">533: </a>  MatProductSetType(G,MATPRODUCT_PtAP);
+<a name="line534">534: </a>  MatProductSetFromOptions(G);
+<a name="line535">535: </a>  MatProductSymbolic(G);
+<a name="line536">536: </a>  MatProductNumeric(G);
+<a name="line537">537: </a>  MatProductClear(G);
+<a name="line538">538: </a>  MatDestroy(&amp;X);
+<a name="line539">539: </a>  MatDestroy(&amp;Xt);
+<a name="line540">540: </a>  MatDestroy(&amp;M);
+<a name="line541">541: </a>  <font color="#B22222">/* B = B*G */</font>
+<a name="line542">542: </a>  <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(bv,G,bv-&gt;l,bv-&gt;k);
+<a name="line543">543: </a>  MatDestroy(&amp;G);
+<a name="line544">544: </a>  PetscFree(eig);
+<a name="line545">545: </a>  <a href="../../../../../docs/manualpages/DS/DSDestroy.html#DSDestroy">DSDestroy</a>(&amp;ds);
+<a name="line546">546: </a>  PetscLogEventEnd(BV_SetRandom,bv,0,0,0);
+<a name="line547">547: </a>  PetscObjectStateIncrease((PetscObject)bv);
+<a name="line548">548: </a>  <font color="#4169E1">return</font>(0);
+<a name="line549">549: </a>}
+
+<a name="line551">551: </a><font color="#B22222">/*@</font>
+<a name="line552">552: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a> - Computes the matrix-vector product for each column, Y=A*V.</font>
+
+<a name="line554">554: </a><font color="#B22222">   Neighbor-wise Collective on A</font>
+
+<a name="line556">556: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line557">557: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line558">558: </a><font color="#B22222">-  A - the matrix</font>
+
+<a name="line560">560: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line561">561: </a><font color="#B22222">.  Y - the result</font>
+
+<a name="line563">563: </a><font color="#B22222">   Notes:</font>
+<a name="line564">564: </a><font color="#B22222">   Both V and Y must be distributed in the same manner. Only active columns</font>
+<a name="line565">565: </a><font color="#B22222">   (excluding the leading ones) are processed.</font>
+<a name="line566">566: </a><font color="#B22222">   In the result Y, columns are overwritten starting from the leading ones.</font>
+<a name="line567">567: </a><font color="#B22222">   The number of active columns in V and Y should match, although they need</font>
+<a name="line568">568: </a><font color="#B22222">   not be the same columns.</font>
+
+<a name="line570">570: </a><font color="#B22222">   It is possible to choose whether the computation is done column by column</font>
+<a name="line571">571: </a><font color="#B22222">   or as a Mat-Mat product, see <a href="../../../../../docs/manualpages/BV/BVSetMatMultMethod.html#BVSetMatMultMethod">BVSetMatMultMethod</a>().</font>
+
+<a name="line573">573: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line575">575: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(), <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultTranspose.html#BVMatMultTranspose">BVMatMultTranspose</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTranspose.html#BVMatMultHermitianTranspose">BVMatMultHermitianTranspose</a>(), <a href="../../../../../docs/manualpages/BV/BVSetMatMultMethod.html#BVSetMatMultMethod">BVSetMatMultMethod</a>()</font>
+<a name="line576">576: </a><font color="#B22222">@*/</font>
+<a name="line577">577: </a><strong><font color="#4169E1"><a name="BVMatMult"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y)</font></strong>
+<a name="line578">578: </a>{
+
+<a name="line584">584: </a>  BVCheckSizes(V,1);
+<a name="line585">585: </a>  BVCheckOp(V,1,matmult);
+<a name="line590">590: </a>  BVCheckSizes(Y,3);
+<a name="line593">593: </a>  <font color="#4169E1">if</font> (V-&gt;n!=Y-&gt;n) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Mismatching local dimension V %D, Y %D"</font>,V-&gt;n,Y-&gt;n);
+<a name="line594">594: </a>  <font color="#4169E1">if</font> (V-&gt;k-V-&gt;l!=Y-&gt;k-Y-&gt;l) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Y has %D active columns, should match %D active columns in V"</font>,Y-&gt;k-Y-&gt;l,V-&gt;k-V-&gt;l);
+
+<a name="line596">596: </a>  PetscLogEventBegin(BV_MatMult,V,A,Y,0);
+<a name="line597">597: </a>  (*V-&gt;ops-&gt;matmult)(V,A,Y);
+<a name="line598">598: </a>  PetscLogEventEnd(BV_MatMult,V,A,Y,0);
+<a name="line599">599: </a>  PetscObjectStateIncrease((PetscObject)Y);
+<a name="line600">600: </a>  <font color="#4169E1">return</font>(0);
+<a name="line601">601: </a>}
+
+<a name="line603">603: </a><font color="#B22222">/*@</font>
+<a name="line604">604: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatMultTranspose.html#BVMatMultTranspose">BVMatMultTranspose</a> - Computes the matrix-vector product with the transpose</font>
+<a name="line605">605: </a><font color="#B22222">   of a matrix for each column, Y=A^T*V.</font>
+
+<a name="line607">607: </a><font color="#B22222">   Neighbor-wise Collective on A</font>
+
+<a name="line609">609: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line610">610: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line611">611: </a><font color="#B22222">-  A - the matrix</font>
+
+<a name="line613">613: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line614">614: </a><font color="#B22222">.  Y - the result</font>
+
+<a name="line616">616: </a><font color="#B22222">   Notes:</font>
+<a name="line617">617: </a><font color="#B22222">   Both V and Y must be distributed in the same manner. Only active columns</font>
+<a name="line618">618: </a><font color="#B22222">   (excluding the leading ones) are processed.</font>
+<a name="line619">619: </a><font color="#B22222">   In the result Y, columns are overwritten starting from the leading ones.</font>
+<a name="line620">620: </a><font color="#B22222">   The number of active columns in V and Y should match, although they need</font>
+<a name="line621">621: </a><font color="#B22222">   not be the same columns.</font>
+
+<a name="line623">623: </a><font color="#B22222">   Currently implemented via MatCreateTranspose().</font>
+
+<a name="line625">625: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line627">627: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTranspose.html#BVMatMultHermitianTranspose">BVMatMultHermitianTranspose</a>()</font>
+<a name="line628">628: </a><font color="#B22222">@*/</font>
+<a name="line629">629: </a><strong><font color="#4169E1"><a name="BVMatMultTranspose"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatMultTranspose.html#BVMatMultTranspose">BVMatMultTranspose</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y)</font></strong>
+<a name="line630">630: </a>{
+<a name="line632">632: </a>  Mat            AT;
+
+<a name="line637">637: </a>  BVCheckSizes(V,1);
+<a name="line642">642: </a>  BVCheckSizes(Y,3);
+<a name="line645">645: </a>  <font color="#4169E1">if</font> (V-&gt;n!=Y-&gt;n) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Mismatching local dimension V %D, Y %D"</font>,V-&gt;n,Y-&gt;n);
+<a name="line646">646: </a>  <font color="#4169E1">if</font> (V-&gt;k-V-&gt;l&gt;Y-&gt;m-Y-&gt;l) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Y has %D non-leading columns, not enough to store %D columns"</font>,Y-&gt;m-Y-&gt;l,V-&gt;k-V-&gt;l);
+
+<a name="line648">648: </a>  MatCreateTranspose(A,&amp;AT);
+<a name="line649">649: </a>  <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(V,AT,Y);
+<a name="line650">650: </a>  MatDestroy(&amp;AT);
+<a name="line651">651: </a>  <font color="#4169E1">return</font>(0);
+<a name="line652">652: </a>}
+
+<a name="line654">654: </a><font color="#B22222">/*@</font>
+<a name="line655">655: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTranspose.html#BVMatMultHermitianTranspose">BVMatMultHermitianTranspose</a> - Computes the matrix-vector product with the</font>
+<a name="line656">656: </a><font color="#B22222">   conjugate transpose of a matrix for each column, Y=A^H*V.</font>
+
+<a name="line658">658: </a><font color="#B22222">   Neighbor-wise Collective on A</font>
+
+<a name="line660">660: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line661">661: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line662">662: </a><font color="#B22222">-  A - the matrix</font>
+
+<a name="line664">664: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line665">665: </a><font color="#B22222">.  Y - the result</font>
+
+<a name="line667">667: </a><font color="#B22222">   Note:</font>
+<a name="line668">668: </a><font color="#B22222">   Both V and Y must be distributed in the same manner. Only active columns</font>
+<a name="line669">669: </a><font color="#B22222">   (excluding the leading ones) are processed.</font>
+<a name="line670">670: </a><font color="#B22222">   In the result Y, columns are overwritten starting from the leading ones.</font>
+<a name="line671">671: </a><font color="#B22222">   The number of active columns in V and Y should match, although they need</font>
+<a name="line672">672: </a><font color="#B22222">   not be the same columns.</font>
+
+<a name="line674">674: </a><font color="#B22222">   Currently implemented via MatCreateHermitianTranspose().</font>
+
+<a name="line676">676: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line678">678: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultTranspose.html#BVMatMultTranspose">BVMatMultTranspose</a>()</font>
+<a name="line679">679: </a><font color="#B22222">@*/</font>
+<a name="line680">680: </a><strong><font color="#4169E1"><a name="BVMatMultHermitianTranspose"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTranspose.html#BVMatMultHermitianTranspose">BVMatMultHermitianTranspose</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> Y)</font></strong>
+<a name="line681">681: </a>{
+<a name="line683">683: </a>  Mat            AH;
+
+<a name="line688">688: </a>  BVCheckSizes(V,1);
+<a name="line693">693: </a>  BVCheckSizes(Y,3);
+<a name="line696">696: </a>  <font color="#4169E1">if</font> (V-&gt;n!=Y-&gt;n) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_INCOMP,<font color="#666666">"Mismatching local dimension V %D, Y %D"</font>,V-&gt;n,Y-&gt;n);
+<a name="line697">697: </a>  <font color="#4169E1">if</font> (V-&gt;k-V-&gt;l&gt;Y-&gt;m-Y-&gt;l) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_SIZ,<font color="#666666">"Y has %D non-leading columns, not enough to store %D columns"</font>,Y-&gt;m-Y-&gt;l,V-&gt;k-V-&gt;l);
+
+<a name="line699">699: </a>  MatCreateHermitianTranspose(A,&amp;AH);
+<a name="line700">700: </a>  <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(V,AH,Y);
+<a name="line701">701: </a>  MatDestroy(&amp;AH);
+<a name="line702">702: </a>  <font color="#4169E1">return</font>(0);
+<a name="line703">703: </a>}
+
+<a name="line705">705: </a><font color="#B22222">/*@</font>
+<a name="line706">706: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a> - Computes the matrix-vector product for a specified</font>
+<a name="line707">707: </a><font color="#B22222">   column, storing the result in the next column: v_{j+1}=A*v_j.</font>
+
+<a name="line709">709: </a><font color="#B22222">   Neighbor-wise Collective on A</font>
+
+<a name="line711">711: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line712">712: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line713">713: </a><font color="#B22222">.  A - the matrix</font>
+<a name="line714">714: </a><font color="#B22222">-  j - the column</font>
+
+<a name="line716">716: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line718">718: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultTransposeColumn.html#BVMatMultTransposeColumn">BVMatMultTransposeColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTransposeColumn.html#BVMatMultHermitianTransposeColumn">BVMatMultHermitianTransposeColumn</a>()</font>
+<a name="line719">719: </a><font color="#B22222">@*/</font>
+<a name="line720">720: </a><strong><font color="#4169E1"><a name="BVMatMultColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,PetscInt j)</font></strong>
+<a name="line721">721: </a>{
+<a name="line723">723: </a>  Vec            vj,vj1;
+
+<a name="line728">728: </a>  BVCheckSizes(V,1);
+<a name="line732">732: </a>  <font color="#4169E1">if</font> (j&lt;0) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j must be non-negative"</font>);
+<a name="line733">733: </a>  <font color="#4169E1">if</font> (j+1&gt;=V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Result should go in index j+1=%D but <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> only has %D columns"</font>,j+1,V-&gt;m);
+
+<a name="line735">735: </a>  PetscLogEventBegin(BV_MatMultVec,V,A,0,0);
+<a name="line736">736: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j,&amp;vj);
+<a name="line737">737: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j+1,&amp;vj1);
+<a name="line738">738: </a>  MatMult(A,vj,vj1);
+<a name="line739">739: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j,&amp;vj);
+<a name="line740">740: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j+1,&amp;vj1);
+<a name="line741">741: </a>  PetscLogEventEnd(BV_MatMultVec,V,A,0,0);
+<a name="line742">742: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line743">743: </a>  <font color="#4169E1">return</font>(0);
+<a name="line744">744: </a>}
+
+<a name="line746">746: </a><font color="#B22222">/*@</font>
+<a name="line747">747: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatMultTransposeColumn.html#BVMatMultTransposeColumn">BVMatMultTransposeColumn</a> - Computes the transpose matrix-vector product for a</font>
+<a name="line748">748: </a><font color="#B22222">   specified column, storing the result in the next column: v_{j+1}=A^T*v_j.</font>
+
+<a name="line750">750: </a><font color="#B22222">   Neighbor-wise Collective on A</font>
+
+<a name="line752">752: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line753">753: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line754">754: </a><font color="#B22222">.  A - the matrix</font>
+<a name="line755">755: </a><font color="#B22222">-  j - the column</font>
+
+<a name="line757">757: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line759">759: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTransposeColumn.html#BVMatMultHermitianTransposeColumn">BVMatMultHermitianTransposeColumn</a>()</font>
+<a name="line760">760: </a><font color="#B22222">@*/</font>
+<a name="line761">761: </a><strong><font color="#4169E1"><a name="BVMatMultTransposeColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatMultTransposeColumn.html#BVMatMultTransposeColumn">BVMatMultTransposeColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,PetscInt j)</font></strong>
+<a name="line762">762: </a>{
+<a name="line764">764: </a>  Vec            vj,vj1;
+
+<a name="line769">769: </a>  BVCheckSizes(V,1);
+<a name="line773">773: </a>  <font color="#4169E1">if</font> (j&lt;0) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j must be non-negative"</font>);
+<a name="line774">774: </a>  <font color="#4169E1">if</font> (j+1&gt;=V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Result should go in index j+1=%D but <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> only has %D columns"</font>,j+1,V-&gt;m);
+
+<a name="line776">776: </a>  PetscLogEventBegin(BV_MatMultVec,V,A,0,0);
+<a name="line777">777: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j,&amp;vj);
+<a name="line778">778: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j+1,&amp;vj1);
+<a name="line779">779: </a>  MatMultTranspose(A,vj,vj1);
+<a name="line780">780: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j,&amp;vj);
+<a name="line781">781: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j+1,&amp;vj1);
+<a name="line782">782: </a>  PetscLogEventEnd(BV_MatMultVec,V,A,0,0);
+<a name="line783">783: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line784">784: </a>  <font color="#4169E1">return</font>(0);
+<a name="line785">785: </a>}
+
+<a name="line787">787: </a><font color="#B22222">/*@</font>
+<a name="line788">788: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTransposeColumn.html#BVMatMultHermitianTransposeColumn">BVMatMultHermitianTransposeColumn</a> - Computes the matrix-vector product for a specified</font>
+<a name="line789">789: </a><font color="#B22222">   column, storing the result in the next column: v_{j+1}=A*v_j.</font>
+
+<a name="line791">791: </a><font color="#B22222">   Neighbor-wise Collective on A</font>
+
+<a name="line793">793: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line794">794: </a><font color="#B22222">+  V - basis vectors context</font>
+<a name="line795">795: </a><font color="#B22222">.  A - the matrix</font>
+<a name="line796">796: </a><font color="#B22222">-  j - the column</font>
+
+<a name="line798">798: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line800">800: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/BV/BVMatMult.html#BVMatMult">BVMatMult</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultColumn.html#BVMatMultColumn">BVMatMultColumn</a>(), <a href="../../../../../docs/manualpages/BV/BVMatMultTransposeColumn.html#BVMatMultTransposeColumn">BVMatMultTransposeColumn</a>()</font>
+<a name="line801">801: </a><font color="#B22222">@*/</font>
+<a name="line802">802: </a><strong><font color="#4169E1"><a name="BVMatMultHermitianTransposeColumn"></a>PetscErrorCode <a href="../../../../../docs/manualpages/BV/BVMatMultHermitianTransposeColumn.html#BVMatMultHermitianTransposeColumn">BVMatMultHermitianTransposeColumn</a>(<a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Mat A,PetscInt j)</font></strong>
+<a name="line803">803: </a>{
+<a name="line805">805: </a>  Vec            vj,vj1;
+
+<a name="line810">810: </a>  BVCheckSizes(V,1);
+<a name="line814">814: </a>  <font color="#4169E1">if</font> (j&lt;0) SETERRQ(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Index j must be non-negative"</font>);
+<a name="line815">815: </a>  <font color="#4169E1">if</font> (j+1&gt;=V-&gt;m) SETERRQ2(PetscObjectComm((PetscObject)V),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Result should go in index j+1=%D but <a href="../../../../../docs/manualpages/BV/BV.html#BV">BV</a> only has %D columns"</font>,j+1,V-&gt;m);
+
+<a name="line817">817: </a>  PetscLogEventBegin(BV_MatMultVec,V,A,0,0);
+<a name="line818">818: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j,&amp;vj);
+<a name="line819">819: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(V,j+1,&amp;vj1);
+<a name="line820">820: </a>  MatMultHermitianTranspose(A,vj,vj1);
+<a name="line821">821: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j,&amp;vj);
+<a name="line822">822: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(V,j+1,&amp;vj1);
+<a name="line823">823: </a>  PetscLogEventEnd(BV_MatMultVec,V,A,0,0);
+<a name="line824">824: </a>  PetscObjectStateIncrease((PetscObject)V);
+<a name="line825">825: </a>  <font color="#4169E1">return</font>(0);
+<a name="line826">826: </a>}
+
+</pre>
+</body>
+
+</html>

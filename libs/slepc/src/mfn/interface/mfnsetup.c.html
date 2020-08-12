@@ -1,0 +1,181 @@
+<center><a href="mfnsetup.c">Actual source code: mfnsetup.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/mfn/interface/mfnsetup.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:13+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/mfn/interface/mfnsetup.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> routines related to problem setup</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/mfnimpl.h.html">&lt;slepc/private/mfnimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#B22222">/*@</font>
+<a name="line17"> 17: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNSetUp.html#MFNSetUp">MFNSetUp</a> - Sets up all the internal data structures necessary for the</font>
+<a name="line18"> 18: </a><font color="#B22222">   execution of the matrix function solver.</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   Collective on mfn</font>
+
+<a name="line22"> 22: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line23"> 23: </a><font color="#B22222">.  mfn   - matrix function context</font>
+
+<a name="line25"> 25: </a><font color="#B22222">   Notes:</font>
+<a name="line26"> 26: </a><font color="#B22222">   This function need not be called explicitly in most cases, since <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>()</font>
+<a name="line27"> 27: </a><font color="#B22222">   calls it. It can be useful when one wants to measure the set-up time</font>
+<a name="line28"> 28: </a><font color="#B22222">   separately from the solve time.</font>
+
+<a name="line30"> 30: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line32"> 32: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>(), <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(), <a href="../../../docs/manualpages/MFN/MFNDestroy.html#MFNDestroy">MFNDestroy</a>()</font>
+<a name="line33"> 33: </a><font color="#B22222">@*/</font>
+<a name="line34"> 34: </a><strong><font color="#4169E1"><a name="MFNSetUp"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNSetUp.html#MFNSetUp">MFNSetUp</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn)</font></strong>
+<a name="line35"> 35: </a>{
+<a name="line37"> 37: </a>  PetscInt       N;
+
+
+<a name="line42"> 42: </a>  <font color="#B22222">/* reset the convergence flag from the previous solves */</font>
+<a name="line43"> 43: </a>  mfn-&gt;reason = <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_CONVERGED_ITERATING</a>;
+
+<a name="line45"> 45: </a>  <font color="#4169E1">if</font> (mfn-&gt;setupcalled) <font color="#4169E1">return</font>(0);
+<a name="line46"> 46: </a>  PetscLogEventBegin(MFN_SetUp,mfn,0,0,0);
+
+<a name="line48"> 48: </a>  <font color="#B22222">/* Set default solver type (<a href="../../../docs/manualpages/MFN/MFNSetFromOptions.html#MFNSetFromOptions">MFNSetFromOptions</a> was not called) */</font>
+<a name="line49"> 49: </a>  <font color="#4169E1">if</font> (!((PetscObject)mfn)-&gt;type_name) {
+<a name="line50"> 50: </a>    <a href="../../../docs/manualpages/MFN/MFNSetType.html#MFNSetType">MFNSetType</a>(mfn,MFNKRYLOV);
+<a name="line51"> 51: </a>  }
+<a name="line52"> 52: </a>  <font color="#4169E1">if</font> (!mfn-&gt;fn) { <a href="../../../docs/manualpages/MFN/MFNGetFN.html#MFNGetFN">MFNGetFN</a>(mfn,&amp;mfn-&gt;fn); }
+<a name="line53"> 53: </a>  <font color="#4169E1">if</font> (!((PetscObject)mfn-&gt;fn)-&gt;type_name) {
+<a name="line54"> 54: </a>    <a href="../../../docs/manualpages/FN/FNSetFromOptions.html#FNSetFromOptions">FNSetFromOptions</a>(mfn-&gt;fn);
+<a name="line55"> 55: </a>  }
+
+<a name="line57"> 57: </a>  <font color="#B22222">/* Check problem dimensions */</font>
+<a name="line58"> 58: </a>  <font color="#4169E1">if</font> (!mfn-&gt;A) SETERRQ(PetscObjectComm((PetscObject)mfn),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"<a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a> must be called first"</font>);
+<a name="line59"> 59: </a>  MatGetSize(mfn-&gt;A,&amp;N,NULL);
+<a name="line60"> 60: </a>  <font color="#4169E1">if</font> (mfn-&gt;ncv &gt; N) mfn-&gt;ncv = N;
+
+<a name="line62"> 62: </a>  <font color="#B22222">/* call specific solver setup */</font>
+<a name="line63"> 63: </a>  (*mfn-&gt;ops-&gt;setup)(mfn);
+
+<a name="line65"> 65: </a>  <font color="#B22222">/* set tolerance if not yet set */</font>
+<a name="line66"> 66: </a>  <font color="#4169E1">if</font> (mfn-&gt;tol==PETSC_DEFAULT) mfn-&gt;tol = SLEPC_DEFAULT_TOL;
+
+<a name="line68"> 68: </a>  PetscLogEventEnd(MFN_SetUp,mfn,0,0,0);
+<a name="line69"> 69: </a>  mfn-&gt;setupcalled = 1;
+<a name="line70"> 70: </a>  <font color="#4169E1">return</font>(0);
+<a name="line71"> 71: </a>}
+
+<a name="line73"> 73: </a><font color="#B22222">/*@</font>
+<a name="line74"> 74: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a> - Sets the matrix for which the matrix function is to be computed.</font>
+
+<a name="line76"> 76: </a><font color="#B22222">   Collective on mfn</font>
+
+<a name="line78"> 78: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line79"> 79: </a><font color="#B22222">+  mfn - the matrix function context</font>
+<a name="line80"> 80: </a><font color="#B22222">-  A   - the problem matrix</font>
+
+<a name="line82"> 82: </a><font color="#B22222">   Notes:</font>
+<a name="line83"> 83: </a><font color="#B22222">   It must be called before <a href="../../../docs/manualpages/MFN/MFNSetUp.html#MFNSetUp">MFNSetUp</a>(). If it is called again after <a href="../../../docs/manualpages/MFN/MFNSetUp.html#MFNSetUp">MFNSetUp</a>() then</font>
+<a name="line84"> 84: </a><font color="#B22222">   the <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> object is reset.</font>
+
+<a name="line86"> 86: </a><font color="#B22222">   Level: beginner</font>
+
+<a name="line88"> 88: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(), <a href="../../../docs/manualpages/MFN/MFNSetUp.html#MFNSetUp">MFNSetUp</a>(), <a href="../../../docs/manualpages/MFN/MFNReset.html#MFNReset">MFNReset</a>()</font>
+<a name="line89"> 89: </a><font color="#B22222">@*/</font>
+<a name="line90"> 90: </a><strong><font color="#4169E1"><a name="MFNSetOperator"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,Mat A)</font></strong>
+<a name="line91"> 91: </a>{
+<a name="line93"> 93: </a>  PetscInt       m,n;
+
+
+<a name="line100">100: </a>  MatGetSize(A,&amp;m,&amp;n);
+<a name="line101">101: </a>  <font color="#4169E1">if</font> (m!=n) SETERRQ(PetscObjectComm((PetscObject)mfn),PETSC_ERR_ARG_WRONG,<font color="#666666">"A is a non-square matrix"</font>);
+<a name="line102">102: </a>  PetscObjectReference((PetscObject)A);
+<a name="line103">103: </a>  <font color="#4169E1">if</font> (mfn-&gt;setupcalled) { <a href="../../../docs/manualpages/MFN/MFNReset.html#MFNReset">MFNReset</a>(mfn); }
+<a name="line104">104: </a>  <font color="#4169E1">else</font> { MatDestroy(&amp;mfn-&gt;A); }
+<a name="line105">105: </a>  mfn-&gt;A = A;
+<a name="line106">106: </a>  mfn-&gt;setupcalled = 0;
+<a name="line107">107: </a>  <font color="#4169E1">return</font>(0);
+<a name="line108">108: </a>}
+
+<a name="line110">110: </a><font color="#B22222">/*@</font>
+<a name="line111">111: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNGetOperator.html#MFNGetOperator">MFNGetOperator</a> - Gets the matrix associated with the <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> object.</font>
+
+<a name="line113">113: </a><font color="#B22222">   Collective on mfn</font>
+
+<a name="line115">115: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line116">116: </a><font color="#B22222">.  mfn - the <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> context</font>
+
+<a name="line118">118: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line119">119: </a><font color="#B22222">.  A  - the matrix for which the matrix function is to be computed</font>
+
+<a name="line121">121: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line123">123: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(), <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>()</font>
+<a name="line124">124: </a><font color="#B22222">@*/</font>
+<a name="line125">125: </a><strong><font color="#4169E1"><a name="MFNGetOperator"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNGetOperator.html#MFNGetOperator">MFNGetOperator</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,Mat *A)</font></strong>
+<a name="line126">126: </a>{
+<a name="line130">130: </a>  *A = mfn-&gt;A;
+<a name="line131">131: </a>  <font color="#4169E1">return</font>(0);
+<a name="line132">132: </a>}
+
+<a name="line134">134: </a><font color="#B22222">/*@</font>
+<a name="line135">135: </a><font color="#B22222">   <a href="../../../docs/manualpages/MFN/MFNAllocateSolution.html#MFNAllocateSolution">MFNAllocateSolution</a> - Allocate memory storage for common variables such</font>
+<a name="line136">136: </a><font color="#B22222">   as the basis vectors.</font>
+
+<a name="line138">138: </a><font color="#B22222">   Collective on mfn</font>
+
+<a name="line140">140: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line141">141: </a><font color="#B22222">+  mfn   - matrix function context</font>
+<a name="line142">142: </a><font color="#B22222">-  extra - number of additional positions, used for methods that require a</font>
+<a name="line143">143: </a><font color="#B22222">           working basis slightly larger than ncv</font>
+
+<a name="line145">145: </a><font color="#B22222">   Developers Note:</font>
+<a name="line146">146: </a><font color="#B22222">   This is SLEPC_EXTERN because it may be required by user plugin <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a></font>
+<a name="line147">147: </a><font color="#B22222">   implementations.</font>
+
+<a name="line149">149: </a><font color="#B22222">   Level: developer</font>
+<a name="line150">150: </a><font color="#B22222">@*/</font>
+<a name="line151">151: </a><strong><font color="#4169E1"><a name="MFNAllocateSolution"></a>PetscErrorCode <a href="../../../docs/manualpages/MFN/MFNAllocateSolution.html#MFNAllocateSolution">MFNAllocateSolution</a>(<a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,PetscInt extra)</font></strong>
+<a name="line152">152: </a>{
+<a name="line154">154: </a>  PetscInt       oldsize,requested;
+<a name="line155">155: </a>  Vec            t;
+
+<a name="line158">158: </a>  requested = mfn-&gt;ncv + extra;
+
+<a name="line160">160: </a>  <font color="#B22222">/* oldsize is zero if this is the first time setup is called */</font>
+<a name="line161">161: </a>  <a href="../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(mfn-&gt;V,NULL,NULL,&amp;oldsize);
+
+<a name="line163">163: </a>  <font color="#B22222">/* allocate basis vectors */</font>
+<a name="line164">164: </a>  <font color="#4169E1">if</font> (!mfn-&gt;V) { <a href="../../../docs/manualpages/MFN/MFNGetBV.html#MFNGetBV">MFNGetBV</a>(mfn,&amp;mfn-&gt;V); }
+<a name="line165">165: </a>  <font color="#4169E1">if</font> (!oldsize) {
+<a name="line166">166: </a>    <font color="#4169E1">if</font> (!((PetscObject)(mfn-&gt;V))-&gt;type_name) {
+<a name="line167">167: </a>      <a href="../../../docs/manualpages/BV/BVSetType.html#BVSetType">BVSetType</a>(mfn-&gt;V,BVSVEC);
+<a name="line168">168: </a>    }
+<a name="line169">169: </a>    <a href="../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(mfn-&gt;A,&amp;t,NULL);
+<a name="line170">170: </a>    <a href="../../../docs/manualpages/BV/BVSetSizesFromVec.html#BVSetSizesFromVec">BVSetSizesFromVec</a>(mfn-&gt;V,t,requested);
+<a name="line171">171: </a>    VecDestroy(&amp;t);
+<a name="line172">172: </a>  } <font color="#4169E1">else</font> {
+<a name="line173">173: </a>    <a href="../../../docs/manualpages/BV/BVResize.html#BVResize">BVResize</a>(mfn-&gt;V,requested,PETSC_FALSE);
+<a name="line174">174: </a>  }
+<a name="line175">175: </a>  <font color="#4169E1">return</font>(0);
+<a name="line176">176: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,513 @@
+<center><a href="dsnep.c">Actual source code: dsnep.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/ds/impls/nep/dsnep.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:41+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/ds/impls/nep/dsnep.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a> #include <A href="../../../../../../include/slepc/private/dsimpl.h.html">&lt;slepc/private/dsimpl.h&gt;</A>
+<a name="line12"> 12: </a> #include <A href="../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line14"> 14: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line15"> 15: </a>  PetscInt       nf;                 <font color="#B22222">/* number of functions in f[] */</font>
+<a name="line16"> 16: </a>  <a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>             f[DS_NUM_EXTRA];    <font color="#B22222">/* functions defining the nonlinear operator */</font>
+<a name="line17"> 17: </a>  PetscInt       neig;               <font color="#B22222">/* number of available eigenpairs */</font>
+<a name="line18"> 18: </a>  void           *computematrixctx;
+<a name="line19"> 19: </a>  PetscErrorCode (*computematrix)(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscScalar,PetscBool,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a>,void*);
+<a name="line20"> 20: </a>} DS_NEP;
+
+<a name="line22"> 22: </a><font color="#B22222">/*</font>
+<a name="line23"> 23: </a><font color="#B22222">   DSNEPComputeMatrix - Build the matrix associated with a nonlinear operator</font>
+<a name="line24"> 24: </a><font color="#B22222">   T(lambda) or its derivative T'(lambda), given the parameter lambda, where</font>
+<a name="line25"> 25: </a><font color="#B22222">   T(lambda) = sum_i E_i*f_i(lambda). The result is written in mat.</font>
+<a name="line26"> 26: </a><font color="#B22222">*/</font>
+<a name="line27"> 27: </a><strong><font color="#4169E1"><a name="DSNEPComputeMatrix"></a>static PetscErrorCode DSNEPComputeMatrix(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar lambda,PetscBool deriv,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> mat)</font></strong>
+<a name="line28"> 28: </a>{
+<a name="line30"> 30: </a>  DS_NEP         *ctx = (DS_NEP*)ds-&gt;data;
+<a name="line31"> 31: </a>  PetscScalar    *T,*E,alpha;
+<a name="line32"> 32: </a>  PetscInt       i,ld,n;
+<a name="line33"> 33: </a>  PetscBLASInt   k,inc=1;
+
+<a name="line36"> 36: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line37"> 37: </a>  <font color="#4169E1">if</font> (ctx-&gt;computematrix) {
+<a name="line38"> 38: </a>    (*ctx-&gt;computematrix)(ds,lambda,deriv,mat,ctx-&gt;computematrixctx);
+<a name="line39"> 39: </a>  } <font color="#4169E1">else</font> {
+<a name="line40"> 40: </a>    <a href="../../../../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(ds,&amp;n,NULL,NULL,NULL,NULL);
+<a name="line41"> 41: </a>    <a href="../../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(ds,&amp;ld);
+<a name="line42"> 42: </a>    PetscBLASIntCast(ld*n,&amp;k);
+<a name="line43"> 43: </a>    <a href="../../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(ds,mat,&amp;T);
+<a name="line44"> 44: </a>    PetscArrayzero(T,k);
+<a name="line45"> 45: </a>    <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;nf;i++) {
+<a name="line46"> 46: </a>      <font color="#4169E1">if</font> (deriv) {
+<a name="line47"> 47: </a>        <a href="../../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(ctx-&gt;f[i],lambda,&amp;alpha);
+<a name="line48"> 48: </a>      } <font color="#4169E1">else</font> {
+<a name="line49"> 49: </a>        <a href="../../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(ctx-&gt;f[i],lambda,&amp;alpha);
+<a name="line50"> 50: </a>      }
+<a name="line51"> 51: </a>      E = ds-&gt;mat[DSMatExtra[i]];
+<a name="line52"> 52: </a>      PetscStackCallBLAS(<font color="#666666">"BLASaxpy"</font>,BLASaxpy_(&amp;k,&amp;alpha,E,&amp;inc,T,&amp;inc));
+<a name="line53"> 53: </a>    }
+<a name="line54"> 54: </a>    <a href="../../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(ds,mat,&amp;T);
+<a name="line55"> 55: </a>  }
+<a name="line56"> 56: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line57"> 57: </a>  <font color="#4169E1">return</font>(0);
+<a name="line58"> 58: </a>}
+
+<a name="line60"> 60: </a><strong><font color="#4169E1"><a name="DSAllocate_NEP"></a>PetscErrorCode DSAllocate_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt ld)</font></strong>
+<a name="line61"> 61: </a>{
+<a name="line63"> 63: </a>  DS_NEP         *ctx = (DS_NEP*)ds-&gt;data;
+<a name="line64"> 64: </a>  PetscInt       i;
+
+<a name="line67"> 67: </a>  <font color="#4169E1">if</font> (!ctx-&gt;nf) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"DSNEP requires passing some functions via DSSetFN()"</font>);
+<a name="line68"> 68: </a>  DSAllocateMat_Private(ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>);
+<a name="line69"> 69: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;nf;i++) {
+<a name="line70"> 70: </a>    DSAllocateMat_Private(ds,DSMatExtra[i]);
+<a name="line71"> 71: </a>  }
+<a name="line72"> 72: </a>  PetscFree(ds-&gt;perm);
+<a name="line73"> 73: </a>  PetscMalloc1(ld,&amp;ds-&gt;perm);
+<a name="line74"> 74: </a>  PetscLogObjectMemory((PetscObject)ds,ld*<font color="#4169E1">sizeof</font>(PetscInt));
+<a name="line75"> 75: </a>  <font color="#4169E1">return</font>(0);
+<a name="line76"> 76: </a>}
+
+<a name="line78"> 78: </a><strong><font color="#4169E1"><a name="DSView_NEP"></a>PetscErrorCode DSView_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscViewer viewer)</font></strong>
+<a name="line79"> 79: </a>{
+<a name="line80"> 80: </a>  PetscErrorCode    ierr;
+<a name="line81"> 81: </a>  DS_NEP            *ctx = (DS_NEP*)ds-&gt;data;
+<a name="line82"> 82: </a>  PetscViewerFormat format;
+<a name="line83"> 83: </a>  PetscInt          i;
+
+<a name="line86"> 86: </a>  PetscViewerGetFormat(viewer,&amp;format);
+<a name="line87"> 87: </a>  PetscViewerASCIIPrintf(viewer,<font color="#666666">"number of functions: %D\n"</font>,ctx-&gt;nf);
+<a name="line88"> 88: </a>  <font color="#4169E1">if</font> (format == PETSC_VIEWER_ASCII_INFO || format == PETSC_VIEWER_ASCII_INFO_DETAIL) <font color="#4169E1">return</font>(0);
+<a name="line89"> 89: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;nf;i++) {
+<a name="line90"> 90: </a>    <a href="../../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>(ctx-&gt;f[i],viewer);
+<a name="line91"> 91: </a>    <a href="../../../../../../docs/manualpages/DS/DSViewMat.html#DSViewMat">DSViewMat</a>(ds,viewer,DSMatExtra[i]);
+<a name="line92"> 92: </a>  }
+<a name="line93"> 93: </a>  <font color="#4169E1">if</font> (ds-&gt;state&gt;<a href="../../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>) { <a href="../../../../../../docs/manualpages/DS/DSViewMat.html#DSViewMat">DSViewMat</a>(ds,viewer,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>); }
+<a name="line94"> 94: </a>  <font color="#4169E1">return</font>(0);
+<a name="line95"> 95: </a>}
+
+<a name="line97"> 97: </a><strong><font color="#4169E1"><a name="DSVectors_NEP"></a>PetscErrorCode DSVectors_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> mat,PetscInt *j,PetscReal *rnorm)</font></strong>
+<a name="line98"> 98: </a>{
+<a name="line100">100: </a>  <font color="#4169E1">if</font> (rnorm) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"Not implemented yet"</font>);
+<a name="line101">101: </a>  <font color="#4169E1">switch</font> (mat) {
+<a name="line102">102: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>:
+<a name="line103">103: </a>      <font color="#4169E1">break</font>;
+<a name="line104">104: </a>    <font color="#4169E1">case</font> <a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Y</a>:
+<a name="line105">105: </a>      SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"Not implemented yet"</font>);
+<a name="line106">106: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line107">107: </a>      SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid mat parameter"</font>);
+<a name="line108">108: </a>  }
+<a name="line109">109: </a>  <font color="#4169E1">return</font>(0);
+<a name="line110">110: </a>}
+
+<a name="line112">112: </a><strong><font color="#4169E1"><a name="DSSort_NEP"></a>PetscErrorCode DSSort_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar *wr,PetscScalar *wi,PetscScalar *rr,PetscScalar *ri,PetscInt *dummy)</font></strong>
+<a name="line113">113: </a>{
+<a name="line115">115: </a>  DS_NEP         *ctx = (DS_NEP*)ds-&gt;data;
+<a name="line116">116: </a>  PetscInt       n,l,i,j,k,p,*perm,told,ld=ds-&gt;ld;
+<a name="line117">117: </a>  PetscScalar    *A,*X,rtmp;
+
+<a name="line120">120: </a>  <font color="#4169E1">if</font> (!ds-&gt;sc) <font color="#4169E1">return</font>(0);
+<a name="line121">121: </a>  n = ds-&gt;n;
+<a name="line122">122: </a>  l = ds-&gt;l;
+<a name="line123">123: </a>  A  = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>];
+<a name="line124">124: </a>  perm = ds-&gt;perm;
+<a name="line125">125: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;neig;i++) perm[i] = i;
+<a name="line126">126: </a>  told = ds-&gt;t;
+<a name="line127">127: </a>  ds-&gt;t = ctx-&gt;neig;  <font color="#B22222">/* force the sorting routines to consider ctx-&gt;neig eigenvalues */</font>
+<a name="line128">128: </a>  <font color="#4169E1">if</font> (rr) {
+<a name="line129">129: </a>    DSSortEigenvalues_Private(ds,rr,ri,perm,PETSC_FALSE);
+<a name="line130">130: </a>  } <font color="#4169E1">else</font> {
+<a name="line131">131: </a>    DSSortEigenvalues_Private(ds,wr,NULL,perm,PETSC_FALSE);
+<a name="line132">132: </a>  }
+<a name="line133">133: </a>  ds-&gt;t = told;  <font color="#B22222">/* restore value of t */</font>
+<a name="line134">134: </a>  <font color="#4169E1">for</font> (i=l;i&lt;n;i++) A[i+i*ld] = wr[perm[i]];
+<a name="line135">135: </a>  <font color="#4169E1">for</font> (i=l;i&lt;n;i++) wr[i] = A[i+i*ld];
+<a name="line136">136: </a>  <font color="#B22222">/* cannot use DSPermuteColumns_Private() since not all columns are filled */</font>
+<a name="line137">137: </a>  X  = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>];
+<a name="line138">138: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;neig;i++) {
+<a name="line139">139: </a>    p = perm[i];
+<a name="line140">140: </a>    <font color="#4169E1">if</font> (p != i) {
+<a name="line141">141: </a>      j = i + 1;
+<a name="line142">142: </a>      <font color="#4169E1">while</font> (perm[j] != i) j++;
+<a name="line143">143: </a>      perm[j] = p; perm[i] = i;
+<a name="line144">144: </a>      <font color="#B22222">/* swap columns i and j */</font>
+<a name="line145">145: </a>      <font color="#4169E1">for</font> (k=0;k&lt;n;k++) {
+<a name="line146">146: </a>        rtmp  = X[k+p*ld]; X[k+p*ld] = X[k+i*ld]; X[k+i*ld] = rtmp;
+<a name="line147">147: </a>      }
+<a name="line148">148: </a>    }
+<a name="line149">149: </a>  }
+<a name="line150">150: </a>  <font color="#4169E1">return</font>(0);
+<a name="line151">151: </a>}
+
+<a name="line153">153: </a><strong><font color="#4169E1"><a name="DSSolve_NEP_SLP"></a>PetscErrorCode DSSolve_NEP_SLP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar *wr,PetscScalar *wi)</font></strong>
+<a name="line154">154: </a>{
+<a name="line156">156: </a>  DS_NEP         *ctx = (DS_NEP*)ds-&gt;data;
+<a name="line157">157: </a>  PetscScalar    *A,*B,*W,*X,*work,*alpha,*beta;
+<a name="line158">158: </a>  PetscScalar    norm,sigma,lambda,mu,re,re2,sone=1.0,zero=0.0;
+<a name="line159">159: </a>  PetscBLASInt   info,n,ld,lrwork=0,lwork,one=1;
+<a name="line160">160: </a>  PetscInt       it,pos,j,maxit=100,result;
+<a name="line161">161: </a>  PetscReal      tol;
+<a name="line162">162: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line163">163: </a>  PetscReal      *rwork;
+<a name="line164">164: </a><font color="#A020F0">#else</font>
+<a name="line165">165: </a>  PetscReal      *alphai,im,im2;
+<a name="line166">166: </a><font color="#A020F0">#endif</font>
+
+<a name="line169">169: </a>  <font color="#4169E1">if</font> (!ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>]) {
+<a name="line170">170: </a>    DSAllocateMat_Private(ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>);
+<a name="line171">171: </a>  }
+<a name="line172">172: </a>  <font color="#4169E1">if</font> (!ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>]) {
+<a name="line173">173: </a>    DSAllocateMat_Private(ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>);
+<a name="line174">174: </a>  }
+<a name="line175">175: </a>  <font color="#4169E1">if</font> (!ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_W</a>]) {
+<a name="line176">176: </a>    DSAllocateMat_Private(ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_W</a>);
+<a name="line177">177: </a>  }
+<a name="line178">178: </a>  PetscBLASIntCast(ds-&gt;n,&amp;n);
+<a name="line179">179: </a>  PetscBLASIntCast(ds-&gt;ld,&amp;ld);
+<a name="line180">180: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line181">181: </a>  PetscBLASIntCast(2*ds-&gt;n+2*ds-&gt;n,&amp;lwork);
+<a name="line182">182: </a>  PetscBLASIntCast(8*ds-&gt;n,&amp;lrwork);
+<a name="line183">183: </a><font color="#A020F0">#else</font>
+<a name="line184">184: </a>  PetscBLASIntCast(3*ds-&gt;n+8*ds-&gt;n,&amp;lwork);
+<a name="line185">185: </a><font color="#A020F0">#endif</font>
+<a name="line186">186: </a>  DSAllocateWork_Private(ds,lwork,lrwork,0);
+<a name="line187">187: </a>  alpha = ds-&gt;work;
+<a name="line188">188: </a>  beta = ds-&gt;work + ds-&gt;n;
+<a name="line189">189: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line190">190: </a>  work = ds-&gt;work + 2*ds-&gt;n;
+<a name="line191">191: </a>  lwork -= 2*ds-&gt;n;
+<a name="line192">192: </a><font color="#A020F0">#else</font>
+<a name="line193">193: </a>  alphai = ds-&gt;work + 2*ds-&gt;n;
+<a name="line194">194: </a>  work = ds-&gt;work + 3*ds-&gt;n;
+<a name="line195">195: </a>  lwork -= 3*ds-&gt;n;
+<a name="line196">196: </a><font color="#A020F0">#endif</font>
+<a name="line197">197: </a>  A = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>];
+<a name="line198">198: </a>  B = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>];
+<a name="line199">199: </a>  W = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_W</a>];
+<a name="line200">200: </a>  X = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>];
+
+<a name="line202">202: </a>  sigma = 0.0;
+<a name="line203">203: </a>  <font color="#4169E1">if</font> (ds-&gt;sc-&gt;comparison==SlepcCompareTargetMagnitude || ds-&gt;sc-&gt;comparison==SlepcCompareTargetReal) sigma = *(PetscScalar*)ds-&gt;sc-&gt;comparisonctx;
+<a name="line204">204: </a>  lambda = sigma;
+<a name="line205">205: </a>  tol = 1000*n*PETSC_MACHINE_EPSILON;
+
+<a name="line207">207: </a>  <font color="#4169E1">for</font> (it=0;it&lt;maxit;it++) {
+
+<a name="line209">209: </a>    <font color="#B22222">/* evaluate T and T' */</font>
+<a name="line210">210: </a>    DSNEPComputeMatrix(ds,lambda,PETSC_FALSE,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>);
+<a name="line211">211: </a>    <font color="#4169E1">if</font> (it) {
+<a name="line212">212: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;sone,A,&amp;ld,X,&amp;one,&amp;zero,X+ld,&amp;one));
+<a name="line213">213: </a>      norm = BLASnrm2_(&amp;n,X+ld,&amp;one);
+<a name="line214">214: </a>      <font color="#4169E1">if</font> (PetscRealPart(norm)/PetscAbsScalar(lambda)&lt;=tol) <font color="#4169E1">break</font>;
+<a name="line215">215: </a>    }
+<a name="line216">216: </a>    DSNEPComputeMatrix(ds,lambda,PETSC_TRUE,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>);
+
+<a name="line218">218: </a>    <font color="#B22222">/* compute eigenvalue correction mu and eigenvector u */</font>
+<a name="line219">219: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line220">220: </a>    rwork = ds-&gt;rwork;
+<a name="line221">221: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKggev"</font>,LAPACKggev_(<font color="#666666">"N"</font>,<font color="#666666">"V"</font>,&amp;n,A,&amp;ld,B,&amp;ld,alpha,beta,NULL,&amp;ld,W,&amp;ld,work,&amp;lwork,rwork,&amp;info));
+<a name="line222">222: </a><font color="#A020F0">#else</font>
+<a name="line223">223: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKggev"</font>,LAPACKggev_(<font color="#666666">"N"</font>,<font color="#666666">"V"</font>,&amp;n,A,&amp;ld,B,&amp;ld,alpha,alphai,beta,NULL,&amp;ld,W,&amp;ld,work,&amp;lwork,&amp;info));
+<a name="line224">224: </a><font color="#A020F0">#endif</font>
+<a name="line225">225: </a>    SlepcCheckLapackInfo(<font color="#666666">"ggev"</font>,info);
+
+<a name="line227">227: </a>    <font color="#B22222">/* find smallest eigenvalue */</font>
+<a name="line228">228: </a>    j = 0;
+<a name="line229">229: </a>    <font color="#4169E1">if</font> (beta[j]==0.0) re = (PetscRealPart(alpha[j])&gt;0.0)? PETSC_MAX_REAL: PETSC_MIN_REAL;
+<a name="line230">230: </a>    <font color="#4169E1">else</font> re = alpha[j]/beta[j];
+<a name="line231">231: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line232">232: </a>    <font color="#4169E1">if</font> (beta[j]==0.0) im = (alphai[j]&gt;0.0)? PETSC_MAX_REAL: PETSC_MIN_REAL;
+<a name="line233">233: </a>    <font color="#4169E1">else</font> im = alphai[j]/beta[j];
+<a name="line234">234: </a><font color="#A020F0">#endif</font>
+<a name="line235">235: </a>    pos = 0;
+<a name="line236">236: </a>    <font color="#4169E1">for</font> (j=1;j&lt;n;j++) {
+<a name="line237">237: </a>      <font color="#4169E1">if</font> (beta[j]==0.0) re2 = (PetscRealPart(alpha[j])&gt;0.0)? PETSC_MAX_REAL: PETSC_MIN_REAL;
+<a name="line238">238: </a>      <font color="#4169E1">else</font> re2 = alpha[j]/beta[j];
+<a name="line239">239: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line240">240: </a>      <font color="#4169E1">if</font> (beta[j]==0.0) im2 = (alphai[j]&gt;0.0)? PETSC_MAX_REAL: PETSC_MIN_REAL;
+<a name="line241">241: </a>      <font color="#4169E1">else</font> im2 = alphai[j]/beta[j];
+<a name="line242">242: </a>      SlepcCompareSmallestMagnitude(re,im,re2,im2,&amp;result,NULL);
+<a name="line243">243: </a><font color="#A020F0">#else</font>
+<a name="line244">244: </a>      SlepcCompareSmallestMagnitude(re,0.0,re2,0.0,&amp;result,NULL);
+<a name="line245">245: </a><font color="#A020F0">#endif</font>
+<a name="line246">246: </a>      <font color="#4169E1">if</font> (result &gt; 0) {
+<a name="line247">247: </a>        re = re2;
+<a name="line248">248: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line249">249: </a>        im = im2;
+<a name="line250">250: </a><font color="#A020F0">#endif</font>
+<a name="line251">251: </a>        pos = j;
+<a name="line252">252: </a>      }
+<a name="line253">253: </a>    }
+
+<a name="line255">255: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line256">256: </a>    <font color="#4169E1">if</font> (im!=0.0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,<font color="#666666">"DSNEP found a complex eigenvalue; try rerunning with complex scalars"</font>);
+<a name="line257">257: </a><font color="#A020F0">#endif</font>
+<a name="line258">258: </a>    mu = alpha[pos]/beta[pos];
+<a name="line259">259: </a>    PetscArraycpy(X,W+pos*ld,n);
+<a name="line260">260: </a>    norm = BLASnrm2_(&amp;n,X,&amp;one);
+<a name="line261">261: </a>    norm = 1.0/norm;
+<a name="line262">262: </a>    PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;n,&amp;norm,X,&amp;one));
+
+<a name="line264">264: </a>    <font color="#B22222">/* correct eigenvalue approximation */</font>
+<a name="line265">265: </a>    lambda = lambda - mu;
+<a name="line266">266: </a>  }
+
+<a name="line268">268: </a>  <font color="#4169E1">if</font> (it==maxit) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_CONV_FAILED,<font color="#666666">"DSNEP did not converge"</font>);
+<a name="line269">269: </a>  ctx-&gt;neig = 1;
+<a name="line270">270: </a>  wr[0] = lambda;
+<a name="line271">271: </a>  <font color="#4169E1">if</font> (wi) wi[0] = 0.0;
+<a name="line272">272: </a>  <font color="#4169E1">return</font>(0);
+<a name="line273">273: </a>}
+
+<a name="line275">275: </a><strong><font color="#4169E1"><a name="DSSynchronize_NEP"></a>PetscErrorCode DSSynchronize_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar eigr[],PetscScalar eigi[])</font></strong>
+<a name="line276">276: </a>{
+<a name="line278">278: </a>  PetscInt       k=0;
+<a name="line279">279: </a>  PetscMPIInt    n,rank,size,off=0;
+
+<a name="line282">282: </a>  <font color="#4169E1">if</font> (ds-&gt;state&gt;=<a href="../../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_CONDENSED</a>) k += ds-&gt;n;
+<a name="line283">283: </a>  <font color="#4169E1">if</font> (eigr) k += 1;
+<a name="line284">284: </a>  <font color="#4169E1">if</font> (eigi) k += 1;
+<a name="line285">285: </a>  DSAllocateWork_Private(ds,k,0,0);
+<a name="line286">286: </a>  PetscMPIIntCast(k*<font color="#4169E1">sizeof</font>(PetscScalar),&amp;size);
+<a name="line287">287: </a>  PetscMPIIntCast(ds-&gt;n,&amp;n);
+<a name="line288">288: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)ds),&amp;rank);
+<a name="line289">289: </a>  <font color="#4169E1">if</font> (!rank) {
+<a name="line290">290: </a>    <font color="#4169E1">if</font> (ds-&gt;state&gt;=<a href="../../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_CONDENSED</a>) {
+<a name="line291">291: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Pack.html#MPI_Pack">MPI_Pack</a>(ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>],n,MPIU_SCALAR,ds-&gt;work,size,&amp;off,PetscObjectComm((PetscObject)ds));
+<a name="line292">292: </a>    }
+<a name="line293">293: </a>    <font color="#4169E1">if</font> (eigr) {
+<a name="line294">294: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Pack.html#MPI_Pack">MPI_Pack</a>(eigr,1,MPIU_SCALAR,ds-&gt;work,size,&amp;off,PetscObjectComm((PetscObject)ds));
+<a name="line295">295: </a>    }
+<a name="line296">296: </a>    <font color="#4169E1">if</font> (eigi) {
+<a name="line297">297: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Pack.html#MPI_Pack">MPI_Pack</a>(eigi,1,MPIU_SCALAR,ds-&gt;work,size,&amp;off,PetscObjectComm((PetscObject)ds));
+<a name="line298">298: </a>    }
+<a name="line299">299: </a>  }
+<a name="line300">300: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(ds-&gt;work,size,MPI_BYTE,0,PetscObjectComm((PetscObject)ds));
+<a name="line301">301: </a>  <font color="#4169E1">if</font> (rank) {
+<a name="line302">302: </a>    <font color="#4169E1">if</font> (ds-&gt;state&gt;=<a href="../../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_CONDENSED</a>) {
+<a name="line303">303: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Unpack.html#MPI_Unpack">MPI_Unpack</a>(ds-&gt;work,size,&amp;off,ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>],n,MPIU_SCALAR,PetscObjectComm((PetscObject)ds));
+<a name="line304">304: </a>    }
+<a name="line305">305: </a>    <font color="#4169E1">if</font> (eigr) {
+<a name="line306">306: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Unpack.html#MPI_Unpack">MPI_Unpack</a>(ds-&gt;work,size,&amp;off,eigr,1,MPIU_SCALAR,PetscObjectComm((PetscObject)ds));
+<a name="line307">307: </a>    }
+<a name="line308">308: </a>    <font color="#4169E1">if</font> (eigi) {
+<a name="line309">309: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Unpack.html#MPI_Unpack">MPI_Unpack</a>(ds-&gt;work,size,&amp;off,eigi,1,MPIU_SCALAR,PetscObjectComm((PetscObject)ds));
+<a name="line310">310: </a>    }
+<a name="line311">311: </a>  }
+<a name="line312">312: </a>  <font color="#4169E1">return</font>(0);
+<a name="line313">313: </a>}
+
+<a name="line315">315: </a><strong><font color="#4169E1"><a name="DSNEPSetFN_NEP"></a>static PetscErrorCode DSNEPSetFN_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt n,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn[])</font></strong>
+<a name="line316">316: </a>{
+<a name="line318">318: </a>  DS_NEP         *ctx = (DS_NEP*)ds-&gt;data;
+<a name="line319">319: </a>  PetscInt       i;
+
+<a name="line322">322: </a>  <font color="#4169E1">if</font> (n&lt;=0) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Must have one or more functions, you have %D"</font>,n);
+<a name="line323">323: </a>  <font color="#4169E1">if</font> (n&gt;DS_NUM_EXTRA) SETERRQ2(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Too many functions, you specified %D but the limit is %D"</font>,n,DS_NUM_EXTRA);
+<a name="line324">324: </a>  <font color="#4169E1">if</font> (ds-&gt;ld) { PetscInfo(ds,<font color="#666666">"<a href="../../../../../../docs/manualpages/DS/DSNEPSetFN.html#DSNEPSetFN">DSNEPSetFN</a>() called after <a href="../../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>()\n"</font>); }
+<a name="line325">325: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line326">326: </a>    PetscObjectReference((PetscObject)fn[i]);
+<a name="line327">327: </a>  }
+<a name="line328">328: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;nf;i++) {
+<a name="line329">329: </a>    <a href="../../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;ctx-&gt;f[i]);
+<a name="line330">330: </a>  }
+<a name="line331">331: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) ctx-&gt;f[i] = fn[i];
+<a name="line332">332: </a>  ctx-&gt;nf = n;
+<a name="line333">333: </a>  <font color="#4169E1">return</font>(0);
+<a name="line334">334: </a>}
+
+<a name="line336">336: </a><font color="#B22222">/*@</font>
+<a name="line337">337: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/DS/DSNEPSetFN.html#DSNEPSetFN">DSNEPSetFN</a> - Sets a number of functions that define the nonlinear</font>
+<a name="line338">338: </a><font color="#B22222">   eigenproblem.</font>
+
+<a name="line340">340: </a><font color="#B22222">   Collective on ds</font>
+
+<a name="line342">342: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line343">343: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line344">344: </a><font color="#B22222">.  n  - number of functions</font>
+<a name="line345">345: </a><font color="#B22222">-  fn - array of functions</font>
+
+<a name="line347">347: </a><font color="#B22222">   Notes:</font>
+<a name="line348">348: </a><font color="#B22222">   The nonlinear eigenproblem is defined in terms of the split nonlinear</font>
+<a name="line349">349: </a><font color="#B22222">   operator T(lambda) = sum_i A_i*f_i(lambda).</font>
+
+<a name="line351">351: </a><font color="#B22222">   This function must be called before <a href="../../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(). Then <a href="../../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>()</font>
+<a name="line352">352: </a><font color="#B22222">   will allocate an extra matrix A_i per each function, that can be</font>
+<a name="line353">353: </a><font color="#B22222">   filled in the usual way.</font>
+
+<a name="line355">355: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line357">357: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/DS/DSNEPGetFN.html#DSNEPGetFN">DSNEPGetFN</a>(), <a href="../../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>()</font>
+<a name="line358">358: </a><font color="#B22222"> @*/</font>
+<a name="line359">359: </a><strong><font color="#4169E1"><a name="DSNEPSetFN"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/DS/DSNEPSetFN.html#DSNEPSetFN">DSNEPSetFN</a>(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt n,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> fn[])</font></strong>
+<a name="line360">360: </a>{
+<a name="line361">361: </a>  PetscInt       i;
+
+<a name="line368">368: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line371">371: </a>  }
+<a name="line372">372: </a>  PetscTryMethod(ds,<font color="#666666">"DSNEPSetFN_C"</font>,(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscInt,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>[]),(ds,n,fn));
+<a name="line373">373: </a>  <font color="#4169E1">return</font>(0);
+<a name="line374">374: </a>}
+
+<a name="line376">376: </a><strong><font color="#4169E1"><a name="DSNEPGetFN_NEP"></a>static PetscErrorCode DSNEPGetFN_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt k,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *fn)</font></strong>
+<a name="line377">377: </a>{
+<a name="line378">378: </a>  DS_NEP *ctx = (DS_NEP*)ds-&gt;data;
+
+<a name="line381">381: </a>  <font color="#4169E1">if</font> (k&lt;0 || k&gt;=ctx-&gt;nf) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"k must be between 0 and %D"</font>,ctx-&gt;nf-1);
+<a name="line382">382: </a>  *fn = ctx-&gt;f[k];
+<a name="line383">383: </a>  <font color="#4169E1">return</font>(0);
+<a name="line384">384: </a>}
+
+<a name="line386">386: </a><font color="#B22222">/*@</font>
+<a name="line387">387: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/DS/DSNEPGetFN.html#DSNEPGetFN">DSNEPGetFN</a> - Gets the functions associated with the nonlinear <a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>.</font>
+
+<a name="line389">389: </a><font color="#B22222">   Not collective, though parallel FNs are returned if the <a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> is parallel</font>
+
+<a name="line391">391: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line392">392: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line393">393: </a><font color="#B22222">-  k  - the index of the requested function (starting in 0)</font>
+
+<a name="line395">395: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line396">396: </a><font color="#B22222">.  fn - the function</font>
+
+<a name="line398">398: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line400">400: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/DS/DSNEPSetFN.html#DSNEPSetFN">DSNEPSetFN</a>()</font>
+<a name="line401">401: </a><font color="#B22222">@*/</font>
+<a name="line402">402: </a><strong><font color="#4169E1"><a name="DSNEPGetFN"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/DS/DSNEPGetFN.html#DSNEPGetFN">DSNEPGetFN</a>(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt k,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a> *fn)</font></strong>
+<a name="line403">403: </a>{
+
+<a name="line409">409: </a>  PetscUseMethod(ds,<font color="#666666">"DSNEPGetFN_C"</font>,(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscInt,<a href="../../../../../../docs/manualpages/FN/FN.html#FN">FN</a>*),(ds,k,fn));
+<a name="line410">410: </a>  <font color="#4169E1">return</font>(0);
+<a name="line411">411: </a>}
+
+<a name="line413">413: </a><strong><font color="#4169E1"><a name="DSNEPGetNumFN_NEP"></a>static PetscErrorCode DSNEPGetNumFN_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt *n)</font></strong>
+<a name="line414">414: </a>{
+<a name="line415">415: </a>  DS_NEP *ctx = (DS_NEP*)ds-&gt;data;
+
+<a name="line418">418: </a>  *n = ctx-&gt;nf;
+<a name="line419">419: </a>  <font color="#4169E1">return</font>(0);
+<a name="line420">420: </a>}
+
+<a name="line422">422: </a><font color="#B22222">/*@</font>
+<a name="line423">423: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/DS/DSNEPGetNumFN.html#DSNEPGetNumFN">DSNEPGetNumFN</a> - Returns the number of functions stored internally by</font>
+<a name="line424">424: </a><font color="#B22222">   the <a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>.</font>
+
+<a name="line426">426: </a><font color="#B22222">   Not collective</font>
+
+<a name="line428">428: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line429">429: </a><font color="#B22222">.  ds - the direct solver context</font>
+
+<a name="line431">431: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line432">432: </a><font color="#B22222">.  n - the number of functions passed in <a href="../../../../../../docs/manualpages/DS/DSNEPSetFN.html#DSNEPSetFN">DSNEPSetFN</a>()</font>
+
+<a name="line434">434: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line436">436: </a><font color="#B22222">.seealso: <a href="../../../../../../docs/manualpages/DS/DSNEPSetFN.html#DSNEPSetFN">DSNEPSetFN</a>()</font>
+<a name="line437">437: </a><font color="#B22222">@*/</font>
+<a name="line438">438: </a><strong><font color="#4169E1"><a name="DSNEPGetNumFN"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/DS/DSNEPGetNumFN.html#DSNEPGetNumFN">DSNEPGetNumFN</a>(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt *n)</font></strong>
+<a name="line439">439: </a>{
+
+<a name="line445">445: </a>  PetscUseMethod(ds,<font color="#666666">"DSNEPGetNumFN_C"</font>,(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscInt*),(ds,n));
+<a name="line446">446: </a>  <font color="#4169E1">return</font>(0);
+<a name="line447">447: </a>}
+
+<a name="line449">449: </a><strong><font color="#4169E1"><a name="DSNEPSetComputeMatrixFunction_NEP"></a>static PetscErrorCode DSNEPSetComputeMatrixFunction_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscErrorCode (*fun)(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscScalar,PetscBool,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a>,void*),void *ctx)</font></strong>
+<a name="line450">450: </a>{
+<a name="line451">451: </a>  DS_NEP *dsctx = (DS_NEP*)ds-&gt;data;
+
+<a name="line454">454: </a>  dsctx-&gt;computematrix    = fun;
+<a name="line455">455: </a>  dsctx-&gt;computematrixctx = ctx;
+<a name="line456">456: </a>  <font color="#4169E1">return</font>(0);
+<a name="line457">457: </a>}
+
+<a name="line459">459: </a><font color="#B22222">/*@</font>
+<a name="line460">460: </a><font color="#B22222">   <a href="../../../../../../docs/manualpages/DS/DSNEPSetComputeMatrixFunction.html#DSNEPSetComputeMatrixFunction">DSNEPSetComputeMatrixFunction</a> - Sets a user-provided subroutine to compute</font>
+<a name="line461">461: </a><font color="#B22222">   the matrices T(lambda) or T'(lambda).</font>
+
+<a name="line463">463: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line465">465: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line466">466: </a><font color="#B22222">+  ds  - the direct solver context</font>
+<a name="line467">467: </a><font color="#B22222">.  fun - a pointer to the user function</font>
+<a name="line468">468: </a><font color="#B22222">-  ctx - a context pointer (the last parameter to the user function)</font>
+
+<a name="line470">470: </a><font color="#B22222">   Calling Sequence of fun:</font>
+<a name="line471">471: </a><font color="#B22222">$   fun(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar lambda,PetscBool deriv,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> mat,void *ctx)</font>
+
+<a name="line473">473: </a><font color="#B22222">+   ds     - the direct solver object</font>
+<a name="line474">474: </a><font color="#B22222">.   lambda - point where T(lambda) or T'(lambda) must be evaluated</font>
+<a name="line475">475: </a><font color="#B22222">.   deriv  - if true compute T'(lambda), otherwise compute T(lambda)</font>
+<a name="line476">476: </a><font color="#B22222">.   mat    - the <a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> matrix where the result must be stored</font>
+<a name="line477">477: </a><font color="#B22222">-   ctx    - optional context, as set by <a href="../../../../../../docs/manualpages/DS/DSNEPSetComputeMatrixFunction.html#DSNEPSetComputeMatrixFunction">DSNEPSetComputeMatrixFunction</a>()</font>
+
+<a name="line479">479: </a><font color="#B22222">   Note:</font>
+<a name="line480">480: </a><font color="#B22222">   The result is computed as T(lambda) = sum_i E_i*f_i(lambda), and similarly</font>
+<a name="line481">481: </a><font color="#B22222">   for the derivative.</font>
+
+<a name="line483">483: </a><font color="#B22222">   Level: developer</font>
+<a name="line484">484: </a><font color="#B22222">@*/</font>
+<a name="line485">485: </a><strong><font color="#4169E1"><a name="DSNEPSetComputeMatrixFunction"></a>PetscErrorCode <a href="../../../../../../docs/manualpages/DS/DSNEPSetComputeMatrixFunction.html#DSNEPSetComputeMatrixFunction">DSNEPSetComputeMatrixFunction</a>(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscErrorCode (*fun)(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscScalar,PetscBool,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a>,void*),void *ctx)</font></strong>
+<a name="line486">486: </a>{
+
+<a name="line491">491: </a>  PetscTryMethod(ds,<font color="#666666">"DSNEPSetComputeMatrixFunction_C"</font>,(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscErrorCode (*)(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a>,PetscScalar,PetscBool,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a>,void*),void*),(ds,fun,ctx));
+<a name="line492">492: </a>  <font color="#4169E1">return</font>(0);
+<a name="line493">493: </a>}
+
+<a name="line495">495: </a><strong><font color="#4169E1"><a name="DSDestroy_NEP"></a>PetscErrorCode DSDestroy_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds)</font></strong>
+<a name="line496">496: </a>{
+<a name="line498">498: </a>  DS_NEP         *ctx = (DS_NEP*)ds-&gt;data;
+<a name="line499">499: </a>  PetscInt       i;
+
+<a name="line502">502: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ctx-&gt;nf;i++) {
+<a name="line503">503: </a>    <a href="../../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(&amp;ctx-&gt;f[i]);
+<a name="line504">504: </a>  }
+<a name="line505">505: </a>  PetscFree(ds-&gt;data);
+<a name="line506">506: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPSetFN_C"</font>,NULL);
+<a name="line507">507: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPGetFN_C"</font>,NULL);
+<a name="line508">508: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPGetNumFN_C"</font>,NULL);
+<a name="line509">509: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPSetComputeMatrixFunction_C"</font>,NULL);
+<a name="line510">510: </a>  <font color="#4169E1">return</font>(0);
+<a name="line511">511: </a>}
+
+<a name="line513">513: </a><strong><font color="#4169E1"><a name="DSCreate_NEP"></a>SLEPC_EXTERN PetscErrorCode DSCreate_NEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds)</font></strong>
+<a name="line514">514: </a>{
+<a name="line515">515: </a>  DS_NEP         *ctx;
+
+<a name="line519">519: </a>  PetscNewLog(ds,&amp;ctx);
+<a name="line520">520: </a>  ds-&gt;data = (void*)ctx;
+
+<a name="line522">522: </a>  ds-&gt;ops-&gt;allocate      = DSAllocate_NEP;
+<a name="line523">523: </a>  ds-&gt;ops-&gt;view          = DSView_NEP;
+<a name="line524">524: </a>  ds-&gt;ops-&gt;vectors       = DSVectors_NEP;
+<a name="line525">525: </a>  ds-&gt;ops-&gt;solve[0]      = DSSolve_NEP_SLP;
+<a name="line526">526: </a>  ds-&gt;ops-&gt;sort          = DSSort_NEP;
+<a name="line527">527: </a>  ds-&gt;ops-&gt;synchronize   = DSSynchronize_NEP;
+<a name="line528">528: </a>  ds-&gt;ops-&gt;destroy       = DSDestroy_NEP;
+<a name="line529">529: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPSetFN_C"</font>,DSNEPSetFN_NEP);
+<a name="line530">530: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPGetFN_C"</font>,DSNEPGetFN_NEP);
+<a name="line531">531: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPGetNumFN_C"</font>,DSNEPGetNumFN_NEP);
+<a name="line532">532: </a>  PetscObjectComposeFunction((PetscObject)ds,<font color="#666666">"DSNEPSetComputeMatrixFunction_C"</font>,DSNEPSetComputeMatrixFunction_NEP);
+<a name="line533">533: </a>  <font color="#4169E1">return</font>(0);
+<a name="line534">534: </a>}
+
+</pre>
+</body>
+
+</html>

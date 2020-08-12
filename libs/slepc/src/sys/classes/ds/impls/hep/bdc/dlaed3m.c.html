@@ -1,0 +1,333 @@
+<center><a href="dlaed3m.c">Actual source code: dlaed3m.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/ds/impls/hep/bdc/dlaed3m.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:40+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/ds/impls/hep/bdc/dlaed3m.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   BDC - Block-divide and conquer (see description in README file)</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../../include/slepc/private/dsimpl.h.html">&lt;slepc/private/dsimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="BDC_dlaed3m_"></a>PetscErrorCode BDC_dlaed3m_(const char *jobz,const char *defl,PetscBLASInt k,PetscBLASInt n,</font></strong>
+<a name="line18"> 18: </a><strong><font color="#4169E1">        PetscBLASInt n1,PetscReal *d,PetscReal *q,PetscBLASInt ldq,</font></strong>
+<a name="line19"> 19: </a><strong><font color="#4169E1">        PetscReal rho,PetscReal *dlamda,PetscReal *q2,PetscBLASInt *indx,</font></strong>
+<a name="line20"> 20: </a><strong><font color="#4169E1">        PetscBLASInt *ctot,PetscReal *w,PetscReal *s,PetscBLASInt *info,</font></strong>
+<a name="line21"> 21: </a><strong><font color="#4169E1">        PetscBLASInt jobz_len,PetscBLASInt defl_len)</font></strong>
+<a name="line22"> 22: </a>{
+<a name="line23"> 23: </a><font color="#B22222">/*  -- Routine written in LAPACK version 3.0 style -- */</font>
+<a name="line24"> 24: </a><font color="#B22222">/* *************************************************** */</font>
+<a name="line25"> 25: </a><font color="#B22222">/*     Written by */</font>
+<a name="line26"> 26: </a><font color="#B22222">/*     Michael Moldaschl and Wilfried Gansterer */</font>
+<a name="line27"> 27: </a><font color="#B22222">/*     University of Vienna */</font>
+<a name="line28"> 28: </a><font color="#B22222">/*     last modification: March 16, 2014 */</font>
+
+<a name="line30"> 30: </a><font color="#B22222">/*     Small adaptations of original code written by */</font>
+<a name="line31"> 31: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line32"> 32: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+<a name="line33"> 33: </a><font color="#B22222">/*     see https://doi.org/10.1137/S1064827501399432 */</font>
+<a name="line34"> 34: </a><font color="#B22222">/* *************************************************** */</font>
+
+<a name="line36"> 36: </a><font color="#B22222">/*  Purpose */</font>
+<a name="line37"> 37: </a><font color="#B22222">/*  ======= */</font>
+
+<a name="line39"> 39: </a><font color="#B22222">/*  DLAED3M finds the roots of the secular equation, as defined by the */</font>
+<a name="line40"> 40: </a><font color="#B22222">/*  values in D, W, and RHO, between 1 and K.  It makes the */</font>
+<a name="line41"> 41: </a><font color="#B22222">/*  appropriate calls to DLAED4 and then updates the eigenvectors by */</font>
+<a name="line42"> 42: </a><font color="#B22222">/*  multiplying the matrix of eigenvectors of the pair of eigensystems */</font>
+<a name="line43"> 43: </a><font color="#B22222">/*  being combined by the matrix of eigenvectors of the K-by-K system */</font>
+<a name="line44"> 44: </a><font color="#B22222">/*  which is solved here. */</font>
+
+<a name="line46"> 46: </a><font color="#B22222">/*  This code makes very mild assumptions about floating point */</font>
+<a name="line47"> 47: </a><font color="#B22222">/*  arithmetic. It will work on machines with a guard digit in */</font>
+<a name="line48"> 48: </a><font color="#B22222">/*  add/subtract, or on those binary machines without guard digits */</font>
+<a name="line49"> 49: </a><font color="#B22222">/*  which subtract like the Cray X-MP, Cray Y-MP, Cray C-90, or Cray-2. */</font>
+<a name="line50"> 50: </a><font color="#B22222">/*  It could conceivably fail on hexadecimal or decimal machines */</font>
+<a name="line51"> 51: </a><font color="#B22222">/*  without guard digits, but we know of none. */</font>
+
+<a name="line53"> 53: </a><font color="#B22222">/*  Arguments */</font>
+<a name="line54"> 54: </a><font color="#B22222">/*  ========= */</font>
+
+<a name="line56"> 56: </a><font color="#B22222">/*  JOBZ    (input) CHARACTER*1 */</font>
+<a name="line57"> 57: </a><font color="#B22222">/*          = 'N':  Do not accumulate eigenvectors (not implemented); */</font>
+<a name="line58"> 58: </a><font color="#B22222">/*          = 'D':  Do accumulate eigenvectors in the divide-and-conquer */</font>
+<a name="line59"> 59: </a><font color="#B22222">/*                  process. */</font>
+
+<a name="line61"> 61: </a><font color="#B22222">/*  DEFL    (input) CHARACTER*1 */</font>
+<a name="line62"> 62: </a><font color="#B22222">/*          = '0':  No deflation happened in DSRTDF */</font>
+<a name="line63"> 63: </a><font color="#B22222">/*          = '1':  Some deflation happened in DSRTDF (and therefore some */</font>
+<a name="line64"> 64: </a><font color="#B22222">/*                  Givens rotations need to be applied to the computed */</font>
+<a name="line65"> 65: </a><font color="#B22222">/*                  eigenvector matrix Q) */</font>
+
+<a name="line67"> 67: </a><font color="#B22222">/*  K       (input) INTEGER */</font>
+<a name="line68"> 68: </a><font color="#B22222">/*          The number of terms in the rational function to be solved by */</font>
+<a name="line69"> 69: </a><font color="#B22222">/*          DLAED4. 0 &lt;= K &lt;= N. */</font>
+
+<a name="line71"> 71: </a><font color="#B22222">/*  N       (input) INTEGER */</font>
+<a name="line72"> 72: </a><font color="#B22222">/*          The number of rows and columns in the Q matrix. */</font>
+<a name="line73"> 73: </a><font color="#B22222">/*          N &gt;= K (deflation may result in N&gt;K). */</font>
+
+<a name="line75"> 75: </a><font color="#B22222">/*  N1      (input) INTEGER */</font>
+<a name="line76"> 76: </a><font color="#B22222">/*          The location of the last eigenvalue in the leading submatrix. */</font>
+<a name="line77"> 77: </a><font color="#B22222">/*          min(1,N) &lt;= N1 &lt;= max(1,N-1). */</font>
+
+<a name="line79"> 79: </a><font color="#B22222">/*  D       (output) DOUBLE PRECISION array, dimension (N) */</font>
+<a name="line80"> 80: </a><font color="#B22222">/*          D(I) contains the updated eigenvalues for */</font>
+<a name="line81"> 81: </a><font color="#B22222">/*          1 &lt;= I &lt;= K. */</font>
+
+<a name="line83"> 83: </a><font color="#B22222">/*  Q       (output) DOUBLE PRECISION array, dimension (LDQ,N) */</font>
+<a name="line84"> 84: </a><font color="#B22222">/*          Initially the first K columns are used as workspace. */</font>
+<a name="line85"> 85: </a><font color="#B22222">/*          On output the columns 1 to K contain */</font>
+<a name="line86"> 86: </a><font color="#B22222">/*          the updated eigenvectors. */</font>
+
+<a name="line88"> 88: </a><font color="#B22222">/*  LDQ     (input) INTEGER */</font>
+<a name="line89"> 89: </a><font color="#B22222">/*          The leading dimension of the array Q.  LDQ &gt;= max(1,N). */</font>
+
+<a name="line91"> 91: </a><font color="#B22222">/*  RHO     (input) DOUBLE PRECISION */</font>
+<a name="line92"> 92: </a><font color="#B22222">/*          The value of the parameter in the rank one update equation. */</font>
+<a name="line93"> 93: </a><font color="#B22222">/*          RHO &gt;= 0 required. */</font>
+
+<a name="line95"> 95: </a><font color="#B22222">/*  DLAMDA  (input/output) DOUBLE PRECISION array, dimension (K) */</font>
+<a name="line96"> 96: </a><font color="#B22222">/*          The first K elements of this array contain the old roots */</font>
+<a name="line97"> 97: </a><font color="#B22222">/*          of the deflated updating problem.  These are the poles */</font>
+<a name="line98"> 98: </a><font color="#B22222">/*          of the secular equation. May be changed on output by */</font>
+<a name="line99"> 99: </a><font color="#B22222">/*          having lowest order bit set to zero on Cray X-MP, Cray Y-MP, */</font>
+<a name="line100">100: </a><font color="#B22222">/*          Cray-2, or Cray C-90, as described above. */</font>
+
+<a name="line102">102: </a><font color="#B22222">/*  Q2      (input) DOUBLE PRECISION array, dimension (LDQ2, N) */</font>
+<a name="line103">103: </a><font color="#B22222">/*          The first K columns of this matrix contain the non-deflated */</font>
+<a name="line104">104: </a><font color="#B22222">/*          eigenvectors for the split problem. */</font>
+
+<a name="line106">106: </a><font color="#B22222">/*  INDX    (input) INTEGER array, dimension (N) */</font>
+<a name="line107">107: </a><font color="#B22222">/*          The permutation used to arrange the columns of the deflated */</font>
+<a name="line108">108: </a><font color="#B22222">/*          Q matrix into three groups (see DLAED2). */</font>
+<a name="line109">109: </a><font color="#B22222">/*          The rows of the eigenvectors found by DLAED4 must be likewise */</font>
+<a name="line110">110: </a><font color="#B22222">/*          permuted before the matrix multiply can take place. */</font>
+
+<a name="line112">112: </a><font color="#B22222">/*  CTOT    (input) INTEGER array, dimension (4) */</font>
+<a name="line113">113: </a><font color="#B22222">/*          A count of the total number of the various types of columns */</font>
+<a name="line114">114: </a><font color="#B22222">/*          in Q, as described in INDX.  The fourth column type is any */</font>
+<a name="line115">115: </a><font color="#B22222">/*          column which has been deflated. */</font>
+
+<a name="line117">117: </a><font color="#B22222">/*  W       (input/output) DOUBLE PRECISION array, dimension (K) */</font>
+<a name="line118">118: </a><font color="#B22222">/*          The first K elements of this array contain the components */</font>
+<a name="line119">119: </a><font color="#B22222">/*          of the deflation-adjusted updating vector. Destroyed on */</font>
+<a name="line120">120: </a><font color="#B22222">/*          output. */</font>
+
+<a name="line122">122: </a><font color="#B22222">/*  S       (workspace) DOUBLE PRECISION array, dimension */</font>
+<a name="line123">123: </a><font color="#B22222">/*          (MAX(CTOT(1)+CTOT(2),CTOT(2)+CTOT(3)) + 1)*K */</font>
+<a name="line124">124: </a><font color="#B22222">/*          Will contain parts of the eigenvectors of the repaired matrix */</font>
+<a name="line125">125: </a><font color="#B22222">/*          which will be multiplied by the previously accumulated */</font>
+<a name="line126">126: </a><font color="#B22222">/*          eigenvectors to update the system. This array is a major */</font>
+<a name="line127">127: </a><font color="#B22222">/*          source of workspace requirements ! */</font>
+
+<a name="line129">129: </a><font color="#B22222">/*  INFO    (output) INTEGER */</font>
+<a name="line130">130: </a><font color="#B22222">/*          = 0:  successful exit. */</font>
+<a name="line131">131: </a><font color="#B22222">/*          &lt; 0:  if INFO = -i, the i-th argument had an illegal value. */</font>
+<a name="line132">132: </a><font color="#B22222">/*          &gt; 0:  if INFO = i, eigenpair i was not computed successfully */</font>
+
+<a name="line134">134: </a><font color="#B22222">/*  Further Details */</font>
+<a name="line135">135: </a><font color="#B22222">/*  =============== */</font>
+
+<a name="line137">137: </a><font color="#B22222">/*  Based on code written by */</font>
+<a name="line138">138: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line139">139: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+<a name="line140">140: </a><font color="#B22222">/*  Based on the design of the LAPACK code DLAED3 with small modifications */</font>
+<a name="line141">141: </a><font color="#B22222">/*  (Note that in contrast to the original DLAED3, this routine */</font>
+<a name="line142">142: </a><font color="#B22222">/*  DOES NOT require that N1 &lt;= N/2) */</font>
+
+<a name="line144">144: </a><font color="#B22222">/*  Based on contributions by */</font>
+<a name="line145">145: </a><font color="#B22222">/*     Jeff Rutter, Computer Science Division, University of California */</font>
+<a name="line146">146: </a><font color="#B22222">/*     at Berkeley, USA */</font>
+<a name="line147">147: </a><font color="#B22222">/*  Modified by Francoise Tisseur, University of Tennessee. */</font>
+
+<a name="line149">149: </a><font color="#B22222">/*  ===================================================================== */</font>
+
+<a name="line151">151: </a>  PetscReal    temp, done = 1.0, dzero = 0.0;
+<a name="line152">152: </a>  PetscBLASInt i, j, n2, n12, ii, n23, iq2, i1, one=1;
+
+<a name="line155">155: </a>  *info = 0;
+
+<a name="line157">157: </a>  <font color="#4169E1">if</font> (k &lt; 0) *info = -3;
+<a name="line158">158: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (n &lt; k) *info = -4;
+<a name="line159">159: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (n1 &lt; PetscMin(1,n) || n1 &gt; PetscMax(1,n)) *info = -5;
+<a name="line160">160: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ldq &lt; PetscMax(1,n)) *info = -8;
+<a name="line161">161: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (rho &lt; 0.) *info = -9;
+<a name="line162">162: </a>  <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Wrong argument %d in DLAED3M"</font>,-(*info));
+
+<a name="line164">164: </a>  <font color="#B22222">/* Quick return if possible */</font>
+
+<a name="line166">166: </a>  <font color="#4169E1">if</font> (k == 0) <font color="#4169E1">return</font>(0);
+
+<a name="line168">168: </a>  <font color="#B22222">/* Modify values DLAMDA(i) to make sure all DLAMDA(i)-DLAMDA(j) can */</font>
+<a name="line169">169: </a>  <font color="#B22222">/* be computed with high relative accuracy (barring over/underflow). */</font>
+<a name="line170">170: </a>  <font color="#B22222">/* This is a problem on machines without a guard digit in */</font>
+<a name="line171">171: </a>  <font color="#B22222">/* add/subtract (Cray XMP, Cray YMP, Cray C 90 and Cray 2). */</font>
+<a name="line172">172: </a>  <font color="#B22222">/* The following code replaces DLAMDA(I) by 2*DLAMDA(I)-DLAMDA(I), */</font>
+<a name="line173">173: </a>  <font color="#B22222">/* which on any of these machines zeros out the bottommost */</font>
+<a name="line174">174: </a>  <font color="#B22222">/* bit of DLAMDA(I) if it is 1; this makes the subsequent */</font>
+<a name="line175">175: </a>  <font color="#B22222">/* subtractions DLAMDA(I)-DLAMDA(J) unproblematic when cancellation */</font>
+<a name="line176">176: </a>  <font color="#B22222">/* occurs. On binary machines with a guard digit (almost all */</font>
+<a name="line177">177: </a>  <font color="#B22222">/* machines) it does not change DLAMDA(I) at all. On hexadecimal */</font>
+<a name="line178">178: </a>  <font color="#B22222">/* and decimal machines with a guard digit, it slightly */</font>
+<a name="line179">179: </a>  <font color="#B22222">/* changes the bottommost bits of DLAMDA(I). It does not account */</font>
+<a name="line180">180: </a>  <font color="#B22222">/* for hexadecimal or decimal machines without guard digits */</font>
+<a name="line181">181: </a>  <font color="#B22222">/* (we know of none). We use a subroutine call to compute */</font>
+<a name="line182">182: </a>  <font color="#B22222">/* 2*DLAMBDA(I) to prevent optimizing compilers from eliminating */</font>
+<a name="line183">183: </a>  <font color="#B22222">/* this code. */</font>
+
+<a name="line185">185: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; k; ++i) {
+<a name="line186">186: </a>    dlamda[i] = LAPACKlamc3_(&amp;dlamda[i], &amp;dlamda[i]) - dlamda[i];
+<a name="line187">187: </a>  }
+
+<a name="line189">189: </a>  <font color="#4169E1">for</font> (j = 1; j &lt;= k; ++j) {
+
+<a name="line191">191: </a>    <font color="#B22222">/* ....calling DLAED4 for eigenpair J.... */</font>
+
+<a name="line193">193: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKlaed4"</font>,LAPACKlaed4_(&amp;k, &amp;j, dlamda, w, &amp;q[(j-1)*ldq], &amp;rho, &amp;d[j-1], info));
+<a name="line194">194: </a>    <font color="#4169E1">if</font> (*info) SETERRQ3(PETSC_COMM_SELF,1,<font color="#666666">"Error in dlaed4, info = %d, failed when computing D(%d)=%g"</font>,*info,j,d[j-1]);
+
+<a name="line196">196: </a>    <font color="#4169E1">if</font> (j &lt; k) {
+
+<a name="line198">198: </a>      <font color="#B22222">/* If the zero finder terminated properly, but the computed */</font>
+<a name="line199">199: </a>      <font color="#B22222">/* eigenvalues are not ordered, issue an error statement */</font>
+<a name="line200">200: </a>      <font color="#B22222">/* but continue computation. */</font>
+
+<a name="line202">202: </a>      <font color="#4169E1">if</font> (dlamda[j-1] &gt;= dlamda[j]) SETERRQ2(PETSC_COMM_SELF,1,<font color="#666666">"DLAMDA(%d) is greater or equal than DLAMDA(%d)"</font>, j, j+1);
+<a name="line203">203: </a>      <font color="#4169E1">if</font> (d[j-1] &lt; dlamda[j-1] || d[j-1] &gt; dlamda[j]) SETERRQ6(PETSC_COMM_SELF,1,<font color="#666666">"DLAMDA(%d) = %g D(%d) = %g DLAMDA(%d) = %g"</font>, j, dlamda[j-1], j, d[j-1], j+1, dlamda[j]);
+<a name="line204">204: </a>    }
+<a name="line205">205: </a>  }
+
+<a name="line207">207: </a>  <font color="#4169E1">if</font> (k == 1) <font color="#4169E1">goto</font> L110;
+
+<a name="line209">209: </a>  <font color="#4169E1">if</font> (k == 2) {
+
+<a name="line211">211: </a>    <font color="#B22222">/* permute the components of Q(:,J) (the information returned by DLAED4 */</font>
+<a name="line212">212: </a>    <font color="#B22222">/* necessary to construct the eigenvectors) according to the permutation */</font>
+<a name="line213">213: </a>    <font color="#B22222">/* stored in INDX, resulting from deflation */</font>
+
+<a name="line215">215: </a>    <font color="#4169E1">for</font> (j = 0; j &lt; k; ++j) {
+<a name="line216">216: </a>      w[0] = q[0+j*ldq];
+<a name="line217">217: </a>      w[1] = q[1+j*ldq];
+<a name="line218">218: </a>      ii = indx[0];
+<a name="line219">219: </a>      q[0+j*ldq] = w[ii-1];
+<a name="line220">220: </a>      ii = indx[1];
+<a name="line221">221: </a>      q[1+j*ldq] = w[ii-1];
+<a name="line222">222: </a>    }
+<a name="line223">223: </a>    <font color="#4169E1">goto</font> L110;
+<a name="line224">224: </a>  }
+
+<a name="line226">226: </a>  <font color="#B22222">/* ....K.GE.3.... */</font>
+<a name="line227">227: </a>  <font color="#B22222">/* Compute updated W (used for computing the eigenvectors corresponding */</font>
+<a name="line228">228: </a>  <font color="#B22222">/* to the previously computed eigenvalues). */</font>
+
+<a name="line230">230: </a>  PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;k, w, &amp;one, s, &amp;one));
+
+<a name="line232">232: </a>  <font color="#B22222">/* Initialize W(I) = Q(I,I) */</font>
+
+<a name="line234">234: </a>  i1 = ldq + 1;
+<a name="line235">235: </a>  PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;k, q, &amp;i1, w, &amp;one));
+<a name="line236">236: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; k; ++j) {
+<a name="line237">237: </a>    <font color="#4169E1">for</font> (i = 0; i &lt; j; ++i) {
+<a name="line238">238: </a>      w[i] *= q[i+j*ldq] / (dlamda[i] - dlamda[j]);
+<a name="line239">239: </a>    }
+<a name="line240">240: </a>    <font color="#4169E1">for</font> (i = j + 1; i &lt; k; ++i) {
+<a name="line241">241: </a>      w[i] *= q[i+j*ldq] / (dlamda[i] - dlamda[j]);
+<a name="line242">242: </a>    }
+<a name="line243">243: </a>  }
+<a name="line244">244: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; k; ++i) {
+<a name="line245">245: </a>    temp = PetscSqrtReal(-w[i]);
+<a name="line246">246: </a>    <font color="#4169E1">if</font> (temp&lt;0) temp = -temp;
+<a name="line247">247: </a>    w[i] =  (s[i] &gt;= 0) ? temp : -temp;
+<a name="line248">248: </a>  }
+
+<a name="line250">250: </a>  <font color="#B22222">/* Compute eigenvectors of the modified rank-1 modification (using the */</font>
+<a name="line251">251: </a>  <font color="#B22222">/* vector W). */</font>
+
+<a name="line253">253: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; k; ++j) {
+<a name="line254">254: </a>    <font color="#4169E1">for</font> (i = 0; i &lt; k; ++i) {
+<a name="line255">255: </a>      s[i] = w[i] / q[i+j*ldq];
+<a name="line256">256: </a>    }
+<a name="line257">257: </a>    temp = BLASnrm2_(&amp;k, s, &amp;one);
+<a name="line258">258: </a>    <font color="#4169E1">for</font> (i = 0; i &lt; k; ++i) {
+
+<a name="line260">260: </a>      <font color="#B22222">/* apply the permutation resulting from deflation as stored */</font>
+<a name="line261">261: </a>      <font color="#B22222">/* in INDX */</font>
+
+<a name="line263">263: </a>      ii = indx[i];
+<a name="line264">264: </a>      q[i+j*ldq] = s[ii-1] / temp;
+<a name="line265">265: </a>    }
+<a name="line266">266: </a>  }
+
+<a name="line268">268: </a><font color="#B22222">/* ************************************************************************** */</font>
+
+<a name="line270">270: </a>  <font color="#B22222">/* ....updating the eigenvectors.... */</font>
+
+<a name="line272">272: </a><strong><font color="#FF0000">L110:</font></strong>
+
+<a name="line274">274: </a>  n2 = n - n1;
+<a name="line275">275: </a>  n12 = ctot[0] + ctot[1];
+<a name="line276">276: </a>  n23 = ctot[1] + ctot[2];
+<a name="line277">277: </a>  <font color="#4169E1">if</font> (*(unsigned char *)jobz == 'D') {
+
+<a name="line279">279: </a>    <font color="#B22222">/* Compute the updated eigenvectors. (NOTE that every call of */</font>
+<a name="line280">280: </a>    <font color="#B22222">/* DGEMM requires three DISTINCT arrays) */</font>
+
+<a name="line282">282: </a>    <font color="#B22222">/* copy Q(CTOT(1)+1:K,1:K) to S */</font>
+
+<a name="line284">284: </a>    <font color="#4169E1">for</font> (j=0;j&lt;k;j++) <font color="#4169E1">for</font> (i=0;i&lt;n23;i++) s[i+j*n23] = q[ctot[0]+i+j*ldq];
+<a name="line285">285: </a>    iq2 = n1 * n12 + 1;
+
+<a name="line287">287: </a>    <font color="#4169E1">if</font> (n23 != 0) {
+
+<a name="line289">289: </a>      <font color="#B22222">/* multiply the second part of Q2 (the eigenvectors of the */</font>
+<a name="line290">290: </a>      <font color="#B22222">/* lower block) with S and write the result into the lower part of */</font>
+<a name="line291">291: </a>      <font color="#B22222">/* Q, i.e., Q(N1+1:N,1:K) */</font>
+
+<a name="line293">293: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>, <font color="#666666">"N"</font>, &amp;n2, &amp;k, &amp;n23, &amp;done,
+<a name="line294">294: </a>                  &amp;q2[iq2-1], &amp;n2, s, &amp;n23, &amp;dzero, &amp;q[n1], &amp;ldq));
+<a name="line295">295: </a>    } <font color="#4169E1">else</font> {
+<a name="line296">296: </a>      <font color="#4169E1">for</font> (j=0;j&lt;k;j++) <font color="#4169E1">for</font> (i=0;i&lt;n2;i++) q[n1+i+j*ldq] = 0.0;
+<a name="line297">297: </a>    }
+
+<a name="line299">299: </a>    <font color="#B22222">/* copy Q(1:CTOT(1)+CTOT(2),1:K) to S */</font>
+
+<a name="line301">301: </a>    <font color="#4169E1">for</font> (j=0;j&lt;k;j++) <font color="#4169E1">for</font> (i=0;i&lt;n12;i++) s[i+j*n12] = q[i+j*ldq];
+
+<a name="line303">303: </a>    <font color="#4169E1">if</font> (n12 != 0) {
+
+<a name="line305">305: </a>      <font color="#B22222">/* multiply the first part of Q2 (the eigenvectors of the */</font>
+<a name="line306">306: </a>      <font color="#B22222">/* upper block) with S and write the result into the upper part of */</font>
+<a name="line307">307: </a>      <font color="#B22222">/* Q, i.e., Q(1:N1,1:K) */</font>
+
+<a name="line309">309: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>, <font color="#666666">"N"</font>, &amp;n1, &amp;k, &amp;n12, &amp;done,
+<a name="line310">310: </a>                  q2, &amp;n1, s, &amp;n12, &amp;dzero, q, &amp;ldq));
+<a name="line311">311: </a>    } <font color="#4169E1">else</font> {
+<a name="line312">312: </a>      <font color="#4169E1">for</font> (j=0;j&lt;k;j++) <font color="#4169E1">for</font> (i=0;i&lt;n1;i++) q[i+j*ldq] = 0.0;
+<a name="line313">313: </a>    }
+<a name="line314">314: </a>  }
+<a name="line315">315: </a>  <font color="#4169E1">return</font>(0);
+<a name="line316">316: </a>}
+
+</pre>
+</body>
+
+</html>

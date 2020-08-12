@@ -1,0 +1,318 @@
+<center><a href="ks-twosided.c">Actual source code: ks-twosided.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/krylov/krylovschur/ks-twosided.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:52+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/krylov/krylovschur/ks-twosided.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "krylovschur"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Two-sided Arnoldi with Krylov-Schur restart (for left eigenvectors)</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   References:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       [1] I.N. Zwaan and M.E. Hochstenbach, "Krylov-Schur-type restarts</font>
+<a name="line18"> 18: </a><font color="#B22222">           for the two-sided Arnoldi method", SIAM J. Matrix Anal. Appl.</font>
+<a name="line19"> 19: </a><font color="#B22222">           38(2):297-321, 2017.</font>
+
+<a name="line21"> 21: </a><font color="#B22222">*/</font>
+
+<a name="line23"> 23: </a> #include <A href="../../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line24"> 24: </a><font color="#A020F0">#include </font><font color="#666666">"krylovschur.h"</font><font color="#A020F0"></font>
+<a name="line25"> 25: </a> #include <A href="../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line27"> 27: </a><strong><font color="#4169E1"><a name="EPSTwoSidedRQUpdate1"></a>static PetscErrorCode EPSTwoSidedRQUpdate1(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,Mat M,PetscInt nv)</font></strong>
+<a name="line28"> 28: </a>{
+<a name="line30"> 30: </a>  PetscScalar    *T,*S,*A,*w,*pM,beta;
+<a name="line31"> 31: </a>  Vec            u;
+<a name="line32"> 32: </a>  PetscInt       ld,ncv=eps-&gt;ncv,i,l,nnv;
+<a name="line33"> 33: </a>  PetscBLASInt   info,n_,ncv_,*p,one=1;
+
+<a name="line36"> 36: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(eps-&gt;ds,&amp;ld);
+<a name="line37"> 37: </a>  PetscMalloc3(nv,&amp;p,ncv*ncv,&amp;A,ncv,&amp;w);
+<a name="line38"> 38: </a>  <a href="../../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(eps-&gt;V,&amp;l,&amp;nnv);
+<a name="line39"> 39: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,nv);
+<a name="line40"> 40: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;W,0,nv);
+<a name="line41"> 41: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,nv,&amp;u);
+<a name="line42"> 42: </a>  <a href="../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(eps-&gt;W,u,w);
+<a name="line43"> 43: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,nv,&amp;u);
+<a name="line44"> 44: </a>  MatDenseGetArray(M,&amp;pM);
+<a name="line45"> 45: </a>  PetscArraycpy(A,pM,ncv*ncv);
+<a name="line46"> 46: </a>  PetscBLASIntCast(nv,&amp;n_);
+<a name="line47"> 47: </a>  PetscBLASIntCast(ncv,&amp;ncv_);
+<a name="line48"> 48: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgetrf"</font>,LAPACKgetrf_(&amp;n_,&amp;n_,A,&amp;ncv_,p,&amp;info));
+<a name="line49"> 49: </a>  SlepcCheckLapackInfo(<font color="#666666">"getrf"</font>,info);
+<a name="line50"> 50: </a>  PetscLogFlops(2.0*n_*n_*n_/3.0);
+<a name="line51"> 51: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgetrs"</font>,LAPACKgetrs_(<font color="#666666">"N"</font>,&amp;n_,&amp;one,A,&amp;ncv_,p,w,&amp;ncv_,&amp;info));
+<a name="line52"> 52: </a>  SlepcCheckLapackInfo(<font color="#666666">"getrs"</font>,info);
+<a name="line53"> 53: </a>  PetscLogFlops(2.0*n_*n_-n_);
+<a name="line54"> 54: </a>  <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(eps-&gt;V,-1.0,1.0,nv,w);
+<a name="line55"> 55: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line56"> 56: </a>  beta = S[(nv-1)*ld+nv];
+<a name="line57"> 57: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nv;i++) S[(nv-1)*ld+i] += beta*w[i];
+<a name="line58"> 58: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line59"> 59: </a>  <a href="../../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;W,nv,&amp;u);
+<a name="line60"> 60: </a>  <a href="../../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(eps-&gt;V,u,w);
+<a name="line61"> 61: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;W,nv,&amp;u);
+<a name="line62"> 62: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgetrs"</font>,LAPACKgetrs_(<font color="#666666">"C"</font>,&amp;n_,&amp;one,A,&amp;ncv_,p,w,&amp;ncv_,&amp;info));
+<a name="line63"> 63: </a>  <a href="../../../../../docs/manualpages/BV/BVMultColumn.html#BVMultColumn">BVMultColumn</a>(eps-&gt;W,-1.0,1.0,nv,w);
+<a name="line64"> 64: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;T);
+<a name="line65"> 65: </a>  beta = T[(nv-1)*ld+nv];
+<a name="line66"> 66: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nv;i++) T[(nv-1)*ld+i] += beta*w[i];
+<a name="line67"> 67: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;T);
+<a name="line68"> 68: </a>  PetscFree3(p,A,w);
+<a name="line69"> 69: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,l,nnv);
+<a name="line70"> 70: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;W,l,nnv);
+<a name="line71"> 71: </a>  <font color="#4169E1">return</font>(0);
+<a name="line72"> 72: </a>}
+
+<a name="line74"> 74: </a><strong><font color="#4169E1"><a name="EPSTwoSidedRQUpdate2"></a>static PetscErrorCode EPSTwoSidedRQUpdate2(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,Mat M,PetscInt k)</font></strong>
+<a name="line75"> 75: </a>{
+<a name="line77"> 77: </a>  PetscScalar    *Q,*pM,*w,zero=0.0,sone=1.0,*c,*A;
+<a name="line78"> 78: </a>  PetscBLASInt   n_,ncv_,ld_;
+<a name="line79"> 79: </a>  PetscReal      norm;
+<a name="line80"> 80: </a>  PetscInt       l,nv,ncv=eps-&gt;ncv,ld,i,j;
+
+<a name="line83"> 83: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(eps-&gt;ds,&amp;ld);
+<a name="line84"> 84: </a>  <a href="../../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(eps-&gt;V,&amp;l,&amp;nv);
+<a name="line85"> 85: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,nv);
+<a name="line86"> 86: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;W,0,nv);
+<a name="line87"> 87: </a>  PetscMalloc2(ncv*ncv,&amp;w,ncv,&amp;c);
+<a name="line88"> 88: </a>  <font color="#B22222">/* u = u - V*V'*u */</font>
+<a name="line89"> 89: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(eps-&gt;V,k,c,&amp;norm,NULL);
+<a name="line90"> 90: </a>  <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;V,k,1.0/norm);
+<a name="line91"> 91: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line92"> 92: </a>  <font color="#B22222">/* H = H + V'*u*b' */</font>
+<a name="line93"> 93: </a>  <font color="#4169E1">for</font> (j=l;j&lt;k;j++) {
+<a name="line94"> 94: </a>    <font color="#4169E1">for</font> (i=0;i&lt;k;i++) A[i+j*ld] += c[i]*A[k+j*ld];
+<a name="line95"> 95: </a>    A[k+j*ld] *= norm;
+<a name="line96"> 96: </a>  }
+<a name="line97"> 97: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line98"> 98: </a>  <a href="../../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(eps-&gt;W,k,c,&amp;norm,NULL);
+<a name="line99"> 99: </a>  <a href="../../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;W,k,1.0/norm);
+<a name="line100">100: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line101">101: </a>  <font color="#B22222">/* H = H + V'*u*b' */</font>
+<a name="line102">102: </a>  <font color="#4169E1">for</font> (j=l;j&lt;k;j++) {
+<a name="line103">103: </a>    <font color="#4169E1">for</font> (i=0;i&lt;k;i++) A[i+j*ld] += c[i]*A[k+j*ld];
+<a name="line104">104: </a>    A[k+j*ld] *= norm;
+<a name="line105">105: </a>  }
+<a name="line106">106: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+
+<a name="line108">108: </a>  <font color="#B22222">/* M = Q'*M*Q */</font>
+<a name="line109">109: </a>  MatDenseGetArray(M,&amp;pM);
+<a name="line110">110: </a>  PetscBLASIntCast(ncv,&amp;ncv_);
+<a name="line111">111: </a>  PetscBLASIntCast(nv,&amp;n_);
+<a name="line112">112: </a>  PetscBLASIntCast(ld,&amp;ld_);
+<a name="line113">113: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line114">114: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;sone,pM,&amp;ncv_,Q,&amp;ld_,&amp;zero,w,&amp;ncv_));
+<a name="line115">115: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line116">116: </a>  <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line117">117: </a>  PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;sone,Q,&amp;ld_,w,&amp;ncv_,&amp;zero,pM,&amp;ncv_));
+<a name="line118">118: </a>  <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line119">119: </a>  PetscFree2(w,c);
+<a name="line120">120: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,l,nv);
+<a name="line121">121: </a>  <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;W,l,nv);
+<a name="line122">122: </a>  <font color="#4169E1">return</font>(0);
+<a name="line123">123: </a>}
+
+<a name="line125">125: </a><strong><font color="#4169E1"><a name="EPSSolve_KrylovSchur_TwoSided"></a>PetscErrorCode EPSSolve_KrylovSchur_TwoSided(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line126">126: </a>{
+<a name="line127">127: </a>  PetscErrorCode  ierr;
+<a name="line128">128: </a>  EPS_KRYLOVSCHUR *ctx = (EPS_KRYLOVSCHUR*)eps-&gt;data;
+<a name="line129">129: </a>  Mat             M,U,Op,OpHT;
+<a name="line130">130: </a>  PetscReal       norm,norm2,beta,betat,s,t;
+<a name="line131">131: </a>  PetscScalar     *pM,*S,*T,*eigr,*eigi,*Q;
+<a name="line132">132: </a>  PetscInt        ld,l,nv,nvt,ncv=eps-&gt;ncv,i,j,k,nconv,*p,cont,*idx,*idx2,id=0;
+<a name="line133">133: </a>  PetscBool       breakdownt,breakdown,breakdownl;
+<a name="line134">134: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line135">135: </a>  Mat             A;
+<a name="line136">136: </a><font color="#A020F0">#endif</font>
+
+<a name="line139">139: </a>  <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(eps-&gt;ds,&amp;ld);
+<a name="line140">140: </a>  EPSGetStartVector(eps,0,NULL);
+<a name="line141">141: </a>  EPSGetLeftStartVector(eps,0,NULL);
+<a name="line142">142: </a>  l = 0;
+<a name="line143">143: </a>  PetscMalloc6(ncv*ncv,&amp;pM,ncv,&amp;eigr,ncv,&amp;eigi,ncv,&amp;idx,ncv,&amp;idx2,ncv,&amp;p);
+<a name="line144">144: </a>  MatCreateSeqDense(PETSC_COMM_SELF,eps-&gt;ncv,eps-&gt;ncv,pM,&amp;M);
+
+<a name="line146">146: </a>  <a href="../../../../../docs/manualpages/ST/STGetOperator.html#STGetOperator">STGetOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line147">147: </a>  MatCreateHermitianTranspose(Op,&amp;OpHT);
+
+<a name="line149">149: </a>  <font color="#B22222">/* Restart loop */</font>
+<a name="line150">150: </a>  <font color="#4169E1">while</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+<a name="line151">151: </a>    eps-&gt;its++;
+
+<a name="line153">153: </a>    <font color="#B22222">/* Compute an nv-step Arnoldi factorization for Op */</font>
+<a name="line154">154: </a>    nv = PetscMin(eps-&gt;nconv+eps-&gt;mpd,eps-&gt;ncv);
+<a name="line155">155: </a>    <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line156">156: </a>    <a href="../../../../../docs/manualpages/BV/BVMatArnoldi.html#BVMatArnoldi">BVMatArnoldi</a>(eps-&gt;V,Op,S,ld,eps-&gt;nconv+l,&amp;nv,&amp;beta,&amp;breakdown);
+<a name="line157">157: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+
+<a name="line159">159: </a>    <font color="#B22222">/* Compute an nv-step Arnoldi factorization for Op' */</font>
+<a name="line160">160: </a>    nvt = nv;
+<a name="line161">161: </a>    <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;T);
+<a name="line162">162: </a>    <a href="../../../../../docs/manualpages/BV/BVMatArnoldi.html#BVMatArnoldi">BVMatArnoldi</a>(eps-&gt;W,OpHT,T,ld,eps-&gt;nconv+l,&amp;nvt,&amp;betat,&amp;breakdownt);
+<a name="line163">163: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;T);
+
+<a name="line165">165: </a>    <font color="#B22222">/* Make sure both factorizations have the same length */</font>
+<a name="line166">166: </a>    nv = PetscMin(nv,nvt);
+<a name="line167">167: </a>    <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,nv,0,eps-&gt;nconv,eps-&gt;nconv+l);
+<a name="line168">168: </a>    <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;dsts,nv,0,eps-&gt;nconv,eps-&gt;nconv+l);
+<a name="line169">169: </a>    <font color="#4169E1">if</font> (l==0) {
+<a name="line170">170: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>);
+<a name="line171">171: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>);
+<a name="line172">172: </a>    } <font color="#4169E1">else</font> {
+<a name="line173">173: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line174">174: </a>      <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line175">175: </a>    }
+<a name="line176">176: </a>    breakdown = (breakdown || breakdownt)? PETSC_TRUE: PETSC_FALSE;
+
+<a name="line178">178: </a>    <font color="#B22222">/* Update M, modify Rayleigh quotients S and T */</font>
+<a name="line179">179: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,eps-&gt;nconv+l,nv);
+<a name="line180">180: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;W,eps-&gt;nconv+l,nv);
+<a name="line181">181: </a>    <a href="../../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(eps-&gt;V,NULL,eps-&gt;W,M);
+
+<a name="line183">183: </a>    EPSTwoSidedRQUpdate1(eps,M,nv);
+
+<a name="line185">185: </a>    <font color="#B22222">/* Solve projected problem */</font>
+<a name="line186">186: </a>    <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;ds,eps-&gt;eigr,eps-&gt;eigi);
+<a name="line187">187: </a>    <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;ds,eps-&gt;eigr,eps-&gt;eigi,NULL,NULL,NULL);
+<a name="line188">188: </a>    <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;ds,eps-&gt;eigr,eps-&gt;eigi);
+<a name="line189">189: </a>    <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(eps-&gt;dsts,eigr,eigi);
+<a name="line190">190: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line191">191: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line192">192: </a>    MatConjugate(A);
+<a name="line193">193: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line194">194: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line195">195: </a>    MatConjugate(U);
+<a name="line196">196: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line197">197: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nv;i++) eigr[i] = PetscConj(eigr[i]);
+<a name="line198">198: </a><font color="#A020F0">#endif</font>
+<a name="line199">199: </a>    <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(eps-&gt;dsts,eigr,eigi,NULL,NULL,NULL);
+<a name="line200">200: </a>    <font color="#B22222">/* check correct eigenvalue correspondence */</font>
+<a name="line201">201: </a>    cont = 0;
+<a name="line202">202: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nv;i++) {
+<a name="line203">203: </a>      <font color="#4169E1">if</font> (SlepcAbsEigenvalue(eigr[i]-eps-&gt;eigr[i],eigi[i]-eps-&gt;eigi[i])&gt;PETSC_SQRT_MACHINE_EPSILON) {idx2[cont] = i; idx[cont++] = i;}
+<a name="line204">204: </a>      p[i] = -1;
+<a name="line205">205: </a>    }
+<a name="line206">206: </a>    <font color="#4169E1">if</font> (cont) {
+<a name="line207">207: </a>      <font color="#4169E1">for</font> (i=0;i&lt;cont;i++) {
+<a name="line208">208: </a>        t = PETSC_MAX_REAL;
+<a name="line209">209: </a>        <font color="#4169E1">for</font> (j=0;j&lt;cont;j++) <font color="#4169E1">if</font> (idx2[j]!=-1 &amp;&amp; (s=SlepcAbsEigenvalue(eigr[idx[j]]-eps-&gt;eigr[idx[i]],eigi[idx[j]]-eps-&gt;eigi[idx[i]]))&lt;t) { id = j; t = s; }
+<a name="line210">210: </a>        p[idx[i]] = idx[id];
+<a name="line211">211: </a>        idx2[id] = -1;
+<a name="line212">212: </a>      }
+<a name="line213">213: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nv;i++) <font color="#4169E1">if</font> (p[i]==-1) p[i] = i;
+<a name="line214">214: </a>      <a href="../../../../../docs/manualpages/DS/DSSortWithPermutation.html#DSSortWithPermutation">DSSortWithPermutation</a>(eps-&gt;dsts,p,eigr,eigi);
+<a name="line215">215: </a>    }
+<a name="line216">216: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line217">217: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line218">218: </a>    MatConjugate(A);
+<a name="line219">219: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;A);
+<a name="line220">220: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line221">221: </a>    MatConjugate(U);
+<a name="line222">222: </a>    <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line223">223: </a><font color="#A020F0">#endif</font>
+<a name="line224">224: </a>    <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(eps-&gt;dsts,eigr,eigi);
+
+<a name="line226">226: </a>    <font color="#B22222">/* Check convergence */</font>
+<a name="line227">227: </a>    <a href="../../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(eps-&gt;V,nv,NORM_2,&amp;norm);
+<a name="line228">228: </a>    <a href="../../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(eps-&gt;W,nv,NORM_2,&amp;norm2);
+<a name="line229">229: </a>    EPSKrylovConvergence(eps,PETSC_FALSE,eps-&gt;nconv,nv-eps-&gt;nconv,beta*norm,betat*norm2,1.0,&amp;k);
+<a name="line230">230: </a>    (*eps-&gt;stopping)(eps,eps-&gt;its,eps-&gt;max_it,k,eps-&gt;nev,&amp;eps-&gt;reason,eps-&gt;stoppingctx);
+<a name="line231">231: </a>    nconv = k;
+
+<a name="line233">233: </a>    <font color="#B22222">/* Update l */</font>
+<a name="line234">234: </a>    <font color="#4169E1">if</font> (eps-&gt;reason != <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a> || breakdown || k==nv) l = 0;
+<a name="line235">235: </a>    <font color="#4169E1">else</font> {
+<a name="line236">236: </a>      l = PetscMax(1,(PetscInt)((nv-k)*ctx-&gt;keep));
+<a name="line237">237: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line238">238: </a>      <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line239">239: </a>      <font color="#4169E1">if</font> (S[k+l+(k+l-1)*ld] != 0.0) {
+<a name="line240">240: </a>        <font color="#4169E1">if</font> (k+l&lt;nv-1) l = l+1;
+<a name="line241">241: </a>        <font color="#4169E1">else</font> l = l-1;
+<a name="line242">242: </a>      }
+<a name="line243">243: </a>      <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line244">244: </a><font color="#A020F0">#endif</font>
+<a name="line245">245: </a>    }
+<a name="line246">246: </a>    <font color="#4169E1">if</font> (!ctx-&gt;lock &amp;&amp; l&gt;0) { l += k; k = 0; } <font color="#B22222">/* non-locking variant: reset no. of converged pairs */</font>
+
+<a name="line248">248: </a>    <font color="#B22222">/* Update the corresponding vectors V(:,idx) = V*Q(:,idx) */</font>
+<a name="line249">249: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,eps-&gt;nconv,nv);
+<a name="line250">250: </a>    <a href="../../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;W,eps-&gt;nconv,nv);
+<a name="line251">251: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line252">252: </a>    <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;V,U,eps-&gt;nconv,k+l);
+<a name="line253">253: </a>    MatDestroy(&amp;U);
+<a name="line254">254: </a>    <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;U);
+<a name="line255">255: </a>    <a href="../../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;W,U,eps-&gt;nconv,k+l);
+<a name="line256">256: </a>    MatDestroy(&amp;U);
+<a name="line257">257: </a>    <font color="#4169E1">if</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a> &amp;&amp; !breakdown) {
+<a name="line258">258: </a>      <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(eps-&gt;V,nv,k+l);
+<a name="line259">259: </a>      <a href="../../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(eps-&gt;W,nv,k+l);
+<a name="line260">260: </a>    }
+
+<a name="line262">262: </a>    <font color="#4169E1">if</font> (eps-&gt;reason == <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>) {
+<a name="line263">263: </a>      <font color="#4169E1">if</font> (breakdown || k==nv) {
+<a name="line264">264: </a>        <font color="#B22222">/* Start a new Arnoldi factorization */</font>
+<a name="line265">265: </a>        PetscInfo2(eps,<font color="#666666">"Breakdown in Krylov-Schur method (it=%D norm=%g)\n"</font>,eps-&gt;its,(double)beta);
+<a name="line266">266: </a>        <font color="#4169E1">if</font> (k&lt;eps-&gt;nev) {
+<a name="line267">267: </a>          EPSGetStartVector(eps,k,&amp;breakdown);
+<a name="line268">268: </a>          EPSGetLeftStartVector(eps,k,&amp;breakdownl);
+<a name="line269">269: </a>          <font color="#4169E1">if</font> (breakdown || breakdownl) {
+<a name="line270">270: </a>            eps-&gt;reason = <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_BREAKDOWN</a>;
+<a name="line271">271: </a>            PetscInfo(eps,<font color="#666666">"Unable to generate more start vectors\n"</font>);
+<a name="line272">272: </a>          }
+<a name="line273">273: </a>        }
+<a name="line274">274: </a>      } <font color="#4169E1">else</font> {
+<a name="line275">275: </a>        <font color="#B22222">/* Prepare the Rayleigh quotient for restart */</font>
+<a name="line276">276: </a>        <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line277">277: </a>        <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line278">278: </a>        <font color="#4169E1">for</font> (i=k;i&lt;k+l;i++) S[k+l+i*ld] = Q[nv-1+i*ld]*beta;
+<a name="line279">279: </a>        <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line280">280: </a>        <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line281">281: </a>        <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line282">282: </a>        <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line283">283: </a>        <font color="#4169E1">for</font> (i=k;i&lt;k+l;i++) S[k+l+i*ld] = Q[nv-1+i*ld]*betat;
+<a name="line284">284: </a>        <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>,&amp;S);
+<a name="line285">285: </a>        <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,&amp;Q);
+<a name="line286">286: </a>      }
+<a name="line287">287: </a>      EPSTwoSidedRQUpdate2(eps,M,k+l);
+<a name="line288">288: </a>    }
+<a name="line289">289: </a>    eps-&gt;nconv = k;
+<a name="line290">290: </a>    EPSMonitor(eps,eps-&gt;its,nconv,eps-&gt;eigr,eps-&gt;eigi,eps-&gt;errest,nv);
+<a name="line291">291: </a>  }
+
+<a name="line293">293: </a>  <a href="../../../../../docs/manualpages/ST/STRestoreOperator.html#STRestoreOperator">STRestoreOperator</a>(eps-&gt;st,&amp;Op);
+<a name="line294">294: </a>  MatDestroy(&amp;OpHT);
+
+<a name="line296">296: </a>  <font color="#B22222">/* truncate Schur decomposition and change the state to raw so that</font>
+<a name="line297">297: </a><font color="#B22222">     <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>() computes eigenvectors from scratch */</font>
+<a name="line298">298: </a>  <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;ds,eps-&gt;nconv,0,0,0);
+<a name="line299">299: </a>  <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line300">300: </a>  <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(eps-&gt;dsts,eps-&gt;nconv,0,0,0);
+<a name="line301">301: </a>  <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(eps-&gt;dsts,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line302">302: </a>  PetscFree6(pM,eigr,eigi,idx,idx2,p);
+<a name="line303">303: </a>  MatDestroy(&amp;M);
+<a name="line304">304: </a>  <font color="#4169E1">return</font>(0);
+<a name="line305">305: </a>}
+
+</pre>
+</body>
+
+</html>

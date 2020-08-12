@@ -1,0 +1,335 @@
+<center><a href="dvdutils.c">Actual source code: dvdutils.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/davidson/dvdutils.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:52+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/davidson/dvdutils.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "davidson"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Some utils</font>
+<a name="line14"> 14: </a><font color="#B22222">*/</font>
+
+<a name="line16"> 16: </a><font color="#A020F0">#include </font><font color="#666666">"davidson.h"</font><font color="#A020F0"></font>
+
+<a name="line18"> 18: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line19"> 19: </a>  PC pc;
+<a name="line20"> 20: </a>} dvdPCWrapper;
+
+<a name="line22"> 22: </a><font color="#B22222">/*</font>
+<a name="line23"> 23: </a><font color="#B22222">  Configure the harmonics.</font>
+<a name="line24"> 24: </a><font color="#B22222">  switch (mode) {</font>
+<a name="line25"> 25: </a><font color="#B22222">  DVD_HARM_RR:    harmonic RR</font>
+<a name="line26"> 26: </a><font color="#B22222">  DVD_HARM_RRR:   relative harmonic RR</font>
+<a name="line27"> 27: </a><font color="#B22222">  DVD_HARM_REIGS: rightmost eigenvalues</font>
+<a name="line28"> 28: </a><font color="#B22222">  DVD_HARM_LEIGS: largest eigenvalues</font>
+<a name="line29"> 29: </a><font color="#B22222">  }</font>
+<a name="line30"> 30: </a><font color="#B22222">  fixedTarged, if true use the target instead of the best eigenvalue</font>
+<a name="line31"> 31: </a><font color="#B22222">  target, the fixed target to be used</font>
+<a name="line32"> 32: </a><font color="#B22222">*/</font>
+<a name="line33"> 33: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line34"> 34: </a>  PetscScalar Wa,Wb;       <font color="#B22222">/* span{W} = span{Wa*AV - Wb*<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>} */</font>
+<a name="line35"> 35: </a>  PetscScalar Pa,Pb;       <font color="#B22222">/* H=W'*(Pa*AV - Pb*<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>), G=W'*(Wa*AV - Wb*<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>) */</font>
+<a name="line36"> 36: </a>  PetscBool   withTarget;
+<a name="line37"> 37: </a>  HarmType_t  mode;
+<a name="line38"> 38: </a>} dvdHarmonic;
+
+<a name="line40"> 40: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line41"> 41: </a>  Vec diagA, diagB;
+<a name="line42"> 42: </a>} dvdJacobiPrecond;
+
+<a name="line44"> 44: </a><strong><font color="#4169E1"><a name="dvd_improvex_precond_d"></a>static PetscErrorCode dvd_improvex_precond_d(dvdDashboard *d)</font></strong>
+<a name="line45"> 45: </a>{
+<a name="line47"> 47: </a>  dvdPCWrapper   *dvdpc = (dvdPCWrapper*)d-&gt;improvex_precond_data;
+
+<a name="line50"> 50: </a>  <font color="#B22222">/* Free local data */</font>
+<a name="line51"> 51: </a>  PCDestroy(&amp;dvdpc-&gt;pc);
+<a name="line52"> 52: </a>  PetscFree(d-&gt;improvex_precond_data);
+<a name="line53"> 53: </a>  <font color="#4169E1">return</font>(0);
+<a name="line54"> 54: </a>}
+
+<a name="line56"> 56: </a><strong><font color="#4169E1"><a name="dvd_static_precond_PC_0"></a>static PetscErrorCode dvd_static_precond_PC_0(dvdDashboard *d,PetscInt i,Vec x,Vec Px)</font></strong>
+<a name="line57"> 57: </a>{
+<a name="line59"> 59: </a>  dvdPCWrapper   *dvdpc = (dvdPCWrapper*)d-&gt;improvex_precond_data;
+
+<a name="line62"> 62: </a>  PCApply(dvdpc-&gt;pc,x,Px);
+<a name="line63"> 63: </a>  <font color="#4169E1">return</font>(0);
+<a name="line64"> 64: </a>}
+
+<a name="line66"> 66: </a><font color="#B22222">/*</font>
+<a name="line67"> 67: </a><font color="#B22222">  Create a trivial preconditioner</font>
+<a name="line68"> 68: </a><font color="#B22222">*/</font>
+<a name="line69"> 69: </a><strong><font color="#4169E1"><a name="dvd_precond_none"></a>static PetscErrorCode dvd_precond_none(dvdDashboard *d,PetscInt i,Vec x,Vec Px)</font></strong>
+<a name="line70"> 70: </a>{
+
+<a name="line74"> 74: </a>  VecCopy(x,Px);
+<a name="line75"> 75: </a>  <font color="#4169E1">return</font>(0);
+<a name="line76"> 76: </a>}
+
+<a name="line78"> 78: </a><font color="#B22222">/*</font>
+<a name="line79"> 79: </a><font color="#B22222">  Create a static preconditioner from a PC</font>
+<a name="line80"> 80: </a><font color="#B22222">*/</font>
+<a name="line81"> 81: </a><strong><font color="#4169E1"><a name="dvd_static_precond_PC"></a>PetscErrorCode dvd_static_precond_PC(dvdDashboard *d,dvdBlackboard *b,PC pc)</font></strong>
+<a name="line82"> 82: </a>{
+<a name="line84"> 84: </a>  dvdPCWrapper   *dvdpc;
+<a name="line85"> 85: </a>  Mat            P;
+<a name="line86"> 86: </a>  PetscBool      t0,t1,t2;
+
+<a name="line89"> 89: </a>  <font color="#B22222">/* Setup the step */</font>
+<a name="line90"> 90: </a>  <font color="#4169E1">if</font> (b-&gt;state &gt;= DVD_STATE_CONF) {
+<a name="line91"> 91: </a>    <font color="#B22222">/* If the preconditioner is valid */</font>
+<a name="line92"> 92: </a>    <font color="#4169E1">if</font> (pc) {
+<a name="line93"> 93: </a>      PetscNewLog(d-&gt;eps,&amp;dvdpc);
+<a name="line94"> 94: </a>      dvdpc-&gt;pc = pc;
+<a name="line95"> 95: </a>      PetscObjectReference((PetscObject)pc);
+<a name="line96"> 96: </a>      d-&gt;improvex_precond_data = dvdpc;
+<a name="line97"> 97: </a>      d-&gt;improvex_precond = dvd_static_precond_PC_0;
+
+<a name="line99"> 99: </a>      <font color="#B22222">/* PC saves the matrix associated with the linear system, and it has to</font>
+<a name="line100">100: </a><font color="#B22222">         be initialize to a valid matrix */</font>
+<a name="line101">101: </a>      PCGetOperatorsSet(pc,NULL,&amp;t0);
+<a name="line102">102: </a>      PetscObjectTypeCompare((PetscObject)pc,PCNONE,&amp;t1);
+<a name="line103">103: </a>      PetscObjectTypeCompare((PetscObject)pc,PCSHELL,&amp;t2);
+<a name="line104">104: </a>      <font color="#4169E1">if</font> (t0 &amp;&amp; !t1) {
+<a name="line105">105: </a>        PCGetOperators(pc,NULL,&amp;P);
+<a name="line106">106: </a>        PetscObjectReference((PetscObject)P);
+<a name="line107">107: </a>        PCSetOperators(pc,P,P);
+<a name="line108">108: </a>        PCSetReusePreconditioner(pc,PETSC_TRUE);
+<a name="line109">109: </a>        MatDestroy(&amp;P);
+<a name="line110">110: </a>      } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (t2) {
+<a name="line111">111: </a>        PCSetOperators(pc,d-&gt;A,d-&gt;A);
+<a name="line112">112: </a>        PCSetReusePreconditioner(pc,PETSC_TRUE);
+<a name="line113">113: </a>      } <font color="#4169E1">else</font> {
+<a name="line114">114: </a>        d-&gt;improvex_precond = dvd_precond_none;
+<a name="line115">115: </a>      }
+
+<a name="line117">117: </a>      EPSDavidsonFLAdd(&amp;d-&gt;destroyList,dvd_improvex_precond_d);
+
+<a name="line119">119: </a>    <font color="#B22222">/* Else, use no preconditioner */</font>
+<a name="line120">120: </a>    } <font color="#4169E1">else</font> d-&gt;improvex_precond = dvd_precond_none;
+<a name="line121">121: </a>  }
+<a name="line122">122: </a>  <font color="#4169E1">return</font>(0);
+<a name="line123">123: </a>}
+
+<a name="line125">125: </a><strong><font color="#4169E1"><a name="dvd_harm_d"></a>static PetscErrorCode dvd_harm_d(dvdDashboard *d)</font></strong>
+<a name="line126">126: </a>{
+
+<a name="line130">130: </a>  <font color="#B22222">/* Free local data */</font>
+<a name="line131">131: </a>  PetscFree(d-&gt;calcpairs_W_data);
+<a name="line132">132: </a>  <font color="#4169E1">return</font>(0);
+<a name="line133">133: </a>}
+
+<a name="line135">135: </a><strong><font color="#4169E1"><a name="dvd_harm_transf"></a>static PetscErrorCode dvd_harm_transf(dvdHarmonic *dvdh,PetscScalar t)</font></strong>
+<a name="line136">136: </a>{
+<a name="line138">138: </a>  <font color="#4169E1">switch</font> (dvdh-&gt;mode) {
+<a name="line139">139: </a>  <font color="#4169E1">case</font> DVD_HARM_RR:    <font color="#B22222">/* harmonic RR */</font>
+<a name="line140">140: </a>    dvdh-&gt;Wa = 1.0; dvdh-&gt;Wb = t;   dvdh-&gt;Pa = 0.0; dvdh-&gt;Pb = -1.0;
+<a name="line141">141: </a>    <font color="#4169E1">break</font>;
+<a name="line142">142: </a>  <font color="#4169E1">case</font> DVD_HARM_RRR:   <font color="#B22222">/* relative harmonic RR */</font>
+<a name="line143">143: </a>    dvdh-&gt;Wa = 1.0; dvdh-&gt;Wb = t;   dvdh-&gt;Pa = 1.0; dvdh-&gt;Pb = 0.0;
+<a name="line144">144: </a>    <font color="#4169E1">break</font>;
+<a name="line145">145: </a>  <font color="#4169E1">case</font> DVD_HARM_REIGS: <font color="#B22222">/* rightmost eigenvalues */</font>
+<a name="line146">146: </a>    dvdh-&gt;Wa = 1.0; dvdh-&gt;Wb = t;   dvdh-&gt;Pa = 1.0; dvdh-&gt;Pb = -PetscConj(t);
+<a name="line147">147: </a>    <font color="#4169E1">break</font>;
+<a name="line148">148: </a>  <font color="#4169E1">case</font> DVD_HARM_LEIGS: <font color="#B22222">/* largest eigenvalues */</font>
+<a name="line149">149: </a>    dvdh-&gt;Wa = 0.0; dvdh-&gt;Wb = 1.0; dvdh-&gt;Pa = 1.0; dvdh-&gt;Pb = 0.0;
+<a name="line150">150: </a>    <font color="#4169E1">break</font>;
+<a name="line151">151: </a>  <font color="#4169E1">case</font> DVD_HARM_NONE:
+<a name="line152">152: </a><strong><font color="#FF0000">  default:</font></strong>
+<a name="line153">153: </a>    SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Harmonic type not supported"</font>);
+<a name="line154">154: </a>  }
+
+<a name="line156">156: </a>  <font color="#B22222">/* Check the transformation does not change the sign of the imaginary part */</font>
+<a name="line157">157: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line158">158: </a>  <font color="#4169E1">if</font> (dvdh-&gt;Pb*dvdh-&gt;Wa - dvdh-&gt;Wb*dvdh-&gt;Pa &lt; 0.0) {
+<a name="line159">159: </a>    dvdh-&gt;Pa *= -1.0;
+<a name="line160">160: </a>    dvdh-&gt;Pb *= -1.0;
+<a name="line161">161: </a>  }
+<a name="line162">162: </a><font color="#A020F0">#endif</font>
+<a name="line163">163: </a>  <font color="#4169E1">return</font>(0);
+<a name="line164">164: </a>}
+
+<a name="line166">166: </a><strong><font color="#4169E1"><a name="dvd_harm_updateW"></a>static PetscErrorCode dvd_harm_updateW(dvdDashboard *d)</font></strong>
+<a name="line167">167: </a>{
+<a name="line168">168: </a>  dvdHarmonic    *data = (dvdHarmonic*)d-&gt;calcpairs_W_data;
+<a name="line170">170: </a>  PetscInt       l,k;
+<a name="line171">171: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>             BX = d-&gt;BX?d-&gt;BX:d-&gt;eps-&gt;V;
+
+<a name="line174">174: </a>  <font color="#B22222">/* Update the target if it is necessary */</font>
+<a name="line175">175: </a>  <font color="#4169E1">if</font> (!data-&gt;withTarget) {
+<a name="line176">176: </a>    dvd_harm_transf(data,d-&gt;eigr[0]);
+<a name="line177">177: </a>  }
+
+<a name="line179">179: </a>  <font color="#B22222">/* W(i) &lt;- Wa*AV(i) - Wb*<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>(i) */</font>
+<a name="line180">180: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;l,&amp;k);
+<a name="line181">181: </a>  <font color="#4169E1">if</font> (k != l+d-&gt;V_new_s) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Consistency broken"</font>);
+<a name="line182">182: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W,l+d-&gt;V_new_s,l+d-&gt;V_new_e);
+<a name="line183">183: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,l+d-&gt;V_new_s,l+d-&gt;V_new_e);
+<a name="line184">184: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(BX,l+d-&gt;V_new_s,l+d-&gt;V_new_e);
+<a name="line185">185: </a>  <a href="../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(d-&gt;AX,d-&gt;W);
+<a name="line186">186: </a>  <a href="../../../../docs/manualpages/BV/BVScale.html#BVScale">BVScale</a>(d-&gt;W,data-&gt;Wa);
+<a name="line187">187: </a>  <a href="../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(d-&gt;W,-data-&gt;Wb,1.0,BX,NULL);
+<a name="line188">188: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;W,l,k);
+<a name="line189">189: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(d-&gt;AX,l,k);
+<a name="line190">190: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(BX,l,k);
+<a name="line191">191: </a>  <font color="#4169E1">return</font>(0);
+<a name="line192">192: </a>}
+
+<a name="line194">194: </a><strong><font color="#4169E1"><a name="dvd_harm_proj"></a>static PetscErrorCode dvd_harm_proj(dvdDashboard *d)</font></strong>
+<a name="line195">195: </a>{
+<a name="line197">197: </a>  dvdHarmonic    *data = (dvdHarmonic*)d-&gt;calcpairs_W_data;
+<a name="line198">198: </a>  PetscInt       i,j,l0,l,k,ld;
+<a name="line199">199: </a>  PetscScalar    h,g,*H,*G;
+
+<a name="line202">202: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;l0,&amp;k);
+<a name="line203">203: </a>  l = l0 + d-&gt;V_new_s;
+<a name="line204">204: </a>  k = l0 + d-&gt;V_new_e;
+<a name="line205">205: </a>  MatGetSize(d-&gt;H,&amp;ld,NULL);
+<a name="line206">206: </a>  MatDenseGetArray(d-&gt;H,&amp;H);
+<a name="line207">207: </a>  MatDenseGetArray(d-&gt;G,&amp;G);
+<a name="line208">208: </a>  <font color="#B22222">/* [H G] &lt;- [Pa*H - Pb*G, Wa*H - Wb*G] */</font>
+<a name="line209">209: </a>  <font color="#B22222">/* Right part */</font>
+<a name="line210">210: </a>  <font color="#4169E1">for</font> (i=l;i&lt;k;i++) {
+<a name="line211">211: </a>    <font color="#4169E1">for</font> (j=l0;j&lt;k;j++) {
+<a name="line212">212: </a>      h = H[ld*i+j];
+<a name="line213">213: </a>      g = G[ld*i+j];
+<a name="line214">214: </a>      H[ld*i+j] = data-&gt;Pa*h - data-&gt;Pb*g;
+<a name="line215">215: </a>      G[ld*i+j] = data-&gt;Wa*h - data-&gt;Wb*g;
+<a name="line216">216: </a>    }
+<a name="line217">217: </a>  }
+<a name="line218">218: </a>  <font color="#B22222">/* Left part */</font>
+<a name="line219">219: </a>  <font color="#4169E1">for</font> (i=l0;i&lt;l;i++) {
+<a name="line220">220: </a>    <font color="#4169E1">for</font> (j=l;j&lt;k;j++) {
+<a name="line221">221: </a>      h = H[ld*i+j];
+<a name="line222">222: </a>      g = G[ld*i+j];
+<a name="line223">223: </a>      H[ld*i+j] = data-&gt;Pa*h - data-&gt;Pb*g;
+<a name="line224">224: </a>      G[ld*i+j] = data-&gt;Wa*h - data-&gt;Wb*g;
+<a name="line225">225: </a>    }
+<a name="line226">226: </a>  }
+<a name="line227">227: </a>  MatDenseRestoreArray(d-&gt;H,&amp;H);
+<a name="line228">228: </a>  MatDenseRestoreArray(d-&gt;G,&amp;G);
+<a name="line229">229: </a>  <font color="#4169E1">return</font>(0);
+<a name="line230">230: </a>}
+
+<a name="line232">232: </a><strong><font color="#4169E1"><a name="dvd_harm_updateproj"></a>PetscErrorCode dvd_harm_updateproj(dvdDashboard *d)</font></strong>
+<a name="line233">233: </a>{
+<a name="line235">235: </a>  dvdHarmonic    *data = (dvdHarmonic*)d-&gt;calcpairs_W_data;
+<a name="line236">236: </a>  PetscInt       i,j,l,k,ld;
+<a name="line237">237: </a>  PetscScalar    h,g,*H,*G;
+
+<a name="line240">240: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;l,&amp;k);
+<a name="line241">241: </a>  k = l + d-&gt;V_tra_s;
+<a name="line242">242: </a>  MatGetSize(d-&gt;H,&amp;ld,NULL);
+<a name="line243">243: </a>  MatDenseGetArray(d-&gt;H,&amp;H);
+<a name="line244">244: </a>  MatDenseGetArray(d-&gt;G,&amp;G);
+<a name="line245">245: </a>  <font color="#B22222">/* [H G] &lt;- [Pa*H - Pb*G, Wa*H - Wb*G] */</font>
+<a name="line246">246: </a>  <font color="#B22222">/* Right part */</font>
+<a name="line247">247: </a>  <font color="#4169E1">for</font> (i=l;i&lt;k;i++) {
+<a name="line248">248: </a>    <font color="#4169E1">for</font> (j=0;j&lt;l;j++) {
+<a name="line249">249: </a>      h = H[ld*i+j];
+<a name="line250">250: </a>      g = G[ld*i+j];
+<a name="line251">251: </a>      H[ld*i+j] = data-&gt;Pa*h - data-&gt;Pb*g;
+<a name="line252">252: </a>      G[ld*i+j] = data-&gt;Wa*h - data-&gt;Wb*g;
+<a name="line253">253: </a>    }
+<a name="line254">254: </a>  }
+<a name="line255">255: </a>  <font color="#B22222">/* Lower triangular part */</font>
+<a name="line256">256: </a>  <font color="#4169E1">for</font> (i=0;i&lt;l;i++) {
+<a name="line257">257: </a>    <font color="#4169E1">for</font> (j=l;j&lt;k;j++) {
+<a name="line258">258: </a>      h = H[ld*i+j];
+<a name="line259">259: </a>      g = G[ld*i+j];
+<a name="line260">260: </a>      H[ld*i+j] = data-&gt;Pa*h - data-&gt;Pb*g;
+<a name="line261">261: </a>      G[ld*i+j] = data-&gt;Wa*h - data-&gt;Wb*g;
+<a name="line262">262: </a>    }
+<a name="line263">263: </a>  }
+<a name="line264">264: </a>  MatDenseRestoreArray(d-&gt;H,&amp;H);
+<a name="line265">265: </a>  MatDenseRestoreArray(d-&gt;G,&amp;G);
+<a name="line266">266: </a>  <font color="#4169E1">return</font>(0);
+<a name="line267">267: </a>}
+
+<a name="line269">269: </a><strong><font color="#4169E1"><a name="dvd_harm_backtrans"></a>static PetscErrorCode dvd_harm_backtrans(dvdHarmonic *data,PetscScalar *ar,PetscScalar *ai)</font></strong>
+<a name="line270">270: </a>{
+<a name="line271">271: </a>  PetscScalar xr;
+<a name="line272">272: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line273">273: </a>  PetscScalar xi, k;
+<a name="line274">274: </a><font color="#A020F0">#endif</font>
+
+<a name="line277">277: </a>  xr = *ar;
+<a name="line278">278: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line279">279: </a>  xi = *ai;
+<a name="line280">280: </a>  <font color="#4169E1">if</font> (xi != 0.0) {
+<a name="line281">281: </a>    k = (data-&gt;Pa - data-&gt;Wa*xr)*(data-&gt;Pa - data-&gt;Wa*xr) + data-&gt;Wa*data-&gt;Wa*xi*xi;
+<a name="line282">282: </a>    *ar = (data-&gt;Pb*data-&gt;Pa - (data-&gt;Pb*data-&gt;Wa + data-&gt;Wb*data-&gt;Pa)*xr + data-&gt;Wb*data-&gt;Wa*(xr*xr + xi*xi))/k;
+<a name="line283">283: </a>    *ai = (data-&gt;Pb*data-&gt;Wa - data-&gt;Wb*data-&gt;Pa)*xi/k;
+<a name="line284">284: </a>  } <font color="#4169E1">else</font>
+<a name="line285">285: </a><font color="#A020F0">#endif</font>
+<a name="line286">286: </a>    *ar = (data-&gt;Pb - data-&gt;Wb*xr) / (data-&gt;Pa - data-&gt;Wa*xr);
+<a name="line287">287: </a>  <font color="#4169E1">return</font>(0);
+<a name="line288">288: </a>}
+
+<a name="line290">290: </a><strong><font color="#4169E1"><a name="dvd_harm_eig_backtrans"></a>static PetscErrorCode dvd_harm_eig_backtrans(dvdDashboard *d,PetscScalar ar,PetscScalar ai,PetscScalar *br,PetscScalar *bi)</font></strong>
+<a name="line291">291: </a>{
+<a name="line292">292: </a>  dvdHarmonic    *data = (dvdHarmonic*)d-&gt;calcpairs_W_data;
+
+<a name="line296">296: </a>  dvd_harm_backtrans(data,&amp;ar,&amp;ai);
+<a name="line297">297: </a>  *br = ar;
+<a name="line298">298: </a>  *bi = ai;
+<a name="line299">299: </a>  <font color="#4169E1">return</font>(0);
+<a name="line300">300: </a>}
+
+<a name="line302">302: </a><strong><font color="#4169E1"><a name="dvd_harm_eigs_trans"></a>static PetscErrorCode dvd_harm_eigs_trans(dvdDashboard *d)</font></strong>
+<a name="line303">303: </a>{
+<a name="line304">304: </a>  dvdHarmonic    *data = (dvdHarmonic*)d-&gt;calcpairs_W_data;
+<a name="line305">305: </a>  PetscInt       i,l,k;
+
+<a name="line309">309: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;l,&amp;k);
+<a name="line310">310: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k-l;i++) {
+<a name="line311">311: </a>    dvd_harm_backtrans(data,&amp;d-&gt;eigr[i],&amp;d-&gt;eigi[i]);
+<a name="line312">312: </a>  }
+<a name="line313">313: </a>  <font color="#4169E1">return</font>(0);
+<a name="line314">314: </a>}
+
+<a name="line316">316: </a><strong><font color="#4169E1"><a name="dvd_harm_conf"></a>PetscErrorCode dvd_harm_conf(dvdDashboard *d,dvdBlackboard *b,HarmType_t mode,PetscBool fixedTarget,PetscScalar t)</font></strong>
+<a name="line317">317: </a>{
+<a name="line319">319: </a>  dvdHarmonic    *dvdh;
+
+<a name="line322">322: </a>  <font color="#B22222">/* Set the problem to GNHEP:</font>
+<a name="line323">323: </a><font color="#B22222">     d-&gt;G maybe is upper triangular due to biorthogonality of V and W */</font>
+<a name="line324">324: </a>  d-&gt;sEP = d-&gt;sA = d-&gt;sB = 0;
+
+<a name="line326">326: </a>  <font color="#B22222">/* Setup the step */</font>
+<a name="line327">327: </a>  <font color="#4169E1">if</font> (b-&gt;state &gt;= DVD_STATE_CONF) {
+<a name="line328">328: </a>    PetscNewLog(d-&gt;eps,&amp;dvdh);
+<a name="line329">329: </a>    dvdh-&gt;withTarget = fixedTarget;
+<a name="line330">330: </a>    dvdh-&gt;mode = mode;
+<a name="line331">331: </a>    <font color="#4169E1">if</font> (fixedTarget) dvd_harm_transf(dvdh, t);
+<a name="line332">332: </a>    d-&gt;calcpairs_W_data = dvdh;
+<a name="line333">333: </a>    d-&gt;calcpairs_W = dvd_harm_updateW;
+<a name="line334">334: </a>    d-&gt;calcpairs_proj_trans = dvd_harm_proj;
+<a name="line335">335: </a>    d-&gt;calcpairs_eigs_trans = dvd_harm_eigs_trans;
+<a name="line336">336: </a>    d-&gt;calcpairs_eig_backtrans = dvd_harm_eig_backtrans;
+
+<a name="line338">338: </a>    EPSDavidsonFLAdd(&amp;d-&gt;destroyList,dvd_harm_d);
+<a name="line339">339: </a>  }
+<a name="line340">340: </a>  <font color="#4169E1">return</font>(0);
+<a name="line341">341: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,308 @@
+<center><a href="davidson.h">Actual source code: davidson.h</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/davidson/davidson.h.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:53+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/davidson/davidson.h.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   Method: General Davidson Method (includes GD and JD)</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   References:</font>
+<a name="line14"> 14: </a><font color="#B22222">    - Ernest R. Davidson. Super-matrix methods. Computer Physics Communications,</font>
+<a name="line15"> 15: </a><font color="#B22222">      53:49-60, May 1989.</font>
+<a name="line16"> 16: </a><font color="#B22222">*/</font>
+
+<a name="line18"> 18: </a> #include <A href="../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line19"> 19: </a> #include <A href="../../../../include/slepc/private/vecimplslepc.h.html">&lt;slepc/private/vecimplslepc.h&gt;</A>
+
+<a name="line21"> 21: </a><font color="#4169E1">typedef PetscInt MatType_t;</font>
+<a name="line22"> 22: </a><strong><font color="#228B22">#define DVD_MAT_HERMITIAN (1&lt;&lt;1)</font></strong>
+<a name="line23"> 23: </a><strong><font color="#228B22">#define DVD_MAT_NEG_DEF (1&lt;&lt;2)</font></strong>
+<a name="line24"> 24: </a><strong><font color="#228B22">#define DVD_MAT_POS_DEF (1&lt;&lt;3)</font></strong>
+<a name="line25"> 25: </a><strong><font color="#228B22">#define DVD_MAT_SINGULAR (1&lt;&lt;4)</font></strong>
+<a name="line26"> 26: </a><strong><font color="#228B22">#define DVD_MAT_COMPLEX (1&lt;&lt;5)</font></strong>
+<a name="line27"> 27: </a><strong><font color="#228B22">#define DVD_MAT_IMPLICIT (1&lt;&lt;6)</font></strong>
+<a name="line28"> 28: </a><strong><font color="#228B22">#define DVD_MAT_IDENTITY (1&lt;&lt;7)</font></strong>
+<a name="line29"> 29: </a><strong><font color="#228B22">#define DVD_MAT_DIAG (1&lt;&lt;8)</font></strong>
+<a name="line30"> 30: </a><strong><font color="#228B22">#define DVD_MAT_TRIANG (1&lt;&lt;9)</font></strong>
+<a name="line31"> 31: </a><strong><font color="#228B22">#define DVD_MAT_UTRIANG (1&lt;&lt;9)</font></strong>
+<a name="line32"> 32: </a><strong><font color="#228B22">#define DVD_MAT_LTRIANG (1&lt;&lt;10)</font></strong>
+<a name="line33"> 33: </a><strong><font color="#228B22">#define DVD_MAT_UNITARY (1&lt;&lt;11)</font></strong>
+
+<a name="line35"> 35: </a><font color="#4169E1">typedef PetscInt EPType_t;</font>
+<a name="line36"> 36: </a><strong><font color="#228B22">#define DVD_EP_STD (1&lt;&lt;1)</font></strong>
+<a name="line37"> 37: </a><strong><font color="#228B22">#define DVD_EP_HERMITIAN (1&lt;&lt;2)</font></strong>
+<a name="line38"> 38: </a><strong><font color="#228B22">#define DVD_EP_INDEFINITE (1&lt;&lt;3)</font></strong>
+
+<a name="line40"> 40: </a><strong><font color="#228B22">#define DVD_IS(T,P) ((T) &amp; (P))</font></strong>
+<a name="line41"> 41: </a><strong><font color="#228B22">#define DVD_ISNOT(T,P) (((T) &amp; (P)) ^ (P))</font></strong>
+
+<a name="line43"> 43: </a><font color="#4169E1"><a name="_dvdDashboard"></a>struct _dvdDashboard</font>;
+<a name="line44"> 44: </a><strong><font color="#4169E1">typedef PetscErrorCode (*dvdCallback)(struct _dvdDashboard*)</font></strong>;
+<a name="line45"> 45: </a><font color="#4169E1"><a name="_dvdFunctionList"></a>typedef struct _dvdFunctionList </font>{
+<a name="line46"> 46: </a>  dvdCallback f;
+<a name="line47"> 47: </a>  <font color="#4169E1">struct _dvdFunctionList</font> *next;
+<a name="line48"> 48: </a>} dvdFunctionList;
+
+<a name="line50"> 50: </a><font color="#4169E1">typedef</font> <font color="#4169E1">enum</font> {
+<a name="line51"> 51: </a>  DVD_HARM_NONE,
+<a name="line52"> 52: </a>  DVD_HARM_RR,
+<a name="line53"> 53: </a>  DVD_HARM_RRR,
+<a name="line54"> 54: </a>  DVD_HARM_REIGS,
+<a name="line55"> 55: </a>  DVD_HARM_LEIGS
+<a name="line56"> 56: </a>} HarmType_t;
+
+<a name="line58"> 58: </a><font color="#4169E1">typedef</font> <font color="#4169E1">enum</font> {
+<a name="line59"> 59: </a>  DVD_INITV_CLASSIC,
+<a name="line60"> 60: </a>  DVD_INITV_KRYLOV
+<a name="line61"> 61: </a>} InitType_t;
+
+<a name="line63"> 63: </a><font color="#B22222">/*</font>
+<a name="line64"> 64: </a><font color="#B22222">   Dashboard struct: contains the methods that will be employed and the tuning</font>
+<a name="line65"> 65: </a><font color="#B22222">   options.</font>
+<a name="line66"> 66: </a><font color="#B22222">*/</font>
+
+<a name="line68"> 68: </a><font color="#4169E1"><a name="_dvdDashboard"></a>typedef struct _dvdDashboard </font>{
+<a name="line69"> 69: </a>  <font color="#B22222">/**** Function steps ****/</font>
+<a name="line70"> 70: </a>  <font color="#B22222">/* Initialize V */</font>
+<a name="line71"> 71: </a>  PetscErrorCode (*initV)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line72"> 72: </a>  void *initV_data;
+
+<a name="line74"> 74: </a>  <font color="#B22222">/* Find the approximate eigenpairs from V */</font>
+<a name="line75"> 75: </a>  PetscErrorCode (*calcPairs)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line76"> 76: </a>  void *calcPairs_data;
+
+<a name="line78"> 78: </a>  <font color="#B22222">/* Eigenpair test for convergence */</font>
+<a name="line79"> 79: </a>  PetscBool (*testConv)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscScalar,PetscScalar,PetscReal,PetscReal*);
+<a name="line80"> 80: </a>  void *testConv_data;
+
+<a name="line82"> 82: </a>  <font color="#B22222">/* Improve the selected eigenpairs */</font>
+<a name="line83"> 83: </a>  PetscErrorCode (*improveX)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,PetscInt,PetscInt*);
+<a name="line84"> 84: </a>  void *improveX_data;
+
+<a name="line86"> 86: </a>  <font color="#B22222">/* Check for restarting */</font>
+<a name="line87"> 87: </a>  PetscErrorCode (*isRestarting)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscBool*);
+<a name="line88"> 88: </a>  void *isRestarting_data;
+
+<a name="line90"> 90: </a>  <font color="#B22222">/* Perform restarting */</font>
+<a name="line91"> 91: </a>  PetscErrorCode (*restartV)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line92"> 92: </a>  void *restartV_data;
+
+<a name="line94"> 94: </a>  <font color="#B22222">/* Update V */</font>
+<a name="line95"> 95: </a>  PetscErrorCode (*updateV)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line96"> 96: </a>  void *updateV_data;
+
+<a name="line98"> 98: </a>  <font color="#B22222">/**** Problem specification ****/</font>
+<a name="line99"> 99: </a>  Mat         A,B;            <font color="#B22222">/* problem matrices */</font>
+<a name="line100">100: </a>  MatType_t   sA,sB;          <font color="#B22222">/* matrix specifications */</font>
+<a name="line101">101: </a>  EPType_t    sEP;            <font color="#B22222">/* problem specifications */</font>
+<a name="line102">102: </a>  PetscInt    nev;            <font color="#B22222">/* number of eigenpairs */</font>
+<a name="line103">103: </a>  <a href="../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPSWhich</a>    which;          <font color="#B22222">/* spectrum selection */</font>
+<a name="line104">104: </a>  PetscBool   withTarget;     <font color="#B22222">/* if there is a target */</font>
+<a name="line105">105: </a>  PetscScalar target[2];      <font color="#B22222">/* target value */</font>
+<a name="line106">106: </a>  PetscReal   tol;            <font color="#B22222">/* tolerance */</font>
+<a name="line107">107: </a>  PetscBool   correctXnorm;   <font color="#B22222">/* if true, norm of X are computed */</font>
+
+<a name="line109">109: </a>  <font color="#B22222">/**** Subspaces specification ****/</font>
+<a name="line110">110: </a>  PetscInt nconv;             <font color="#B22222">/* number of converged eigenpairs */</font>
+<a name="line111">111: </a>  PetscInt npreconv;          <font color="#B22222">/* number of pairs ready to converge */</font>
+
+<a name="line113">113: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>       W;                 <font color="#B22222">/* left basis for harmonic case */</font>
+<a name="line114">114: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>       AX;                <font color="#B22222">/* A*V */</font>
+<a name="line115">115: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>       BX;                <font color="#B22222">/* B*V */</font>
+<a name="line116">116: </a>  PetscInt size_D;            <font color="#B22222">/* active vectors */</font>
+<a name="line117">117: </a>  PetscInt max_size_proj;     <font color="#B22222">/* max size projected problem */</font>
+<a name="line118">118: </a>  PetscInt max_size_P;        <font color="#B22222">/* max unconverged vectors in the projector */</font>
+<a name="line119">119: </a>  PetscInt bs;                <font color="#B22222">/* max vectors that expands the subspace every iteration */</font>
+<a name="line120">120: </a>  <a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>      eps;               <font color="#B22222">/* connection to SLEPc */</font>
+
+<a name="line122">122: </a>  <font color="#B22222">/**** Auxiliary space ****/</font>
+<a name="line123">123: </a>  VecPool auxV;               <font color="#B22222">/* auxiliary vectors */</font>
+<a name="line124">124: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>      auxBV;              <font color="#B22222">/* auxiliary vectors */</font>
+
+<a name="line126">126: </a>  <font color="#B22222">/**** Eigenvalues and errors ****/</font>
+<a name="line127">127: </a>  PetscScalar *ceigr,*ceigi;  <font color="#B22222">/* converged eigenvalues */</font>
+<a name="line128">128: </a>  PetscScalar *eigr,*eigi;    <font color="#B22222">/* current eigenvalues */</font>
+<a name="line129">129: </a>  PetscReal   *nR;            <font color="#B22222">/* residual norm */</font>
+<a name="line130">130: </a>  PetscReal   *real_nR;       <font color="#B22222">/* original nR */</font>
+<a name="line131">131: </a>  PetscReal   *nX;            <font color="#B22222">/* X norm */</font>
+<a name="line132">132: </a>  PetscReal   *real_nX;       <font color="#B22222">/* original nX */</font>
+<a name="line133">133: </a>  PetscReal   *errest;        <font color="#B22222">/* relative error eigenpairs */</font>
+<a name="line134">134: </a>  PetscReal   *nBds;          <font color="#B22222">/* B-norms of projected problem  */</font>
+
+<a name="line136">136: </a>  <font color="#B22222">/**** Shared function and variables ****/</font>
+<a name="line137">137: </a>  PetscErrorCode (*e_Vchanged)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,PetscInt,PetscInt,PetscInt);
+<a name="line138">138: </a>  void *e_Vchanged_data;
+<a name="line139">139: </a>  PetscErrorCode (*calcpairs_residual)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,PetscInt);
+<a name="line140">140: </a>  PetscErrorCode (*calcpairs_selectPairs)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt);
+<a name="line141">141: </a>  void *calcpairs_residual_data;
+<a name="line142">142: </a>  PetscErrorCode (*improvex_precond)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,Vec,Vec);
+<a name="line143">143: </a>  void *improvex_precond_data;
+<a name="line144">144: </a>  PetscErrorCode (*improvex_jd_proj_uv)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,PetscInt,Vec*,Vec*,Vec*,PetscScalar*,PetscScalar*,PetscScalar*,PetscScalar*,PetscInt);
+<a name="line145">145: </a>  PetscErrorCode (*improvex_jd_lit)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,PetscScalar*,PetscScalar*,PetscInt*,PetscReal*);
+<a name="line146">146: </a>  PetscErrorCode (*calcpairs_W)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line147">147: </a>  void *calcpairs_W_data;
+<a name="line148">148: </a>  PetscErrorCode (*calcpairs_proj_trans)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line149">149: </a>  PetscErrorCode (*calcpairs_eigs_trans)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line150">150: </a>  PetscErrorCode (*calcpairs_eig_backtrans)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscScalar,PetscScalar,PetscScalar*,PetscScalar*);
+<a name="line151">151: </a>  PetscErrorCode (*calcpairs_proj_res)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,PetscInt,Vec*);
+<a name="line152">152: </a>  PetscErrorCode (*preTestConv)(<font color="#4169E1">struct _dvdDashboard</font>*,PetscInt,PetscInt,PetscInt,PetscInt*);
+<a name="line153">153: </a>  PetscErrorCode (*e_newIteration)(<font color="#4169E1">struct _dvdDashboard</font>*);
+<a name="line154">154: </a>  void *e_newIteration_data;
+
+<a name="line156">156: </a>  dvdFunctionList *startList;  <font color="#B22222">/* starting list */</font>
+<a name="line157">157: </a>  dvdFunctionList *endList;    <font color="#B22222">/* ending list */</font>
+<a name="line158">158: </a>  dvdFunctionList *destroyList;<font color="#B22222">/* destructor list */</font>
+
+<a name="line160">160: </a>  Mat       H,G;               <font color="#B22222">/* projected problem matrices */</font>
+<a name="line161">161: </a>  Mat       auxM;              <font color="#B22222">/* auxiliary dense matrix */</font>
+<a name="line162">162: </a>  PetscInt  size_MT;           <font color="#B22222">/* rows in MT */</font>
+
+<a name="line164">164: </a>  PetscInt  V_tra_s;
+<a name="line165">165: </a>  PetscInt  V_tra_e;       <font color="#B22222">/* cX &lt;- [cX V*MT(0:V_tra_s-1)], V &lt;- V*MT(V_tra_s:V_tra_e) */</font>
+<a name="line166">166: </a>  PetscInt  V_new_s;
+<a name="line167">167: </a>  PetscInt  V_new_e;           <font color="#B22222">/* added to V the columns V_new_s:V_new_e */</font>
+<a name="line168">168: </a>  PetscBool W_shift;           <font color="#B22222">/* if true W is shifted when vectors converge */</font>
+<a name="line169">169: </a>} dvdDashboard;
+
+<a name="line171">171: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line172">172: </a>  <font color="#B22222">/*------------------------- User parameters ---------------------------*/</font>
+<a name="line173">173: </a>  PetscInt  blocksize;     <font color="#B22222">/* block size */</font>
+<a name="line174">174: </a>  PetscInt  initialsize;   <font color="#B22222">/* initial size of V */</font>
+<a name="line175">175: </a>  PetscInt  minv;          <font color="#B22222">/* size of V after restarting */</font>
+<a name="line176">176: </a>  PetscInt  plusk;         <font color="#B22222">/* keep plusk eigenvectors from the last iteration */</font>
+<a name="line177">177: </a>  PetscBool ipB;           <font color="#B22222">/* true if B-ortho is used */</font>
+<a name="line178">178: </a>  PetscReal fix;           <font color="#B22222">/* the fix parameter */</font>
+<a name="line179">179: </a>  PetscBool krylovstart;   <font color="#B22222">/* true if the starting subspace is a Krylov basis */</font>
+<a name="line180">180: </a>  PetscBool dynamic;       <font color="#B22222">/* true if dynamic stopping criterion is used */</font>
+<a name="line181">181: </a>  PetscBool doubleexp;     <font color="#B22222">/* double expansion in GD (GD2) */</font>
+
+<a name="line183">183: </a>  <font color="#B22222">/*----------------- Child objects and working data -------------------*/</font>
+<a name="line184">184: </a>  dvdDashboard ddb;
+<a name="line185">185: </a>} EPS_DAVIDSON;
+
+<a name="line187">187: </a><strong><font color="#4169E1"><a name="EPSDavidsonFLAdd"></a>PETSC_STATIC_INLINE PetscErrorCode EPSDavidsonFLAdd(dvdFunctionList **fl,dvdCallback f)</font></strong>
+<a name="line188">188: </a>{
+<a name="line190">190: </a>  dvdFunctionList *l;
+
+<a name="line193">193: </a>  PetscNew(&amp;l);
+<a name="line194">194: </a>  l-&gt;f = f;
+<a name="line195">195: </a>  l-&gt;next = *fl;
+<a name="line196">196: </a>  *fl = l;
+<a name="line197">197: </a>  <font color="#4169E1">return</font>(0);
+<a name="line198">198: </a>}
+
+<a name="line200">200: </a><strong><font color="#4169E1"><a name="EPSDavidsonFLCall"></a>PETSC_STATIC_INLINE PetscErrorCode EPSDavidsonFLCall(dvdFunctionList *fl,dvdDashboard *d)</font></strong>
+<a name="line201">201: </a>{
+<a name="line203">203: </a>  dvdFunctionList *l;
+
+<a name="line206">206: </a>  <font color="#4169E1">for</font> (l=fl;l;l=l-&gt;next) { (l-&gt;f)(d); }
+<a name="line207">207: </a>  <font color="#4169E1">return</font>(0);
+<a name="line208">208: </a>}
+
+<a name="line210">210: </a><strong><font color="#4169E1"><a name="EPSDavidsonFLDestroy"></a>PETSC_STATIC_INLINE PetscErrorCode EPSDavidsonFLDestroy(dvdFunctionList **fl)</font></strong>
+<a name="line211">211: </a>{
+<a name="line212">212: </a>  PetscErrorCode  ierr;
+<a name="line213">213: </a>  dvdFunctionList *l,*l0;
+
+<a name="line216">216: </a>  <font color="#4169E1">for</font> (l=*fl;l;l=l0) {
+<a name="line217">217: </a>    l0 = l-&gt;next;
+<a name="line218">218: </a>    PetscFree(l);
+<a name="line219">219: </a>  }
+<a name="line220">220: </a>  *fl = NULL;
+<a name="line221">221: </a>  <font color="#4169E1">return</font>(0);
+<a name="line222">222: </a>}
+
+<a name="line224">224: </a><font color="#B22222">/*</font>
+<a name="line225">225: </a><font color="#B22222">  The blackboard configuration structure: saves information about the memory</font>
+<a name="line226">226: </a><font color="#B22222">  and other requirements.</font>
+
+<a name="line228">228: </a><font color="#B22222">  The starting memory structure:</font>
+
+<a name="line230">230: </a><font color="#B22222">  V           W?          AV          <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>?          tKZ</font>
+<a name="line231">231: </a><font color="#B22222">  |-----------|-----------|-----------|------------|-------|</font>
+<a name="line232">232: </a><font color="#B22222">  nev+mpd     nev+mpd     scP+mpd     nev?+mpd     sP+scP</font>
+<a name="line233">233: </a><font color="#B22222">              scP+mpd                 scP+mpd</font>
+
+<a name="line235">235: </a><font color="#B22222">  The final memory structure considering W_shift:</font>
+
+<a name="line237">237: </a><font color="#B22222">  cX  V       cY?  W?     cAV AV      BcX? <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>?     KZ  tKZ</font>
+<a name="line238">238: </a><font color="#B22222">  |---|-------|----|------|---|-------|----|-------|---|---|</font>
+<a name="line239">239: </a><font color="#B22222">  nev mpd     nev  mpd    scP mpd     nev  mpd     scP sP    &lt;- shift</font>
+<a name="line240">240: </a><font color="#B22222">              scP                     scP                    &lt;- !shift</font>
+<a name="line241">241: </a><font color="#B22222">*/</font>
+<a name="line242">242: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line243">243: </a>  PetscInt max_size_V;         <font color="#B22222">/* max size of the searching subspace (mpd) */</font>
+<a name="line244">244: </a>  PetscInt max_size_X;         <font color="#B22222">/* max size of X (bs) */</font>
+<a name="line245">245: </a>  PetscInt size_V;             <font color="#B22222">/* real size of V (nev+size_P+mpd) */</font>
+<a name="line246">246: </a>  PetscInt max_size_oldX;      <font color="#B22222">/* max size of oldX */</font>
+<a name="line247">247: </a>  PetscInt max_nev;            <font color="#B22222">/* max number of converged pairs */</font>
+<a name="line248">248: </a>  PetscInt max_size_P;         <font color="#B22222">/* number of computed vectors for the projector */</font>
+<a name="line249">249: </a>  PetscInt max_size_cP;        <font color="#B22222">/* number of converged vectors in the projectors */</font>
+<a name="line250">250: </a>  PetscInt max_size_proj;      <font color="#B22222">/* max size projected problem */</font>
+<a name="line251">251: </a>  PetscInt max_size_cX_proj;   <font color="#B22222">/* max converged vectors in the projected problem */</font>
+<a name="line252">252: </a>  PetscInt state;              <font color="#B22222">/* method states:</font>
+<a name="line253">253: </a><font color="#B22222">                                   0: preconfiguring</font>
+<a name="line254">254: </a><font color="#B22222">                                   1: configuring</font>
+<a name="line255">255: </a><font color="#B22222">                                   2: running */</font>
+<a name="line256">256: </a>} dvdBlackboard;
+
+<a name="line258">258: </a><strong><font color="#228B22">#define DVD_STATE_PRECONF 0</font></strong>
+<a name="line259">259: </a><strong><font color="#228B22">#define DVD_STATE_CONF 1</font></strong>
+<a name="line260">260: </a><strong><font color="#228B22">#define DVD_STATE_RUN 2</font></strong>
+
+<a name="line262">262: </a><font color="#B22222">/* Prototypes of non-static auxiliary functions */</font>
+<a name="line263">263: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_calcpairs_qz(dvdDashboard*,dvdBlackboard*,PetscBool,PetscBool)</font></strong>;
+<a name="line264">264: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_improvex_gd2(dvdDashboard*,dvdBlackboard*,KSP,PetscInt)</font></strong>;
+<a name="line265">265: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_improvex_jd(dvdDashboard*,dvdBlackboard*,KSP,PetscInt,PetscBool)</font></strong>;
+<a name="line266">266: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_improvex_jd_proj_uv(dvdDashboard*,dvdBlackboard*)</font></strong>;
+<a name="line267">267: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_improvex_jd_lit_const(dvdDashboard*,dvdBlackboard*,PetscInt,PetscReal,PetscReal)</font></strong>;
+<a name="line268">268: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_improvex_compute_X(dvdDashboard*,PetscInt,PetscInt,Vec*,PetscScalar*,PetscInt)</font></strong>;
+<a name="line269">269: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_initV(dvdDashboard*,dvdBlackboard*,PetscInt,PetscInt,PetscBool)</font></strong>;
+<a name="line270">270: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_orthV(<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>,PetscInt,PetscInt)</font></strong>;
+<a name="line271">271: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_schm_basic_preconf(dvdDashboard*,dvdBlackboard*,PetscInt,PetscInt,PetscInt,PetscInt,PetscInt,PetscInt,HarmType_t,KSP,InitType_t,PetscBool,PetscBool,PetscBool)</font></strong>;
+<a name="line272">272: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_schm_basic_conf(dvdDashboard*,dvdBlackboard*,PetscInt,PetscInt,PetscInt,PetscInt,PetscInt,PetscInt,HarmType_t,PetscBool,PetscScalar,KSP,PetscReal,InitType_t,PetscBool,PetscBool,PetscBool,PetscBool)</font></strong>;
+<a name="line273">273: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_testconv_slepc(dvdDashboard*,dvdBlackboard*)</font></strong>;
+<a name="line274">274: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_managementV_basic(dvdDashboard*,dvdBlackboard*,PetscInt,PetscInt,PetscInt,PetscInt,PetscBool,PetscBool)</font></strong>;
+<a name="line275">275: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_static_precond_PC(dvdDashboard*,dvdBlackboard*,PC)</font></strong>;
+<a name="line276">276: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_harm_updateproj(dvdDashboard*)</font></strong>;
+<a name="line277">277: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode dvd_harm_conf(dvdDashboard*,dvdBlackboard*,HarmType_t,PetscBool,PetscScalar)</font></strong>;
+
+<a name="line279">279: </a><font color="#B22222">/* Internal interface routines */</font>
+<a name="line280">280: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSReset_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>)</font></strong>;
+<a name="line281">281: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSSetUp_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>)</font></strong>;
+<a name="line282">282: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSSolve_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>)</font></strong>;
+<a name="line283">283: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSComputeVectors_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>)</font></strong>;
+<a name="line284">284: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDSetKrylovStart_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscBool)</font></strong>;
+<a name="line285">285: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDGetKrylovStart_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscBool*)</font></strong>;
+<a name="line286">286: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDSetBlockSize_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt)</font></strong>;
+<a name="line287">287: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDGetBlockSize_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt*)</font></strong>;
+<a name="line288">288: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDSetRestart_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt,PetscInt)</font></strong>;
+<a name="line289">289: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDGetRestart_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt*,PetscInt*)</font></strong>;
+<a name="line290">290: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDGetInitialSize_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt*)</font></strong>;
+<a name="line291">291: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDSetInitialSize_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt)</font></strong>;
+<a name="line292">292: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDSetBOrth_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscBool)</font></strong>;
+<a name="line293">293: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSXDGetBOrth_XD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscBool*)</font></strong>;
+<a name="line294">294: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSJDGetFix_JD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscReal*)</font></strong>;
+<a name="line295">295: </a><strong><font color="#4169E1">SLEPC_INTERN PetscErrorCode EPSJDGetConstCorrectionTol_JD(<a href="../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscBool*)</font></strong>;
+
+</pre>
+</body>
+
+</html>

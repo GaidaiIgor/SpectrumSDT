@@ -1,0 +1,144 @@
+<center><a href="test10.c">Actual source code: test10.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tests/test10.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:55+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tests/test10.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Computes the smallest nonzero eigenvalue of the Laplacian of a graph.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"This example illustrates <a href="../../../docs/manualpages/EPS/EPSSetDeflationSpace.html#EPSSetDeflationSpace">EPSSetDeflationSpace</a>(). The example graph corresponds to a "</font>
+<a name="line13"> 13: </a>  <font color="#666666">"2-D regular mesh. The command line options are:\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x dimension.\n"</font>
+<a name="line15"> 15: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in y dimension.\n\n"</font>;
+
+<a name="line17"> 17: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line19"> 19: </a><strong><font color="#4169E1"><a name="main"></a>int main (int argc,char **argv)</font></strong>
+<a name="line20"> 20: </a>{
+<a name="line21"> 21: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;             <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line22"> 22: </a>  Mat            A;               <font color="#B22222">/* operator matrix */</font>
+<a name="line23"> 23: </a>  Vec            x;
+<a name="line24"> 24: </a>  PetscInt       N,n=10,m,i,j,II,Istart,Iend,nev;
+<a name="line25"> 25: </a>  PetscScalar    w;
+<a name="line26"> 26: </a>  PetscBool      flag;
+
+<a name="line29"> 29: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line31"> 31: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line32"> 32: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,&amp;flag);
+<a name="line33"> 33: </a>  <font color="#4169E1">if</font> (!flag) m=n;
+<a name="line34"> 34: </a>  N = n*m;
+<a name="line35"> 35: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nFiedler vector of a 2-D regular mesh, N=%D (%Dx%D grid)\n\n"</font>,N,n,m);
+
+<a name="line37"> 37: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line38"> 38: </a><font color="#B22222">     Compute the operator matrix that defines the eigensystem, Ax=kx</font>
+<a name="line39"> 39: </a><font color="#B22222">     In this example, A = L(G), where L is the Laplacian of graph G, i.e.</font>
+<a name="line40"> 40: </a><font color="#B22222">     Lii = degree of node i, Lij = -1 if edge (i,j) exists in G</font>
+<a name="line41"> 41: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line43"> 43: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line44"> 44: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line45"> 45: </a>  MatSetFromOptions(A);
+<a name="line46"> 46: </a>  MatSetUp(A);
+
+<a name="line48"> 48: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line49"> 49: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line50"> 50: </a>    i = II/n; j = II-i*n;
+<a name="line51"> 51: </a>    w = 0.0;
+<a name="line52"> 52: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,II,II-n,-1.0,INSERT_VALUES); w=w+1.0; }
+<a name="line53"> 53: </a>    <font color="#4169E1">if</font> (i&lt;m-1) { MatSetValue(A,II,II+n,-1.0,INSERT_VALUES); w=w+1.0; }
+<a name="line54"> 54: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(A,II,II-1,-1.0,INSERT_VALUES); w=w+1.0; }
+<a name="line55"> 55: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(A,II,II+1,-1.0,INSERT_VALUES); w=w+1.0; }
+<a name="line56"> 56: </a>    MatSetValue(A,II,II,w,INSERT_VALUES);
+<a name="line57"> 57: </a>  }
+
+<a name="line59"> 59: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line60"> 60: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+
+<a name="line62"> 62: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line63"> 63: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line64"> 64: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line66"> 66: </a>  <font color="#B22222">/*</font>
+<a name="line67"> 67: </a><font color="#B22222">     Create eigensolver context</font>
+<a name="line68"> 68: </a><font color="#B22222">  */</font>
+<a name="line69"> 69: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+
+<a name="line71"> 71: </a>  <font color="#B22222">/*</font>
+<a name="line72"> 72: </a><font color="#B22222">     Set operators. In this case, it is a standard eigenvalue problem</font>
+<a name="line73"> 73: </a><font color="#B22222">  */</font>
+<a name="line74"> 74: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,NULL);
+<a name="line75"> 75: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_HEP</a>);
+
+<a name="line77"> 77: </a>  <font color="#B22222">/*</font>
+<a name="line78"> 78: </a><font color="#B22222">     Select portion of spectrum</font>
+<a name="line79"> 79: </a><font color="#B22222">  */</font>
+<a name="line80"> 80: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>);
+
+<a name="line82"> 82: </a>  <font color="#B22222">/*</font>
+<a name="line83"> 83: </a><font color="#B22222">     Set solver parameters at runtime</font>
+<a name="line84"> 84: </a><font color="#B22222">  */</font>
+<a name="line85"> 85: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line87"> 87: </a>  <font color="#B22222">/*</font>
+<a name="line88"> 88: </a><font color="#B22222">     Attach deflation space: in this case, the matrix has a constant</font>
+<a name="line89"> 89: </a><font color="#B22222">     nullspace, [1 1 ... 1]^T is the eigenvector of the zero eigenvalue</font>
+<a name="line90"> 90: </a><font color="#B22222">  */</font>
+<a name="line91"> 91: </a>  MatCreateVecs(A,&amp;x,NULL);
+<a name="line92"> 92: </a>  VecSet(x,1.0);
+<a name="line93"> 93: </a>  <a href="../../../docs/manualpages/EPS/EPSSetDeflationSpace.html#EPSSetDeflationSpace">EPSSetDeflationSpace</a>(eps,1,&amp;x);
+<a name="line94"> 94: </a>  VecDestroy(&amp;x);
+
+<a name="line96"> 96: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line97"> 97: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line98"> 98: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line100">100: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line101">101: </a>  <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(eps,&amp;nev,NULL,NULL);
+<a name="line102">102: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of requested eigenvalues: %D\n"</font>,nev);
+
+<a name="line104">104: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line105">105: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line106">106: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+<a name="line109">109: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line110">110: </a>  MatDestroy(&amp;A);
+<a name="line111">111: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line112">112: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line113">113: </a>}
+
+<a name="line115">115: </a><font color="#B22222">/*TEST</font>
+
+<a name="line117">117: </a><font color="#B22222">   testset:</font>
+<a name="line118">118: </a><font color="#B22222">      args: -eps_nev 4 -m 11 -eps_max_it 500</font>
+<a name="line119">119: </a><font color="#B22222">      requires: !single</font>
+<a name="line120">120: </a><font color="#B22222">      output_file: output/test10_1.out</font>
+<a name="line121">121: </a><font color="#B22222">      test:</font>
+<a name="line122">122: </a><font color="#B22222">         suffix: 1</font>
+<a name="line123">123: </a><font color="#B22222">         args: -eps_type {{krylovschur arnoldi lanczos gd jd rqcg lobpcg}}</font>
+<a name="line124">124: </a><font color="#B22222">      test:</font>
+<a name="line125">125: </a><font color="#B22222">         suffix: 1_gd2</font>
+<a name="line126">126: </a><font color="#B22222">         args: -eps_type gd -eps_gd_double_expansion</font>
+
+<a name="line128">128: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

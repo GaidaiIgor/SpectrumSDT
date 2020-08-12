@@ -1,0 +1,213 @@
+<center><a href="ex23f90.F90">Actual source code: ex23f90.F90</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/mfn/tutorials/ex23f90.F90.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:14+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/mfn/tutorials/ex23f90.F90.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a>!
+<a name="line2">  2: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line3">  3: </a>!  SLEPc - Scalable Library <font color="#4169E1">for</font> Eigenvalue Problem Computations
+<a name="line4">  4: </a>!  Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain
+<a name="line5">  5: </a>!
+<a name="line6">  6: </a>!  This file is part of SLEPc.
+<a name="line7">  7: </a>!  SLEPc is distributed under a 2-clause BSD license (see LICENSE).
+<a name="line8">  8: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line9">  9: </a>!
+<a name="line10"> 10: </a>!  Program usage: mpiexec -n &lt;np&gt; ./ex23f90 [-help] [-t &lt;t&gt;] [-m &lt;m&gt;] [SLEPc opts]
+<a name="line11"> 11: </a>!
+<a name="line12"> 12: </a>!  Description: Computes exp(t*A)*v <font color="#4169E1">for</font> a matrix associated with a
+<a name="line13"> 13: </a>!  Markov model. This is the Fortran90 equivalent to ex23.c
+<a name="line14"> 14: </a>!
+<a name="line15"> 15: </a>!  The command line options are:
+<a name="line16"> 16: </a>!    -t &lt;t&gt;, where &lt;t&gt; = time parameter (multiplies the matrix)
+<a name="line17"> 17: </a>!    -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in each dimension
+<a name="line18"> 18: </a>!
+<a name="line19"> 19: </a>! ----------------------------------------------------------------------
+<a name="line20"> 20: </a>!
+<a name="line21"> 21: </a>      program main
+<a name="line22"> 22: </a> #include <A href="../../../include/slepc/finclude/slepcmfn.h.html">&lt;slepc/finclude/slepcmfn.h&gt;</A>
+<a name="line23"> 23: </a>      use slepcmfn
+<a name="line24"> 24: </a>      implicit none
+
+<a name="line26"> 26: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line27"> 27: </a>!     Declarations
+<a name="line28"> 28: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line29"> 29: </a>!
+<a name="line30"> 30: </a>!  Variables:
+<a name="line31"> 31: </a>!     A      problem matrix
+<a name="line32"> 32: </a>!     mfn    matrix function solver context
+
+<a name="line34"> 34: </a>      Mat            A
+<a name="line35"> 35: </a>      <a href="../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a>            mfn
+<a name="line36"> 36: </a>      <a href="../../../docs/manualpages/FN/FN.html#FN">FN</a>             f
+<a name="line37"> 37: </a>      PetscReal      tol, norm, cst, pd, pu
+<a name="line38"> 38: </a>      PetscScalar    t, z
+<a name="line39"> 39: </a>      Vec            v, y
+<a name="line40"> 40: </a>      PetscInt       N, m, ncv, maxit, its, ii, jj
+<a name="line41"> 41: </a>      PetscInt       i, j, jmax, ix, Istart, Iend
+<a name="line42"> 42: </a>      PetscMPIInt    rank
+<a name="line43"> 43: </a>      PetscErrorCode ierr
+<a name="line44"> 44: </a>      PetscBool      flg
+<a name="line45"> 45: </a>      <a href="../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFNConvergedReason</a> reason
+
+<a name="line47"> 47: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line48"> 48: </a>!     Beginning of program
+<a name="line49"> 49: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line51"> 51: </a>      call <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(PETSC_NULL_CHARACTER,ierr)
+<a name="line52"> 52: </a>      <font color="#4169E1">if</font> (ierr .ne. 0) then
+<a name="line53"> 53: </a>        print*,'<a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a> failed'
+<a name="line54"> 54: </a>        stop
+<a name="line55"> 55: </a>      endif
+<a name="line56"> 56: </a>      call <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PETSC_COMM_WORLD,rank,ierr);CHKERRA(ierr)
+<a name="line57"> 57: </a>      m = 15
+<a name="line58"> 58: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-m',m,flg,ierr);CHKERRA(ierr)
+<a name="line59"> 59: </a>      t = 2.0
+<a name="line60"> 60: </a>      call PetscOptionsGetScalar(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-t',t,flg,ierr);CHKERRA(ierr)
+<a name="line61"> 61: </a>      N = m*(m+1)/2
+<a name="line62"> 62: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line63"> 63: </a>        write(*,100) N, m
+<a name="line64"> 64: </a>      endif
+<a name="line65"> 65: </a> 100  format (/'Markov y=exp(t*A)*e_1, N=',I6,' (m=',I4,')')
+
+<a name="line67"> 67: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line68"> 68: </a>!     Compute the transition probability matrix, A
+<a name="line69"> 69: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line71"> 71: </a>      call MatCreate(PETSC_COMM_WORLD,A,ierr);CHKERRA(ierr)
+<a name="line72"> 72: </a>      call MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,N,N,ierr);CHKERRA(ierr)
+<a name="line73"> 73: </a>      call MatSetFromOptions(A,ierr);CHKERRA(ierr)
+<a name="line74"> 74: </a>      call MatSetUp(A,ierr);CHKERRA(ierr)
+<a name="line75"> 75: </a>      call MatGetOwnershipRange(A,Istart,Iend,ierr);CHKERRA(ierr)
+<a name="line76"> 76: </a>      ix = 0
+<a name="line77"> 77: </a>      cst = 0.5/real(m-1)
+<a name="line78"> 78: </a>      <font color="#4169E1">do</font> i=1,m
+<a name="line79"> 79: </a>        jmax = m-i+1
+<a name="line80"> 80: </a>        <font color="#4169E1">do</font> j=1,jmax
+<a name="line81"> 81: </a>          ix = ix + 1
+<a name="line82"> 82: </a>          ii = ix - 1
+<a name="line83"> 83: </a>          <font color="#4169E1">if</font> (ix-1.ge.Istart .and. ix.le.Iend) then
+<a name="line84"> 84: </a>            <font color="#4169E1">if</font> (j.ne.jmax) then
+<a name="line85"> 85: </a>              pd = cst*(i+j-1)
+<a name="line86"> 86: </a>              !** north
+<a name="line87"> 87: </a>              <font color="#4169E1">if</font> (i.eq.1) then
+<a name="line88"> 88: </a>                z = 2.0*pd
+<a name="line89"> 89: </a>              <font color="#4169E1">else</font>
+<a name="line90"> 90: </a>                z = pd
+<a name="line91"> 91: </a>              end <font color="#4169E1">if</font>
+<a name="line92"> 92: </a>              call MatSetValue(A,ii,ix,z,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line93"> 93: </a>              !** east
+<a name="line94"> 94: </a>              <font color="#4169E1">if</font> (j.eq.1) then
+<a name="line95"> 95: </a>                z = 2.0*pd
+<a name="line96"> 96: </a>              <font color="#4169E1">else</font>
+<a name="line97"> 97: </a>                z = pd
+<a name="line98"> 98: </a>              end <font color="#4169E1">if</font>
+<a name="line99"> 99: </a>              jj = ix+jmax-1
+<a name="line100">100: </a>              call MatSetValue(A,ii,jj,z,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line101">101: </a>            end <font color="#4169E1">if</font>
+
+<a name="line103">103: </a>            !** south
+<a name="line104">104: </a>            pu = 0.5 - cst*(i+j-3)
+<a name="line105">105: </a>            z = pu
+<a name="line106">106: </a>            <font color="#4169E1">if</font> (j.gt.1) then
+<a name="line107">107: </a>              jj = ix-2
+<a name="line108">108: </a>              call MatSetValue(A,ii,jj,z,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line109">109: </a>            end <font color="#4169E1">if</font>
+<a name="line110">110: </a>            !** west
+<a name="line111">111: </a>            <font color="#4169E1">if</font> (i.gt.1) then
+<a name="line112">112: </a>              jj = ix-jmax-2
+<a name="line113">113: </a>              call MatSetValue(A,ii,jj,z,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line114">114: </a>            end <font color="#4169E1">if</font>
+<a name="line115">115: </a>          end <font color="#4169E1">if</font>
+<a name="line116">116: </a>        end <font color="#4169E1">do</font>
+<a name="line117">117: </a>      end <font color="#4169E1">do</font>
+<a name="line118">118: </a>      call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line119">119: </a>      call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+
+<a name="line121">121: </a>!     ** Set v = e_1
+<a name="line122">122: </a>      call MatCreateVecs(A,y,v,ierr);CHKERRA(ierr)
+<a name="line123">123: </a>      ii = 0
+<a name="line124">124: </a>      z = 1.0
+<a name="line125">125: </a>      call VecSetValue(v,ii,z,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line126">126: </a>      call VecAssemblyBegin(v,ierr);CHKERRA(ierr)
+<a name="line127">127: </a>      call VecAssemblyEnd(v,ierr);CHKERRA(ierr)
+
+<a name="line129">129: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line130">130: </a>!     Create the solver and set various options
+<a name="line131">131: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line133">133: </a>!     ** Create matrix function solver context
+<a name="line134">134: </a>      call <a href="../../../docs/manualpages/MFN/MFNCreate.html#MFNCreate">MFNCreate</a>(PETSC_COMM_WORLD,mfn,ierr);CHKERRA(ierr)
+
+<a name="line136">136: </a>!     ** Set operator matrix, the function to compute, and other options
+<a name="line137">137: </a>      call <a href="../../../docs/manualpages/MFN/MFNSetOperator.html#MFNSetOperator">MFNSetOperator</a>(mfn,A,ierr);CHKERRA(ierr)
+<a name="line138">138: </a>      call <a href="../../../docs/manualpages/MFN/MFNGetFN.html#MFNGetFN">MFNGetFN</a>(mfn,f,ierr);CHKERRA(ierr)
+<a name="line139">139: </a>      call <a href="../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(f,FNEXP,ierr);CHKERRA(ierr)
+<a name="line140">140: </a>      z = 1.0
+<a name="line141">141: </a>      call <a href="../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(f,t,z,ierr);CHKERRA(ierr)
+<a name="line142">142: </a>      tol = 0.0000001
+<a name="line143">143: </a>      call <a href="../../../docs/manualpages/MFN/MFNSetTolerances.html#MFNSetTolerances">MFNSetTolerances</a>(mfn,tol,PETSC_DEFAULT_INTEGER,ierr);CHKERRA(ierr)
+
+<a name="line145">145: </a>!     ** Set solver parameters at runtime
+<a name="line146">146: </a>      call <a href="../../../docs/manualpages/MFN/MFNSetFromOptions.html#MFNSetFromOptions">MFNSetFromOptions</a>(mfn,ierr);CHKERRA(ierr)
+
+<a name="line148">148: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line149">149: </a>!     Solve the problem, y=exp(t*A)*v
+<a name="line150">150: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line152">152: </a>      call <a href="../../../docs/manualpages/MFN/MFNSolve.html#MFNSolve">MFNSolve</a>(mfn,v,y,ierr);CHKERRA(ierr)
+<a name="line153">153: </a>      call <a href="../../../docs/manualpages/MFN/MFNGetConvergedReason.html#MFNGetConvergedReason">MFNGetConvergedReason</a>(mfn,reason,ierr);CHKERRA(ierr)
+<a name="line154">154: </a>      <font color="#4169E1">if</font> (reason.lt.0) then; SETERRA(PETSC_COMM_WORLD,1,'Solver did not converge'); endif
+<a name="line155">155: </a>      call VecNorm(y,NORM_2,norm,ierr);CHKERRA(ierr)
+
+<a name="line157">157: </a>!     ** Optional: Get some information from the solver and display it
+<a name="line158">158: </a>      call <a href="../../../docs/manualpages/MFN/MFNGetIterationNumber.html#MFNGetIterationNumber">MFNGetIterationNumber</a>(mfn,its,ierr);CHKERRA(ierr)
+<a name="line159">159: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line160">160: </a>        write(*,120) its
+<a name="line161">161: </a>      endif
+<a name="line162">162: </a> 120  format (' Number of iterations of the method: ',I4)
+<a name="line163">163: </a>      call <a href="../../../docs/manualpages/MFN/MFNGetDimensions.html#MFNGetDimensions">MFNGetDimensions</a>(mfn,ncv,ierr);CHKERRA(ierr)
+<a name="line164">164: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line165">165: </a>        write(*,130) ncv
+<a name="line166">166: </a>      endif
+<a name="line167">167: </a> 130  format (' Subspace dimension:',I4)
+<a name="line168">168: </a>      call <a href="../../../docs/manualpages/MFN/MFNGetTolerances.html#MFNGetTolerances">MFNGetTolerances</a>(mfn,tol,maxit,ierr);CHKERRA(ierr)
+<a name="line169">169: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line170">170: </a>        write(*,140) tol,maxit
+<a name="line171">171: </a>      endif
+<a name="line172">172: </a> 140  format (' Stopping condition: tol=',f10.7,' maxit=',I4)
+
+<a name="line174">174: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line175">175: </a>!     Display solution and clean up
+<a name="line176">176: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line178">178: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line179">179: </a>        write(*,150) PetscRealPart(t),norm
+<a name="line180">180: </a>      endif
+<a name="line181">181: </a> 150  format (' Computed vector at time t=',f4.1,' has norm ',f8.5)
+
+<a name="line183">183: </a>      call <a href="../../../docs/manualpages/MFN/MFNDestroy.html#MFNDestroy">MFNDestroy</a>(mfn,ierr);CHKERRA(ierr)
+<a name="line184">184: </a>      call MatDestroy(A,ierr);CHKERRA(ierr)
+<a name="line185">185: </a>      call VecDestroy(v,ierr);CHKERRA(ierr)
+<a name="line186">186: </a>      call VecDestroy(y,ierr);CHKERRA(ierr)
+<a name="line187">187: </a>      call <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>(ierr)
+<a name="line188">188: </a>      end
+
+<a name="line190">190: </a>!<font color="#B22222">/*TEST</font>
+<a name="line191">191: </a><font color="#B22222">!</font>
+<a name="line192">192: </a><font color="#B22222">!   test:</font>
+<a name="line193">193: </a><font color="#B22222">!      suffix: 1</font>
+<a name="line194">194: </a><font color="#B22222">!      args: -mfn_ncv 6</font>
+<a name="line195">195: </a><font color="#B22222">!</font>
+<a name="line196">196: </a><font color="#B22222">!TEST*/</font>
+</pre>
+</body>
+
+</html>

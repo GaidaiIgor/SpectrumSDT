@@ -1,0 +1,600 @@
+<center><a href="primme.c">Actual source code: primme.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/external/primme/primme.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:55+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/external/primme/primme.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This file implements a wrapper to the PRIMME package</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#A020F0">#include &lt;primme.h&gt;</font>
+
+<a name="line18"> 18: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line19"> 19: </a><font color="#A020F0">#if defined(PETSC_USE_REAL_SINGLE)</font>
+<a name="line20"> 20: </a><strong><font color="#228B22">#define PRIMME_DRIVER cprimme</font></strong>
+<a name="line21"> 21: </a><font color="#A020F0">#else</font>
+<a name="line22"> 22: </a><strong><font color="#228B22">#define PRIMME_DRIVER zprimme</font></strong>
+<a name="line23"> 23: </a><font color="#A020F0">#endif</font>
+<a name="line24"> 24: </a><font color="#A020F0">#else</font>
+<a name="line25"> 25: </a><font color="#A020F0">#if defined(PETSC_USE_REAL_SINGLE)</font>
+<a name="line26"> 26: </a><strong><font color="#228B22">#define PRIMME_DRIVER sprimme</font></strong>
+<a name="line27"> 27: </a><font color="#A020F0">#else</font>
+<a name="line28"> 28: </a><strong><font color="#228B22">#define PRIMME_DRIVER dprimme</font></strong>
+<a name="line29"> 29: </a><font color="#A020F0">#endif</font>
+<a name="line30"> 30: </a><font color="#A020F0">#endif</font>
+
+<a name="line32"> 32: </a><font color="#A020F0">#if defined(PRIMME_VERSION_MAJOR) &amp;&amp; PRIMME_VERSION_MAJOR*100+PRIMME_VERSION_MINOR &gt;= 202</font>
+<a name="line33"> 33: </a><strong><font color="#228B22">#define SLEPC_HAVE_PRIMME2p2</font></strong>
+<a name="line34"> 34: </a><font color="#A020F0">#endif</font>
+
+<a name="line36"> 36: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line37"> 37: </a>  primme_params        primme;    <font color="#B22222">/* param struc */</font>
+<a name="line38"> 38: </a>  PetscInt             bs;        <font color="#B22222">/* block size */</font>
+<a name="line39"> 39: </a>  primme_preset_method method;    <font color="#B22222">/* primme method */</font>
+<a name="line40"> 40: </a>  Mat                  A,B;       <font color="#B22222">/* problem matrices */</font>
+<a name="line41"> 41: </a>  KSP                  ksp;       <font color="#B22222">/* linear solver and preconditioner */</font>
+<a name="line42"> 42: </a>  Vec                  x,y;       <font color="#B22222">/* auxiliary vectors */</font>
+<a name="line43"> 43: </a>  double               target;    <font color="#B22222">/* a copy of eps's target */</font>
+<a name="line44"> 44: </a>} EPS_PRIMME;
+
+<a name="line46"> 46: </a><strong><font color="#4169E1"><a name="par_GlobalSumReal"></a>static void par_GlobalSumReal(void *sendBuf,void *recvBuf,int *count,primme_params *primme,int *ierr)</font></strong>
+<a name="line47"> 47: </a>{
+<a name="line48"> 48: </a>  <font color="#4169E1">if</font> (sendBuf == recvBuf) {
+<a name="line49"> 49: </a>    *<a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(MPI_IN_PLACE,recvBuf,*count,MPIU_REAL,MPIU_SUM,PetscObjectComm((PetscObject)primme-&gt;commInfo));CHKERRABORT(PetscObjectComm((PetscObject)primme-&gt;commInfo),*ierr);
+<a name="line50"> 50: </a>  } <font color="#4169E1">else</font> {
+<a name="line51"> 51: </a>    *<a href="http://www.mpich.org/static/docs/latest/www3/MPI_Allreduce.html#MPI_Allreduce">MPI_Allreduce</a>(sendBuf,recvBuf,*count,MPIU_REAL,MPIU_SUM,PetscObjectComm((PetscObject)primme-&gt;commInfo));CHKERRABORT(PetscObjectComm((PetscObject)primme-&gt;commInfo),*ierr);
+<a name="line52"> 52: </a>  }
+<a name="line53"> 53: </a>}
+
+<a name="line55"> 55: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line56"> 56: </a><strong><font color="#4169E1"><a name="par_broadcastReal"></a>static void par_broadcastReal(void *buf,int *count,primme_params *primme,int *ierr)</font></strong>
+<a name="line57"> 57: </a>{
+<a name="line58"> 58: </a>  *<a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(buf,*count,MPIU_REAL,0<font color="#B22222">/*root*/</font>,PetscObjectComm((PetscObject)primme-&gt;commInfo));CHKERRABORT(PetscObjectComm((PetscObject)primme-&gt;commInfo),*ierr);
+<a name="line59"> 59: </a>}
+<a name="line60"> 60: </a><font color="#A020F0">#endif</font>
+
+<a name="line62"> 62: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line63"> 63: </a><strong><font color="#4169E1"><a name="convTestFun"></a>static void convTestFun(double *eval,void *evec,double *resNorm,int *isconv,primme_params *primme,int *err)</font></strong>
+<a name="line64"> 64: </a>{
+<a name="line66"> 66: </a>  <a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps = (<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>)primme-&gt;commInfo;
+<a name="line67"> 67: </a>  PetscScalar    eigvr = eval?*eval:0.0;
+<a name="line68"> 68: </a>  PetscReal      r = resNorm?*resNorm:HUGE_VAL,errest;
+
+<a name="line70"> 70: </a>  *err = 1;
+<a name="line71"> 71: </a>  (*eps-&gt;converged)(eps,eigvr,0.0,r,&amp;errest,eps-&gt;convergedctx);CHKERRABORT(PetscObjectComm((PetscObject)eps),ierr);
+<a name="line72"> 72: </a>  *isconv = (errest&lt;=eps-&gt;tol?1:0);
+<a name="line73"> 73: </a>  *err = 0;
+<a name="line74"> 74: </a>}
+
+<a name="line76"> 76: </a>static void monitorFun(void *basisEvals,int *basisSize,int *basisFlags,int *iblock,int *blockSize,void *basisNorms,int *numConverged,void *lockedEvals,int *numLocked,int *lockedFlags,void *lockedNorms,int *inner_its,void *LSRes,
+<a name="line77"> 77: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line78"> 78: </a>                       const char *msg,double *time,
+<a name="line79"> 79: </a><font color="#A020F0">#endif</font>
+<a name="line80"> 80: </a>                       primme_event *event,<font color="#4169E1">struct primme_params</font> *primme,int *err)
+<a name="line81"> 81: </a>{
+<a name="line83"> 83: </a>  <a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps = (<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>)primme-&gt;commInfo;
+<a name="line84"> 84: </a>  PetscInt       i,k,nerrest;
+
+<a name="line86"> 86: </a>  *err = 1;
+<a name="line87"> 87: </a>  <font color="#4169E1">switch</font> (*event) {
+<a name="line88"> 88: </a>    <font color="#4169E1">case</font> primme_event_outer_iteration:
+<a name="line89"> 89: </a>      <font color="#B22222">/* Update <a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> */</font>
+<a name="line90"> 90: </a>      eps-&gt;its = primme-&gt;stats.numOuterIterations;
+<a name="line91"> 91: </a>      eps-&gt;nconv = primme-&gt;initSize;
+<a name="line92"> 92: </a>      k=0;
+<a name="line93"> 93: </a>      <font color="#4169E1">if</font> (lockedEvals &amp;&amp; numLocked) <font color="#4169E1">for</font> (i=0; i&lt;*numLocked &amp;&amp; k&lt;eps-&gt;ncv; i++) eps-&gt;eigr[k++] = ((PetscReal*)lockedEvals)[i];
+<a name="line94"> 94: </a>      nerrest = k;
+<a name="line95"> 95: </a>      <font color="#4169E1">if</font> (iblock &amp;&amp; blockSize) {
+<a name="line96"> 96: </a>        <font color="#4169E1">for</font> (i=0; i&lt;*blockSize &amp;&amp; k+iblock[i]&lt;eps-&gt;ncv; i++) eps-&gt;errest[k+iblock[i]] = ((PetscReal*)basisNorms)[i];
+<a name="line97"> 97: </a>        nerrest = k+(*blockSize&gt;0?1+iblock[*blockSize-1]:0);
+<a name="line98"> 98: </a>      }
+<a name="line99"> 99: </a>      <font color="#4169E1">if</font> (basisEvals &amp;&amp; basisSize) <font color="#4169E1">for</font> (i=0; i&lt;*basisSize &amp;&amp; k&lt;eps-&gt;ncv; i++) eps-&gt;eigr[k++] = ((PetscReal*)basisEvals)[i];
+<a name="line100">100: </a>      <font color="#B22222">/* Show progress */</font>
+<a name="line101">101: </a>      EPSMonitor(eps,eps-&gt;its,numConverged?*numConverged:0,eps-&gt;eigr,eps-&gt;eigi,eps-&gt;errest,nerrest);CHKERRABORT(PetscObjectComm((PetscObject)eps),ierr);
+<a name="line102">102: </a>      <font color="#4169E1">break</font>;
+<a name="line103">103: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line104">104: </a>    <font color="#4169E1">case</font> primme_event_message:
+<a name="line105">105: </a>      <font color="#B22222">/* Print PRIMME information messages */</font>
+<a name="line106">106: </a>      PetscInfo(eps,msg);CHKERRABORT(PetscObjectComm((PetscObject)eps),ierr);
+<a name="line107">107: </a>      <font color="#4169E1">break</font>;
+<a name="line108">108: </a><font color="#A020F0">#endif</font>
+<a name="line109">109: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line110">110: </a>      <font color="#4169E1">break</font>;
+<a name="line111">111: </a>  }
+<a name="line112">112: </a>  *err = 0;
+<a name="line113">113: </a>}
+<a name="line114">114: </a><font color="#A020F0">#endif </font><font color="#B22222">/* SLEPC_HAVE_PRIMME2p2 */</font><font color="#A020F0"></font>
+
+<a name="line116">116: </a><strong><font color="#4169E1"><a name="matrixMatvec_PRIMME"></a>static void matrixMatvec_PRIMME(void *xa,PRIMME_INT *ldx,void *ya,PRIMME_INT *ldy,int *blockSize,struct primme_params *primme,int *ierr)</font></strong>
+<a name="line117">117: </a>{
+<a name="line118">118: </a>  PetscInt   i;
+<a name="line119">119: </a>  EPS_PRIMME *ops = (EPS_PRIMME*)primme-&gt;matrix;
+<a name="line120">120: </a>  Vec        x = ops-&gt;x,y = ops-&gt;y;
+<a name="line121">121: </a>  Mat        A = ops-&gt;A;
+
+<a name="line124">124: </a>  <font color="#4169E1">for</font> (i=0;i&lt;*blockSize;i++) {
+<a name="line125">125: </a>    *VecPlaceArray(x,(PetscScalar*)xa+(*ldx)*i);CHKERRABORT(PetscObjectComm((PetscObject)A),*ierr);
+<a name="line126">126: </a>    *VecPlaceArray(y,(PetscScalar*)ya+(*ldy)*i);CHKERRABORT(PetscObjectComm((PetscObject)A),*ierr);
+<a name="line127">127: </a>    *MatMult(A,x,y);CHKERRABORT(PetscObjectComm((PetscObject)A),*ierr);
+<a name="line128">128: </a>    *VecResetArray(x);CHKERRABORT(PetscObjectComm((PetscObject)A),*ierr);
+<a name="line129">129: </a>    *VecResetArray(y);CHKERRABORT(PetscObjectComm((PetscObject)A),*ierr);
+<a name="line130">130: </a>  }
+<a name="line131">131: </a>  PetscFunctionReturnVoid();
+<a name="line132">132: </a>}
+
+<a name="line134">134: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line135">135: </a><strong><font color="#4169E1"><a name="massMatrixMatvec_PRIMME"></a>static void massMatrixMatvec_PRIMME(void *xa,PRIMME_INT *ldx,void *ya,PRIMME_INT *ldy,int *blockSize,struct primme_params *primme,int *ierr)</font></strong>
+<a name="line136">136: </a>{
+<a name="line137">137: </a>  PetscInt   i;
+<a name="line138">138: </a>  EPS_PRIMME *ops = (EPS_PRIMME*)primme-&gt;massMatrix;
+<a name="line139">139: </a>  Vec        x = ops-&gt;x,y = ops-&gt;y;
+<a name="line140">140: </a>  Mat        B = ops-&gt;B;
+
+<a name="line143">143: </a>  <font color="#4169E1">for</font> (i=0;i&lt;*blockSize;i++) {
+<a name="line144">144: </a>    *VecPlaceArray(x,(PetscScalar*)xa+(*ldx)*i);CHKERRABORT(PetscObjectComm((PetscObject)B),*ierr);
+<a name="line145">145: </a>    *VecPlaceArray(y,(PetscScalar*)ya+(*ldy)*i);CHKERRABORT(PetscObjectComm((PetscObject)B),*ierr);
+<a name="line146">146: </a>    *MatMult(B,x,y);CHKERRABORT(PetscObjectComm((PetscObject)B),*ierr);
+<a name="line147">147: </a>    *VecResetArray(x);CHKERRABORT(PetscObjectComm((PetscObject)B),*ierr);
+<a name="line148">148: </a>    *VecResetArray(y);CHKERRABORT(PetscObjectComm((PetscObject)B),*ierr);
+<a name="line149">149: </a>  }
+<a name="line150">150: </a>  PetscFunctionReturnVoid();
+<a name="line151">151: </a>}
+<a name="line152">152: </a><font color="#A020F0">#endif</font>
+
+<a name="line154">154: </a><strong><font color="#4169E1"><a name="applyPreconditioner_PRIMME"></a>static void applyPreconditioner_PRIMME(void *xa,PRIMME_INT *ldx,void *ya,PRIMME_INT *ldy,int *blockSize,struct primme_params *primme,int *ierr)</font></strong>
+<a name="line155">155: </a>{
+<a name="line156">156: </a>  PetscInt   i;
+<a name="line157">157: </a>  EPS_PRIMME *ops = (EPS_PRIMME*)primme-&gt;matrix;
+<a name="line158">158: </a>  Vec        x = ops-&gt;x,y = ops-&gt;y;
+
+<a name="line161">161: </a>  <font color="#4169E1">for</font> (i=0;i&lt;*blockSize;i++) {
+<a name="line162">162: </a>    *VecPlaceArray(x,(PetscScalar*)xa+(*ldx)*i);CHKERRABORT(PetscObjectComm((PetscObject)ops-&gt;ksp),*ierr);
+<a name="line163">163: </a>    *VecPlaceArray(y,(PetscScalar*)ya+(*ldy)*i);CHKERRABORT(PetscObjectComm((PetscObject)ops-&gt;ksp),*ierr);
+<a name="line164">164: </a>    *KSPSolve(ops-&gt;ksp,x,y);CHKERRABORT(PetscObjectComm((PetscObject)ops-&gt;ksp),*ierr);
+<a name="line165">165: </a>    *VecResetArray(x);CHKERRABORT(PetscObjectComm((PetscObject)ops-&gt;ksp),*ierr);
+<a name="line166">166: </a>    *VecResetArray(y);CHKERRABORT(PetscObjectComm((PetscObject)ops-&gt;ksp),*ierr);
+<a name="line167">167: </a>  }
+<a name="line168">168: </a>  PetscFunctionReturnVoid();
+<a name="line169">169: </a>}
+
+<a name="line171">171: </a><strong><font color="#4169E1"><a name="EPSSetUp_PRIMME"></a>PetscErrorCode EPSSetUp_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line172">172: </a>{
+<a name="line174">174: </a>  PetscMPIInt    numProcs,procID;
+<a name="line175">175: </a>  EPS_PRIMME     *ops = (EPS_PRIMME*)eps-&gt;data;
+<a name="line176">176: </a>  primme_params  *primme = &amp;ops-&gt;primme;
+<a name="line177">177: </a>  PetscBool      istrivial,flg;
+
+<a name="line180">180: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)eps),&amp;numProcs);
+<a name="line181">181: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)eps),&amp;procID);
+
+<a name="line183">183: </a>  <font color="#B22222">/* Check some constraints and set some default values */</font>
+<a name="line184">184: </a>  <font color="#4169E1">if</font> (eps-&gt;max_it==PETSC_DEFAULT) eps-&gt;max_it = PETSC_MAX_INT;
+<a name="line185">185: </a>  <a href="../../../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,0,&amp;ops-&gt;A);
+<a name="line186">186: </a>  <font color="#4169E1">if</font> (!eps-&gt;ishermitian) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"PRIMME is only available for Hermitian problems"</font>);
+<a name="line187">187: </a>  <font color="#4169E1">if</font> (eps-&gt;isgeneralized) {
+<a name="line188">188: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line189">189: </a>    <a href="../../../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,1,&amp;ops-&gt;B);
+<a name="line190">190: </a><font color="#A020F0">#else</font>
+<a name="line191">191: </a>    SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"This version of PRIMME is not available for generalized problems"</font>);
+<a name="line192">192: </a><font color="#A020F0">#endif</font>
+<a name="line193">193: </a>  }
+<a name="line194">194: </a>  <font color="#4169E1">if</font> (eps-&gt;arbitrary) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"Arbitrary selection of eigenpairs not supported in this solver"</font>);
+<a name="line195">195: </a>  <font color="#4169E1">if</font> (eps-&gt;stopping!=<a href="../../../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a>) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"External packages do not support user-defined stopping test"</font>);
+<a name="line196">196: </a>  <font color="#4169E1">if</font> (!eps-&gt;which) eps-&gt;which = <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>;
+<a name="line197">197: </a><font color="#A020F0">#if !defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line198">198: </a>  <font color="#4169E1">if</font> (eps-&gt;converged != EPSConvergedAbsolute) { PetscInfo(eps,<font color="#666666">"Warning: using absolute convergence test\n"</font>); }
+<a name="line199">199: </a><font color="#A020F0">#endif</font>
+<a name="line200">200: </a>  <a href="../../../../../docs/manualpages/RG/RGIsTrivial.html#RGIsTrivial">RGIsTrivial</a>(eps-&gt;rg,&amp;istrivial);
+<a name="line201">201: </a>  <font color="#4169E1">if</font> (!istrivial) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"This solver does not support region filtering"</font>);
+
+<a name="line203">203: </a>  <font color="#B22222">/* Transfer SLEPc options to PRIMME options */</font>
+<a name="line204">204: </a>  primme_free(primme);
+<a name="line205">205: </a>  primme_initialize(primme);
+<a name="line206">206: </a>  primme-&gt;n                             = eps-&gt;n;
+<a name="line207">207: </a>  primme-&gt;nLocal                        = eps-&gt;nloc;
+<a name="line208">208: </a>  primme-&gt;numEvals                      = eps-&gt;nev;
+<a name="line209">209: </a>  primme-&gt;matrix                        = ops;
+<a name="line210">210: </a>  primme-&gt;matrixMatvec                  = matrixMatvec_PRIMME;
+<a name="line211">211: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line212">212: </a>  <font color="#4169E1">if</font> (eps-&gt;isgeneralized) {
+<a name="line213">213: </a>    primme-&gt;massMatrix                  = ops;
+<a name="line214">214: </a>    primme-&gt;massMatrixMatvec            = massMatrixMatvec_PRIMME;
+<a name="line215">215: </a>  }
+<a name="line216">216: </a><font color="#A020F0">#endif</font>
+<a name="line217">217: </a>  primme-&gt;commInfo                      = eps;
+<a name="line218">218: </a>  primme-&gt;maxOuterIterations            = eps-&gt;max_it;
+<a name="line219">219: </a><font color="#A020F0">#if !defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line220">220: </a>  primme-&gt;eps                           = eps-&gt;tol==PETSC_DEFAULT?SLEPC_DEFAULT_TOL:eps-&gt;tol;
+<a name="line221">221: </a><font color="#A020F0">#endif</font>
+<a name="line222">222: </a>  primme-&gt;numProcs                      = numProcs;
+<a name="line223">223: </a>  primme-&gt;procID                        = procID;
+<a name="line224">224: </a>  primme-&gt;printLevel                    = 1;
+<a name="line225">225: </a>  primme-&gt;correctionParams.precondition = 1;
+<a name="line226">226: </a>  primme-&gt;globalSumReal                 = par_GlobalSumReal;
+<a name="line227">227: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line228">228: </a>  primme-&gt;broadcastReal                 = par_broadcastReal;
+<a name="line229">229: </a><font color="#A020F0">#endif</font>
+<a name="line230">230: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line231">231: </a>  primme-&gt;convTestFun                   = convTestFun;
+<a name="line232">232: </a>  primme-&gt;monitorFun                    = monitorFun;
+<a name="line233">233: </a><font color="#A020F0">#endif</font>
+<a name="line234">234: </a>  <font color="#4169E1">if</font> (ops-&gt;bs &gt; 0) primme-&gt;maxBlockSize = ops-&gt;bs;
+
+<a name="line236">236: </a>  <font color="#4169E1">switch</font> (eps-&gt;which) {
+<a name="line237">237: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_REAL</a>:
+<a name="line238">238: </a>      primme-&gt;target = primme_largest;
+<a name="line239">239: </a>      <font color="#4169E1">break</font>;
+<a name="line240">240: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_REAL</a>:
+<a name="line241">241: </a>      primme-&gt;target = primme_smallest;
+<a name="line242">242: </a>      <font color="#4169E1">break</font>;
+<a name="line243">243: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a>:
+<a name="line244">244: </a>      primme-&gt;target = primme_largest_abs;
+<a name="line245">245: </a>      ops-&gt;target = 0.0;
+<a name="line246">246: </a>      primme-&gt;numTargetShifts = 1;
+<a name="line247">247: </a>      primme-&gt;targetShifts = &amp;ops-&gt;target;
+<a name="line248">248: </a>      <font color="#4169E1">break</font>;
+<a name="line249">249: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_SMALLEST_MAGNITUDE</a>:
+<a name="line250">250: </a>      primme-&gt;target = primme_closest_abs;
+<a name="line251">251: </a>      ops-&gt;target = 0.0;
+<a name="line252">252: </a>      primme-&gt;numTargetShifts = 1;
+<a name="line253">253: </a>      primme-&gt;targetShifts = &amp;ops-&gt;target;
+<a name="line254">254: </a>      <font color="#4169E1">break</font>;
+<a name="line255">255: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a>:
+<a name="line256">256: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_REAL</a>:
+<a name="line257">257: </a>      primme-&gt;target = primme_closest_abs;
+<a name="line258">258: </a>      primme-&gt;numTargetShifts = 1;
+<a name="line259">259: </a>      ops-&gt;target = PetscRealPart(eps-&gt;target);
+<a name="line260">260: </a>      primme-&gt;targetShifts = &amp;ops-&gt;target;
+<a name="line261">261: </a>      <font color="#4169E1">break</font>;
+<a name="line262">262: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line263">263: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"'which' value not supported by PRIMME"</font>);
+<a name="line264">264: </a>      <font color="#4169E1">break</font>;
+<a name="line265">265: </a>  }
+
+<a name="line267">267: </a>  <font color="#4169E1">switch</font> (eps-&gt;extraction) {
+<a name="line268">268: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_RITZ</a>:
+<a name="line269">269: </a>      primme-&gt;projectionParams.projection = primme_proj_RR;
+<a name="line270">270: </a>      <font color="#4169E1">break</font>;
+<a name="line271">271: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_HARMONIC</a>:
+<a name="line272">272: </a>      primme-&gt;projectionParams.projection = primme_proj_harmonic;
+<a name="line273">273: </a>      <font color="#4169E1">break</font>;
+<a name="line274">274: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/EPS/EPSExtraction.html#EPSExtraction">EPS_REFINED</a>:
+<a name="line275">275: </a>      primme-&gt;projectionParams.projection = primme_proj_refined;
+<a name="line276">276: </a>      <font color="#4169E1">break</font>;
+<a name="line277">277: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line278">278: </a>      SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"'extraction' value not supported by PRIMME"</font>);
+<a name="line279">279: </a>      <font color="#4169E1">break</font>;
+<a name="line280">280: </a>  }
+
+<a name="line282">282: </a>  <font color="#B22222">/* If user sets mpd or ncv, maxBasisSize is modified */</font>
+<a name="line283">283: </a>  <font color="#4169E1">if</font> (eps-&gt;mpd!=PETSC_DEFAULT) {
+<a name="line284">284: </a>    primme-&gt;maxBasisSize = eps-&gt;mpd;
+<a name="line285">285: </a>    <font color="#4169E1">if</font> (eps-&gt;ncv!=PETSC_DEFAULT) { PetscInfo(eps,<font color="#666666">"Warning: 'ncv' is ignored by PRIMME\n"</font>); }
+<a name="line286">286: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (eps-&gt;ncv!=PETSC_DEFAULT) primme-&gt;maxBasisSize = eps-&gt;ncv;
+
+<a name="line288">288: </a>  <font color="#4169E1">if</font> (primme_set_method(ops-&gt;method,primme) &lt; 0) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_SUP,<font color="#666666">"PRIMME method not valid"</font>);
+
+<a name="line290">290: </a>  eps-&gt;mpd = primme-&gt;maxBasisSize;
+<a name="line291">291: </a>  eps-&gt;ncv = (primme-&gt;locking?eps-&gt;nev:0)+primme-&gt;maxBasisSize;
+<a name="line292">292: </a>  ops-&gt;bs  = primme-&gt;maxBlockSize;
+
+<a name="line294">294: </a>  <font color="#B22222">/* Set workspace */</font>
+<a name="line295">295: </a>  <a href="../../../../../docs/manualpages/EPS/EPSAllocateSolution.html#EPSAllocateSolution">EPSAllocateSolution</a>(eps,0);
+
+<a name="line297">297: </a>  <font color="#B22222">/* Setup the preconditioner */</font>
+<a name="line298">298: </a>  <font color="#4169E1">if</font> (primme-&gt;correctionParams.precondition) {
+<a name="line299">299: </a>    <a href="../../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(eps-&gt;st,&amp;ops-&gt;ksp);
+<a name="line300">300: </a>    PetscObjectTypeCompare((PetscObject)ops-&gt;ksp,KSPPREONLY,&amp;flg);
+<a name="line301">301: </a>    <font color="#4169E1">if</font> (!flg) { PetscInfo(eps,<font color="#666666">"Warning: ignoring KSP, should use KSPPREONLY\n"</font>); }
+<a name="line302">302: </a>    primme-&gt;preconditioner = NULL;
+<a name="line303">303: </a>    primme-&gt;applyPreconditioner = applyPreconditioner_PRIMME;
+<a name="line304">304: </a>  }
+
+<a name="line306">306: </a>  <font color="#B22222">/* Prepare auxiliary vectors */</font>
+<a name="line307">307: </a>  <font color="#4169E1">if</font> (!ops-&gt;x) {
+<a name="line308">308: </a>    <a href="../../../../../docs/manualpages/sys/MatCreateVecsEmpty.html#MatCreateVecsEmpty">MatCreateVecsEmpty</a>(ops-&gt;A,&amp;ops-&gt;x,&amp;ops-&gt;y);
+<a name="line309">309: </a>    PetscLogObjectParent((PetscObject)eps,(PetscObject)ops-&gt;x);
+<a name="line310">310: </a>    PetscLogObjectParent((PetscObject)eps,(PetscObject)ops-&gt;y);
+<a name="line311">311: </a>  }
+<a name="line312">312: </a>  <font color="#4169E1">return</font>(0);
+<a name="line313">313: </a>}
+
+<a name="line315">315: </a><strong><font color="#4169E1"><a name="EPSSolve_PRIMME"></a>PetscErrorCode EPSSolve_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line316">316: </a>{
+<a name="line318">318: </a>  EPS_PRIMME     *ops = (EPS_PRIMME*)eps-&gt;data;
+<a name="line319">319: </a>  PetscScalar    *a;
+<a name="line320">320: </a>  PetscInt       i,ierrprimme;
+<a name="line321">321: </a>  PetscReal      *evals,*rnorms;
+
+<a name="line324">324: </a>  <font color="#B22222">/* Reset some parameters left from previous runs */</font>
+<a name="line325">325: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line326">326: </a>  ops-&gt;primme.aNorm    = 0.0;
+<a name="line327">327: </a><font color="#A020F0">#else</font>
+<a name="line328">328: </a>  <font color="#B22222">/* Force PRIMME to stop by absolute error */</font>
+<a name="line329">329: </a>  ops-&gt;primme.aNorm    = 1.0;
+<a name="line330">330: </a><font color="#A020F0">#endif</font>
+<a name="line331">331: </a>  ops-&gt;primme.initSize = eps-&gt;nini;
+<a name="line332">332: </a>  ops-&gt;primme.iseed[0] = -1;
+<a name="line333">333: </a>  ops-&gt;primme.iseed[1] = -1;
+<a name="line334">334: </a>  ops-&gt;primme.iseed[2] = -1;
+<a name="line335">335: </a>  ops-&gt;primme.iseed[3] = -1;
+
+<a name="line337">337: </a>  <font color="#B22222">/* Call PRIMME solver */</font>
+<a name="line338">338: </a>  <a href="../../../../../docs/manualpages/BV/BVGetArray.html#BVGetArray">BVGetArray</a>(eps-&gt;V,&amp;a);
+<a name="line339">339: </a>  PetscMalloc2(eps-&gt;ncv,&amp;evals,eps-&gt;ncv,&amp;rnorms);
+<a name="line340">340: </a>  ierrprimme = PRIMME_DRIVER(evals,a,rnorms,&amp;ops-&gt;primme);
+<a name="line341">341: </a>  <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;ncv;i++) eps-&gt;eigr[i] = evals[i];
+<a name="line342">342: </a>  <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;ncv;i++) eps-&gt;errest[i] = rnorms[i];
+<a name="line343">343: </a>  PetscFree2(evals,rnorms);
+<a name="line344">344: </a>  <a href="../../../../../docs/manualpages/BV/BVRestoreArray.html#BVRestoreArray">BVRestoreArray</a>(eps-&gt;V,&amp;a);
+
+<a name="line346">346: </a>  eps-&gt;nconv  = ops-&gt;primme.initSize &gt;= 0 ? ops-&gt;primme.initSize : 0;
+<a name="line347">347: </a>  eps-&gt;reason = eps-&gt;nconv &gt;= eps-&gt;nev ? <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_TOL</a>: <a href="../../../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_ITS</a>;
+<a name="line348">348: </a>  eps-&gt;its    = ops-&gt;primme.stats.numOuterIterations;
+
+<a name="line350">350: </a>  <font color="#B22222">/* Process PRIMME error code */</font>
+<a name="line351">351: </a>  <font color="#4169E1">if</font> (ierrprimme == 0) {
+<a name="line352">352: </a>    <font color="#B22222">/* no error */</font>
+<a name="line353">353: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme == -1) SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: unexpected error"</font>,ierrprimme);
+<a name="line354">354: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme == -2) SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: allocation error"</font>,ierrprimme);
+<a name="line355">355: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme == -3) {
+<a name="line356">356: </a>    <font color="#B22222">/* stop by maximum number of iteration or matvecs */</font>
+<a name="line357">357: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ierrprimme &gt;= -39) SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: configuration error; check PRIMME's manual"</font>,ierrprimme);
+<a name="line358">358: </a>  <font color="#4169E1">else</font> SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_LIB,<font color="#666666">"PRIMME library failed with error code=%d: runtime error; check PRIMME's manual"</font>,ierrprimme);
+<a name="line359">359: </a>  <font color="#4169E1">return</font>(0);
+<a name="line360">360: </a>}
+
+<a name="line362">362: </a><strong><font color="#4169E1"><a name="EPSReset_PRIMME"></a>PetscErrorCode EPSReset_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line363">363: </a>{
+<a name="line365">365: </a>  EPS_PRIMME     *ops = (EPS_PRIMME*)eps-&gt;data;
+
+<a name="line368">368: </a>  primme_free(&amp;ops-&gt;primme);
+<a name="line369">369: </a>  VecDestroy(&amp;ops-&gt;x);
+<a name="line370">370: </a>  VecDestroy(&amp;ops-&gt;y);
+<a name="line371">371: </a>  <font color="#4169E1">return</font>(0);
+<a name="line372">372: </a>}
+
+<a name="line374">374: </a><strong><font color="#4169E1"><a name="EPSDestroy_PRIMME"></a>PetscErrorCode EPSDestroy_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line375">375: </a>{
+
+<a name="line379">379: </a>  PetscFree(eps-&gt;data);
+<a name="line380">380: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMESetBlockSize_C"</font>,NULL);
+<a name="line381">381: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMESetMethod_C"</font>,NULL);
+<a name="line382">382: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMEGetBlockSize_C"</font>,NULL);
+<a name="line383">383: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMEGetMethod_C"</font>,NULL);
+<a name="line384">384: </a>  <font color="#4169E1">return</font>(0);
+<a name="line385">385: </a>}
+
+<a name="line387">387: </a><strong><font color="#4169E1"><a name="EPSView_PRIMME"></a>PetscErrorCode EPSView_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscViewer viewer)</font></strong>
+<a name="line388">388: </a>{
+<a name="line390">390: </a>  PetscBool      isascii;
+<a name="line391">391: </a>  EPS_PRIMME     *ctx = (EPS_PRIMME*)eps-&gt;data;
+<a name="line392">392: </a>  PetscMPIInt    rank;
+
+<a name="line395">395: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line396">396: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line397">397: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  block size=%D\n"</font>,ctx-&gt;bs);
+<a name="line398">398: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  solver method: %s\n"</font>,EPSPRIMMEMethods[(<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a>)ctx-&gt;method]);
+
+<a name="line400">400: </a>    <font color="#B22222">/* Display PRIMME params */</font>
+<a name="line401">401: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)eps),&amp;rank);
+<a name="line402">402: </a>    <font color="#4169E1">if</font> (!rank) primme_display_params(ctx-&gt;primme);
+<a name="line403">403: </a>  }
+<a name="line404">404: </a>  <font color="#4169E1">return</font>(0);
+<a name="line405">405: </a>}
+
+<a name="line407">407: </a><strong><font color="#4169E1"><a name="EPSSetFromOptions_PRIMME"></a>PetscErrorCode EPSSetFromOptions_PRIMME(PetscOptionItems *PetscOptionsObject,<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line408">408: </a>{
+<a name="line409">409: </a>  PetscErrorCode  ierr;
+<a name="line410">410: </a>  EPS_PRIMME      *ctx = (EPS_PRIMME*)eps-&gt;data;
+<a name="line411">411: </a>  PetscInt        bs;
+<a name="line412">412: </a>  <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a> meth;
+<a name="line413">413: </a>  PetscBool       flg;
+
+<a name="line416">416: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> PRIMME Options"</font>);
+
+<a name="line418">418: </a>    PetscOptionsInt(<font color="#666666">"-eps_primme_blocksize"</font>,<font color="#666666">"Maximum block size"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetBlockSize.html#EPSPRIMMESetBlockSize">EPSPRIMMESetBlockSize</a>"</font>,ctx-&gt;bs,&amp;bs,&amp;flg);
+<a name="line419">419: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetBlockSize.html#EPSPRIMMESetBlockSize">EPSPRIMMESetBlockSize</a>(eps,bs); }
+
+<a name="line421">421: </a>    PetscOptionsEnum(<font color="#666666">"-eps_primme_method"</font>,<font color="#666666">"Method for solving the eigenproblem"</font>,<font color="#666666">"<a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetMethod.html#EPSPRIMMESetMethod">EPSPRIMMESetMethod</a>"</font>,EPSPRIMMEMethods,(PetscEnum)ctx-&gt;method,(PetscEnum*)&amp;meth,&amp;flg);
+<a name="line422">422: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetMethod.html#EPSPRIMMESetMethod">EPSPRIMMESetMethod</a>(eps,meth); }
+
+<a name="line424">424: </a>  PetscOptionsTail();
+<a name="line425">425: </a>  <font color="#4169E1">return</font>(0);
+<a name="line426">426: </a>}
+
+<a name="line428">428: </a><strong><font color="#4169E1"><a name="EPSPRIMMESetBlockSize_PRIMME"></a>static PetscErrorCode EPSPRIMMESetBlockSize_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt bs)</font></strong>
+<a name="line429">429: </a>{
+<a name="line430">430: </a>  EPS_PRIMME *ops = (EPS_PRIMME*)eps-&gt;data;
+
+<a name="line433">433: </a>  <font color="#4169E1">if</font> (bs == PETSC_DEFAULT) ops-&gt;bs = 0;
+<a name="line434">434: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (bs &lt;= 0) SETERRQ(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"PRIMME: block size must be positive"</font>);
+<a name="line435">435: </a>  <font color="#4169E1">else</font> ops-&gt;bs = bs;
+<a name="line436">436: </a>  <font color="#4169E1">return</font>(0);
+<a name="line437">437: </a>}
+
+<a name="line439">439: </a><font color="#B22222">/*@</font>
+<a name="line440">440: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetBlockSize.html#EPSPRIMMESetBlockSize">EPSPRIMMESetBlockSize</a> - The maximum block size that PRIMME will try to use.</font>
+
+<a name="line442">442: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line444">444: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line445">445: </a><font color="#B22222">+  eps - the eigenproblem solver context</font>
+<a name="line446">446: </a><font color="#B22222">-  bs - block size</font>
+
+<a name="line448">448: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line449">449: </a><font color="#B22222">.  -eps_primme_blocksize - Sets the max allowed block size value</font>
+
+<a name="line451">451: </a><font color="#B22222">   Notes:</font>
+<a name="line452">452: </a><font color="#B22222">   If the block size is not set, the value established by primme_initialize</font>
+<a name="line453">453: </a><font color="#B22222">   is used.</font>
+
+<a name="line455">455: </a><font color="#B22222">   The user should set the block size based on the architecture specifics</font>
+<a name="line456">456: </a><font color="#B22222">   of the target computer, as well as any a priori knowledge of multiplicities.</font>
+<a name="line457">457: </a><font color="#B22222">   The code does NOT require bs &gt; 1 to find multiple eigenvalues. For some</font>
+<a name="line458">458: </a><font color="#B22222">   methods, keeping bs = 1 yields the best overall performance.</font>
+
+<a name="line460">460: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line462">462: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEGetBlockSize.html#EPSPRIMMEGetBlockSize">EPSPRIMMEGetBlockSize</a>()</font>
+<a name="line463">463: </a><font color="#B22222">@*/</font>
+<a name="line464">464: </a><strong><font color="#4169E1"><a name="EPSPRIMMESetBlockSize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetBlockSize.html#EPSPRIMMESetBlockSize">EPSPRIMMESetBlockSize</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt bs)</font></strong>
+<a name="line465">465: </a>{
+
+<a name="line471">471: </a>  PetscTryMethod(eps,<font color="#666666">"EPSPRIMMESetBlockSize_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt),(eps,bs));
+<a name="line472">472: </a>  <font color="#4169E1">return</font>(0);
+<a name="line473">473: </a>}
+
+<a name="line475">475: </a><strong><font color="#4169E1"><a name="EPSPRIMMEGetBlockSize_PRIMME"></a>static PetscErrorCode EPSPRIMMEGetBlockSize_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *bs)</font></strong>
+<a name="line476">476: </a>{
+<a name="line477">477: </a>  EPS_PRIMME *ops = (EPS_PRIMME*)eps-&gt;data;
+
+<a name="line480">480: </a>  *bs = ops-&gt;bs;
+<a name="line481">481: </a>  <font color="#4169E1">return</font>(0);
+<a name="line482">482: </a>}
+
+<a name="line484">484: </a><font color="#B22222">/*@</font>
+<a name="line485">485: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEGetBlockSize.html#EPSPRIMMEGetBlockSize">EPSPRIMMEGetBlockSize</a> - Get the maximum block size the code will try to use.</font>
+
+<a name="line487">487: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line489">489: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line490">490: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line492">492: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line493">493: </a><font color="#B22222">.  bs - returned block size</font>
+
+<a name="line495">495: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line497">497: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetBlockSize.html#EPSPRIMMESetBlockSize">EPSPRIMMESetBlockSize</a>()</font>
+<a name="line498">498: </a><font color="#B22222">@*/</font>
+<a name="line499">499: </a><strong><font color="#4169E1"><a name="EPSPRIMMEGetBlockSize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEGetBlockSize.html#EPSPRIMMEGetBlockSize">EPSPRIMMEGetBlockSize</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt *bs)</font></strong>
+<a name="line500">500: </a>{
+
+<a name="line506">506: </a>  PetscUseMethod(eps,<font color="#666666">"EPSPRIMMEGetBlockSize_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,PetscInt*),(eps,bs));
+<a name="line507">507: </a>  <font color="#4169E1">return</font>(0);
+<a name="line508">508: </a>}
+
+<a name="line510">510: </a><strong><font color="#4169E1"><a name="EPSPRIMMESetMethod_PRIMME"></a>static PetscErrorCode EPSPRIMMESetMethod_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a> method)</font></strong>
+<a name="line511">511: </a>{
+<a name="line512">512: </a>  EPS_PRIMME *ops = (EPS_PRIMME*)eps-&gt;data;
+
+<a name="line515">515: </a>  ops-&gt;method = (primme_preset_method)method;
+<a name="line516">516: </a>  <font color="#4169E1">return</font>(0);
+<a name="line517">517: </a>}
+
+<a name="line519">519: </a><font color="#B22222">/*@</font>
+<a name="line520">520: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetMethod.html#EPSPRIMMESetMethod">EPSPRIMMESetMethod</a> - Sets the method for the PRIMME library.</font>
+
+<a name="line522">522: </a><font color="#B22222">   Logically Collective on eps</font>
+
+<a name="line524">524: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line525">525: </a><font color="#B22222">+  eps - the eigenproblem solver context</font>
+<a name="line526">526: </a><font color="#B22222">-  method - method that will be used by PRIMME</font>
+
+<a name="line528">528: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line529">529: </a><font color="#B22222">.  -eps_primme_method - Sets the method for the PRIMME library</font>
+
+<a name="line531">531: </a><font color="#B22222">   Note:</font>
+<a name="line532">532: </a><font color="#B22222">   If not set, the method defaults to <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPS_PRIMME_DEFAULT_MIN_TIME</a>.</font>
+
+<a name="line534">534: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line536">536: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEGetMethod.html#EPSPRIMMEGetMethod">EPSPRIMMEGetMethod</a>(), <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a></font>
+<a name="line537">537: </a><font color="#B22222">@*/</font>
+<a name="line538">538: </a><strong><font color="#4169E1"><a name="EPSPRIMMESetMethod"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetMethod.html#EPSPRIMMESetMethod">EPSPRIMMESetMethod</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a> method)</font></strong>
+<a name="line539">539: </a>{
+
+<a name="line545">545: </a>  PetscTryMethod(eps,<font color="#666666">"EPSPRIMMESetMethod_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a>),(eps,method));
+<a name="line546">546: </a>  <font color="#4169E1">return</font>(0);
+<a name="line547">547: </a>}
+
+<a name="line549">549: </a><strong><font color="#4169E1"><a name="EPSPRIMMEGetMethod_PRIMME"></a>static PetscErrorCode EPSPRIMMEGetMethod_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a> *method)</font></strong>
+<a name="line550">550: </a>{
+<a name="line551">551: </a>  EPS_PRIMME *ops = (EPS_PRIMME*)eps-&gt;data;
+
+<a name="line554">554: </a>  *method = (<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a>)ops-&gt;method;
+<a name="line555">555: </a>  <font color="#4169E1">return</font>(0);
+<a name="line556">556: </a>}
+
+<a name="line558">558: </a><font color="#B22222">/*@</font>
+<a name="line559">559: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEGetMethod.html#EPSPRIMMEGetMethod">EPSPRIMMEGetMethod</a> - Gets the method for the PRIMME library.</font>
+
+<a name="line561">561: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line563">563: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line564">564: </a><font color="#B22222">.  eps - the eigenproblem solver context</font>
+
+<a name="line566">566: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line567">567: </a><font color="#B22222">.  method - method that will be used by PRIMME</font>
+
+<a name="line569">569: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line571">571: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/EPS/EPSPRIMMESetMethod.html#EPSPRIMMESetMethod">EPSPRIMMESetMethod</a>(), <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a></font>
+<a name="line572">572: </a><font color="#B22222">@*/</font>
+<a name="line573">573: </a><strong><font color="#4169E1"><a name="EPSPRIMMEGetMethod"></a>PetscErrorCode <a href="../../../../../docs/manualpages/EPS/EPSPRIMMEGetMethod.html#EPSPRIMMEGetMethod">EPSPRIMMEGetMethod</a>(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a> *method)</font></strong>
+<a name="line574">574: </a>{
+
+<a name="line580">580: </a>  PetscUseMethod(eps,<font color="#666666">"EPSPRIMMEGetMethod_C"</font>,(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>,<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a>*),(eps,method));
+<a name="line581">581: </a>  <font color="#4169E1">return</font>(0);
+<a name="line582">582: </a>}
+
+<a name="line584">584: </a><strong><font color="#4169E1"><a name="EPSCreate_PRIMME"></a>SLEPC_EXTERN PetscErrorCode EPSCreate_PRIMME(<a href="../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line585">585: </a>{
+<a name="line587">587: </a>  EPS_PRIMME     *primme;
+
+<a name="line590">590: </a>  PetscNewLog(eps,&amp;primme);
+<a name="line591">591: </a>  eps-&gt;data = (void*)primme;
+
+<a name="line593">593: </a>  primme_initialize(&amp;primme-&gt;primme);
+<a name="line594">594: </a>  primme-&gt;primme.globalSumReal = par_GlobalSumReal;
+<a name="line595">595: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME3)</font>
+<a name="line596">596: </a>  primme-&gt;primme.broadcastReal = par_broadcastReal;
+<a name="line597">597: </a><font color="#A020F0">#endif</font>
+<a name="line598">598: </a><font color="#A020F0">#if defined(SLEPC_HAVE_PRIMME2p2)</font>
+<a name="line599">599: </a>  primme-&gt;primme.convTestFun = convTestFun;
+<a name="line600">600: </a>  primme-&gt;primme.monitorFun = monitorFun;
+<a name="line601">601: </a><font color="#A020F0">#endif</font>
+<a name="line602">602: </a>  primme-&gt;method = (primme_preset_method)<a href="../../../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPS_PRIMME_DEFAULT_MIN_TIME</a>;
+
+<a name="line604">604: </a>  eps-&gt;categ = EPS_CATEGORY_PRECOND;
+
+<a name="line606">606: </a>  eps-&gt;ops-&gt;solve          = EPSSolve_PRIMME;
+<a name="line607">607: </a>  eps-&gt;ops-&gt;setup          = EPSSetUp_PRIMME;
+<a name="line608">608: </a>  eps-&gt;ops-&gt;setfromoptions = EPSSetFromOptions_PRIMME;
+<a name="line609">609: </a>  eps-&gt;ops-&gt;destroy        = EPSDestroy_PRIMME;
+<a name="line610">610: </a>  eps-&gt;ops-&gt;reset          = EPSReset_PRIMME;
+<a name="line611">611: </a>  eps-&gt;ops-&gt;view           = EPSView_PRIMME;
+<a name="line612">612: </a>  eps-&gt;ops-&gt;backtransform  = EPSBackTransform_Default;
+<a name="line613">613: </a>  eps-&gt;ops-&gt;setdefaultst   = EPSSetDefaultST_GMRES;
+
+<a name="line615">615: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMESetBlockSize_C"</font>,EPSPRIMMESetBlockSize_PRIMME);
+<a name="line616">616: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMESetMethod_C"</font>,EPSPRIMMESetMethod_PRIMME);
+<a name="line617">617: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMEGetBlockSize_C"</font>,EPSPRIMMEGetBlockSize_PRIMME);
+<a name="line618">618: </a>  PetscObjectComposeFunction((PetscObject)eps,<font color="#666666">"EPSPRIMMEGetMethod_C"</font>,EPSPRIMMEGetMethod_PRIMME);
+<a name="line619">619: </a>  <font color="#4169E1">return</font>(0);
+<a name="line620">620: </a>}
+
+</pre>
+</body>
+
+</html>

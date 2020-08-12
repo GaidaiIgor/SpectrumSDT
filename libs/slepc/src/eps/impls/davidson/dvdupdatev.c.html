@@ -1,0 +1,401 @@
+<center><a href="dvdupdatev.c">Actual source code: dvdupdatev.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/davidson/dvdupdatev.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:52+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/davidson/dvdupdatev.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc eigensolver: "davidson"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Step: test for restarting, updateV, restartV</font>
+<a name="line14"> 14: </a><font color="#B22222">*/</font>
+
+<a name="line16"> 16: </a><font color="#A020F0">#include </font><font color="#666666">"davidson.h"</font><font color="#A020F0"></font>
+
+<a name="line18"> 18: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line19"> 19: </a>  PetscInt          min_size_V;        <font color="#B22222">/* restart with this number of eigenvectors */</font>
+<a name="line20"> 20: </a>  PetscInt          plusk;             <font color="#B22222">/* at restart, save plusk vectors from last iteration */</font>
+<a name="line21"> 21: </a>  PetscInt          mpd;               <font color="#B22222">/* max size of the searching subspace */</font>
+<a name="line22"> 22: </a>  void              *old_updateV_data; <font color="#B22222">/* old updateV data */</font>
+<a name="line23"> 23: </a>  PetscErrorCode    (*old_isRestarting)(dvdDashboard*,PetscBool*);  <font color="#B22222">/* old isRestarting */</font>
+<a name="line24"> 24: </a>  Mat               oldU;              <font color="#B22222">/* previous projected right igenvectors */</font>
+<a name="line25"> 25: </a>  Mat               oldV;              <font color="#B22222">/* previous projected left eigenvectors */</font>
+<a name="line26"> 26: </a>  PetscInt          size_oldU;         <font color="#B22222">/* size of oldU */</font>
+<a name="line27"> 27: </a>  PetscBool         allResiduals;      <font color="#B22222">/* if computing all the residuals */</font>
+<a name="line28"> 28: </a>} dvdManagV_basic;
+
+<a name="line30"> 30: </a><strong><font color="#4169E1"><a name="dvd_updateV_start"></a>static PetscErrorCode dvd_updateV_start(dvdDashboard *d)</font></strong>
+<a name="line31"> 31: </a>{
+<a name="line32"> 32: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+<a name="line33"> 33: </a>  PetscInt        i;
+
+<a name="line36"> 36: </a>  <font color="#4169E1">for</font> (i=0;i&lt;d-&gt;eps-&gt;ncv;i++) d-&gt;eigi[i] = 0.0;
+<a name="line37"> 37: </a>  d-&gt;nR = d-&gt;real_nR;
+<a name="line38"> 38: </a>  <font color="#4169E1">for</font> (i=0;i&lt;d-&gt;eps-&gt;ncv;i++) d-&gt;nR[i] = 1.0;
+<a name="line39"> 39: </a>  d-&gt;nX = d-&gt;real_nX;
+<a name="line40"> 40: </a>  <font color="#4169E1">for</font> (i=0;i&lt;d-&gt;eps-&gt;ncv;i++) d-&gt;errest[i] = 1.0;
+<a name="line41"> 41: </a>  data-&gt;size_oldU = 0;
+<a name="line42"> 42: </a>  d-&gt;nconv = 0;
+<a name="line43"> 43: </a>  d-&gt;npreconv = 0;
+<a name="line44"> 44: </a>  d-&gt;V_tra_s = d-&gt;V_tra_e = d-&gt;V_new_s = d-&gt;V_new_e = 0;
+<a name="line45"> 45: </a>  d-&gt;size_D = 0;
+<a name="line46"> 46: </a>  <font color="#4169E1">return</font>(0);
+<a name="line47"> 47: </a>}
+
+<a name="line49"> 49: </a><strong><font color="#4169E1"><a name="dvd_isrestarting_fullV"></a>static PetscErrorCode dvd_isrestarting_fullV(dvdDashboard *d,PetscBool *r)</font></strong>
+<a name="line50"> 50: </a>{
+<a name="line51"> 51: </a>  PetscErrorCode  ierr;
+<a name="line52"> 52: </a>  PetscInt        l,k;
+<a name="line53"> 53: </a>  PetscBool       restart;
+<a name="line54"> 54: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+
+<a name="line57"> 57: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;l,&amp;k);
+<a name="line58"> 58: </a>  restart = (k+2 &gt; d-&gt;eps-&gt;ncv)? PETSC_TRUE: PETSC_FALSE;
+
+<a name="line60"> 60: </a>  <font color="#B22222">/* Check old isRestarting function */</font>
+<a name="line61"> 61: </a>  <font color="#4169E1">if</font> (!restart &amp;&amp; data-&gt;old_isRestarting) {
+<a name="line62"> 62: </a>    data-&gt;old_isRestarting(d,&amp;restart);
+<a name="line63"> 63: </a>  }
+<a name="line64"> 64: </a>  *r = restart;
+<a name="line65"> 65: </a>  <font color="#4169E1">return</font>(0);
+<a name="line66"> 66: </a>}
+
+<a name="line68"> 68: </a><strong><font color="#4169E1"><a name="dvd_managementV_basic_d"></a>static PetscErrorCode dvd_managementV_basic_d(dvdDashboard *d)</font></strong>
+<a name="line69"> 69: </a>{
+<a name="line70"> 70: </a>  PetscErrorCode  ierr;
+<a name="line71"> 71: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+
+<a name="line74"> 74: </a>  <font color="#B22222">/* Restore changes in dvdDashboard */</font>
+<a name="line75"> 75: </a>  d-&gt;updateV_data = data-&gt;old_updateV_data;
+
+<a name="line77"> 77: </a>  <font color="#B22222">/* Free local data */</font>
+<a name="line78"> 78: </a>  MatDestroy(&amp;data-&gt;oldU);
+<a name="line79"> 79: </a>  MatDestroy(&amp;data-&gt;oldV);
+<a name="line80"> 80: </a>  PetscFree(d-&gt;real_nR);
+<a name="line81"> 81: </a>  PetscFree(d-&gt;real_nX);
+<a name="line82"> 82: </a>  PetscFree(data);
+<a name="line83"> 83: </a>  <font color="#4169E1">return</font>(0);
+<a name="line84"> 84: </a>}
+
+<a name="line86"> 86: </a><strong><font color="#4169E1"><a name="dvd_updateV_conv_gen"></a>static PetscErrorCode dvd_updateV_conv_gen(dvdDashboard *d)</font></strong>
+<a name="line87"> 87: </a>{
+<a name="line88"> 88: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+<a name="line89"> 89: </a>  PetscInt        npreconv,cMT,cMTX,lV,kV,nV;
+<a name="line90"> 90: </a>  PetscErrorCode  ierr;
+<a name="line91"> 91: </a>  Mat             Z;
+<a name="line92"> 92: </a>  PetscBool       t;
+<a name="line93"> 93: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line94"> 94: </a>  PetscInt        i;
+<a name="line95"> 95: </a><font color="#A020F0">#endif</font>
+
+<a name="line98"> 98: </a>  npreconv = d-&gt;npreconv;
+<a name="line99"> 99: </a>  <font color="#B22222">/* Constrains the converged pairs to nev */</font>
+<a name="line100">100: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line101">101: </a>  <font color="#B22222">/* Tries to maintain together conjugate eigenpairs */</font>
+<a name="line102">102: </a>  <font color="#4169E1">for</font> (i=0; (i + (d-&gt;eigi[i]!=0.0?1:0) &lt; npreconv) &amp;&amp; (d-&gt;nconv + i &lt; d-&gt;nev); i+= (d-&gt;eigi[i]!=0.0?2:1));
+<a name="line103">103: </a>  npreconv = i;
+<a name="line104">104: </a><font color="#A020F0">#else</font>
+<a name="line105">105: </a>  npreconv = PetscMax(PetscMin(d-&gt;nev-d-&gt;nconv,npreconv),0);
+<a name="line106">106: </a><font color="#A020F0">#endif</font>
+<a name="line107">107: </a>  <font color="#B22222">/* For GHEP without B-ortho, converge all of the requested pairs at once */</font>
+<a name="line108">108: </a>  PetscObjectTypeCompare((PetscObject)d-&gt;eps-&gt;ds,DSGHEP,&amp;t);
+<a name="line109">109: </a>  <font color="#4169E1">if</font> (t &amp;&amp; d-&gt;nconv+npreconv&lt;d-&gt;nev) npreconv = 0;
+<a name="line110">110: </a>  <font color="#B22222">/* Quick exit */</font>
+<a name="line111">111: </a>  <font color="#4169E1">if</font> (npreconv == 0) <font color="#4169E1">return</font>(0);
+
+<a name="line113">113: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;lV,&amp;kV);
+<a name="line114">114: </a>  nV  = kV - lV;
+<a name="line115">115: </a>  cMT = nV - npreconv;
+<a name="line116">116: </a>  <font color="#B22222">/* Harmonics restarts wiht right eigenvectors, and other with the left ones.</font>
+<a name="line117">117: </a><font color="#B22222">     If the problem is standard or hermitian, left and right vectors are the same */</font>
+<a name="line118">118: </a>  <font color="#4169E1">if</font> (!(d-&gt;W||DVD_IS(d-&gt;sEP,DVD_EP_STD)||DVD_IS(d-&gt;sEP,DVD_EP_HERMITIAN))) {
+<a name="line119">119: </a>    <font color="#B22222">/* ps.Q &lt;- [ps.Q(0:npreconv-1) ps.Z(npreconv:size_H-1)] */</font>
+<a name="line120">120: </a>    <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>,&amp;Z);
+<a name="line121">121: </a>    <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,0,npreconv,Z,0,npreconv,nV,cMT,PETSC_FALSE);
+<a name="line122">122: </a>    MatDestroy(&amp;Z);
+<a name="line123">123: </a>  }
+<a name="line124">124: </a>  <font color="#4169E1">if</font> (DVD_IS(d-&gt;sEP,DVD_EP_INDEFINITE)) {
+<a name="line125">125: </a>    <a href="../../../../docs/manualpages/DS/DSPseudoOrthogonalize.html#DSPseudoOrthogonalize">DSPseudoOrthogonalize</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,nV,d-&gt;nBds,&amp;cMTX,d-&gt;nBds);
+<a name="line126">126: </a>  } <font color="#4169E1">else</font> {
+<a name="line127">127: </a>    <a href="../../../../docs/manualpages/DS/DSOrthogonalize.html#DSOrthogonalize">DSOrthogonalize</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,nV,&amp;cMTX);
+<a name="line128">128: </a>  }
+<a name="line129">129: </a>  cMT = cMTX - npreconv;
+
+<a name="line131">131: </a>  <font color="#4169E1">if</font> (d-&gt;W) {
+<a name="line132">132: </a>    <a href="../../../../docs/manualpages/DS/DSOrthogonalize.html#DSOrthogonalize">DSOrthogonalize</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>,nV,&amp;cMTX);
+<a name="line133">133: </a>    cMT = PetscMin(cMT,cMTX - npreconv);
+<a name="line134">134: </a>  }
+
+<a name="line136">136: </a>  <font color="#B22222">/* Lock the converged pairs */</font>
+<a name="line137">137: </a>  d-&gt;eigr+= npreconv;
+<a name="line138">138: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line139">139: </a>  <font color="#4169E1">if</font> (d-&gt;eigi) d-&gt;eigi+= npreconv;
+<a name="line140">140: </a><font color="#A020F0">#endif</font>
+<a name="line141">141: </a>  d-&gt;nconv+= npreconv;
+<a name="line142">142: </a>  d-&gt;errest+= npreconv;
+<a name="line143">143: </a>  <font color="#B22222">/* Notify the changes in V and update the other subspaces */</font>
+<a name="line144">144: </a>  d-&gt;V_tra_s = npreconv;          d-&gt;V_tra_e = nV;
+<a name="line145">145: </a>  d-&gt;V_new_s = cMT;               d-&gt;V_new_e = d-&gt;V_new_s;
+<a name="line146">146: </a>  <font color="#B22222">/* Remove oldU */</font>
+<a name="line147">147: </a>  data-&gt;size_oldU = 0;
+
+<a name="line149">149: </a>  d-&gt;npreconv-= npreconv;
+<a name="line150">150: </a>  <font color="#4169E1">return</font>(0);
+<a name="line151">151: </a>}
+
+<a name="line153">153: </a><strong><font color="#4169E1"><a name="dvd_updateV_restart_gen"></a>static PetscErrorCode dvd_updateV_restart_gen(dvdDashboard *d)</font></strong>
+<a name="line154">154: </a>{
+<a name="line155">155: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+<a name="line156">156: </a>  PetscInt        lV,kV,nV,size_plusk,size_X,cMTX,cMTY,max_restart_size;
+<a name="line157">157: </a>  Mat             Z;
+<a name="line158">158: </a>  PetscErrorCode  ierr;
+
+<a name="line161">161: </a>  <font color="#B22222">/* Select size_X desired pairs from V */</font>
+<a name="line162">162: </a>  <font color="#B22222">/* The restarted basis should:</font>
+<a name="line163">163: </a><font color="#B22222">     - have at least one spot to add a new direction;</font>
+<a name="line164">164: </a><font color="#B22222">     - keep converged vectors, npreconv;</font>
+<a name="line165">165: </a><font color="#B22222">     - keep at least 1 oldU direction if possible.</font>
+<a name="line166">166: </a><font color="#B22222">  */</font>
+<a name="line167">167: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;lV,&amp;kV);
+<a name="line168">168: </a>  nV = kV - lV;
+<a name="line169">169: </a>  max_restart_size = PetscMax(0,PetscMin(d-&gt;eps-&gt;mpd - 1,d-&gt;eps-&gt;ncv - lV - 2));
+<a name="line170">170: </a>  size_X = PetscMin(PetscMin(data-&gt;min_size_V+d-&gt;npreconv,max_restart_size - (max_restart_size - d-&gt;npreconv &gt; 1 &amp;&amp; data-&gt;plusk &gt; 0 &amp;&amp; data-&gt;size_oldU &gt; 0 ? 1 : 0)), nV);
+
+<a name="line172">172: </a>  <font color="#B22222">/* Add plusk eigenvectors from the previous iteration */</font>
+<a name="line173">173: </a>  size_plusk = PetscMax(0,PetscMin(PetscMin(PetscMin(data-&gt;plusk,data-&gt;size_oldU),max_restart_size - size_X),nV - size_X));
+
+<a name="line175">175: </a>  d-&gt;size_MT = nV;
+<a name="line176">176: </a>  <font color="#B22222">/* ps.Q &lt;- orth([pX(0:size_X-1) [oldU(0:size_plusk-1); 0] ]) */</font>
+<a name="line177">177: </a>  <font color="#B22222">/* Harmonics restarts wiht right eigenvectors, and other with the left ones.</font>
+<a name="line178">178: </a><font color="#B22222">     If the problem is standard or hermitian, left and right vectors are the same */</font>
+<a name="line179">179: </a>  <font color="#4169E1">if</font> (!(d-&gt;W||DVD_IS(d-&gt;sEP,DVD_EP_STD)||DVD_IS(d-&gt;sEP,DVD_EP_HERMITIAN))) {
+<a name="line180">180: </a>    <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>,&amp;Z);
+<a name="line181">181: </a>    <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,0,0,Z,0,0,nV,size_X,PETSC_FALSE);
+<a name="line182">182: </a>    MatDestroy(&amp;Z);
+<a name="line183">183: </a>  }
+<a name="line184">184: </a>  <font color="#4169E1">if</font> (size_plusk &gt; 0 &amp;&amp; DVD_IS(d-&gt;sEP,DVD_EP_INDEFINITE)) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,<font color="#666666">"Unsupported plusk&gt;0 in indefinite eigenvalue problems"</font>);
+<a name="line185">185: </a>  <font color="#4169E1">if</font> (size_plusk &gt; 0) {
+<a name="line186">186: </a>    <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,0,size_X,data-&gt;oldU,0,0,nV,size_plusk,PETSC_FALSE);
+<a name="line187">187: </a>  }
+<a name="line188">188: </a>  <font color="#4169E1">if</font> (DVD_IS(d-&gt;sEP,DVD_EP_INDEFINITE)) {
+<a name="line189">189: </a>    <a href="../../../../docs/manualpages/DS/DSPseudoOrthogonalize.html#DSPseudoOrthogonalize">DSPseudoOrthogonalize</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,size_X,d-&gt;nBds,&amp;cMTX,d-&gt;nBds);
+<a name="line190">190: </a>  } <font color="#4169E1">else</font> {
+<a name="line191">191: </a>    <a href="../../../../docs/manualpages/DS/DSOrthogonalize.html#DSOrthogonalize">DSOrthogonalize</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,size_X+size_plusk,&amp;cMTX);
+<a name="line192">192: </a>  }
+
+<a name="line194">194: </a>  <font color="#4169E1">if</font> (d-&gt;W &amp;&amp; size_plusk &gt; 0) {
+<a name="line195">195: </a>    <font color="#B22222">/* ps.Z &lt;- orth([ps.Z(0:size_X-1) [oldV(0:size_plusk-1); 0] ]) */</font>
+<a name="line196">196: </a>    <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>,0,size_X,data-&gt;oldV,0,0,nV,size_plusk,PETSC_FALSE);
+<a name="line197">197: </a>    <a href="../../../../docs/manualpages/DS/DSOrthogonalize.html#DSOrthogonalize">DSOrthogonalize</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>,size_X+size_plusk,&amp;cMTY);
+<a name="line198">198: </a>    cMTX = PetscMin(cMTX, cMTY);
+<a name="line199">199: </a>  }
+<a name="line200">200: </a>  <font color="#4169E1">if</font> (cMTX &gt; size_X+size_plusk) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,<font color="#666666">"Invalid number of columns to restart"</font>);
+
+<a name="line202">202: </a>  <font color="#B22222">/* Notify the changes in V and update the other subspaces */</font>
+<a name="line203">203: </a>  d-&gt;V_tra_s = 0;                     d-&gt;V_tra_e = cMTX;
+<a name="line204">204: </a>  d-&gt;V_new_s = d-&gt;V_tra_e;            d-&gt;V_new_e = d-&gt;V_new_s;
+
+<a name="line206">206: </a>  <font color="#B22222">/* Remove oldU */</font>
+<a name="line207">207: </a>  data-&gt;size_oldU = 0;
+
+<a name="line209">209: </a>  <font color="#B22222">/* Remove npreconv */</font>
+<a name="line210">210: </a>  d-&gt;npreconv = 0;
+<a name="line211">211: </a>  <font color="#4169E1">return</font>(0);
+<a name="line212">212: </a>}
+
+<a name="line214">214: </a><strong><font color="#4169E1"><a name="dvd_updateV_testConv"></a>static PetscErrorCode dvd_updateV_testConv(dvdDashboard *d,PetscInt s,PetscInt pre,PetscInt e,PetscInt *nConv)</font></strong>
+<a name="line215">215: </a>{
+<a name="line216">216: </a>  PetscInt        i,j,b;
+<a name="line217">217: </a>  PetscReal       norm;
+<a name="line218">218: </a>  PetscErrorCode  ierr;
+<a name="line219">219: </a>  PetscBool       conv, c;
+<a name="line220">220: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+
+<a name="line223">223: </a>  <font color="#4169E1">if</font> (nConv) *nConv = s;
+<a name="line224">224: </a>  <font color="#4169E1">for</font> (i=s,conv=PETSC_TRUE;(conv || data-&gt;allResiduals) &amp;&amp; (i &lt; e);i+=b) {
+<a name="line225">225: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line226">226: </a>    b = d-&gt;eigi[i]!=0.0?2:1;
+<a name="line227">227: </a><font color="#A020F0">#else</font>
+<a name="line228">228: </a>    b = 1;
+<a name="line229">229: </a><font color="#A020F0">#endif</font>
+<a name="line230">230: </a>    <font color="#4169E1">if</font> (i+b-1 &gt;= pre) {
+<a name="line231">231: </a>      d-&gt;calcpairs_residual(d,i,i+b);
+<a name="line232">232: </a>    }
+<a name="line233">233: </a>    <font color="#B22222">/* Test the Schur vector */</font>
+<a name="line234">234: </a>    <font color="#4169E1">for</font> (j=0,c=PETSC_TRUE;j&lt;b &amp;&amp; c;j++) {
+<a name="line235">235: </a>      norm = d-&gt;nR[i+j]/d-&gt;nX[i+j];
+<a name="line236">236: </a>      c = d-&gt;testConv(d,d-&gt;eigr[i+j],d-&gt;eigi[i+j],norm,&amp;d-&gt;errest[i+j]);
+<a name="line237">237: </a>    }
+<a name="line238">238: </a>    <font color="#4169E1">if</font> (conv &amp;&amp; c) { <font color="#4169E1">if</font> (nConv) *nConv = i+b; }
+<a name="line239">239: </a>    <font color="#4169E1">else</font> conv = PETSC_FALSE;
+<a name="line240">240: </a>  }
+<a name="line241">241: </a>  pre = PetscMax(pre,i);
+
+<a name="line243">243: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line244">244: </a>  <font color="#B22222">/* Enforce converged conjugate complex eigenpairs */</font>
+<a name="line245">245: </a>  <font color="#4169E1">if</font> (nConv) {
+<a name="line246">246: </a>    <font color="#4169E1">for</font> (j=0;j&lt;*nConv;j++) <font color="#4169E1">if</font> (d-&gt;eigi[j] != 0.0) j++;
+<a name="line247">247: </a>    <font color="#4169E1">if</font> (j&gt;*nConv) (*nConv)--;
+<a name="line248">248: </a>  }
+<a name="line249">249: </a><font color="#A020F0">#endif</font>
+<a name="line250">250: </a>  <font color="#4169E1">for</font> (i=pre;i&lt;e;i++) d-&gt;errest[i] = d-&gt;nR[i] = 1.0;
+<a name="line251">251: </a>  <font color="#4169E1">return</font>(0);
+<a name="line252">252: </a>}
+
+<a name="line254">254: </a><strong><font color="#4169E1"><a name="dvd_updateV_update_gen"></a>static PetscErrorCode dvd_updateV_update_gen(dvdDashboard *d)</font></strong>
+<a name="line255">255: </a>{
+<a name="line256">256: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+<a name="line257">257: </a>  PetscInt        size_D,s,lV,kV,nV;
+<a name="line258">258: </a>  PetscErrorCode  ierr;
+
+<a name="line261">261: </a>  <font color="#B22222">/* Select the desired pairs */</font>
+<a name="line262">262: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;lV,&amp;kV);
+<a name="line263">263: </a>  nV = kV - lV;
+<a name="line264">264: </a>  size_D = PetscMin(PetscMin(PetscMin(d-&gt;bs,nV),d-&gt;eps-&gt;ncv-nV),nV);
+<a name="line265">265: </a>  <font color="#4169E1">if</font> (size_D == 0) <font color="#4169E1">return</font>(0);
+
+<a name="line267">267: </a>  <font color="#B22222">/* Fill V with D */</font>
+<a name="line268">268: </a>  d-&gt;improveX(d,d-&gt;npreconv,d-&gt;npreconv+size_D,&amp;size_D);
+
+<a name="line270">270: </a>  <font color="#B22222">/* If D is empty, exit */</font>
+<a name="line271">271: </a>  d-&gt;size_D = size_D;
+<a name="line272">272: </a>  <font color="#4169E1">if</font> (size_D == 0) <font color="#4169E1">return</font>(0);
+
+<a name="line274">274: </a>  <font color="#B22222">/* Get the residual of all pairs */</font>
+<a name="line275">275: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line276">276: </a>  s = (d-&gt;eigi[0]!=0.0)? 2: 1;
+<a name="line277">277: </a><font color="#A020F0">#else</font>
+<a name="line278">278: </a>  s = 1;
+<a name="line279">279: </a><font color="#A020F0">#endif</font>
+<a name="line280">280: </a>  <a href="../../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(d-&gt;eps-&gt;V,&amp;lV,&amp;kV);
+<a name="line281">281: </a>  nV = kV - lV;
+<a name="line282">282: </a>  dvd_updateV_testConv(d,s,s,data-&gt;allResiduals?nV:size_D,NULL);
+
+<a name="line284">284: </a>  <font color="#B22222">/* Notify the changes in V */</font>
+<a name="line285">285: </a>  d-&gt;V_tra_s = 0;                 d-&gt;V_tra_e = 0;
+<a name="line286">286: </a>  d-&gt;V_new_s = nV;                d-&gt;V_new_e = nV+size_D;
+
+<a name="line288">288: </a>  <font color="#B22222">/* Save the projected eigenvectors */</font>
+<a name="line289">289: </a>  <font color="#4169E1">if</font> (data-&gt;plusk &gt; 0) {
+<a name="line290">290: </a>    MatZeroEntries(data-&gt;oldU);
+<a name="line291">291: </a>    data-&gt;size_oldU = nV;
+<a name="line292">292: </a>    <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>,0,0,data-&gt;oldU,0,0,nV,nV,PETSC_TRUE);
+<a name="line293">293: </a>    <font color="#4169E1">if</font> (d-&gt;W) {
+<a name="line294">294: </a>      MatZeroEntries(data-&gt;oldV);
+<a name="line295">295: </a>      <a href="../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(d-&gt;eps-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Z</a>,0,0,data-&gt;oldV,0,0,nV,nV,PETSC_TRUE);
+<a name="line296">296: </a>    }
+<a name="line297">297: </a>  }
+<a name="line298">298: </a>  <font color="#4169E1">return</font>(0);
+<a name="line299">299: </a>}
+
+<a name="line301">301: </a><strong><font color="#4169E1"><a name="dvd_updateV_extrapol"></a>static PetscErrorCode dvd_updateV_extrapol(dvdDashboard *d)</font></strong>
+<a name="line302">302: </a>{
+<a name="line303">303: </a>  dvdManagV_basic *data = (dvdManagV_basic*)d-&gt;updateV_data;
+<a name="line304">304: </a>  PetscInt        i;
+<a name="line305">305: </a>  PetscBool       restart,t;
+<a name="line306">306: </a>  PetscErrorCode  ierr;
+
+<a name="line309">309: </a>  <font color="#B22222">/* TODO: restrict select pairs to each case */</font>
+<a name="line310">310: </a>  d-&gt;calcpairs_selectPairs(d, data-&gt;min_size_V+d-&gt;npreconv);
+
+<a name="line312">312: </a>  <font color="#B22222">/* If the subspaces doesn't need restart, add new vector */</font>
+<a name="line313">313: </a>  d-&gt;isRestarting(d,&amp;restart);
+<a name="line314">314: </a>  <font color="#4169E1">if</font> (!restart) {
+<a name="line315">315: </a>    d-&gt;size_D = 0;
+<a name="line316">316: </a>    dvd_updateV_update_gen(d);
+
+<a name="line318">318: </a>    <font color="#B22222">/* If no vector were converged, exit */</font>
+<a name="line319">319: </a>    <font color="#B22222">/* For GHEP without B-ortho, converge all of the requested pairs at once */</font>
+<a name="line320">320: </a>    PetscObjectTypeCompareAny((PetscObject)d-&gt;eps-&gt;ds,&amp;t,DSGHEP,<font color="#666666">""</font>);
+<a name="line321">321: </a>    <font color="#4169E1">if</font> (d-&gt;nconv+d-&gt;npreconv &lt; d-&gt;nev &amp;&amp; (t || d-&gt;npreconv == 0)) <font color="#4169E1">return</font>(0);
+<a name="line322">322: </a>  }
+
+<a name="line324">324: </a>  <font color="#B22222">/* If some eigenpairs were converged, lock them  */</font>
+<a name="line325">325: </a>  <font color="#4169E1">if</font> (d-&gt;npreconv &gt; 0) {
+<a name="line326">326: </a>    i = d-&gt;npreconv;
+<a name="line327">327: </a>    dvd_updateV_conv_gen(d);
+
+<a name="line329">329: </a>    <font color="#B22222">/* If some eigenpair was locked, exit */</font>
+<a name="line330">330: </a>    <font color="#4169E1">if</font> (i &gt; d-&gt;npreconv) <font color="#4169E1">return</font>(0);
+<a name="line331">331: </a>  }
+
+<a name="line333">333: </a>  <font color="#B22222">/* Else, a restarting is performed */</font>
+<a name="line334">334: </a>  dvd_updateV_restart_gen(d);
+<a name="line335">335: </a>  <font color="#4169E1">return</font>(0);
+<a name="line336">336: </a>}
+
+<a name="line338">338: </a><strong><font color="#4169E1"><a name="dvd_managementV_basic"></a>PetscErrorCode dvd_managementV_basic(dvdDashboard *d,dvdBlackboard *b,PetscInt bs,PetscInt mpd,PetscInt min_size_V,PetscInt plusk,PetscBool harm,PetscBool allResiduals)</font></strong>
+<a name="line339">339: </a>{
+<a name="line340">340: </a>  PetscErrorCode  ierr;
+<a name="line341">341: </a>  dvdManagV_basic *data;
+<a name="line342">342: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line343">343: </a>  PetscBool       her_probl,std_probl;
+<a name="line344">344: </a><font color="#A020F0">#endif</font>
+
+<a name="line347">347: </a>  <font color="#B22222">/* Setting configuration constrains */</font>
+<a name="line348">348: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line349">349: </a>  <font color="#B22222">/* if the last converged eigenvalue is complex its conjugate pair is also</font>
+<a name="line350">350: </a><font color="#B22222">     converged */</font>
+<a name="line351">351: </a>  her_probl = DVD_IS(d-&gt;sEP,DVD_EP_HERMITIAN)? PETSC_TRUE: PETSC_FALSE;
+<a name="line352">352: </a>  std_probl = DVD_IS(d-&gt;sEP,DVD_EP_STD)? PETSC_TRUE: PETSC_FALSE;
+<a name="line353">353: </a>  b-&gt;max_size_X = PetscMax(b-&gt;max_size_X,bs+((her_probl &amp;&amp; std_probl)?0:1));
+<a name="line354">354: </a><font color="#A020F0">#else</font>
+<a name="line355">355: </a>  b-&gt;max_size_X = PetscMax(b-&gt;max_size_X,bs);
+<a name="line356">356: </a><font color="#A020F0">#endif</font>
+
+<a name="line358">358: </a>  b-&gt;max_size_V = PetscMax(b-&gt;max_size_V,mpd);
+<a name="line359">359: </a>  min_size_V = PetscMin(min_size_V,mpd-bs);
+<a name="line360">360: </a>  b-&gt;size_V = PetscMax(b-&gt;size_V,b-&gt;max_size_V+b-&gt;max_size_P+b-&gt;max_nev);
+<a name="line361">361: </a>  b-&gt;max_size_oldX = plusk;
+
+<a name="line363">363: </a>  <font color="#B22222">/* Setup the step */</font>
+<a name="line364">364: </a>  <font color="#4169E1">if</font> (b-&gt;state &gt;= DVD_STATE_CONF) {
+<a name="line365">365: </a>    PetscNewLog(d-&gt;eps,&amp;data);
+<a name="line366">366: </a>    data-&gt;mpd = b-&gt;max_size_V;
+<a name="line367">367: </a>    data-&gt;min_size_V = min_size_V;
+<a name="line368">368: </a>    d-&gt;bs = bs;
+<a name="line369">369: </a>    data-&gt;plusk = plusk;
+<a name="line370">370: </a>    data-&gt;allResiduals = allResiduals;
+
+<a name="line372">372: </a>    d-&gt;eigr = d-&gt;eps-&gt;eigr;
+<a name="line373">373: </a>    d-&gt;eigi = d-&gt;eps-&gt;eigi;
+<a name="line374">374: </a>    d-&gt;errest = d-&gt;eps-&gt;errest;
+<a name="line375">375: </a>    PetscMalloc1(d-&gt;eps-&gt;ncv,&amp;d-&gt;real_nR);
+<a name="line376">376: </a>    PetscMalloc1(d-&gt;eps-&gt;ncv,&amp;d-&gt;real_nX);
+<a name="line377">377: </a>    <font color="#4169E1">if</font> (plusk &gt; 0) { MatCreateSeqDense(PETSC_COMM_SELF,d-&gt;eps-&gt;ncv,d-&gt;eps-&gt;ncv,NULL,&amp;data-&gt;oldU); }
+<a name="line378">378: </a>    <font color="#4169E1">else</font> data-&gt;oldU = NULL;
+<a name="line379">379: </a>    <font color="#4169E1">if</font> (harm &amp;&amp; plusk&gt;0) { MatCreateSeqDense(PETSC_COMM_SELF,d-&gt;eps-&gt;ncv,d-&gt;eps-&gt;ncv,NULL,&amp;data-&gt;oldV); }
+<a name="line380">380: </a>    <font color="#4169E1">else</font> data-&gt;oldV = NULL;
+
+<a name="line382">382: </a>    data-&gt;old_updateV_data = d-&gt;updateV_data;
+<a name="line383">383: </a>    d-&gt;updateV_data = data;
+<a name="line384">384: </a>    data-&gt;old_isRestarting = d-&gt;isRestarting;
+<a name="line385">385: </a>    d-&gt;isRestarting = dvd_isrestarting_fullV;
+<a name="line386">386: </a>    d-&gt;updateV = dvd_updateV_extrapol;
+<a name="line387">387: </a>    d-&gt;preTestConv = dvd_updateV_testConv;
+<a name="line388">388: </a>    EPSDavidsonFLAdd(&amp;d-&gt;startList,dvd_updateV_start);
+<a name="line389">389: </a>    EPSDavidsonFLAdd(&amp;d-&gt;destroyList,dvd_managementV_basic_d);
+<a name="line390">390: </a>  }
+<a name="line391">391: </a>  <font color="#4169E1">return</font>(0);
+<a name="line392">392: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,154 @@
+<center><a href="mfnkrylov.c">Actual source code: mfnkrylov.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/mfn/impls/krylov/mfnkrylov.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:13+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/mfn/impls/krylov/mfnkrylov.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc matrix function solver: "krylov"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Arnoldi with Eiermann-Ernst restart</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       Build Arnoldi approximations using f(H) for the Hessenberg matrix H,</font>
+<a name="line18"> 18: </a><font color="#B22222">       restart by discarding the Krylov basis but keeping H.</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   References:</font>
+
+<a name="line22"> 22: </a><font color="#B22222">       [1] M. Eiermann and O. Ernst, "A restarted Krylov subspace method</font>
+<a name="line23"> 23: </a><font color="#B22222">           for the evaluation of matrix functions", SIAM J. Numer. Anal.</font>
+<a name="line24"> 24: </a><font color="#B22222">           44(6):2481-2504, 2006.</font>
+<a name="line25"> 25: </a><font color="#B22222">*/</font>
+
+<a name="line27"> 27: </a> #include <A href="../../../../include/slepc/private/mfnimpl.h.html">&lt;slepc/private/mfnimpl.h&gt;</A>
+<a name="line28"> 28: </a> #include <A href="../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line30"> 30: </a><strong><font color="#4169E1"><a name="MFNSetUp_Krylov"></a>PetscErrorCode MFNSetUp_Krylov(<a href="../../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn)</font></strong>
+<a name="line31"> 31: </a>{
+<a name="line33"> 33: </a>  PetscInt       N;
+
+<a name="line36"> 36: </a>  MatGetSize(mfn-&gt;A,&amp;N,NULL);
+<a name="line37"> 37: </a>  <font color="#4169E1">if</font> (mfn-&gt;ncv==PETSC_DEFAULT) mfn-&gt;ncv = PetscMin(30,N);
+<a name="line38"> 38: </a>  <font color="#4169E1">if</font> (mfn-&gt;max_it==PETSC_DEFAULT) mfn-&gt;max_it = 100;
+<a name="line39"> 39: </a>  <a href="../../../../docs/manualpages/MFN/MFNAllocateSolution.html#MFNAllocateSolution">MFNAllocateSolution</a>(mfn,1);
+<a name="line40"> 40: </a>  <font color="#4169E1">return</font>(0);
+<a name="line41"> 41: </a>}
+
+<a name="line43"> 43: </a><strong><font color="#4169E1"><a name="MFNSolve_Krylov"></a>PetscErrorCode MFNSolve_Krylov(<a href="../../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn,Vec b,Vec x)</font></strong>
+<a name="line44"> 44: </a>{
+<a name="line46"> 46: </a>  PetscInt       n=0,m,ld,ldh,j;
+<a name="line47"> 47: </a>  PetscBLASInt   m_,inc=1;
+<a name="line48"> 48: </a>  Mat            G=NULL,H=NULL;
+<a name="line49"> 49: </a>  Vec            F=NULL;
+<a name="line50"> 50: </a>  PetscScalar    *array,*farray,*garray,*harray;
+<a name="line51"> 51: </a>  PetscReal      beta,betaold=0.0,nrm=1.0;
+<a name="line52"> 52: </a>  PetscBool      breakdown,set,flg,symm=PETSC_FALSE;
+
+<a name="line55"> 55: </a>  m  = mfn-&gt;ncv;
+<a name="line56"> 56: </a>  ld = m+1;
+<a name="line57"> 57: </a>  PetscCalloc1(ld*ld,&amp;array);
+
+<a name="line59"> 59: </a>  <font color="#B22222">/* set initial vector to b/||b|| */</font>
+<a name="line60"> 60: </a>  <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(mfn-&gt;V,0,b);
+<a name="line61"> 61: </a>  <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(mfn-&gt;V,0,1.0/mfn-&gt;bnorm);
+<a name="line62"> 62: </a>  VecSet(x,0.0);
+
+<a name="line64"> 64: </a>  <font color="#B22222">/* Restart loop */</font>
+<a name="line65"> 65: </a>  <font color="#4169E1">while</font> (mfn-&gt;reason == <a href="../../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_CONVERGED_ITERATING</a>) {
+<a name="line66"> 66: </a>    mfn-&gt;its++;
+
+<a name="line68"> 68: </a>    <font color="#B22222">/* compute Arnoldi factorization */</font>
+<a name="line69"> 69: </a>    <a href="../../../../docs/manualpages/BV/BVMatArnoldi.html#BVMatArnoldi">BVMatArnoldi</a>(mfn-&gt;V,mfn-&gt;transpose_solve?mfn-&gt;AT:mfn-&gt;A,array,ld,0,&amp;m,&amp;beta,&amp;breakdown);
+
+<a name="line71"> 71: </a>    <font color="#B22222">/* save previous Hessenberg matrix in G; allocate new storage for H and f(H) */</font>
+<a name="line72"> 72: </a>    <font color="#4169E1">if</font> (mfn-&gt;its&gt;1) { G = H; H = NULL; }
+<a name="line73"> 73: </a>    ldh = n+m;
+<a name="line74"> 74: </a>    MFN_CreateVec(ldh,&amp;F);
+<a name="line75"> 75: </a>    MFN_CreateDenseMat(ldh,&amp;H);
+
+<a name="line77"> 77: </a>    <font color="#B22222">/* glue together the previous H and the new H obtained with Arnoldi */</font>
+<a name="line78"> 78: </a>    MatDenseGetArray(H,&amp;harray);
+<a name="line79"> 79: </a>    <font color="#4169E1">for</font> (j=0;j&lt;m;j++) {
+<a name="line80"> 80: </a>      PetscArraycpy(harray+n+(j+n)*ldh,array+j*ld,m);
+<a name="line81"> 81: </a>    }
+<a name="line82"> 82: </a>    <font color="#4169E1">if</font> (mfn-&gt;its&gt;1) {
+<a name="line83"> 83: </a>      MatDenseGetArray(G,&amp;garray);
+<a name="line84"> 84: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line85"> 85: </a>        PetscArraycpy(harray+j*ldh,garray+j*n,n);
+<a name="line86"> 86: </a>      }
+<a name="line87"> 87: </a>      MatDenseRestoreArray(G,&amp;garray);
+<a name="line88"> 88: </a>      MatDestroy(&amp;G);
+<a name="line89"> 89: </a>      harray[n+(n-1)*ldh] = betaold;
+<a name="line90"> 90: </a>    }
+<a name="line91"> 91: </a>    MatDenseRestoreArray(H,&amp;harray);
+
+<a name="line93"> 93: </a>    <font color="#4169E1">if</font> (mfn-&gt;its==1) {
+<a name="line94"> 94: </a>      <font color="#B22222">/* set symmetry flag of H from A */</font>
+<a name="line95"> 95: </a>      MatIsHermitianKnown(mfn-&gt;A,&amp;set,&amp;flg);
+<a name="line96"> 96: </a>      symm = set? flg: PETSC_FALSE;
+<a name="line97"> 97: </a>      <font color="#4169E1">if</font> (symm) {
+<a name="line98"> 98: </a>        MatSetOption(H,MAT_HERMITIAN,PETSC_TRUE);
+<a name="line99"> 99: </a>      }
+<a name="line100">100: </a>    }
+
+<a name="line102">102: </a>    <font color="#B22222">/* evaluate f(H) */</font>
+<a name="line103">103: </a>    <a href="../../../../docs/manualpages/FN/FNEvaluateFunctionMatVec.html#FNEvaluateFunctionMatVec">FNEvaluateFunctionMatVec</a>(mfn-&gt;fn,H,F);
+
+<a name="line105">105: </a>    <font color="#B22222">/* x += ||b||*V*f(H)*e_1 */</font>
+<a name="line106">106: </a>    VecGetArray(F,&amp;farray);
+<a name="line107">107: </a>    PetscBLASIntCast(m,&amp;m_);
+<a name="line108">108: </a>    nrm = BLASnrm2_(&amp;m_,farray+n,&amp;inc);   <font color="#B22222">/* relative norm of the update ||u||/||b|| */</font>
+<a name="line109">109: </a>    MFNMonitor(mfn,mfn-&gt;its,nrm);
+<a name="line110">110: </a>    <font color="#4169E1">for</font> (j=0;j&lt;m;j++) farray[j+n] *= mfn-&gt;bnorm;
+<a name="line111">111: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(mfn-&gt;V,0,m);
+<a name="line112">112: </a>    <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(mfn-&gt;V,1.0,1.0,x,farray+n);
+<a name="line113">113: </a>    VecRestoreArray(F,&amp;farray);
+
+<a name="line115">115: </a>    <font color="#B22222">/* check convergence */</font>
+<a name="line116">116: </a>    <font color="#4169E1">if</font> (mfn-&gt;its &gt;= mfn-&gt;max_it) mfn-&gt;reason = <a href="../../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_DIVERGED_ITS</a>;
+<a name="line117">117: </a>    <font color="#4169E1">if</font> (mfn-&gt;its&gt;1) {
+<a name="line118">118: </a>      <font color="#4169E1">if</font> (m&lt;mfn-&gt;ncv || breakdown || beta==0.0 || nrm&lt;mfn-&gt;tol) mfn-&gt;reason = <a href="../../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_CONVERGED_TOL</a>;
+<a name="line119">119: </a>    }
+
+<a name="line121">121: </a>    <font color="#B22222">/* restart with vector v_{m+1} */</font>
+<a name="line122">122: </a>    <font color="#4169E1">if</font> (mfn-&gt;reason == <a href="../../../../docs/manualpages/MFN/MFNConvergedReason.html#MFNConvergedReason">MFN_CONVERGED_ITERATING</a>) {
+<a name="line123">123: </a>      <a href="../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(mfn-&gt;V,m,0);
+<a name="line124">124: </a>      n += m;
+<a name="line125">125: </a>      betaold = beta;
+<a name="line126">126: </a>    }
+<a name="line127">127: </a>  }
+
+<a name="line129">129: </a>  MatDestroy(&amp;H);
+<a name="line130">130: </a>  MatDestroy(&amp;G);
+<a name="line131">131: </a>  VecDestroy(&amp;F);
+<a name="line132">132: </a>  PetscFree(array);
+<a name="line133">133: </a>  <font color="#4169E1">return</font>(0);
+<a name="line134">134: </a>}
+
+<a name="line136">136: </a><strong><font color="#4169E1"><a name="MFNCreate_Krylov"></a>SLEPC_EXTERN PetscErrorCode MFNCreate_Krylov(<a href="../../../../docs/manualpages/MFN/MFN.html#MFN">MFN</a> mfn)</font></strong>
+<a name="line137">137: </a>{
+<a name="line139">139: </a>  mfn-&gt;ops-&gt;solve          = MFNSolve_Krylov;
+<a name="line140">140: </a>  mfn-&gt;ops-&gt;setup          = MFNSetUp_Krylov;
+<a name="line141">141: </a>  <font color="#4169E1">return</font>(0);
+<a name="line142">142: </a>}
+</pre>
+</body>
+
+</html>

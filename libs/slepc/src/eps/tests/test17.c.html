@@ -1,0 +1,253 @@
+<center><a href="test17.c">Actual source code: test17.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tests/test17.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:55+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tests/test17.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Test interface functions of spectrum-slicing Krylov-Schur.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"This is based on ex12.c. The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x dimension.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in y dimension.\n\n"</font>;
+
+<a name="line16"> 16: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line18"> 18: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line19"> 19: </a>{
+<a name="line20"> 20: </a>  Mat            A,B;         <font color="#B22222">/* matrices */</font>
+<a name="line21"> 21: </a>  Mat            As,Bs;       <font color="#B22222">/* matrices distributed in subcommunicators */</font>
+<a name="line22"> 22: </a>  Mat            Au;          <font color="#B22222">/* matrix used to modify A on subcommunicators */</font>
+<a name="line23"> 23: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;         <font color="#B22222">/* eigenproblem solver context */</font>
+<a name="line24"> 24: </a>  <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st;          <font color="#B22222">/* spectral transformation context */</font>
+<a name="line25"> 25: </a>  KSP            ksp;
+<a name="line26"> 26: </a>  PC             pc;
+<a name="line27"> 27: </a>  Vec            v;
+<a name="line28"> 28: </a>  PetscMPIInt    size,rank;
+<a name="line29"> 29: </a>  PetscInt       N,n=35,m,Istart,Iend,II,nev,ncv,mpd,i,j,k,*inertias,npart,nval,nloc,nlocs,mlocs;
+<a name="line30"> 30: </a>  PetscBool      flag,showinertia=PETSC_TRUE,lock,detect;
+<a name="line31"> 31: </a>  PetscReal      int0,int1,*shifts,keep,*subint,*evals;
+<a name="line32"> 32: </a>  PetscScalar    lambda;
+<a name="line33"> 33: </a>  char           vlist[4000];
+
+<a name="line36"> 36: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+<a name="line37"> 37: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PETSC_COMM_WORLD,&amp;size);
+<a name="line38"> 38: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PETSC_COMM_WORLD,&amp;rank);
+
+<a name="line40"> 40: </a>  PetscOptionsGetBool(NULL,NULL,<font color="#666666">"-showinertia"</font>,&amp;showinertia,NULL);
+<a name="line41"> 41: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line42"> 42: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,&amp;flag);
+<a name="line43"> 43: </a>  <font color="#4169E1">if</font> (!flag) m=n;
+<a name="line44"> 44: </a>  N = n*m;
+<a name="line45"> 45: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nSpectrum-slicing test, N=%D (%Dx%D grid)\n\n"</font>,N,n,m);
+
+<a name="line47"> 47: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line48"> 48: </a><font color="#B22222">     Compute the matrices that define the eigensystem, Ax=kBx</font>
+<a name="line49"> 49: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line51"> 51: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line52"> 52: </a>  MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line53"> 53: </a>  MatSetFromOptions(A);
+<a name="line54"> 54: </a>  MatSetUp(A);
+
+<a name="line56"> 56: </a>  MatCreate(PETSC_COMM_WORLD,&amp;B);
+<a name="line57"> 57: </a>  MatSetSizes(B,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line58"> 58: </a>  MatSetFromOptions(B);
+<a name="line59"> 59: </a>  MatSetUp(B);
+
+<a name="line61"> 61: </a>  MatGetOwnershipRange(A,&amp;Istart,&amp;Iend);
+<a name="line62"> 62: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line63"> 63: </a>    i = II/n; j = II-i*n;
+<a name="line64"> 64: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(A,II,II-n,-1.0,INSERT_VALUES); }
+<a name="line65"> 65: </a>    <font color="#4169E1">if</font> (i&lt;m-1) { MatSetValue(A,II,II+n,-1.0,INSERT_VALUES); }
+<a name="line66"> 66: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(A,II,II-1,-1.0,INSERT_VALUES); }
+<a name="line67"> 67: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(A,II,II+1,-1.0,INSERT_VALUES); }
+<a name="line68"> 68: </a>    MatSetValue(A,II,II,4.0,INSERT_VALUES);
+<a name="line69"> 69: </a>    MatSetValue(B,II,II,2.0,INSERT_VALUES);
+<a name="line70"> 70: </a>  }
+<a name="line71"> 71: </a>  <font color="#4169E1">if</font> (Istart==0) {
+<a name="line72"> 72: </a>    MatSetValue(B,0,0,6.0,INSERT_VALUES);
+<a name="line73"> 73: </a>    MatSetValue(B,0,1,-1.0,INSERT_VALUES);
+<a name="line74"> 74: </a>    MatSetValue(B,1,0,-1.0,INSERT_VALUES);
+<a name="line75"> 75: </a>    MatSetValue(B,1,1,1.0,INSERT_VALUES);
+<a name="line76"> 76: </a>  }
+
+<a name="line78"> 78: </a>  MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+<a name="line79"> 79: </a>  MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
+<a name="line80"> 80: </a>  MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);
+<a name="line81"> 81: </a>  MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);
+
+<a name="line83"> 83: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line84"> 84: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line85"> 85: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line87"> 87: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line88"> 88: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,B);
+<a name="line89"> 89: </a>  <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHEP</a>);
+<a name="line90"> 90: </a>  <a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(eps,EPSKRYLOVSCHUR);
+
+<a name="line92"> 92: </a>  <font color="#B22222">/*</font>
+<a name="line93"> 93: </a><font color="#B22222">     Set interval and other settings for spectrum slicing</font>
+<a name="line94"> 94: </a><font color="#B22222">  */</font>
+<a name="line95"> 95: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a>);
+<a name="line96"> 96: </a>  int0 = 1.1; int1 = 1.3;
+<a name="line97"> 97: </a>  <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>(eps,int0,int1);
+<a name="line98"> 98: </a>  <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,&amp;st);
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STSINVERT);
+<a name="line100">100: </a>  <a href="../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,&amp;ksp);
+<a name="line101">101: </a>  KSPGetPC(ksp,&amp;pc);
+<a name="line102">102: </a>  KSPSetType(ksp,KSPPREONLY);
+<a name="line103">103: </a>  PCSetType(pc,PCCHOLESKY);
+
+<a name="line105">105: </a>  <font color="#B22222">/*</font>
+<a name="line106">106: </a><font color="#B22222">     Test interface functions of Krylov-Schur solver</font>
+<a name="line107">107: </a><font color="#B22222">  */</font>
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetRestart.html#EPSKrylovSchurGetRestart">EPSKrylovSchurGetRestart</a>(eps,&amp;keep);
+<a name="line109">109: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Restart parameter before changing = %g"</font>,(double)keep);
+<a name="line110">110: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetRestart.html#EPSKrylovSchurSetRestart">EPSKrylovSchurSetRestart</a>(eps,0.4);
+<a name="line111">111: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetRestart.html#EPSKrylovSchurGetRestart">EPSKrylovSchurGetRestart</a>(eps,&amp;keep);
+<a name="line112">112: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to %g\n"</font>,(double)keep);
+
+<a name="line114">114: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetDetectZeros.html#EPSKrylovSchurGetDetectZeros">EPSKrylovSchurGetDetectZeros</a>(eps,&amp;detect);
+<a name="line115">115: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Detect zeros before changing = %d"</font>,(int)detect);
+<a name="line116">116: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetDetectZeros.html#EPSKrylovSchurSetDetectZeros">EPSKrylovSchurSetDetectZeros</a>(eps,PETSC_TRUE);
+<a name="line117">117: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetDetectZeros.html#EPSKrylovSchurGetDetectZeros">EPSKrylovSchurGetDetectZeros</a>(eps,&amp;detect);
+<a name="line118">118: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to %d\n"</font>,(int)detect);
+
+<a name="line120">120: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetLocking.html#EPSKrylovSchurGetLocking">EPSKrylovSchurGetLocking</a>(eps,&amp;lock);
+<a name="line121">121: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Locking flag before changing = %d"</font>,(int)lock);
+<a name="line122">122: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetLocking.html#EPSKrylovSchurSetLocking">EPSKrylovSchurSetLocking</a>(eps,PETSC_FALSE);
+<a name="line123">123: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetLocking.html#EPSKrylovSchurGetLocking">EPSKrylovSchurGetLocking</a>(eps,&amp;lock);
+<a name="line124">124: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to %d\n"</font>,(int)lock);
+
+<a name="line126">126: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetDimensions.html#EPSKrylovSchurGetDimensions">EPSKrylovSchurGetDimensions</a>(eps,&amp;nev,&amp;ncv,&amp;mpd);
+<a name="line127">127: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Sub-solve dimensions before changing = [%D,%D,%D]"</font>,nev,ncv,mpd);
+<a name="line128">128: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetDimensions.html#EPSKrylovSchurSetDimensions">EPSKrylovSchurSetDimensions</a>(eps,30,60,60);
+<a name="line129">129: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetDimensions.html#EPSKrylovSchurGetDimensions">EPSKrylovSchurGetDimensions</a>(eps,&amp;nev,&amp;ncv,&amp;mpd);
+<a name="line130">130: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" ... changed to [%D,%D,%D]\n"</font>,nev,ncv,mpd);
+
+<a name="line132">132: </a>  <font color="#4169E1">if</font> (size&gt;1) {
+<a name="line133">133: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetPartitions.html#EPSKrylovSchurSetPartitions">EPSKrylovSchurSetPartitions</a>(eps,size);
+<a name="line134">134: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetPartitions.html#EPSKrylovSchurGetPartitions">EPSKrylovSchurGetPartitions</a>(eps,&amp;npart);
+<a name="line135">135: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Using %D partitions\n"</font>,npart);
+
+<a name="line137">137: </a>    PetscMalloc1(npart+1,&amp;subint);
+<a name="line138">138: </a>    subint[0] = int0;
+<a name="line139">139: </a>    subint[npart] = int1;
+<a name="line140">140: </a>    <font color="#4169E1">for</font> (i=1;i&lt;npart;i++) subint[i] = int0+i*(int1-int0)/npart;
+<a name="line141">141: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetSubintervals.html#EPSKrylovSchurSetSubintervals">EPSKrylovSchurSetSubintervals</a>(eps,subint);
+<a name="line142">142: </a>    PetscFree(subint);
+<a name="line143">143: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubintervals.html#EPSKrylovSchurGetSubintervals">EPSKrylovSchurGetSubintervals</a>(eps,&amp;subint);
+<a name="line144">144: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Using sub-interval separations = "</font>);
+<a name="line145">145: </a>    <font color="#4169E1">for</font> (i=1;i&lt;npart;i++) { PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" %g"</font>,(double)subint[i]); }
+<a name="line146">146: </a>    PetscFree(subint);
+<a name="line147">147: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n"</font>);
+<a name="line148">148: </a>  }
+
+<a name="line150">150: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+
+<a name="line152">152: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line153">153: </a><font color="#B22222">           Compute all eigenvalues in interval and display info</font>
+<a name="line154">154: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line156">156: </a>  <a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>(eps);
+<a name="line157">157: </a>  <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetInertias.html#EPSKrylovSchurGetInertias">EPSKrylovSchurGetInertias</a>(eps,&amp;k,&amp;shifts,&amp;inertias);
+<a name="line158">158: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Inertias after <a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>:\n"</font>);
+<a name="line159">159: </a>  <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line160">160: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" .. %g (%D)\n"</font>,(double)shifts[i],inertias[i]);
+<a name="line161">161: </a>  }
+<a name="line162">162: </a>  PetscFree(shifts);
+<a name="line163">163: </a>  PetscFree(inertias);
+
+<a name="line165">165: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+<a name="line166">166: </a>  <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(eps,&amp;nev,NULL,NULL);
+<a name="line167">167: </a>  <a href="../../../docs/manualpages/EPS/EPSGetInterval.html#EPSGetInterval">EPSGetInterval</a>(eps,&amp;int0,&amp;int1);
+<a name="line168">168: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Found %D eigenvalues in interval [%g,%g]\n"</font>,nev,(double)int0,(double)int1);
+
+<a name="line170">170: </a>  <font color="#4169E1">if</font> (showinertia) {
+<a name="line171">171: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetInertias.html#EPSKrylovSchurGetInertias">EPSKrylovSchurGetInertias</a>(eps,&amp;k,&amp;shifts,&amp;inertias);
+<a name="line172">172: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Used %D shifts (inertia):\n"</font>,k);
+<a name="line173">173: </a>    <font color="#4169E1">for</font> (i=0;i&lt;k;i++) {
+<a name="line174">174: </a>      PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" .. %g (%D)\n"</font>,(double)shifts[i],inertias[i]);
+<a name="line175">175: </a>    }
+<a name="line176">176: </a>    PetscFree(shifts);
+<a name="line177">177: </a>    PetscFree(inertias);
+<a name="line178">178: </a>  }
+
+<a name="line180">180: </a>  <a href="../../../docs/manualpages/EPS/EPSErrorView.html#EPSErrorView">EPSErrorView</a>(eps,<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPS_ERROR_RELATIVE</a>,NULL);
+
+<a name="line182">182: </a>  <font color="#4169E1">if</font> (size&gt;1) {
+<a name="line183">183: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubcommInfo.html#EPSKrylovSchurGetSubcommInfo">EPSKrylovSchurGetSubcommInfo</a>(eps,&amp;k,&amp;nval,&amp;v);
+<a name="line184">184: </a>    PetscMalloc1(nval,&amp;evals);
+<a name="line185">185: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nval;i++) {
+<a name="line186">186: </a>      <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubcommPairs.html#EPSKrylovSchurGetSubcommPairs">EPSKrylovSchurGetSubcommPairs</a>(eps,i,&amp;lambda,v);
+<a name="line187">187: </a>      evals[i] = PetscRealPart(lambda);
+<a name="line188">188: </a>    }
+<a name="line189">189: </a>    PetscFormatRealArray(vlist,<font color="#4169E1">sizeof</font>(vlist),<font color="#666666">"%f"</font>,nval,evals);
+<a name="line190">190: </a>    PetscSynchronizedPrintf(PETSC_COMM_WORLD,<font color="#666666">" Process %d has worked in sub-interval %D, containing %D eigenvalues: %s\n"</font>,(int)rank,k,nval,vlist);
+<a name="line191">191: </a>    PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
+<a name="line192">192: </a>    VecDestroy(&amp;v);
+<a name="line193">193: </a>    PetscFree(evals);
+
+<a name="line195">195: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubcommMats.html#EPSKrylovSchurGetSubcommMats">EPSKrylovSchurGetSubcommMats</a>(eps,&amp;As,&amp;Bs);
+<a name="line196">196: </a>    MatGetLocalSize(A,&amp;nloc,NULL);
+<a name="line197">197: </a>    MatGetLocalSize(As,&amp;nlocs,&amp;mlocs);
+<a name="line198">198: </a>    PetscSynchronizedPrintf(PETSC_COMM_WORLD,<font color="#666666">" Process %d owns %D rows of the global matrices, and %D rows in the subcommunicator\n"</font>,(int)rank,nloc,nlocs);
+<a name="line199">199: </a>    PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
+
+<a name="line201">201: </a>    <font color="#B22222">/* modify A on subcommunicators */</font>
+<a name="line202">202: </a>    MatCreate(PetscObjectComm((PetscObject)As),&amp;Au);
+<a name="line203">203: </a>    MatSetSizes(Au,nlocs,mlocs,N,N);
+<a name="line204">204: </a>    MatSetFromOptions(Au);
+<a name="line205">205: </a>    MatSetUp(Au);
+<a name="line206">206: </a>    MatGetOwnershipRange(Au,&amp;Istart,&amp;Iend);
+<a name="line207">207: </a>    <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line208">208: </a>      MatSetValue(Au,II,II,0.5,INSERT_VALUES);
+<a name="line209">209: </a>    }
+<a name="line210">210: </a>    MatAssemblyBegin(Au,MAT_FINAL_ASSEMBLY);
+<a name="line211">211: </a>    MatAssemblyEnd(Au,MAT_FINAL_ASSEMBLY);
+<a name="line212">212: </a>    <a href="../../../docs/manualpages/EPS/EPSKrylovSchurUpdateSubcommMats.html#EPSKrylovSchurUpdateSubcommMats">EPSKrylovSchurUpdateSubcommMats</a>(eps,1.0,-1.0,Au,0.0,0.0,NULL,DIFFERENT_NONZERO_PATTERN,PETSC_TRUE);
+<a name="line213">213: </a>    MatDestroy(&amp;Au);
+<a name="line214">214: </a>  }
+
+<a name="line216">216: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line217">217: </a>  MatDestroy(&amp;A);
+<a name="line218">218: </a>  MatDestroy(&amp;B);
+<a name="line219">219: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line220">220: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line221">221: </a>}
+
+<a name="line223">223: </a><font color="#B22222">/*TEST</font>
+
+<a name="line225">225: </a><font color="#B22222">   test:</font>
+<a name="line226">226: </a><font color="#B22222">      suffix: 1</font>
+<a name="line227">227: </a><font color="#B22222">      nsize: 2</font>
+<a name="line228">228: </a><font color="#B22222">      args: -showinertia 0 -log_exclude eps,st,rg,bv,ds</font>
+<a name="line229">229: </a><font color="#B22222">      requires: !single</font>
+
+<a name="line231">231: </a><font color="#B22222">   test:</font>
+<a name="line232">232: </a><font color="#B22222">      suffix: 2</font>
+<a name="line233">233: </a><font color="#B22222">      nsize: 1</font>
+<a name="line234">234: </a><font color="#B22222">      args: -showinertia 0 -log_exclude eps,st,rg,bv,ds</font>
+<a name="line235">235: </a><font color="#B22222">      requires: !single</font>
+
+<a name="line237">237: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

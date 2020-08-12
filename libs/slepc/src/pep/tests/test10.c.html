@@ -1,0 +1,152 @@
+<center><a href="test10.c">Actual source code: test10.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/tests/test10.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:06+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/tests/test10.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Tests a user-defined convergence test in <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> (based on ex16.c).\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -n &lt;n&gt;, where &lt;n&gt; = number of grid subdivisions in x dimension.\n"</font>
+<a name="line14"> 14: </a>  <font color="#666666">"  -m &lt;m&gt;, where &lt;m&gt; = number of grid subdivisions in y dimension.\n\n"</font>;
+
+<a name="line16"> 16: </a> #include <A href="../../../include/slepcpep.h.html">&lt;slepcpep.h&gt;</A>
+
+<a name="line18"> 18: </a><font color="#B22222">/*</font>
+<a name="line19"> 19: </a><font color="#B22222">  MyConvergedRel - Convergence test relative to the norm of M (given in ctx).</font>
+<a name="line20"> 20: </a><font color="#B22222">*/</font>
+<a name="line21"> 21: </a><strong><font color="#4169E1"><a name="MyConvergedRel"></a>PetscErrorCode MyConvergedRel(<a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscScalar eigr,PetscScalar eigi,PetscReal res,PetscReal *errest,void *ctx)</font></strong>
+<a name="line22"> 22: </a>{
+<a name="line23"> 23: </a>  PetscReal norm = *(PetscReal*)ctx;
+
+<a name="line26"> 26: </a>  *errest = res/norm;
+<a name="line27"> 27: </a>  <font color="#4169E1">return</font>(0);
+<a name="line28"> 28: </a>}
+
+<a name="line30"> 30: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line31"> 31: </a>{
+<a name="line32"> 32: </a>  Mat            M,C,K,A[3];      <font color="#B22222">/* problem matrices */</font>
+<a name="line33"> 33: </a>  <a href="../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>            pep;             <font color="#B22222">/* polynomial eigenproblem solver context */</font>
+<a name="line34"> 34: </a>  PetscInt       N,n=10,m,Istart,Iend,II,nev,i,j;
+<a name="line35"> 35: </a>  PetscBool      flag;
+<a name="line36"> 36: </a>  PetscReal      norm;
+
+<a name="line39"> 39: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line41"> 41: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-n"</font>,&amp;n,NULL);
+<a name="line42"> 42: </a>  PetscOptionsGetInt(NULL,NULL,<font color="#666666">"-m"</font>,&amp;m,&amp;flag);
+<a name="line43"> 43: </a>  <font color="#4169E1">if</font> (!flag) m=n;
+<a name="line44"> 44: </a>  N = n*m;
+<a name="line45"> 45: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nQuadratic Eigenproblem, N=%D (%Dx%D grid)\n\n"</font>,N,n,m);
+
+<a name="line47"> 47: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line48"> 48: </a><font color="#B22222">     Compute the matrices that define the eigensystem, (k^2*M+k*C+K)x=0</font>
+<a name="line49"> 49: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line51"> 51: </a>  <font color="#B22222">/* K is the 2-D Laplacian */</font>
+<a name="line52"> 52: </a>  MatCreate(PETSC_COMM_WORLD,&amp;K);
+<a name="line53"> 53: </a>  MatSetSizes(K,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line54"> 54: </a>  MatSetFromOptions(K);
+<a name="line55"> 55: </a>  MatSetUp(K);
+<a name="line56"> 56: </a>  MatGetOwnershipRange(K,&amp;Istart,&amp;Iend);
+<a name="line57"> 57: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line58"> 58: </a>    i = II/n; j = II-i*n;
+<a name="line59"> 59: </a>    <font color="#4169E1">if</font> (i&gt;0) { MatSetValue(K,II,II-n,-1.0,INSERT_VALUES); }
+<a name="line60"> 60: </a>    <font color="#4169E1">if</font> (i&lt;m-1) { MatSetValue(K,II,II+n,-1.0,INSERT_VALUES); }
+<a name="line61"> 61: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(K,II,II-1,-1.0,INSERT_VALUES); }
+<a name="line62"> 62: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(K,II,II+1,-1.0,INSERT_VALUES); }
+<a name="line63"> 63: </a>    MatSetValue(K,II,II,4.0,INSERT_VALUES);
+<a name="line64"> 64: </a>  }
+<a name="line65"> 65: </a>  MatAssemblyBegin(K,MAT_FINAL_ASSEMBLY);
+<a name="line66"> 66: </a>  MatAssemblyEnd(K,MAT_FINAL_ASSEMBLY);
+
+<a name="line68"> 68: </a>  <font color="#B22222">/* C is the 1-D Laplacian on horizontal lines */</font>
+<a name="line69"> 69: </a>  MatCreate(PETSC_COMM_WORLD,&amp;C);
+<a name="line70"> 70: </a>  MatSetSizes(C,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line71"> 71: </a>  MatSetFromOptions(C);
+<a name="line72"> 72: </a>  MatSetUp(C);
+<a name="line73"> 73: </a>  MatGetOwnershipRange(C,&amp;Istart,&amp;Iend);
+<a name="line74"> 74: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line75"> 75: </a>    i = II/n; j = II-i*n;
+<a name="line76"> 76: </a>    <font color="#4169E1">if</font> (j&gt;0) { MatSetValue(C,II,II-1,-1.0,INSERT_VALUES); }
+<a name="line77"> 77: </a>    <font color="#4169E1">if</font> (j&lt;n-1) { MatSetValue(C,II,II+1,-1.0,INSERT_VALUES); }
+<a name="line78"> 78: </a>    MatSetValue(C,II,II,2.0,INSERT_VALUES);
+<a name="line79"> 79: </a>  }
+<a name="line80"> 80: </a>  MatAssemblyBegin(C,MAT_FINAL_ASSEMBLY);
+<a name="line81"> 81: </a>  MatAssemblyEnd(C,MAT_FINAL_ASSEMBLY);
+
+<a name="line83"> 83: </a>  <font color="#B22222">/* M is a diagonal matrix */</font>
+<a name="line84"> 84: </a>  MatCreate(PETSC_COMM_WORLD,&amp;M);
+<a name="line85"> 85: </a>  MatSetSizes(M,PETSC_DECIDE,PETSC_DECIDE,N,N);
+<a name="line86"> 86: </a>  MatSetFromOptions(M);
+<a name="line87"> 87: </a>  MatSetUp(M);
+<a name="line88"> 88: </a>  MatGetOwnershipRange(M,&amp;Istart,&amp;Iend);
+<a name="line89"> 89: </a>  <font color="#4169E1">for</font> (II=Istart;II&lt;Iend;II++) {
+<a name="line90"> 90: </a>    MatSetValue(M,II,II,(PetscReal)(II+1),INSERT_VALUES);
+<a name="line91"> 91: </a>  }
+<a name="line92"> 92: </a>  MatAssemblyBegin(M,MAT_FINAL_ASSEMBLY);
+<a name="line93"> 93: </a>  MatAssemblyEnd(M,MAT_FINAL_ASSEMBLY);
+
+<a name="line95"> 95: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line96"> 96: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line97"> 97: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line99"> 99: </a>  <a href="../../../docs/manualpages/PEP/PEPCreate.html#PEPCreate">PEPCreate</a>(PETSC_COMM_WORLD,&amp;pep);
+<a name="line100">100: </a>  A[0] = K; A[1] = C; A[2] = M;
+<a name="line101">101: </a>  <a href="../../../docs/manualpages/PEP/PEPSetOperators.html#PEPSetOperators">PEPSetOperators</a>(pep,3,A);
+<a name="line102">102: </a>  <a href="../../../docs/manualpages/PEP/PEPSetProblemType.html#PEPSetProblemType">PEPSetProblemType</a>(pep,<a href="../../../docs/manualpages/PEP/PEPProblemType.html#PEPProblemType">PEP_HERMITIAN</a>);
+<a name="line103">103: </a>  <a href="../../../docs/manualpages/PEP/PEPSetDimensions.html#PEPSetDimensions">PEPSetDimensions</a>(pep,4,20,PETSC_DEFAULT);
+
+<a name="line105">105: </a>  <font color="#B22222">/* setup convergence test relative to the norm of M */</font>
+<a name="line106">106: </a>  MatNorm(M,NORM_1,&amp;norm);
+<a name="line107">107: </a>  <a href="../../../docs/manualpages/PEP/PEPSetConvergenceTestFunction.html#PEPSetConvergenceTestFunction">PEPSetConvergenceTestFunction</a>(pep,MyConvergedRel,&amp;norm,NULL);
+<a name="line108">108: </a>  <a href="../../../docs/manualpages/PEP/PEPSetFromOptions.html#PEPSetFromOptions">PEPSetFromOptions</a>(pep);
+
+<a name="line110">110: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line111">111: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line112">112: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line114">114: </a>  <a href="../../../docs/manualpages/PEP/PEPSolve.html#PEPSolve">PEPSolve</a>(pep);
+<a name="line115">115: </a>  <a href="../../../docs/manualpages/PEP/PEPGetDimensions.html#PEPGetDimensions">PEPGetDimensions</a>(pep,&amp;nev,NULL,NULL);
+<a name="line116">116: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of requested eigenvalues: %D\n"</font>,nev);
+
+<a name="line118">118: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line119">119: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line120">120: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line122">122: </a>  <a href="../../../docs/manualpages/PEP/PEPErrorView.html#PEPErrorView">PEPErrorView</a>(pep,<a href="../../../docs/manualpages/PEP/PEPErrorType.html#PEPErrorType">PEP_ERROR_BACKWARD</a>,NULL);
+<a name="line123">123: </a>  <a href="../../../docs/manualpages/PEP/PEPDestroy.html#PEPDestroy">PEPDestroy</a>(&amp;pep);
+<a name="line124">124: </a>  MatDestroy(&amp;M);
+<a name="line125">125: </a>  MatDestroy(&amp;C);
+<a name="line126">126: </a>  MatDestroy(&amp;K);
+<a name="line127">127: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line128">128: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line129">129: </a>}
+
+<a name="line131">131: </a><font color="#B22222">/*TEST</font>
+
+<a name="line133">133: </a><font color="#B22222">   testset:</font>
+<a name="line134">134: </a><font color="#B22222">      requires: double</font>
+<a name="line135">135: </a><font color="#B22222">      suffix: 1</font>
+
+<a name="line137">137: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

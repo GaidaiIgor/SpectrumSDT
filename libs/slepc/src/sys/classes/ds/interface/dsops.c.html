@@ -1,0 +1,941 @@
+<center><a href="dsops.c">Actual source code: dsops.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/ds/interface/dsops.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:39+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/ds/interface/dsops.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> operations: <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(), <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(), etc</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../include/slepc/private/dsimpl.h.html">&lt;slepc/private/dsimpl.h&gt;</A>
+
+<a name="line16"> 16: </a><font color="#B22222">/*@</font>
+<a name="line17"> 17: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a> - Returns the leading dimension of the allocated</font>
+<a name="line18"> 18: </a><font color="#B22222">   matrices.</font>
+
+<a name="line20"> 20: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line22"> 22: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line23"> 23: </a><font color="#B22222">.  ds - the direct solver context</font>
+
+<a name="line25"> 25: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line26"> 26: </a><font color="#B22222">.  ld - leading dimension (maximum allowed dimension for the matrices)</font>
+
+<a name="line28"> 28: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line30"> 30: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(), <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>()</font>
+<a name="line31"> 31: </a><font color="#B22222">@*/</font>
+<a name="line32"> 32: </a><strong><font color="#4169E1"><a name="DSGetLeadingDimension"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt *ld)</font></strong>
+<a name="line33"> 33: </a>{
+<a name="line37"> 37: </a>  *ld = ds-&gt;ld;
+<a name="line38"> 38: </a>  <font color="#4169E1">return</font>(0);
+<a name="line39"> 39: </a>}
+
+<a name="line41"> 41: </a><font color="#B22222">/*@</font>
+<a name="line42"> 42: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a> - Change the state of the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> object.</font>
+
+<a name="line44"> 44: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line46"> 46: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line47"> 47: </a><font color="#B22222">+  ds    - the direct solver context</font>
+<a name="line48"> 48: </a><font color="#B22222">-  state - the new state</font>
+
+<a name="line50"> 50: </a><font color="#B22222">   Notes:</font>
+<a name="line51"> 51: </a><font color="#B22222">   The state indicates that the dense system is in an initial state (raw),</font>
+<a name="line52"> 52: </a><font color="#B22222">   in an intermediate state (such as tridiagonal, Hessenberg or</font>
+<a name="line53"> 53: </a><font color="#B22222">   Hessenberg-triangular), in a condensed state (such as diagonal, Schur or</font>
+<a name="line54"> 54: </a><font color="#B22222">   generalized Schur), or in a truncated state.</font>
+
+<a name="line56"> 56: </a><font color="#B22222">   This function is normally used to return to the raw state when the</font>
+<a name="line57"> 57: </a><font color="#B22222">   condensed structure is destroyed.</font>
+
+<a name="line59"> 59: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line61"> 61: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSGetState.html#DSGetState">DSGetState</a>()</font>
+<a name="line62"> 62: </a><font color="#B22222">@*/</font>
+<a name="line63"> 63: </a><strong><font color="#4169E1"><a name="DSSetState"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DSStateType</a> state)</font></strong>
+<a name="line64"> 64: </a>{
+
+<a name="line70"> 70: </a>  <font color="#4169E1">switch</font> (state) {
+<a name="line71"> 71: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>:
+<a name="line72"> 72: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>:
+<a name="line73"> 73: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_CONDENSED</a>:
+<a name="line74"> 74: </a>    <font color="#4169E1">case</font> <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_TRUNCATED</a>:
+<a name="line75"> 75: </a>      <font color="#4169E1">if</font> (ds-&gt;state&lt;state) { PetscInfo(ds,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> state has been increased\n"</font>); }
+<a name="line76"> 76: </a>      ds-&gt;state = state;
+<a name="line77"> 77: </a>      <font color="#4169E1">break</font>;
+<a name="line78"> 78: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line79"> 79: </a>      SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONG,<font color="#666666">"Wrong state"</font>);
+<a name="line80"> 80: </a>  }
+<a name="line81"> 81: </a>  <font color="#4169E1">return</font>(0);
+<a name="line82"> 82: </a>}
+
+<a name="line84"> 84: </a><font color="#B22222">/*@</font>
+<a name="line85"> 85: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSGetState.html#DSGetState">DSGetState</a> - Returns the current state.</font>
+
+<a name="line87"> 87: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line89"> 89: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line90"> 90: </a><font color="#B22222">.  ds - the direct solver context</font>
+
+<a name="line92"> 92: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line93"> 93: </a><font color="#B22222">.  state - current state</font>
+
+<a name="line95"> 95: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line97"> 97: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>()</font>
+<a name="line98"> 98: </a><font color="#B22222">@*/</font>
+<a name="line99"> 99: </a><strong><font color="#4169E1"><a name="DSGetState"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSGetState.html#DSGetState">DSGetState</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DSStateType</a> *state)</font></strong>
+<a name="line100">100: </a>{
+<a name="line104">104: </a>  *state = ds-&gt;state;
+<a name="line105">105: </a>  <font color="#4169E1">return</font>(0);
+<a name="line106">106: </a>}
+
+<a name="line108">108: </a><font color="#B22222">/*@</font>
+<a name="line109">109: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a> - Resize the matrices in the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> object.</font>
+
+<a name="line111">111: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line113">113: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line114">114: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line115">115: </a><font color="#B22222">.  n  - the new size</font>
+<a name="line116">116: </a><font color="#B22222">.  m  - the new column size (only for DSSVD)</font>
+<a name="line117">117: </a><font color="#B22222">.  l  - number of locked (inactive) leading columns</font>
+<a name="line118">118: </a><font color="#B22222">-  k  - intermediate dimension (e.g., position of arrow)</font>
+
+<a name="line120">120: </a><font color="#B22222">   Notes:</font>
+<a name="line121">121: </a><font color="#B22222">   The internal arrays are not reallocated.</font>
+
+<a name="line123">123: </a><font color="#B22222">   The value m is not used except in the case of DSSVD, pass 0 otherwise.</font>
+
+<a name="line125">125: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line127">127: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(), <a href="../../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>()</font>
+<a name="line128">128: </a><font color="#B22222">@*/</font>
+<a name="line129">129: </a><strong><font color="#4169E1"><a name="DSSetDimensions"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt n,PetscInt m,PetscInt l,PetscInt k)</font></strong>
+<a name="line130">130: </a>{
+<a name="line133">133: </a>  DSCheckAlloc(ds,1);
+<a name="line138">138: </a>  <font color="#4169E1">if</font> (n==PETSC_DECIDE || n==PETSC_DEFAULT) {
+<a name="line139">139: </a>    ds-&gt;n = ds-&gt;ld;
+<a name="line140">140: </a>  } <font color="#4169E1">else</font> {
+<a name="line141">141: </a>    <font color="#4169E1">if</font> (n&lt;0 || n&gt;ds-&gt;ld) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of n. Must be between 0 and ld"</font>);
+<a name="line142">142: </a>    <font color="#4169E1">if</font> (ds-&gt;extrarow &amp;&amp; n+1&gt;ds-&gt;ld) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"A value of n equal to ld leaves no room for extra row"</font>);
+<a name="line143">143: </a>    ds-&gt;n = n;
+<a name="line144">144: </a>  }
+<a name="line145">145: </a>  ds-&gt;t = ds-&gt;n;   <font color="#B22222">/* truncated length equal to the new dimension */</font>
+<a name="line146">146: </a>  <font color="#4169E1">if</font> (m) {
+<a name="line147">147: </a>    <font color="#4169E1">if</font> (m==PETSC_DECIDE || m==PETSC_DEFAULT) {
+<a name="line148">148: </a>      ds-&gt;m = ds-&gt;ld;
+<a name="line149">149: </a>    } <font color="#4169E1">else</font> {
+<a name="line150">150: </a>      <font color="#4169E1">if</font> (m&lt;0 || m&gt;ds-&gt;ld) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of m. Must be between 0 and ld"</font>);
+<a name="line151">151: </a>      ds-&gt;m = m;
+<a name="line152">152: </a>    }
+<a name="line153">153: </a>  }
+<a name="line154">154: </a>  <font color="#4169E1">if</font> (l==PETSC_DECIDE || l==PETSC_DEFAULT) {
+<a name="line155">155: </a>    ds-&gt;l = 0;
+<a name="line156">156: </a>  } <font color="#4169E1">else</font> {
+<a name="line157">157: </a>    <font color="#4169E1">if</font> (l&lt;0 || l&gt;ds-&gt;n) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of l. Must be between 0 and n"</font>);
+<a name="line158">158: </a>    ds-&gt;l = l;
+<a name="line159">159: </a>  }
+<a name="line160">160: </a>  <font color="#4169E1">if</font> (k==PETSC_DECIDE || k==PETSC_DEFAULT) {
+<a name="line161">161: </a>    ds-&gt;k = ds-&gt;n/2;
+<a name="line162">162: </a>  } <font color="#4169E1">else</font> {
+<a name="line163">163: </a>    <font color="#4169E1">if</font> (k&lt;0 || k&gt;ds-&gt;n) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of k. Must be between 0 and n"</font>);
+<a name="line164">164: </a>    ds-&gt;k = k;
+<a name="line165">165: </a>  }
+<a name="line166">166: </a>  <font color="#4169E1">return</font>(0);
+<a name="line167">167: </a>}
+
+<a name="line169">169: </a><font color="#B22222">/*@</font>
+<a name="line170">170: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a> - Returns the current dimensions.</font>
+
+<a name="line172">172: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line174">174: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line175">175: </a><font color="#B22222">.  ds - the direct solver context</font>
+
+<a name="line177">177: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line178">178: </a><font color="#B22222">+  n  - the current size</font>
+<a name="line179">179: </a><font color="#B22222">.  m  - the current column size (only for DSSVD)</font>
+<a name="line180">180: </a><font color="#B22222">.  l  - number of locked (inactive) leading columns</font>
+<a name="line181">181: </a><font color="#B22222">.  k  - intermediate dimension (e.g., position of arrow)</font>
+<a name="line182">182: </a><font color="#B22222">-  t  - truncated length</font>
+
+<a name="line184">184: </a><font color="#B22222">   Note:</font>
+<a name="line185">185: </a><font color="#B22222">   The t parameter makes sense only if <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a>() has been called.</font>
+<a name="line186">186: </a><font color="#B22222">   Otherwise its value equals n.</font>
+
+<a name="line188">188: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line190">190: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(), <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a>()</font>
+<a name="line191">191: </a><font color="#B22222">@*/</font>
+<a name="line192">192: </a><strong><font color="#4169E1"><a name="DSGetDimensions"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt *n,PetscInt *m,PetscInt *l,PetscInt *k,PetscInt *t)</font></strong>
+<a name="line193">193: </a>{
+<a name="line196">196: </a>  DSCheckAlloc(ds,1);
+<a name="line197">197: </a>  <font color="#4169E1">if</font> (n) *n = ds-&gt;n;
+<a name="line198">198: </a>  <font color="#4169E1">if</font> (m) *m = ds-&gt;m;
+<a name="line199">199: </a>  <font color="#4169E1">if</font> (l) *l = ds-&gt;l;
+<a name="line200">200: </a>  <font color="#4169E1">if</font> (k) *k = ds-&gt;k;
+<a name="line201">201: </a>  <font color="#4169E1">if</font> (t) *t = ds-&gt;t;
+<a name="line202">202: </a>  <font color="#4169E1">return</font>(0);
+<a name="line203">203: </a>}
+
+<a name="line205">205: </a><font color="#B22222">/*@</font>
+<a name="line206">206: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a> - Truncates the system represented in the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> object.</font>
+
+<a name="line208">208: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line210">210: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line211">211: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line212">212: </a><font color="#B22222">-  n  - the new size</font>
+
+<a name="line214">214: </a><font color="#B22222">   Note:</font>
+<a name="line215">215: </a><font color="#B22222">   The new size is set to n. In cases where the extra row is meaningful,</font>
+<a name="line216">216: </a><font color="#B22222">   the first n elements are kept as the extra row for the new system.</font>
+
+<a name="line218">218: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line220">220: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(), <a href="../../../../../docs/manualpages/DS/DSSetExtraRow.html#DSSetExtraRow">DSSetExtraRow</a>(), <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DSStateType</a></font>
+<a name="line221">221: </a><font color="#B22222">@*/</font>
+<a name="line222">222: </a><strong><font color="#4169E1"><a name="DSTruncate"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt n)</font></strong>
+<a name="line223">223: </a>{
+
+<a name="line229">229: </a>  DSCheckAlloc(ds,1);
+<a name="line230">230: </a>  DSCheckSolved(ds,1);
+<a name="line232">232: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;truncate) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+<a name="line233">233: </a>  <font color="#4169E1">if</font> (n&lt;ds-&gt;l || n&gt;ds-&gt;n) SETERRQ3(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Illegal value of n (%D). Must be between l (%D) and n (%D)"</font>,n,ds-&gt;l,ds-&gt;n);
+<a name="line234">234: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line235">235: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line236">236: </a>  (*ds-&gt;ops-&gt;truncate)(ds,n);
+<a name="line237">237: </a>  PetscFPTrapPop();
+<a name="line238">238: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line239">239: </a>  ds-&gt;state = <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_TRUNCATED</a>;
+<a name="line240">240: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line241">241: </a>  <font color="#4169E1">return</font>(0);
+<a name="line242">242: </a>}
+
+<a name="line244">244: </a><font color="#B22222">/*@</font>
+<a name="line245">245: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSMatGetSize.html#DSMatGetSize">DSMatGetSize</a> - Returns the numbers of rows and columns of one of the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> matrices.</font>
+
+<a name="line247">247: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line249">249: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line250">250: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line251">251: </a><font color="#B22222">-  t  - the requested matrix</font>
+
+<a name="line253">253: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line254">254: </a><font color="#B22222">+  n  - the number of rows</font>
+<a name="line255">255: </a><font color="#B22222">-  m  - the number of columns</font>
+
+<a name="line257">257: </a><font color="#B22222">   Note:</font>
+<a name="line258">258: </a><font color="#B22222">   This is equivalent to MatGetSize() on a matrix obtained with <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>().</font>
+
+<a name="line260">260: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line262">262: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(), <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>()</font>
+<a name="line263">263: </a><font color="#B22222">@*/</font>
+<a name="line264">264: </a><strong><font color="#4169E1"><a name="DSMatGetSize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSMatGetSize.html#DSMatGetSize">DSMatGetSize</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> t,PetscInt *m,PetscInt *n)</font></strong>
+<a name="line265">265: </a>{
+<a name="line267">267: </a>  PetscInt       rows,cols;
+
+<a name="line272">272: </a>  DSCheckValidMat(ds,t,2);
+<a name="line273">273: </a>  <font color="#4169E1">if</font> (ds-&gt;ops-&gt;matgetsize) {
+<a name="line274">274: </a>    (*ds-&gt;ops-&gt;matgetsize)(ds,t,&amp;rows,&amp;cols);
+<a name="line275">275: </a>  } <font color="#4169E1">else</font> {
+<a name="line276">276: </a>    <font color="#4169E1">if</font> (ds-&gt;state==<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_TRUNCATED</a> &amp;&amp; t&gt;=<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>) rows = ds-&gt;t;
+<a name="line277">277: </a>    <font color="#4169E1">else</font> rows = (t==<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a> &amp;&amp; ds-&gt;extrarow)? ds-&gt;n+1: ds-&gt;n;
+<a name="line278">278: </a>    cols = ds-&gt;n;
+<a name="line279">279: </a>  }
+<a name="line280">280: </a>  <font color="#4169E1">if</font> (m) *m = rows;
+<a name="line281">281: </a>  <font color="#4169E1">if</font> (n) *n = cols;
+<a name="line282">282: </a>  <font color="#4169E1">return</font>(0);
+<a name="line283">283: </a>}
+
+<a name="line285">285: </a><font color="#B22222">/*@</font>
+<a name="line286">286: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSMatIsHermitian.html#DSMatIsHermitian">DSMatIsHermitian</a> - Checks if one of the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> matrices is known to be Hermitian.</font>
+
+<a name="line288">288: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line290">290: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line291">291: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line292">292: </a><font color="#B22222">-  t  - the requested matrix</font>
+
+<a name="line294">294: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line295">295: </a><font color="#B22222">.  flg - the Hermitian flag</font>
+
+<a name="line297">297: </a><font color="#B22222">   Note:</font>
+<a name="line298">298: </a><font color="#B22222">   Does not check the matrix values directly. The flag is set according to the</font>
+<a name="line299">299: </a><font color="#B22222">   problem structure. For instance, in DSHEP matrix A is Hermitian.</font>
+
+<a name="line301">301: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line303">303: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>()</font>
+<a name="line304">304: </a><font color="#B22222">@*/</font>
+<a name="line305">305: </a><strong><font color="#4169E1"><a name="DSMatIsHermitian"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSMatIsHermitian.html#DSMatIsHermitian">DSMatIsHermitian</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> t,PetscBool *flg)</font></strong>
+<a name="line306">306: </a>{
+
+<a name="line312">312: </a>  DSCheckValidMat(ds,t,2);
+<a name="line314">314: </a>  <font color="#4169E1">if</font> (ds-&gt;ops-&gt;hermitian) {
+<a name="line315">315: </a>    (*ds-&gt;ops-&gt;hermitian)(ds,t,flg);
+<a name="line316">316: </a>  } <font color="#4169E1">else</font> *flg = PETSC_FALSE;
+<a name="line317">317: </a>  <font color="#4169E1">return</font>(0);
+<a name="line318">318: </a>}
+
+<a name="line320">320: </a><font color="#B22222">/*@</font>
+<a name="line321">321: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a> - Returns a sequential dense Mat object containing the requested</font>
+<a name="line322">322: </a><font color="#B22222">   matrix.</font>
+
+<a name="line324">324: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line326">326: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line327">327: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line328">328: </a><font color="#B22222">-  m  - the requested matrix</font>
+
+<a name="line330">330: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line331">331: </a><font color="#B22222">.  A  - Mat object</font>
+
+<a name="line333">333: </a><font color="#B22222">   Notes:</font>
+<a name="line334">334: </a><font color="#B22222">   The Mat is created with sizes equal to the current <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> dimensions (nxm),</font>
+<a name="line335">335: </a><font color="#B22222">   then it is filled with the values that would be obtained with <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>()</font>
+<a name="line336">336: </a><font color="#B22222">   (not <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>()). If the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> was truncated, then the number of rows</font>
+<a name="line337">337: </a><font color="#B22222">   is equal to the dimension prior to truncation, see <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a>().</font>
+<a name="line338">338: </a><font color="#B22222">   The communicator is always PETSC_COMM_SELF.</font>
+
+<a name="line340">340: </a><font color="#B22222">   When no longer needed, the user can either destroy the matrix or call</font>
+<a name="line341">341: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(). The latter will copy back the modified values.</font>
+
+<a name="line343">343: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line345">345: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(), <a href="../../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(), <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(), <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>(), <a href="../../../../../docs/manualpages/DS/DSTruncate.html#DSTruncate">DSTruncate</a>()</font>
+<a name="line346">346: </a><font color="#B22222">@*/</font>
+<a name="line347">347: </a><strong><font color="#4169E1"><a name="DSGetMat"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> m,Mat *A)</font></strong>
+<a name="line348">348: </a>{
+<a name="line350">350: </a>  PetscInt       j,rows,cols,arows,acols;
+<a name="line351">351: </a>  PetscBool      create=PETSC_FALSE,flg;
+<a name="line352">352: </a>  PetscScalar    *pA,*M;
+
+<a name="line356">356: </a>  DSCheckAlloc(ds,1);
+<a name="line357">357: </a>  DSCheckValidMat(ds,m,2);
+<a name="line359">359: </a>  <font color="#4169E1">if</font> (m==<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a> || m==<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_D</a>) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONG,<font color="#666666">"Not implemented for T or D matrices"</font>);
+
+<a name="line361">361: </a>  <a href="../../../../../docs/manualpages/DS/DSMatGetSize.html#DSMatGetSize">DSMatGetSize</a>(ds,m,&amp;rows,&amp;cols);
+<a name="line362">362: </a>  <font color="#4169E1">if</font> (!ds-&gt;omat[m]) create=PETSC_TRUE;
+<a name="line363">363: </a>  <font color="#4169E1">else</font> {
+<a name="line364">364: </a>    MatGetSize(ds-&gt;omat[m],&amp;arows,&amp;acols);
+<a name="line365">365: </a>    <font color="#4169E1">if</font> (arows!=rows || acols!=cols) {
+<a name="line366">366: </a>      MatDestroy(&amp;ds-&gt;omat[m]);
+<a name="line367">367: </a>      create=PETSC_TRUE;
+<a name="line368">368: </a>    }
+<a name="line369">369: </a>  }
+<a name="line370">370: </a>  <font color="#4169E1">if</font> (create) {
+<a name="line371">371: </a>    MatCreateSeqDense(PETSC_COMM_SELF,rows,cols,NULL,&amp;ds-&gt;omat[m]);
+<a name="line372">372: </a>  }
+
+<a name="line374">374: </a>  <font color="#B22222">/* set Hermitian flag */</font>
+<a name="line375">375: </a>  <a href="../../../../../docs/manualpages/DS/DSMatIsHermitian.html#DSMatIsHermitian">DSMatIsHermitian</a>(ds,m,&amp;flg);
+<a name="line376">376: </a>  MatSetOption(ds-&gt;omat[m],MAT_HERMITIAN,flg);
+
+<a name="line378">378: </a>  <font color="#B22222">/* copy entries */</font>
+<a name="line379">379: </a>  PetscObjectReference((PetscObject)ds-&gt;omat[m]);
+<a name="line380">380: </a>  *A = ds-&gt;omat[m];
+<a name="line381">381: </a>  M  = ds-&gt;mat[m];
+<a name="line382">382: </a>  MatDenseGetArray(*A,&amp;pA);
+<a name="line383">383: </a>  <font color="#4169E1">for</font> (j=0;j&lt;cols;j++) {
+<a name="line384">384: </a>    PetscArraycpy(pA+j*rows,M+j*ds-&gt;ld,rows);
+<a name="line385">385: </a>  }
+<a name="line386">386: </a>  MatDenseRestoreArray(*A,&amp;pA);
+<a name="line387">387: </a>  <font color="#4169E1">return</font>(0);
+<a name="line388">388: </a>}
+
+<a name="line390">390: </a><font color="#B22222">/*@</font>
+<a name="line391">391: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a> - Restores the matrix after <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>() was called.</font>
+
+<a name="line393">393: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line395">395: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line396">396: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line397">397: </a><font color="#B22222">.  m  - the requested matrix</font>
+<a name="line398">398: </a><font color="#B22222">-  A  - the fetched Mat object</font>
+
+<a name="line400">400: </a><font color="#B22222">   Notes:</font>
+<a name="line401">401: </a><font color="#B22222">   A call to this function must match a previous call of <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>().</font>
+<a name="line402">402: </a><font color="#B22222">   The effect is that the contents of the Mat are copied back to the</font>
+<a name="line403">403: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> internal array, and the matrix is destroyed.</font>
+
+<a name="line405">405: </a><font color="#B22222">   It is not compulsory to call this function, the matrix obtained with</font>
+<a name="line406">406: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>() can simply be destroyed if entries need not be copied back.</font>
+
+<a name="line408">408: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line410">410: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(), <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(), <a href="../../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a>()</font>
+<a name="line411">411: </a><font color="#B22222">@*/</font>
+<a name="line412">412: </a><strong><font color="#4169E1"><a name="DSRestoreMat"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> m,Mat *A)</font></strong>
+<a name="line413">413: </a>{
+<a name="line415">415: </a>  PetscInt       j,rows,cols;
+<a name="line416">416: </a>  PetscScalar    *pA,*M;
+
+<a name="line420">420: </a>  DSCheckAlloc(ds,1);
+<a name="line421">421: </a>  DSCheckValidMat(ds,m,2);
+<a name="line423">423: </a>  <font color="#4169E1">if</font> (!ds-&gt;omat[m]) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a> must match a previous call to <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>"</font>);
+<a name="line424">424: </a>  <font color="#4169E1">if</font> (ds-&gt;omat[m]!=*A) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Mat argument is not the same as the one obtained with <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>"</font>);
+
+<a name="line426">426: </a>  MatGetSize(*A,&amp;rows,&amp;cols);
+<a name="line427">427: </a>  M  = ds-&gt;mat[m];
+<a name="line428">428: </a>  MatDenseGetArray(*A,&amp;pA);
+<a name="line429">429: </a>  <font color="#4169E1">for</font> (j=0;j&lt;cols;j++) {
+<a name="line430">430: </a>    PetscArraycpy(M+j*ds-&gt;ld,pA+j*rows,rows);
+<a name="line431">431: </a>  }
+<a name="line432">432: </a>  MatDenseRestoreArray(*A,&amp;pA);
+<a name="line433">433: </a>  MatDestroy(A);
+<a name="line434">434: </a>  <font color="#4169E1">return</font>(0);
+<a name="line435">435: </a>}
+
+<a name="line437">437: </a><font color="#B22222">/*@C</font>
+<a name="line438">438: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a> - Returns a pointer to one of the internal arrays used to</font>
+<a name="line439">439: </a><font color="#B22222">   represent matrices. You MUST call <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>() when you no longer</font>
+<a name="line440">440: </a><font color="#B22222">   need to access the array.</font>
+
+<a name="line442">442: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line444">444: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line445">445: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line446">446: </a><font color="#B22222">-  m  - the requested matrix</font>
+
+<a name="line448">448: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line449">449: </a><font color="#B22222">.  a  - pointer to the values</font>
+
+<a name="line451">451: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line453">453: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(), <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>()</font>
+<a name="line454">454: </a><font color="#B22222">@*/</font>
+<a name="line455">455: </a><strong><font color="#4169E1"><a name="DSGetArray"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> m,PetscScalar *a[])</font></strong>
+<a name="line456">456: </a>{
+<a name="line459">459: </a>  DSCheckAlloc(ds,1);
+<a name="line460">460: </a>  DSCheckValidMat(ds,m,2);
+<a name="line462">462: </a>  *a = ds-&gt;mat[m];
+<a name="line463">463: </a>  CHKMEMQ;
+<a name="line464">464: </a>  <font color="#4169E1">return</font>(0);
+<a name="line465">465: </a>}
+
+<a name="line467">467: </a><font color="#B22222">/*@C</font>
+<a name="line468">468: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a> - Restores the matrix after <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>() was called.</font>
+
+<a name="line470">470: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line472">472: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line473">473: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line474">474: </a><font color="#B22222">.  m  - the requested matrix</font>
+<a name="line475">475: </a><font color="#B22222">-  a  - pointer to the values</font>
+
+<a name="line477">477: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line479">479: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(), <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>()</font>
+<a name="line480">480: </a><font color="#B22222">@*/</font>
+<a name="line481">481: </a><strong><font color="#4169E1"><a name="DSRestoreArray"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> m,PetscScalar *a[])</font></strong>
+<a name="line482">482: </a>{
+
+<a name="line487">487: </a>  DSCheckAlloc(ds,1);
+<a name="line488">488: </a>  DSCheckValidMat(ds,m,2);
+<a name="line490">490: </a>  CHKMEMQ;
+<a name="line491">491: </a>  *a = 0;
+<a name="line492">492: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line493">493: </a>  <font color="#4169E1">return</font>(0);
+<a name="line494">494: </a>}
+
+<a name="line496">496: </a><font color="#B22222">/*@C</font>
+<a name="line497">497: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a> - Returns a pointer to one of the internal arrays used to</font>
+<a name="line498">498: </a><font color="#B22222">   represent real matrices. You MUST call <a href="../../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a>() when you no longer</font>
+<a name="line499">499: </a><font color="#B22222">   need to access the array.</font>
+
+<a name="line501">501: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line503">503: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line504">504: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line505">505: </a><font color="#B22222">-  m  - the requested matrix</font>
+
+<a name="line507">507: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line508">508: </a><font color="#B22222">.  a  - pointer to the values</font>
+
+<a name="line510">510: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line512">512: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a>(), <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>()</font>
+<a name="line513">513: </a><font color="#B22222">@*/</font>
+<a name="line514">514: </a><strong><font color="#4169E1"><a name="DSGetArrayReal"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> m,PetscReal *a[])</font></strong>
+<a name="line515">515: </a>{
+<a name="line518">518: </a>  DSCheckAlloc(ds,1);
+<a name="line519">519: </a>  DSCheckValidMatReal(ds,m,2);
+<a name="line521">521: </a>  *a = ds-&gt;rmat[m];
+<a name="line522">522: </a>  CHKMEMQ;
+<a name="line523">523: </a>  <font color="#4169E1">return</font>(0);
+<a name="line524">524: </a>}
+
+<a name="line526">526: </a><font color="#B22222">/*@C</font>
+<a name="line527">527: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a> - Restores the matrix after <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>() was called.</font>
+
+<a name="line529">529: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line531">531: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line532">532: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line533">533: </a><font color="#B22222">.  m  - the requested matrix</font>
+<a name="line534">534: </a><font color="#B22222">-  a  - pointer to the values</font>
+
+<a name="line536">536: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line538">538: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSGetArrayReal.html#DSGetArrayReal">DSGetArrayReal</a>(), <a href="../../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>()</font>
+<a name="line539">539: </a><font color="#B22222">@*/</font>
+<a name="line540">540: </a><strong><font color="#4169E1"><a name="DSRestoreArrayReal"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSRestoreArrayReal.html#DSRestoreArrayReal">DSRestoreArrayReal</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> m,PetscReal *a[])</font></strong>
+<a name="line541">541: </a>{
+
+<a name="line546">546: </a>  DSCheckAlloc(ds,1);
+<a name="line547">547: </a>  DSCheckValidMatReal(ds,m,2);
+<a name="line549">549: </a>  CHKMEMQ;
+<a name="line550">550: </a>  *a = 0;
+<a name="line551">551: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line552">552: </a>  <font color="#4169E1">return</font>(0);
+<a name="line553">553: </a>}
+
+<a name="line555">555: </a><font color="#B22222">/*@</font>
+<a name="line556">556: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a> - Solves the problem.</font>
+
+<a name="line558">558: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line560">560: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line561">561: </a><font color="#B22222">+  ds   - the direct solver context</font>
+<a name="line562">562: </a><font color="#B22222">.  eigr - array to store the computed eigenvalues (real part)</font>
+<a name="line563">563: </a><font color="#B22222">-  eigi - array to store the computed eigenvalues (imaginary part)</font>
+
+<a name="line565">565: </a><font color="#B22222">   Note:</font>
+<a name="line566">566: </a><font color="#B22222">   This call brings the dense system to condensed form. No ordering</font>
+<a name="line567">567: </a><font color="#B22222">   of the eigenvalues is enforced (for this, call <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>() afterwards).</font>
+
+<a name="line569">569: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line571">571: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(), <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DSStateType</a></font>
+<a name="line572">572: </a><font color="#B22222">@*/</font>
+<a name="line573">573: </a><strong><font color="#4169E1"><a name="DSSolve"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar eigr[],PetscScalar eigi[])</font></strong>
+<a name="line574">574: </a>{
+
+<a name="line580">580: </a>  DSCheckAlloc(ds,1);
+<a name="line582">582: </a>  <font color="#4169E1">if</font> (ds-&gt;state&gt;=<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_CONDENSED</a>) <font color="#4169E1">return</font>(0);
+<a name="line583">583: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;solve[ds-&gt;method]) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The specified method number does not exist for this <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a>"</font>);
+<a name="line584">584: </a>  PetscLogEventBegin(DS_Solve,ds,0,0,0);
+<a name="line585">585: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line586">586: </a>  (*ds-&gt;ops-&gt;solve[ds-&gt;method])(ds,eigr,eigi);
+<a name="line587">587: </a>  PetscFPTrapPop();
+<a name="line588">588: </a>  PetscLogEventEnd(DS_Solve,ds,0,0,0);
+<a name="line589">589: </a>  ds-&gt;state = <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_CONDENSED</a>;
+<a name="line590">590: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line591">591: </a>  <font color="#4169E1">return</font>(0);
+<a name="line592">592: </a>}
+
+<a name="line594">594: </a><font color="#B22222">/*@C</font>
+<a name="line595">595: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a> - Sorts the result of <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>() according to a given sorting</font>
+<a name="line596">596: </a><font color="#B22222">   criterion.</font>
+
+<a name="line598">598: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line600">600: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line601">601: </a><font color="#B22222">+  ds   - the direct solver context</font>
+<a name="line602">602: </a><font color="#B22222">.  rr   - (optional) array containing auxiliary values (real part)</font>
+<a name="line603">603: </a><font color="#B22222">-  ri   - (optional) array containing auxiliary values (imaginary part)</font>
+
+<a name="line605">605: </a><font color="#B22222">   Input/Output Parameters:</font>
+<a name="line606">606: </a><font color="#B22222">+  eigr - array containing the computed eigenvalues (real part)</font>
+<a name="line607">607: </a><font color="#B22222">.  eigi - array containing the computed eigenvalues (imaginary part)</font>
+<a name="line608">608: </a><font color="#B22222">-  k    - (optional) number of elements in the leading group</font>
+
+<a name="line610">610: </a><font color="#B22222">   Notes:</font>
+<a name="line611">611: </a><font color="#B22222">   This routine sorts the arrays provided in eigr and eigi, and also</font>
+<a name="line612">612: </a><font color="#B22222">   sorts the dense system stored inside ds (assumed to be in condensed form).</font>
+<a name="line613">613: </a><font color="#B22222">   The sorting criterion is specified with <a href="../../../../../docs/manualpages/DS/DSSetSlepcSC.html#DSSetSlepcSC">DSSetSlepcSC</a>().</font>
+
+<a name="line615">615: </a><font color="#B22222">   If arrays rr and ri are provided, then a (partial) reordering based on these</font>
+<a name="line616">616: </a><font color="#B22222">   values rather than on the eigenvalues is performed. In symmetric problems</font>
+<a name="line617">617: </a><font color="#B22222">   a total order is obtained (parameter k is ignored), but otherwise the result</font>
+<a name="line618">618: </a><font color="#B22222">   is sorted only partially. In this latter case, it is only guaranteed that</font>
+<a name="line619">619: </a><font color="#B22222">   all the first k elements satisfy the comparison with any of the last n-k</font>
+<a name="line620">620: </a><font color="#B22222">   elements. The output value of parameter k is the final number of elements in</font>
+<a name="line621">621: </a><font color="#B22222">   the first set.</font>
+
+<a name="line623">623: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line625">625: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(), <a href="../../../../../docs/manualpages/DS/DSSetSlepcSC.html#DSSetSlepcSC">DSSetSlepcSC</a>(), <a href="../../../../../docs/manualpages/DS/DSSortWithPermutation.html#DSSortWithPermutation">DSSortWithPermutation</a>()</font>
+<a name="line626">626: </a><font color="#B22222">@*/</font>
+<a name="line627">627: </a><strong><font color="#4169E1"><a name="DSSort"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar *eigr,PetscScalar *eigi,PetscScalar *rr,PetscScalar *ri,PetscInt *k)</font></strong>
+<a name="line628">628: </a>{
+<a name="line630">630: </a>  PetscInt       i;
+
+<a name="line635">635: </a>  DSCheckSolved(ds,1);
+<a name="line638">638: </a>  <font color="#4169E1">if</font> (ds-&gt;state==<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_TRUNCATED</a>) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ORDER,<font color="#666666">"Cannot sort a truncated <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a>"</font>);
+<a name="line639">639: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;sort) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+<a name="line640">640: </a>  <font color="#4169E1">if</font> (!ds-&gt;sc) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ORDER,<font color="#666666">"Must provide a sorting criterion first"</font>);
+<a name="line641">641: </a>  <font color="#4169E1">if</font> (k &amp;&amp; !rr) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONG,<font color="#666666">"Argument k can only be used together with rr"</font>);
+
+<a name="line643">643: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ds-&gt;n;i++) ds-&gt;perm[i] = i;   <font color="#B22222">/* initialize to trivial permutation */</font>
+<a name="line644">644: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line645">645: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line646">646: </a>  (*ds-&gt;ops-&gt;sort)(ds,eigr,eigi,rr,ri,k);
+<a name="line647">647: </a>  PetscFPTrapPop();
+<a name="line648">648: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line649">649: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line650">650: </a>  <font color="#4169E1">return</font>(0);
+<a name="line651">651: </a>}
+
+<a name="line653">653: </a><font color="#B22222">/*@C</font>
+<a name="line654">654: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSSortWithPermutation.html#DSSortWithPermutation">DSSortWithPermutation</a> - Reorders the result of <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>() according to a given</font>
+<a name="line655">655: </a><font color="#B22222">   permutation.</font>
+
+<a name="line657">657: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line659">659: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line660">660: </a><font color="#B22222">+  ds   - the direct solver context</font>
+<a name="line661">661: </a><font color="#B22222">-  perm - permutation that indicates the new ordering</font>
+
+<a name="line663">663: </a><font color="#B22222">   Input/Output Parameters:</font>
+<a name="line664">664: </a><font color="#B22222">+  eigr - array with the reordered eigenvalues (real part)</font>
+<a name="line665">665: </a><font color="#B22222">-  eigi - array with the reordered eigenvalues (imaginary part)</font>
+
+<a name="line667">667: </a><font color="#B22222">   Notes:</font>
+<a name="line668">668: </a><font color="#B22222">   This routine reorders the arrays provided in eigr and eigi, and also the dense</font>
+<a name="line669">669: </a><font color="#B22222">   system stored inside ds (assumed to be in condensed form). There is no sorting</font>
+<a name="line670">670: </a><font color="#B22222">   criterion, as opposed to <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(). Instead, the new ordering is given in argument perm.</font>
+
+<a name="line672">672: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line674">674: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(), <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>()</font>
+<a name="line675">675: </a><font color="#B22222">@*/</font>
+<a name="line676">676: </a><strong><font color="#4169E1"><a name="DSSortWithPermutation"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSSortWithPermutation.html#DSSortWithPermutation">DSSortWithPermutation</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscInt *perm,PetscScalar *eigr,PetscScalar *eigi)</font></strong>
+<a name="line677">677: </a>{
+
+<a name="line683">683: </a>  DSCheckSolved(ds,1);
+<a name="line686">686: </a>  <font color="#4169E1">if</font> (ds-&gt;state==<a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_TRUNCATED</a>) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ORDER,<font color="#666666">"Cannot sort a truncated <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a>"</font>);
+<a name="line687">687: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;sortperm) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+
+<a name="line689">689: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line690">690: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line691">691: </a>  (*ds-&gt;ops-&gt;sortperm)(ds,perm,eigr,eigi);
+<a name="line692">692: </a>  PetscFPTrapPop();
+<a name="line693">693: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line694">694: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line695">695: </a>  <font color="#4169E1">return</font>(0);
+<a name="line696">696: </a>}
+
+<a name="line698">698: </a><font color="#B22222">/*@</font>
+<a name="line699">699: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a> - Make sure that all processes have the same data, performing</font>
+<a name="line700">700: </a><font color="#B22222">   communication if necessary.</font>
+
+<a name="line702">702: </a><font color="#B22222">   Collective on ds</font>
+
+<a name="line704">704: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line705">705: </a><font color="#B22222">+  ds   - the direct solver context</font>
+
+<a name="line707">707: </a><font color="#B22222">   Input/Output Parameters:</font>
+<a name="line708">708: </a><font color="#B22222">+  eigr - (optional) array with the computed eigenvalues (real part)</font>
+<a name="line709">709: </a><font color="#B22222">-  eigi - (optional) array with the computed eigenvalues (imaginary part)</font>
+
+<a name="line711">711: </a><font color="#B22222">   Notes:</font>
+<a name="line712">712: </a><font color="#B22222">   When the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> has been created with a communicator with more than one process,</font>
+<a name="line713">713: </a><font color="#B22222">   the internal data, especially the computed matrices, may diverge in the</font>
+<a name="line714">714: </a><font color="#B22222">   different processes. This happens when using multithreaded BLAS and may</font>
+<a name="line715">715: </a><font color="#B22222">   cause numerical issues in some ill-conditioned problems. This function</font>
+<a name="line716">716: </a><font color="#B22222">   performs the necessary communication among the processes so that the</font>
+<a name="line717">717: </a><font color="#B22222">   internal data is exactly equal in all of them.</font>
+
+<a name="line719">719: </a><font color="#B22222">   Depending on the parallel mode as set with <a href="../../../../../docs/manualpages/DS/DSSetParallel.html#DSSetParallel">DSSetParallel</a>(), this function</font>
+<a name="line720">720: </a><font color="#B22222">   will either do nothing or synchronize the matrices computed by <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>()</font>
+<a name="line721">721: </a><font color="#B22222">   and <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(). The arguments eigr and eigi are typically those used in the</font>
+<a name="line722">722: </a><font color="#B22222">   calls to <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>() and <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>().</font>
+
+<a name="line724">724: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line726">726: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSetParallel.html#DSSetParallel">DSSetParallel</a>(), <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(), <a href="../../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>()</font>
+<a name="line727">727: </a><font color="#B22222">@*/</font>
+<a name="line728">728: </a><strong><font color="#4169E1"><a name="DSSynchronize"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar eigr[],PetscScalar eigi[])</font></strong>
+<a name="line729">729: </a>{
+<a name="line731">731: </a>  PetscMPIInt    size;
+
+<a name="line736">736: </a>  DSCheckAlloc(ds,1);
+<a name="line737">737: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)ds),&amp;size);
+<a name="line738">738: </a>  <font color="#4169E1">if</font> (size&gt;1 &amp;&amp; ds-&gt;pmode==<a href="../../../../../docs/manualpages/DS/DSParallelType.html#DSParallelType">DS_PARALLEL_SYNCHRONIZED</a>) {
+<a name="line739">739: </a>    PetscLogEventBegin(DS_Synchronize,ds,0,0,0);
+<a name="line740">740: </a>    <font color="#4169E1">if</font> (ds-&gt;ops-&gt;synchronize) {
+<a name="line741">741: </a>      (*ds-&gt;ops-&gt;synchronize)(ds,eigr,eigi);
+<a name="line742">742: </a>    }
+<a name="line743">743: </a>    PetscLogEventEnd(DS_Synchronize,ds,0,0,0);
+<a name="line744">744: </a>    PetscObjectStateIncrease((PetscObject)ds);
+<a name="line745">745: </a>  }
+<a name="line746">746: </a>  <font color="#4169E1">return</font>(0);
+<a name="line747">747: </a>}
+
+<a name="line749">749: </a><font color="#B22222">/*@C</font>
+<a name="line750">750: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a> - Compute vectors associated to the dense system such</font>
+<a name="line751">751: </a><font color="#B22222">   as eigenvectors.</font>
+
+<a name="line753">753: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line755">755: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line756">756: </a><font color="#B22222">+  ds  - the direct solver context</font>
+<a name="line757">757: </a><font color="#B22222">-  mat - the matrix, used to indicate which vectors are required</font>
+
+<a name="line759">759: </a><font color="#B22222">   Input/Output Parameter:</font>
+<a name="line760">760: </a><font color="#B22222">-  j   - (optional) index of vector to be computed</font>
+
+<a name="line762">762: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line763">763: </a><font color="#B22222">.  rnorm - (optional) computed residual norm</font>
+
+<a name="line765">765: </a><font color="#B22222">   Notes:</font>
+<a name="line766">766: </a><font color="#B22222">   Allowed values for mat are <a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>, <a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Y</a>, <a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_U</a> and <a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_VT</a>, to</font>
+<a name="line767">767: </a><font color="#B22222">   compute right or left eigenvectors, or left or right singular vectors,</font>
+<a name="line768">768: </a><font color="#B22222">   respectively.</font>
+
+<a name="line770">770: </a><font color="#B22222">   If NULL is passed in argument j then all vectors are computed,</font>
+<a name="line771">771: </a><font color="#B22222">   otherwise j indicates which vector must be computed. In real non-symmetric</font>
+<a name="line772">772: </a><font color="#B22222">   problems, on exit the index j will be incremented when a complex conjugate</font>
+<a name="line773">773: </a><font color="#B22222">   pair is found.</font>
+
+<a name="line775">775: </a><font color="#B22222">   This function can be invoked after the dense problem has been solved,</font>
+<a name="line776">776: </a><font color="#B22222">   to get the residual norm estimate of the associated Ritz pair. In that</font>
+<a name="line777">777: </a><font color="#B22222">   case, the relevant information is returned in rnorm.</font>
+
+<a name="line779">779: </a><font color="#B22222">   For computing eigenvectors, LAPACK's _trevc is used so the matrix must</font>
+<a name="line780">780: </a><font color="#B22222">   be in (quasi-)triangular form, or call <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>() first.</font>
+
+<a name="line782">782: </a><font color="#B22222">   Level: intermediate</font>
+
+<a name="line784">784: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>()</font>
+<a name="line785">785: </a><font color="#B22222">@*/</font>
+<a name="line786">786: </a><strong><font color="#4169E1"><a name="DSVectors"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> mat,PetscInt *j,PetscReal *rnorm)</font></strong>
+<a name="line787">787: </a>{
+
+<a name="line793">793: </a>  DSCheckAlloc(ds,1);
+<a name="line795">795: </a>  <font color="#4169E1">if</font> (mat&gt;=<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_NUM_MAT</a>) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONG,<font color="#666666">"Invalid matrix"</font>);
+<a name="line796">796: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;vectors) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+<a name="line797">797: </a>  <font color="#4169E1">if</font> (rnorm &amp;&amp; !j) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ORDER,<font color="#666666">"Must give a value of j"</font>);
+<a name="line798">798: </a>  <font color="#4169E1">if</font> (!ds-&gt;mat[mat]) { DSAllocateMat_Private(ds,mat); }
+<a name="line799">799: </a>  PetscLogEventBegin(DS_Vectors,ds,0,0,0);
+<a name="line800">800: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line801">801: </a>  (*ds-&gt;ops-&gt;vectors)(ds,mat,j,rnorm);
+<a name="line802">802: </a>  PetscFPTrapPop();
+<a name="line803">803: </a>  PetscLogEventEnd(DS_Vectors,ds,0,0,0);
+<a name="line804">804: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line805">805: </a>  <font color="#4169E1">return</font>(0);
+<a name="line806">806: </a>}
+
+<a name="line808">808: </a><font color="#B22222">/*@</font>
+<a name="line809">809: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSUpdateExtraRow.html#DSUpdateExtraRow">DSUpdateExtraRow</a> - Performs all necessary operations so that the extra</font>
+<a name="line810">810: </a><font color="#B22222">   row gets up-to-date after a call to <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>().</font>
+
+<a name="line812">812: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line814">814: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line815">815: </a><font color="#B22222">.  ds - the direct solver context</font>
+
+<a name="line817">817: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line819">819: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(), <a href="../../../../../docs/manualpages/DS/DSSetExtraRow.html#DSSetExtraRow">DSSetExtraRow</a>()</font>
+<a name="line820">820: </a><font color="#B22222">@*/</font>
+<a name="line821">821: </a><strong><font color="#4169E1"><a name="DSUpdateExtraRow"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSUpdateExtraRow.html#DSUpdateExtraRow">DSUpdateExtraRow</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds)</font></strong>
+<a name="line822">822: </a>{
+
+<a name="line828">828: </a>  DSCheckAlloc(ds,1);
+<a name="line829">829: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;update) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+<a name="line830">830: </a>  <font color="#4169E1">if</font> (!ds-&gt;extrarow) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONGSTATE,<font color="#666666">"Should have called <a href="../../../../../docs/manualpages/DS/DSSetExtraRow.html#DSSetExtraRow">DSSetExtraRow</a>"</font>);
+<a name="line831">831: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line832">832: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line833">833: </a>  (*ds-&gt;ops-&gt;update)(ds);
+<a name="line834">834: </a>  PetscFPTrapPop();
+<a name="line835">835: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line836">836: </a>  <font color="#4169E1">return</font>(0);
+<a name="line837">837: </a>}
+
+<a name="line839">839: </a><font color="#B22222">/*@</font>
+<a name="line840">840: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSCond.html#DSCond">DSCond</a> - Compute the inf-norm condition number of the first matrix</font>
+<a name="line841">841: </a><font color="#B22222">   as cond(A) = norm(A)*norm(inv(A)).</font>
+
+<a name="line843">843: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line845">845: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line846">846: </a><font color="#B22222">+  ds - the direct solver context</font>
+<a name="line847">847: </a><font color="#B22222">-  cond - the computed condition number</font>
+
+<a name="line849">849: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line851">851: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>()</font>
+<a name="line852">852: </a><font color="#B22222">@*/</font>
+<a name="line853">853: </a><strong><font color="#4169E1"><a name="DSCond"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSCond.html#DSCond">DSCond</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscReal *cond)</font></strong>
+<a name="line854">854: </a>{
+
+<a name="line860">860: </a>  DSCheckAlloc(ds,1);
+<a name="line862">862: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;cond) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+<a name="line863">863: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line864">864: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line865">865: </a>  (*ds-&gt;ops-&gt;cond)(ds,cond);
+<a name="line866">866: </a>  PetscFPTrapPop();
+<a name="line867">867: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line868">868: </a>  <font color="#4169E1">return</font>(0);
+<a name="line869">869: </a>}
+
+<a name="line871">871: </a><font color="#B22222">/*@C</font>
+<a name="line872">872: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSTranslateHarmonic.html#DSTranslateHarmonic">DSTranslateHarmonic</a> - Computes a translation of the dense system.</font>
+
+<a name="line874">874: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line876">876: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line877">877: </a><font color="#B22222">+  ds      - the direct solver context</font>
+<a name="line878">878: </a><font color="#B22222">.  tau     - the translation amount</font>
+<a name="line879">879: </a><font color="#B22222">.  beta    - last component of vector b</font>
+<a name="line880">880: </a><font color="#B22222">-  recover - boolean flag to indicate whether to recover or not</font>
+
+<a name="line882">882: </a><font color="#B22222">   Output Parameters:</font>
+<a name="line883">883: </a><font color="#B22222">+  g       - the computed vector (optional)</font>
+<a name="line884">884: </a><font color="#B22222">-  gamma   - scale factor (optional)</font>
+
+<a name="line886">886: </a><font color="#B22222">   Notes:</font>
+<a name="line887">887: </a><font color="#B22222">   This function is intended for use in the context of Krylov methods only.</font>
+<a name="line888">888: </a><font color="#B22222">   It computes a translation of a Krylov decomposition in order to extract</font>
+<a name="line889">889: </a><font color="#B22222">   eigenpair approximations by harmonic Rayleigh-Ritz.</font>
+<a name="line890">890: </a><font color="#B22222">   The matrix is updated as A + g*b' where g = (A-tau*eye(n))'\b and</font>
+<a name="line891">891: </a><font color="#B22222">   vector b is assumed to be beta*e_n^T.</font>
+
+<a name="line893">893: </a><font color="#B22222">   The gamma factor is defined as sqrt(1+g'*g) and can be interpreted as</font>
+<a name="line894">894: </a><font color="#B22222">   the factor by which the residual of the Krylov decomposition is scaled.</font>
+
+<a name="line896">896: </a><font color="#B22222">   If the recover flag is activated, the computed translation undoes the</font>
+<a name="line897">897: </a><font color="#B22222">   translation done previously. In that case, parameter tau is ignored.</font>
+
+<a name="line899">899: </a><font color="#B22222">   Level: developer</font>
+<a name="line900">900: </a><font color="#B22222">@*/</font>
+<a name="line901">901: </a><strong><font color="#4169E1"><a name="DSTranslateHarmonic"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSTranslateHarmonic.html#DSTranslateHarmonic">DSTranslateHarmonic</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar tau,PetscReal beta,PetscBool recover,PetscScalar *g,PetscReal *gamma)</font></strong>
+<a name="line902">902: </a>{
+
+<a name="line908">908: </a>  DSCheckAlloc(ds,1);
+<a name="line909">909: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;transharm) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+<a name="line910">910: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line911">911: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line912">912: </a>  (*ds-&gt;ops-&gt;transharm)(ds,tau,beta,recover,g,gamma);
+<a name="line913">913: </a>  PetscFPTrapPop();
+<a name="line914">914: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line915">915: </a>  ds-&gt;state = <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>;
+<a name="line916">916: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line917">917: </a>  <font color="#4169E1">return</font>(0);
+<a name="line918">918: </a>}
+
+<a name="line920">920: </a><font color="#B22222">/*@</font>
+<a name="line921">921: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSTranslateRKS.html#DSTranslateRKS">DSTranslateRKS</a> - Computes a modification of the dense system corresponding</font>
+<a name="line922">922: </a><font color="#B22222">   to an update of the shift in a rational Krylov method.</font>
+
+<a name="line924">924: </a><font color="#B22222">   Logically Collective on ds</font>
+
+<a name="line926">926: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line927">927: </a><font color="#B22222">+  ds    - the direct solver context</font>
+<a name="line928">928: </a><font color="#B22222">-  alpha - the translation amount</font>
+
+<a name="line930">930: </a><font color="#B22222">   Notes:</font>
+<a name="line931">931: </a><font color="#B22222">   This function is intended for use in the context of Krylov methods only.</font>
+<a name="line932">932: </a><font color="#B22222">   It takes the leading (k+1,k) submatrix of A, containing the truncated</font>
+<a name="line933">933: </a><font color="#B22222">   Rayleigh quotient of a Krylov-Schur relation computed from a shift</font>
+<a name="line934">934: </a><font color="#B22222">   sigma1 and transforms it to obtain a Krylov relation as if computed</font>
+<a name="line935">935: </a><font color="#B22222">   from a different shift sigma2. The new matrix is computed as</font>
+<a name="line936">936: </a><font color="#B22222">   1.0/alpha*(eye(k)-Q*inv(R)), where [Q,R]=qr(eye(k)-alpha*A) and</font>
+<a name="line937">937: </a><font color="#B22222">   alpha = sigma1-sigma2.</font>
+
+<a name="line939">939: </a><font color="#B22222">   Matrix Q is placed in <a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a> so that it can be used to update the</font>
+<a name="line940">940: </a><font color="#B22222">   Krylov basis.</font>
+
+<a name="line942">942: </a><font color="#B22222">   Level: developer</font>
+<a name="line943">943: </a><font color="#B22222">@*/</font>
+<a name="line944">944: </a><strong><font color="#4169E1"><a name="DSTranslateRKS"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSTranslateRKS.html#DSTranslateRKS">DSTranslateRKS</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,PetscScalar alpha)</font></strong>
+<a name="line945">945: </a>{
+
+<a name="line951">951: </a>  DSCheckAlloc(ds,1);
+<a name="line952">952: </a>  <font color="#4169E1">if</font> (!ds-&gt;ops-&gt;transrks) SETERRQ1(PetscObjectComm((PetscObject)ds),PETSC_ERR_SUP,<font color="#666666">"<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> type %s"</font>,((PetscObject)ds)-&gt;type_name);
+<a name="line953">953: </a>  PetscLogEventBegin(DS_Other,ds,0,0,0);
+<a name="line954">954: </a>  PetscFPTrapPush(PETSC_FP_TRAP_OFF);
+<a name="line955">955: </a>  (*ds-&gt;ops-&gt;transrks)(ds,alpha);
+<a name="line956">956: </a>  PetscFPTrapPop();
+<a name="line957">957: </a>  PetscLogEventEnd(DS_Other,ds,0,0,0);
+<a name="line958">958: </a>  ds-&gt;state   = <a href="../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>;
+<a name="line959">959: </a>  ds-&gt;compact = PETSC_FALSE;
+<a name="line960">960: </a>  PetscObjectStateIncrease((PetscObject)ds);
+<a name="line961">961: </a>  <font color="#4169E1">return</font>(0);
+<a name="line962">962: </a>}
+
+<a name="line964">964: </a><font color="#B22222">/*@</font>
+<a name="line965">965: </a><font color="#B22222">   <a href="../../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a> - Copies the contents of a sequential dense Mat object to</font>
+<a name="line966">966: </a><font color="#B22222">   the indicated <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> matrix, or vice versa.</font>
+
+<a name="line968">968: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line970">970: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line971">971: </a><font color="#B22222">+  ds   - the direct solver context</font>
+<a name="line972">972: </a><font color="#B22222">.  m    - the requested matrix</font>
+<a name="line973">973: </a><font color="#B22222">.  mr   - first row of m to be considered</font>
+<a name="line974">974: </a><font color="#B22222">.  mc   - first column of m to be considered</font>
+<a name="line975">975: </a><font color="#B22222">.  A    - Mat object</font>
+<a name="line976">976: </a><font color="#B22222">.  Ar   - first row of A to be considered</font>
+<a name="line977">977: </a><font color="#B22222">.  Ac   - first column of A to be considered</font>
+<a name="line978">978: </a><font color="#B22222">.  rows - number of rows to copy</font>
+<a name="line979">979: </a><font color="#B22222">.  cols - number of columns to copy</font>
+<a name="line980">980: </a><font color="#B22222">-  out  - whether the data is copied out of the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a></font>
+
+<a name="line982">982: </a><font color="#B22222">   Note:</font>
+<a name="line983">983: </a><font color="#B22222">   If out=true, the values of the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> matrix m are copied to A, otherwise</font>
+<a name="line984">984: </a><font color="#B22222">   the entries of A are copied to the <a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a>.</font>
+
+<a name="line986">986: </a><font color="#B22222">   Level: developer</font>
+
+<a name="line988">988: </a><font color="#B22222">.seealso: <a href="../../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>()</font>
+<a name="line989">989: </a><font color="#B22222">@*/</font>
+<a name="line990">990: </a><strong><font color="#4169E1"><a name="DSCopyMat"></a>PetscErrorCode <a href="../../../../../docs/manualpages/DS/DSCopyMat.html#DSCopyMat">DSCopyMat</a>(<a href="../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> m,PetscInt mr,PetscInt mc,Mat A,PetscInt Ar,PetscInt Ac,PetscInt rows,PetscInt cols,PetscBool out)</font></strong>
+<a name="line991">991: </a>{
+<a name="line993">993: </a>  PetscInt       j,mrows,mcols,arows,acols;
+<a name="line994">994: </a>  PetscScalar    *pA,*M;
+
+<a name="line998">998: </a>  DSCheckAlloc(ds,1);
+<a name="line1000">1000: </a>  DSCheckValidMat(ds,m,2);
+<a name="line1009">1009: </a>  <font color="#4169E1">if</font> (!rows || !cols) <font color="#4169E1">return</font>(0);
+
+<a name="line1011">1011: </a>  <a href="../../../../../docs/manualpages/DS/DSMatGetSize.html#DSMatGetSize">DSMatGetSize</a>(ds,m,&amp;mrows,&amp;mcols);
+<a name="line1012">1012: </a>  MatGetSize(A,&amp;arows,&amp;acols);
+<a name="line1013">1013: </a>  <font color="#4169E1">if</font> (m==<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a> || m==<a href="../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_D</a>) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_WRONG,<font color="#666666">"Not implemented for T or D matrices"</font>);
+<a name="line1014">1014: </a>  <font color="#4169E1">if</font> (mr&lt;0 || mr&gt;=mrows) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid initial row in m"</font>);
+<a name="line1015">1015: </a>  <font color="#4169E1">if</font> (mc&lt;0 || mc&gt;=mcols) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid initial column in m"</font>);
+<a name="line1016">1016: </a>  <font color="#4169E1">if</font> (Ar&lt;0 || Ar&gt;=arows) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid initial row in A"</font>);
+<a name="line1017">1017: </a>  <font color="#4169E1">if</font> (Ac&lt;0 || Ac&gt;=acols) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid initial column in A"</font>);
+<a name="line1018">1018: </a>  <font color="#4169E1">if</font> (mr+rows&gt;mrows || Ar+rows&gt;arows) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid number of rows"</font>);
+<a name="line1019">1019: </a>  <font color="#4169E1">if</font> (mc+cols&gt;mcols || Ac+cols&gt;acols) SETERRQ(PetscObjectComm((PetscObject)ds),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid number of columns"</font>);
+
+<a name="line1021">1021: </a>  M  = ds-&gt;mat[m];
+<a name="line1022">1022: </a>  MatDenseGetArray(A,&amp;pA);
+<a name="line1023">1023: </a>  <font color="#4169E1">for</font> (j=0;j&lt;cols;j++) {
+<a name="line1024">1024: </a>    <font color="#4169E1">if</font> (out) {
+<a name="line1025">1025: </a>      PetscArraycpy(pA+(Ac+j)*arows+Ar,M+(mc+j)*ds-&gt;ld+mr,rows);
+<a name="line1026">1026: </a>    } <font color="#4169E1">else</font> {
+<a name="line1027">1027: </a>      PetscArraycpy(M+(mc+j)*ds-&gt;ld+mr,pA+(Ac+j)*arows+Ar,rows);
+<a name="line1028">1028: </a>    }
+<a name="line1029">1029: </a>  }
+<a name="line1030">1030: </a>  MatDenseRestoreArray(A,&amp;pA);
+<a name="line1031">1031: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1032">1032: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,508 @@
+<center><a href="dsrtdf.c">Actual source code: dsrtdf.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/ds/impls/hep/bdc/dsrtdf.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:40+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/ds/impls/hep/bdc/dsrtdf.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   BDC - Block-divide and conquer (see description in README file)</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../../../../../include/slepc/private/dsimpl.h.html">&lt;slepc/private/dsimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="BDC_dsrtdf_"></a>PetscErrorCode BDC_dsrtdf_(PetscBLASInt *k,PetscBLASInt n,PetscBLASInt n1,</font></strong>
+<a name="line18"> 18: </a><strong><font color="#4169E1">        PetscReal *d,PetscReal *q,PetscBLASInt ldq,PetscBLASInt *indxq,</font></strong>
+<a name="line19"> 19: </a><strong><font color="#4169E1">        PetscReal *rho,PetscReal *z,PetscReal *dlamda,PetscReal *w,</font></strong>
+<a name="line20"> 20: </a><strong><font color="#4169E1">        PetscReal *q2,PetscBLASInt *indx,PetscBLASInt *indxc,PetscBLASInt *indxp,</font></strong>
+<a name="line21"> 21: </a><strong><font color="#4169E1">        PetscBLASInt *coltyp,PetscReal reltol,PetscBLASInt *dz,PetscBLASInt *de,</font></strong>
+<a name="line22"> 22: </a><strong><font color="#4169E1">        PetscBLASInt *info)</font></strong>
+<a name="line23"> 23: </a>{
+<a name="line24"> 24: </a><font color="#B22222">/*  -- Routine written in LAPACK Version 3.0 style -- */</font>
+<a name="line25"> 25: </a><font color="#B22222">/* *************************************************** */</font>
+<a name="line26"> 26: </a><font color="#B22222">/*     Written by */</font>
+<a name="line27"> 27: </a><font color="#B22222">/*     Michael Moldaschl and Wilfried Gansterer */</font>
+<a name="line28"> 28: </a><font color="#B22222">/*     University of Vienna */</font>
+<a name="line29"> 29: </a><font color="#B22222">/*     last modification: March 16, 2014 */</font>
+
+<a name="line31"> 31: </a><font color="#B22222">/*     Small adaptations of original code written by */</font>
+<a name="line32"> 32: </a><font color="#B22222">/*     Wilfried Gansterer and Bob Ward, */</font>
+<a name="line33"> 33: </a><font color="#B22222">/*     Department of Computer Science, University of Tennessee */</font>
+<a name="line34"> 34: </a><font color="#B22222">/*     see https://doi.org/10.1137/S1064827501399432 */</font>
+<a name="line35"> 35: </a><font color="#B22222">/* *************************************************** */</font>
+
+<a name="line37"> 37: </a><font color="#B22222">/*  Purpose */</font>
+<a name="line38"> 38: </a><font color="#B22222">/*  ======= */</font>
+
+<a name="line40"> 40: </a><font color="#B22222">/*  DSRTDF merges the two sets of eigenvalues of a rank-one modified */</font>
+<a name="line41"> 41: </a><font color="#B22222">/*  diagonal matrix D+ZZ^T together into a single sorted set. Then it tries */</font>
+<a name="line42"> 42: </a><font color="#B22222">/*  to deflate the size of the problem. */</font>
+<a name="line43"> 43: </a><font color="#B22222">/*  There are two ways in which deflation can occur:  when two or more */</font>
+<a name="line44"> 44: </a><font color="#B22222">/*  eigenvalues of D are close together or if there is a tiny entry in the */</font>
+<a name="line45"> 45: </a><font color="#B22222">/*  Z vector.  For each such occurrence the order of the related secular */</font>
+<a name="line46"> 46: </a><font color="#B22222">/*  equation problem is reduced by one. */</font>
+
+<a name="line48"> 48: </a><font color="#B22222">/*  Arguments */</font>
+<a name="line49"> 49: </a><font color="#B22222">/*  ========= */</font>
+
+<a name="line51"> 51: </a><font color="#B22222">/*  K      (output) INTEGER */</font>
+<a name="line52"> 52: </a><font color="#B22222">/*         The number of non-deflated eigenvalues, and the order of the */</font>
+<a name="line53"> 53: </a><font color="#B22222">/*         related secular equation. 0 &lt;= K &lt;=N. */</font>
+
+<a name="line55"> 55: </a><font color="#B22222">/*  N      (input) INTEGER */</font>
+<a name="line56"> 56: </a><font color="#B22222">/*         The dimension of the diagonal matrix.  N &gt;= 0. */</font>
+
+<a name="line58"> 58: </a><font color="#B22222">/*  N1     (input) INTEGER */</font>
+<a name="line59"> 59: </a><font color="#B22222">/*         The location of the last eigenvalue in the leading sub-matrix. */</font>
+<a name="line60"> 60: </a><font color="#B22222">/*         min(1,N) &lt;= N1 &lt;= max(1,N). */</font>
+
+<a name="line62"> 62: </a><font color="#B22222">/*  D      (input/output) DOUBLE PRECISION array, dimension (N) */</font>
+<a name="line63"> 63: </a><font color="#B22222">/*         On entry, D contains the eigenvalues of the two submatrices to */</font>
+<a name="line64"> 64: </a><font color="#B22222">/*         be combined. */</font>
+<a name="line65"> 65: </a><font color="#B22222">/*         On exit, D contains the trailing (N-K) updated eigenvalues */</font>
+<a name="line66"> 66: </a><font color="#B22222">/*         (those which were deflated) sorted into increasing order. */</font>
+
+<a name="line68"> 68: </a><font color="#B22222">/*  Q      (input/output) DOUBLE PRECISION array, dimension (LDQ, N) */</font>
+<a name="line69"> 69: </a><font color="#B22222">/*         On entry, Q contains the eigenvectors of two submatrices in */</font>
+<a name="line70"> 70: </a><font color="#B22222">/*         the two square blocks with corners at (1,1), (N1,N1) */</font>
+<a name="line71"> 71: </a><font color="#B22222">/*         and (N1+1, N1+1), (N,N). */</font>
+<a name="line72"> 72: </a><font color="#B22222">/*         On exit, Q contains the trailing (N-K) updated eigenvectors */</font>
+<a name="line73"> 73: </a><font color="#B22222">/*         (those which were deflated) in its last N-K columns. */</font>
+
+<a name="line75"> 75: </a><font color="#B22222">/*  LDQ    (input) INTEGER */</font>
+<a name="line76"> 76: </a><font color="#B22222">/*         The leading dimension of the array Q.  LDQ &gt;= max(1,N). */</font>
+
+<a name="line78"> 78: </a><font color="#B22222">/*  INDXQ  (input/output) INTEGER array, dimension (N) */</font>
+<a name="line79"> 79: </a><font color="#B22222">/*         The permutation which separately sorts the two sub-problems */</font>
+<a name="line80"> 80: </a><font color="#B22222">/*         in D into ascending order.  Note that elements in the second */</font>
+<a name="line81"> 81: </a><font color="#B22222">/*         half of this permutation must first have N1 added to their */</font>
+<a name="line82"> 82: </a><font color="#B22222">/*         values. Destroyed on exit. */</font>
+
+<a name="line84"> 84: </a><font color="#B22222">/*  RHO    (input/output) DOUBLE PRECISION */</font>
+<a name="line85"> 85: </a><font color="#B22222">/*         On entry, the off-diagonal element associated with the rank-1 */</font>
+<a name="line86"> 86: </a><font color="#B22222">/*         cut which originally split the two submatrices which are now */</font>
+<a name="line87"> 87: </a><font color="#B22222">/*         being recombined. */</font>
+<a name="line88"> 88: </a><font color="#B22222">/*         On exit, RHO has been modified to the value required by */</font>
+<a name="line89"> 89: </a><font color="#B22222">/*         DLAED3M (made positive and multiplied by two, such that */</font>
+<a name="line90"> 90: </a><font color="#B22222">/*         the modification vector has norm one). */</font>
+
+<a name="line92"> 92: </a><font color="#B22222">/*  Z      (input/output) DOUBLE PRECISION array, dimension (N) */</font>
+<a name="line93"> 93: </a><font color="#B22222">/*         On entry, Z contains the updating vector. */</font>
+<a name="line94"> 94: </a><font color="#B22222">/*         On exit, the contents of Z has been destroyed by the updating */</font>
+<a name="line95"> 95: </a><font color="#B22222">/*         process. */</font>
+
+<a name="line97"> 97: </a><font color="#B22222">/*  DLAMDA (output) DOUBLE PRECISION array, dimension (N) */</font>
+<a name="line98"> 98: </a><font color="#B22222">/*         A copy of the first K non-deflated eigenvalues which */</font>
+<a name="line99"> 99: </a><font color="#B22222">/*         will be used by DLAED3M to form the secular equation. */</font>
+
+<a name="line101">101: </a><font color="#B22222">/*  W      (output) DOUBLE PRECISION array, dimension (N) */</font>
+<a name="line102">102: </a><font color="#B22222">/*         The first K values of the final deflation-altered z-vector */</font>
+<a name="line103">103: </a><font color="#B22222">/*         which will be passed to DLAED3M. */</font>
+
+<a name="line105">105: </a><font color="#B22222">/*  Q2     (output) DOUBLE PRECISION array, dimension */</font>
+<a name="line106">106: </a><font color="#B22222">/*         (N*N) (if everything is deflated) or */</font>
+<a name="line107">107: </a><font color="#B22222">/*         (N1*(COLTYP(1)+COLTYP(2)) + (N-N1)*(COLTYP(2)+COLTYP(3))) */</font>
+<a name="line108">108: </a><font color="#B22222">/*         (if not everything is deflated) */</font>
+<a name="line109">109: </a><font color="#B22222">/*         If everything is deflated, then N*N intermediate workspace */</font>
+<a name="line110">110: </a><font color="#B22222">/*         is needed in Q2. */</font>
+<a name="line111">111: </a><font color="#B22222">/*         If not everything is deflated, Q2 contains on exit a copy of the */</font>
+<a name="line112">112: </a><font color="#B22222">/*         first K non-deflated eigenvectors which will be used by */</font>
+<a name="line113">113: </a><font color="#B22222">/*         DLAED3M in a matrix multiply (DGEMM) to accumulate the new */</font>
+<a name="line114">114: </a><font color="#B22222">/*         eigenvectors, followed by the N-K deflated eigenvectors. */</font>
+
+<a name="line116">116: </a><font color="#B22222">/*  INDX   (workspace) INTEGER array, dimension (N) */</font>
+<a name="line117">117: </a><font color="#B22222">/*         The permutation used to sort the contents of DLAMDA into */</font>
+<a name="line118">118: </a><font color="#B22222">/*         ascending order. */</font>
+
+<a name="line120">120: </a><font color="#B22222">/*  INDXC  (output) INTEGER array, dimension (N) */</font>
+<a name="line121">121: </a><font color="#B22222">/*         The permutation used to arrange the columns of the deflated */</font>
+<a name="line122">122: </a><font color="#B22222">/*         Q matrix into three groups:  columns in the first group contain */</font>
+<a name="line123">123: </a><font color="#B22222">/*         non-zero elements only at and above N1 (type 1), columns in the */</font>
+<a name="line124">124: </a><font color="#B22222">/*         second group are dense (type 2), and columns in the third group */</font>
+<a name="line125">125: </a><font color="#B22222">/*         contain non-zero elements only below N1 (type 3). */</font>
+
+<a name="line127">127: </a><font color="#B22222">/*  INDXP  (workspace) INTEGER array, dimension (N) */</font>
+<a name="line128">128: </a><font color="#B22222">/*         The permutation used to place deflated values of D at the end */</font>
+<a name="line129">129: </a><font color="#B22222">/*         of the array.  INDXP(1:K) points to the nondeflated D-values */</font>
+<a name="line130">130: </a><font color="#B22222">/*         and INDXP(K+1:N) points to the deflated eigenvalues. */</font>
+
+<a name="line132">132: </a><font color="#B22222">/*  COLTYP (workspace/output) INTEGER array, dimension (N) */</font>
+<a name="line133">133: </a><font color="#B22222">/*         During execution, a label which will indicate which of the */</font>
+<a name="line134">134: </a><font color="#B22222">/*         following types a column in the Q2 matrix is: */</font>
+<a name="line135">135: </a><font color="#B22222">/*         1 : non-zero in the upper half only; */</font>
+<a name="line136">136: </a><font color="#B22222">/*         2 : dense; */</font>
+<a name="line137">137: </a><font color="#B22222">/*         3 : non-zero in the lower half only; */</font>
+<a name="line138">138: </a><font color="#B22222">/*         4 : deflated. */</font>
+<a name="line139">139: </a><font color="#B22222">/*         On exit, COLTYP(i) is the number of columns of type i, */</font>
+<a name="line140">140: </a><font color="#B22222">/*         for i=1 to 4 only. */</font>
+
+<a name="line142">142: </a><font color="#B22222">/*  RELTOL (input) DOUBLE PRECISION */</font>
+<a name="line143">143: </a><font color="#B22222">/*         User specified deflation tolerance. If RELTOL.LT.20*<a href="../../../../../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>, then */</font>
+<a name="line144">144: </a><font color="#B22222">/*         the standard value used in the original LAPACK routines is used. */</font>
+
+<a name="line146">146: </a><font color="#B22222">/*  DZ     (output) INTEGER, DZ.GE.0 */</font>
+<a name="line147">147: </a><font color="#B22222">/*         counts the deflation due to a small component in the modification */</font>
+<a name="line148">148: </a><font color="#B22222">/*         vector. */</font>
+
+<a name="line150">150: </a><font color="#B22222">/*  DE     (output) INTEGER, DE.GE.0 */</font>
+<a name="line151">151: </a><font color="#B22222">/*         counts the deflation due to close eigenvalues. */</font>
+
+<a name="line153">153: </a><font color="#B22222">/*  INFO   (output) INTEGER */</font>
+<a name="line154">154: </a><font color="#B22222">/*          = 0:  successful exit. */</font>
+<a name="line155">155: </a><font color="#B22222">/*          &lt; 0:  if INFO = -i, the i-th argument had an illegal value. */</font>
+
+<a name="line157">157: </a><font color="#B22222">/*  Further Details */</font>
+<a name="line158">158: </a><font color="#B22222">/*  =============== */</font>
+
+<a name="line160">160: </a><font color="#B22222">/*  Based on code written by */</font>
+<a name="line161">161: </a><font color="#B22222">/*  Wilfried Gansterer and Bob Ward, */</font>
+<a name="line162">162: </a><font color="#B22222">/*  Department of Computer Science, University of Tennessee */</font>
+
+<a name="line164">164: </a><font color="#B22222">/*  Based on the design of the LAPACK code DLAED2 with modifications */</font>
+<a name="line165">165: </a><font color="#B22222">/*  to allow a block divide and conquer scheme */</font>
+
+<a name="line167">167: </a><font color="#B22222">/*  DLAED2 was written by Jeff Rutter, Computer Science Division, University */</font>
+<a name="line168">168: </a><font color="#B22222">/*  of California at Berkeley, USA, and modified by Francoise Tisseur, */</font>
+<a name="line169">169: </a><font color="#B22222">/*  University of Tennessee. */</font>
+
+<a name="line171">171: </a><font color="#B22222">/*  ===================================================================== */</font>
+
+<a name="line173">173: </a>  PetscReal    c, s, t, eps, tau, tol, dmax, dmone = -1.;
+<a name="line174">174: </a>  PetscBLASInt i, j, i1, k2, n2, ct, nj, pj=0, js, iq1, iq2;
+<a name="line175">175: </a>  PetscBLASInt psm[4], imax, jmax, ctot[4], factmp=1, one=1;
+
+<a name="line178">178: </a>  *info = 0;
+
+<a name="line180">180: </a>  <font color="#4169E1">if</font> (n &lt; 0) *info = -2;
+<a name="line181">181: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (n1 &lt; PetscMin(1,n) || n1 &gt; PetscMax(1,n)) *info = -3;
+<a name="line182">182: </a>  <font color="#4169E1">else</font> <font color="#4169E1">if</font> (ldq &lt; PetscMax(1,n)) *info = -6;
+<a name="line183">183: </a>  <font color="#4169E1">if</font> (*info) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,<font color="#666666">"Wrong argument %d in DSRTDF"</font>,-(*info));
+
+<a name="line185">185: </a>  <font color="#B22222">/* Initialize deflation counters */</font>
+
+<a name="line187">187: </a>  *dz = 0;
+<a name="line188">188: </a>  *de = 0;
+
+<a name="line190">190: </a><font color="#B22222">/* **************************************************************************** */</font>
+
+<a name="line192">192: </a>  <font color="#B22222">/* Quick return if possible */</font>
+
+<a name="line194">194: </a>  <font color="#4169E1">if</font> (n == 0) <font color="#4169E1">return</font>(0);
+
+<a name="line196">196: </a><font color="#B22222">/* **************************************************************************** */</font>
+
+<a name="line198">198: </a>  n2 = n - n1;
+
+<a name="line200">200: </a>  <font color="#B22222">/* Modify Z so that RHO is positive. */</font>
+
+<a name="line202">202: </a>  <font color="#4169E1">if</font> (*rho &lt; 0.) PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;n2, &amp;dmone, &amp;z[n1], &amp;one));
+
+<a name="line204">204: </a>  <font color="#B22222">/* Normalize z so that norm2(z) = 1.  Since z is the concatenation of */</font>
+<a name="line205">205: </a>  <font color="#B22222">/* two normalized vectors, norm2(z) = sqrt(2). (NOTE that this holds also */</font>
+<a name="line206">206: </a>  <font color="#B22222">/* here in the approximate block-tridiagonal D&amp;C because the two vectors are */</font>
+<a name="line207">207: </a>  <font color="#B22222">/* singular vectors, but it would not necessarily hold in a D&amp;C for a */</font>
+<a name="line208">208: </a>  <font color="#B22222">/* general banded matrix !) */</font>
+
+<a name="line210">210: </a>  t = 1. / PetscSqrtReal(2.);
+<a name="line211">211: </a>  PetscStackCallBLAS(<font color="#666666">"BLASscal"</font>,BLASscal_(&amp;n, &amp;t, z, &amp;one));
+
+<a name="line213">213: </a>  <font color="#B22222">/* NOTE: at this point the value of RHO is modified in order to */</font>
+<a name="line214">214: </a>  <font color="#B22222">/*       normalize Z:    RHO = ABS( norm2(z)**2 * RHO */</font>
+<a name="line215">215: </a>  <font color="#B22222">/*       in our case:    norm2(z) = sqrt(2), and therefore: */</font>
+
+<a name="line217">217: </a>  *rho = PetscAbs(*rho * 2.);
+
+<a name="line219">219: </a>  <font color="#B22222">/* Sort the eigenvalues into increasing order */</font>
+
+<a name="line221">221: </a>  <font color="#4169E1">for</font> (i = n1; i &lt; n; ++i) indxq[i] += n1;
+
+<a name="line223">223: </a>  <font color="#B22222">/* re-integrate the deflated parts from the last pass */</font>
+
+<a name="line225">225: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; n; ++i) dlamda[i] = d[indxq[i]-1];
+<a name="line226">226: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKlamrg"</font>,LAPACKlamrg_(&amp;n1, &amp;n2, dlamda, &amp;one, &amp;one, indxc));
+<a name="line227">227: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; n; ++i) indx[i] = indxq[indxc[i]-1];
+<a name="line228">228: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; n; ++i) indxq[i] = 0;
+
+<a name="line230">230: </a>  <font color="#B22222">/* Calculate the allowable deflation tolerance */</font>
+
+<a name="line232">232: </a>  <font color="#B22222">/* imax = BLASamax_(&amp;n, z, &amp;one); */</font>
+<a name="line233">233: </a>  imax = 1;
+<a name="line234">234: </a>  dmax = PetscAbsReal(z[0]);
+<a name="line235">235: </a>  <font color="#4169E1">for</font> (i=1;i&lt;n;i++) {
+<a name="line236">236: </a>    <font color="#4169E1">if</font> (PetscAbsReal(z[i])&gt;dmax) {
+<a name="line237">237: </a>      imax = i+1;
+<a name="line238">238: </a>      dmax = PetscAbsReal(z[i]);
+<a name="line239">239: </a>    }
+<a name="line240">240: </a>  }
+<a name="line241">241: </a>  <font color="#B22222">/* jmax = BLASamax_(&amp;n, d, &amp;one); */</font>
+<a name="line242">242: </a>  jmax = 1;
+<a name="line243">243: </a>  dmax = PetscAbsReal(d[0]);
+<a name="line244">244: </a>  <font color="#4169E1">for</font> (i=1;i&lt;n;i++) {
+<a name="line245">245: </a>    <font color="#4169E1">if</font> (PetscAbsReal(d[i])&gt;dmax) {
+<a name="line246">246: </a>      jmax = i+1;
+<a name="line247">247: </a>      dmax = PetscAbsReal(d[i]);
+<a name="line248">248: </a>    }
+<a name="line249">249: </a>  }
+
+<a name="line251">251: </a>  eps = LAPACKlamch_(<font color="#666666">"Epsilon"</font>);
+<a name="line252">252: </a>  <font color="#4169E1">if</font> (reltol &lt; eps * 20) {
+<a name="line253">253: </a>    <font color="#B22222">/* use the standard deflation tolerance from the original LAPACK code */</font>
+<a name="line254">254: </a>    tol = eps * 8. * PetscMax(PetscAbs(d[jmax-1]),PetscAbs(z[imax-1]));
+<a name="line255">255: </a>  } <font color="#4169E1">else</font> {
+<a name="line256">256: </a>    <font color="#B22222">/* otherwise set TOL to the input parameter RELTOL ! */</font>
+<a name="line257">257: </a>    tol = reltol * PetscMax(PetscAbs(d[jmax-1]),PetscAbs(z[imax-1]));
+<a name="line258">258: </a>  }
+
+<a name="line260">260: </a>  <font color="#B22222">/* If the rank-1 modifier is small enough, no more needs to be done */</font>
+<a name="line261">261: </a>  <font color="#B22222">/* except to reorganize Q so that its columns correspond with the */</font>
+<a name="line262">262: </a>  <font color="#B22222">/* elements in D. */</font>
+
+<a name="line264">264: </a>  <font color="#4169E1">if</font> (*rho * PetscAbs(z[imax-1]) &lt;= tol) {
+
+<a name="line266">266: </a>    <font color="#B22222">/* complete deflation because of small rank-one modifier */</font>
+<a name="line267">267: </a>    <font color="#B22222">/* NOTE: in this case we need N*N space in the array Q2 ! */</font>
+
+<a name="line269">269: </a>    *dz = n; *k = 0;
+<a name="line270">270: </a>    iq2 = 1;
+<a name="line271">271: </a>    <font color="#4169E1">for</font> (j = 0; j &lt; n; ++j) {
+<a name="line272">272: </a>      i = indx[j]; indxq[j] = i;
+<a name="line273">273: </a>      PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n, &amp;q[(i-1)*ldq], &amp;one, &amp;q2[iq2-1], &amp;one));
+<a name="line274">274: </a>      dlamda[j] = d[i-1];
+<a name="line275">275: </a>      iq2 += n;
+<a name="line276">276: </a>    }
+<a name="line277">277: </a>    <font color="#4169E1">for</font> (j=0;j&lt;n;j++) <font color="#4169E1">for</font> (i=0;i&lt;n;i++) q[i+j*ldq] = q2[i+j*n];
+<a name="line278">278: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n, dlamda, &amp;one, d, &amp;one));
+<a name="line279">279: </a>    <font color="#4169E1">return</font>(0);
+<a name="line280">280: </a>  }
+
+<a name="line282">282: </a>  <font color="#B22222">/* If there are multiple eigenvalues then the problem deflates.  Here */</font>
+<a name="line283">283: </a>  <font color="#B22222">/* the number of equal eigenvalues is found.  As each equal */</font>
+<a name="line284">284: </a>  <font color="#B22222">/* eigenvalue is found, an elementary reflector is computed to rotate */</font>
+<a name="line285">285: </a>  <font color="#B22222">/* the corresponding eigensubspace so that the corresponding */</font>
+<a name="line286">286: </a>  <font color="#B22222">/* components of Z are zero in this new basis. */</font>
+
+<a name="line288">288: </a>  <font color="#B22222">/* initialize the column types */</font>
+
+<a name="line290">290: </a>  <font color="#B22222">/* first N1 columns are initially (before deflation) of type 1 */</font>
+<a name="line291">291: </a>  <font color="#4169E1">for</font> (i = 0; i &lt; n1; ++i) coltyp[i] = 1;
+<a name="line292">292: </a>  <font color="#B22222">/* columns N1+1 to N are initially (before deflation) of type 3 */</font>
+<a name="line293">293: </a>  <font color="#4169E1">for</font> (i = n1; i &lt; n; ++i) coltyp[i] = 3;
+
+<a name="line295">295: </a>  *k = 0;
+<a name="line296">296: </a>  k2 = n + 1;
+<a name="line297">297: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; n; ++j) {
+<a name="line298">298: </a>    nj = indx[j]-1;
+<a name="line299">299: </a>    <font color="#4169E1">if</font> (*rho * PetscAbs(z[nj]) &lt;= tol) {
+
+<a name="line301">301: </a>      <font color="#B22222">/* Deflate due to small z component. */</font>
+<a name="line302">302: </a>      ++(*dz);
+<a name="line303">303: </a>      --k2;
+
+<a name="line305">305: </a>      <font color="#B22222">/* deflated eigenpair, therefore column type 4 */</font>
+<a name="line306">306: </a>      coltyp[nj] = 4;
+<a name="line307">307: </a>      indxp[k2-1] = nj+1;
+<a name="line308">308: </a>      indxq[k2-1] = nj+1;
+<a name="line309">309: </a>      <font color="#4169E1">if</font> (j+1 == n) <font color="#4169E1">goto</font> L100;
+<a name="line310">310: </a>    } <font color="#4169E1">else</font> {
+
+<a name="line312">312: </a>      <font color="#B22222">/* not deflated */</font>
+<a name="line313">313: </a>      pj = nj;
+<a name="line314">314: </a>      <font color="#4169E1">goto</font> L80;
+<a name="line315">315: </a>    }
+<a name="line316">316: </a>  }
+<a name="line317">317: </a>  factmp = 1;
+<a name="line318">318: </a><strong><font color="#FF0000">L80:</font></strong>
+<a name="line319">319: </a>  ++j;
+<a name="line320">320: </a>  nj = indx[j]-1;
+<a name="line321">321: </a>  <font color="#4169E1">if</font> (j+1 &gt; n) <font color="#4169E1">goto</font> L100;
+<a name="line322">322: </a>  <font color="#4169E1">if</font> (*rho * PetscAbs(z[nj]) &lt;= tol) {
+
+<a name="line324">324: </a>    <font color="#B22222">/* Deflate due to small z component. */</font>
+<a name="line325">325: </a>    ++(*dz);
+<a name="line326">326: </a>    --k2;
+<a name="line327">327: </a>    coltyp[nj] = 4;
+<a name="line328">328: </a>    indxp[k2-1] = nj+1;
+<a name="line329">329: </a>    indxq[k2-1] = nj+1;
+<a name="line330">330: </a>  } <font color="#4169E1">else</font> {
+
+<a name="line332">332: </a>    <font color="#B22222">/* Check if eigenvalues are close enough to allow deflation. */</font>
+<a name="line333">333: </a>    s = z[pj];
+<a name="line334">334: </a>    c = z[nj];
+
+<a name="line336">336: </a>    <font color="#B22222">/* Find sqrt(a**2+b**2) without overflow or */</font>
+<a name="line337">337: </a>    <font color="#B22222">/* destructive underflow. */</font>
+
+<a name="line339">339: </a>    tau = SlepcAbs(c, s);
+<a name="line340">340: </a>    t = d[nj] - d[pj];
+<a name="line341">341: </a>    c /= tau;
+<a name="line342">342: </a>    s = -s / tau;
+<a name="line343">343: </a>    <font color="#4169E1">if</font> (PetscAbs(t * c * s) &lt;= tol) {
+
+<a name="line345">345: </a>      <font color="#B22222">/* Deflate due to close eigenvalues. */</font>
+<a name="line346">346: </a>      ++(*de);
+<a name="line347">347: </a>      z[nj] = tau;
+<a name="line348">348: </a>      z[pj] = 0.;
+<a name="line349">349: </a>      <font color="#4169E1">if</font> (coltyp[nj] != coltyp[pj]) coltyp[nj] = 2;
+
+<a name="line351">351: </a>        <font color="#B22222">/* if deflation happens across the two eigenvector blocks */</font>
+<a name="line352">352: </a>        <font color="#B22222">/* (eigenvalues corresponding to different blocks), then */</font>
+<a name="line353">353: </a>        <font color="#B22222">/* on column in the eigenvector matrix fills up completely */</font>
+<a name="line354">354: </a>        <font color="#B22222">/* (changes from type 1 or 3 to type 2) */</font>
+
+<a name="line356">356: </a>        <font color="#B22222">/* eigenpair PJ is deflated, therefore the column type changes */</font>
+<a name="line357">357: </a>        <font color="#B22222">/* to 4 */</font>
+
+<a name="line359">359: </a>        coltyp[pj] = 4;
+<a name="line360">360: </a>        PetscStackCallBLAS(<font color="#666666">"BLASrot"</font>,BLASrot_(&amp;n, &amp;q[pj*ldq], &amp;one, &amp;q[nj*ldq], &amp;one, &amp;c, &amp;s));
+<a name="line361">361: </a>        t = d[pj] * (c * c) + d[nj] * (s * s);
+<a name="line362">362: </a>        d[nj] = d[pj] * (s * s) + d[nj] * (c * c);
+<a name="line363">363: </a>        d[pj] = t;
+<a name="line364">364: </a>        --k2;
+<a name="line365">365: </a>        i = 1;
+<a name="line366">366: </a><strong><font color="#FF0000">L90:</font></strong>
+<a name="line367">367: </a>        <font color="#4169E1">if</font> (k2 + i &lt;= n) {
+<a name="line368">368: </a>          <font color="#4169E1">if</font> (d[pj] &lt; d[indxp[k2 + i-1]-1]) {
+<a name="line369">369: </a>            indxp[k2 + i - 2] = indxp[k2 + i - 1];
+<a name="line370">370: </a>            indxq[k2 + i - 2] = indxq[k2 + i - 1];
+<a name="line371">371: </a>            indxp[k2 + i - 1] = pj + 1;
+<a name="line372">372: </a>            indxq[k2 + i - 2] = pj + 1;
+<a name="line373">373: </a>            ++i;
+<a name="line374">374: </a>            <font color="#4169E1">goto</font> L90;
+<a name="line375">375: </a>          } <font color="#4169E1">else</font> {
+<a name="line376">376: </a>            indxp[k2 + i - 2] = pj + 1;
+<a name="line377">377: </a>            indxq[k2 + i - 2] = pj + 1;
+<a name="line378">378: </a>          }
+<a name="line379">379: </a>        } <font color="#4169E1">else</font> {
+<a name="line380">380: </a>          indxp[k2 + i - 2] = pj + 1;
+<a name="line381">381: </a>          indxq[k2 + i - 2] = pj + 1;
+<a name="line382">382: </a>        }
+<a name="line383">383: </a>        pj = nj;
+<a name="line384">384: </a>        factmp = -1;
+<a name="line385">385: </a>      } <font color="#4169E1">else</font> {
+
+<a name="line387">387: </a>      <font color="#B22222">/* do not deflate */</font>
+<a name="line388">388: </a>      ++(*k);
+<a name="line389">389: </a>      dlamda[*k-1] = d[pj];
+<a name="line390">390: </a>      w[*k-1] = z[pj];
+<a name="line391">391: </a>      indxp[*k-1] = pj + 1;
+<a name="line392">392: </a>      indxq[*k-1] = pj + 1;
+<a name="line393">393: </a>      factmp = 1;
+<a name="line394">394: </a>      pj = nj;
+<a name="line395">395: </a>    }
+<a name="line396">396: </a>  }
+<a name="line397">397: </a>  <font color="#4169E1">goto</font> L80;
+<a name="line398">398: </a><strong><font color="#FF0000">L100:</font></strong>
+
+<a name="line400">400: </a>  <font color="#B22222">/* Record the last eigenvalue. */</font>
+<a name="line401">401: </a>  ++(*k);
+<a name="line402">402: </a>  dlamda[*k-1] = d[pj];
+<a name="line403">403: </a>  w[*k-1] = z[pj];
+<a name="line404">404: </a>  indxp[*k-1] = pj+1;
+<a name="line405">405: </a>  indxq[*k-1] = (pj+1) * factmp;
+
+<a name="line407">407: </a>  <font color="#B22222">/* Count up the total number of the various types of columns, then */</font>
+<a name="line408">408: </a>  <font color="#B22222">/* form a permutation which positions the four column types into */</font>
+<a name="line409">409: </a>  <font color="#B22222">/* four uniform groups (although one or more of these groups may be */</font>
+<a name="line410">410: </a>  <font color="#B22222">/* empty). */</font>
+
+<a name="line412">412: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; 4; ++j) ctot[j] = 0;
+<a name="line413">413: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; n; ++j) {
+<a name="line414">414: </a>    ct = coltyp[j];
+<a name="line415">415: </a>    ++ctot[ct-1];
+<a name="line416">416: </a>  }
+
+<a name="line418">418: </a>  <font color="#B22222">/* PSM(*) = Position in SubMatrix (of types 1 through 4) */</font>
+<a name="line419">419: </a>  psm[0] = 1;
+<a name="line420">420: </a>  psm[1] = ctot[0] + 1;
+<a name="line421">421: </a>  psm[2] = psm[1] + ctot[1];
+<a name="line422">422: </a>  psm[3] = psm[2] + ctot[2];
+<a name="line423">423: </a>  *k = n - ctot[3];
+
+<a name="line425">425: </a>  <font color="#B22222">/* Fill out the INDXC array so that the permutation which it induces */</font>
+<a name="line426">426: </a>  <font color="#B22222">/* will place all type-1 columns first, all type-2 columns next, */</font>
+<a name="line427">427: </a>  <font color="#B22222">/* then all type-3's, and finally all type-4's. */</font>
+
+<a name="line429">429: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; n; ++j) {
+<a name="line430">430: </a>    js = indxp[j];
+<a name="line431">431: </a>    ct = coltyp[js-1];
+<a name="line432">432: </a>    indx[psm[ct - 1]-1] = js;
+<a name="line433">433: </a>    indxc[psm[ct - 1]-1] = j+1;
+<a name="line434">434: </a>    ++psm[ct - 1];
+<a name="line435">435: </a>  }
+
+<a name="line437">437: </a>  <font color="#B22222">/* Sort the eigenvalues and corresponding eigenvectors into DLAMDA */</font>
+<a name="line438">438: </a>  <font color="#B22222">/* and Q2 respectively.  The eigenvalues/vectors which were not */</font>
+<a name="line439">439: </a>  <font color="#B22222">/* deflated go into the first K slots of DLAMDA and Q2 respectively, */</font>
+<a name="line440">440: </a>  <font color="#B22222">/* while those which were deflated go into the last N - K slots. */</font>
+
+<a name="line442">442: </a>  i = 0;
+<a name="line443">443: </a>  iq1 = 0;
+<a name="line444">444: </a>  iq2 = (ctot[0] + ctot[1]) * n1;
+<a name="line445">445: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; ctot[0]; ++j) {
+<a name="line446">446: </a>    js = indx[i];
+<a name="line447">447: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n1, &amp;q[(js-1)*ldq], &amp;one, &amp;q2[iq1], &amp;one));
+<a name="line448">448: </a>    z[i] = d[js-1];
+<a name="line449">449: </a>    ++i;
+<a name="line450">450: </a>    iq1 += n1;
+<a name="line451">451: </a>  }
+
+<a name="line453">453: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; ctot[1]; ++j) {
+<a name="line454">454: </a>    js = indx[i];
+<a name="line455">455: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n1, &amp;q[(js-1)*ldq], &amp;one, &amp;q2[iq1], &amp;one));
+<a name="line456">456: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n2, &amp;q[n1+(js-1)*ldq], &amp;one, &amp;q2[iq2], &amp;one));
+<a name="line457">457: </a>    z[i] = d[js-1];
+<a name="line458">458: </a>    ++i;
+<a name="line459">459: </a>    iq1 += n1;
+<a name="line460">460: </a>    iq2 += n2;
+<a name="line461">461: </a>  }
+
+<a name="line463">463: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; ctot[2]; ++j) {
+<a name="line464">464: </a>    js = indx[i];
+<a name="line465">465: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n2, &amp;q[n1+(js-1)*ldq], &amp;one, &amp;q2[iq2], &amp;one));
+<a name="line466">466: </a>    z[i] = d[js-1];
+<a name="line467">467: </a>    ++i;
+<a name="line468">468: </a>    iq2 += n2;
+<a name="line469">469: </a>  }
+
+<a name="line471">471: </a>  iq1 = iq2;
+<a name="line472">472: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; ctot[3]; ++j) {
+<a name="line473">473: </a>    js = indx[i];
+<a name="line474">474: </a>    PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;n, &amp;q[(js-1)*ldq], &amp;one, &amp;q2[iq2], &amp;one));
+<a name="line475">475: </a>    iq2 += n;
+<a name="line476">476: </a>    z[i] = d[js-1];
+<a name="line477">477: </a>    ++i;
+<a name="line478">478: </a>  }
+
+<a name="line480">480: </a>  <font color="#B22222">/* The deflated eigenvalues and their corresponding vectors go back */</font>
+<a name="line481">481: </a>  <font color="#B22222">/* into the last N - K slots of D and Q respectively. */</font>
+
+<a name="line483">483: </a>  <font color="#4169E1">for</font> (j=0;j&lt;ctot[3];j++) <font color="#4169E1">for</font> (i=0;i&lt;n;i++) q[i+(j+*k)*ldq] = q2[iq1+i+j*n];
+<a name="line484">484: </a>  i1 = n - *k;
+<a name="line485">485: </a>  PetscStackCallBLAS(<font color="#666666">"BLAScopy"</font>,BLAScopy_(&amp;i1, &amp;z[*k], &amp;one, &amp;d[*k], &amp;one));
+
+<a name="line487">487: </a>  <font color="#B22222">/* Copy CTOT into COLTYP for referencing in DLAED3M. */</font>
+
+<a name="line489">489: </a>  <font color="#4169E1">for</font> (j = 0; j &lt; 4; ++j) coltyp[j] = ctot[j];
+<a name="line490">490: </a>  <font color="#4169E1">return</font>(0);
+<a name="line491">491: </a>}
+
+</pre>
+</body>
+
+</html>

@@ -1,0 +1,523 @@
+<center><a href="epsdefault.c">Actual source code: epsdefault.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/interface/epsdefault.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:51+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/interface/epsdefault.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   This file contains some simple default routines for common operations</font>
+<a name="line12"> 12: </a><font color="#B22222">*/</font>
+
+<a name="line14"> 14: </a> #include <A href="../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+<a name="line15"> 15: </a> #include <A href="../../../include/slepcvec.h.html">&lt;slepcvec.h&gt;</A>
+
+<a name="line17"> 17: </a><strong><font color="#4169E1"><a name="EPSBackTransform_Default"></a>PetscErrorCode EPSBackTransform_Default(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line18"> 18: </a>{
+
+<a name="line22"> 22: </a>  <a href="../../../docs/manualpages/ST/STBackTransform.html#STBackTransform">STBackTransform</a>(eps-&gt;st,eps-&gt;nconv,eps-&gt;eigr,eps-&gt;eigi);
+<a name="line23"> 23: </a>  <font color="#4169E1">return</font>(0);
+<a name="line24"> 24: </a>}
+
+<a name="line26"> 26: </a><font color="#B22222">/*</font>
+<a name="line27"> 27: </a><font color="#B22222">  EPSComputeVectors_Hermitian - Copies the Lanczos vectors as eigenvectors</font>
+<a name="line28"> 28: </a><font color="#B22222">  using purification for generalized eigenproblems.</font>
+<a name="line29"> 29: </a><font color="#B22222"> */</font>
+<a name="line30"> 30: </a><strong><font color="#4169E1"><a name="EPSComputeVectors_Hermitian"></a>PetscErrorCode EPSComputeVectors_Hermitian(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line31"> 31: </a>{
+<a name="line33"> 33: </a>  PetscInt       i;
+<a name="line34"> 34: </a>  PetscScalar    dot;
+<a name="line35"> 35: </a>  PetscReal      norm;
+<a name="line36"> 36: </a>  PetscBool      iscayley;
+<a name="line37"> 37: </a>  Mat            B;
+<a name="line38"> 38: </a>  Vec            w,x;
+
+<a name="line41"> 41: </a>  <font color="#4169E1">if</font> (eps-&gt;purify) {
+<a name="line42"> 42: </a>    EPS_Purify(eps,eps-&gt;nconv);
+<a name="line43"> 43: </a>    <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv;i++) {
+<a name="line44"> 44: </a>      <a href="../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(eps-&gt;V,i,NORM_2,&amp;norm);
+<a name="line45"> 45: </a>      <a href="../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;V,i,1.0/norm);
+<a name="line46"> 46: </a>    }
+<a name="line47"> 47: </a>  } <font color="#4169E1">else</font> {
+<a name="line48"> 48: </a>    <font color="#B22222">/* In the case of Cayley transform, eigenvectors need to be B-normalized */</font>
+<a name="line49"> 49: </a>    PetscObjectTypeCompare((PetscObject)eps-&gt;st,STCAYLEY,&amp;iscayley);
+<a name="line50"> 50: </a>    <font color="#4169E1">if</font> (iscayley &amp;&amp; eps-&gt;isgeneralized) {
+<a name="line51"> 51: </a>      <a href="../../../docs/manualpages/ST/STGetMatrix.html#STGetMatrix">STGetMatrix</a>(eps-&gt;st,1,&amp;B);
+<a name="line52"> 52: </a>      MatCreateVecs(B,NULL,&amp;w);
+<a name="line53"> 53: </a>      <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv;i++) {
+<a name="line54"> 54: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;x);
+<a name="line55"> 55: </a>        MatMult(B,x,w);
+<a name="line56"> 56: </a>        VecDot(w,x,&amp;dot);
+<a name="line57"> 57: </a>        VecScale(x,1.0/PetscSqrtScalar(dot));
+<a name="line58"> 58: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;x);
+<a name="line59"> 59: </a>      }
+<a name="line60"> 60: </a>      VecDestroy(&amp;w);
+<a name="line61"> 61: </a>    }
+<a name="line62"> 62: </a>  }
+<a name="line63"> 63: </a>  <font color="#4169E1">return</font>(0);
+<a name="line64"> 64: </a>}
+
+<a name="line66"> 66: </a><font color="#B22222">/*</font>
+<a name="line67"> 67: </a><font color="#B22222">  EPSComputeVectors_Indefinite - similar to the Schur version but</font>
+<a name="line68"> 68: </a><font color="#B22222">  for indefinite problems</font>
+<a name="line69"> 69: </a><font color="#B22222"> */</font>
+<a name="line70"> 70: </a><strong><font color="#4169E1"><a name="EPSComputeVectors_Indefinite"></a>PetscErrorCode EPSComputeVectors_Indefinite(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line71"> 71: </a>{
+<a name="line73"> 73: </a>  PetscInt       n,i;
+<a name="line74"> 74: </a>  Mat            X;
+<a name="line75"> 75: </a>  Vec            v;
+<a name="line76"> 76: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line77"> 77: </a>  Vec            v1;
+<a name="line78"> 78: </a><font color="#A020F0">#endif</font>
+
+<a name="line81"> 81: </a>  <a href="../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(eps-&gt;ds,&amp;n,NULL,NULL,NULL,NULL);
+<a name="line82"> 82: </a>  <a href="../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line83"> 83: </a>  <a href="../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;X);
+<a name="line84"> 84: </a>  <a href="../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,n);
+<a name="line85"> 85: </a>  <a href="../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;V,X,0,n);
+<a name="line86"> 86: </a>  MatDestroy(&amp;X);
+
+<a name="line88"> 88: </a>  <font color="#B22222">/* purification */</font>
+<a name="line89"> 89: </a>  <font color="#4169E1">if</font> (eps-&gt;purify) { EPS_Purify(eps,eps-&gt;nconv); }
+
+<a name="line91"> 91: </a>  <font color="#B22222">/* normalization */</font>
+<a name="line92"> 92: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line93"> 93: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line94"> 94: </a>    <font color="#4169E1">if</font> (eps-&gt;eigi[i] != 0.0) {
+<a name="line95"> 95: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line96"> 96: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i+1,&amp;v1);
+<a name="line97"> 97: </a>      <a href="../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(v,v1,PETSC_TRUE,NULL);
+<a name="line98"> 98: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line99"> 99: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i+1,&amp;v1);
+<a name="line100">100: </a>      i++;
+<a name="line101">101: </a>    } <font color="#4169E1">else</font>
+<a name="line102">102: </a><font color="#A020F0">#endif</font>
+<a name="line103">103: </a>    {
+<a name="line104">104: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line105">105: </a>      VecNormalize(v,NULL);
+<a name="line106">106: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line107">107: </a>    }
+<a name="line108">108: </a>  }
+<a name="line109">109: </a>  <font color="#4169E1">return</font>(0);
+<a name="line110">110: </a>}
+
+<a name="line112">112: </a><font color="#B22222">/*</font>
+<a name="line113">113: </a><font color="#B22222">  EPSComputeVectors_Twosided - Adjust left eigenvectors in generalized problems: y = B^-* y.</font>
+<a name="line114">114: </a><font color="#B22222"> */</font>
+<a name="line115">115: </a><strong><font color="#4169E1"><a name="EPSComputeVectors_Twosided"></a>PetscErrorCode EPSComputeVectors_Twosided(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line116">116: </a>{
+<a name="line118">118: </a>  PetscInt       i;
+<a name="line119">119: </a>  Vec            w,y;
+
+<a name="line122">122: </a>  <font color="#4169E1">if</font> (!eps-&gt;twosided || !eps-&gt;isgeneralized) <font color="#4169E1">return</font>(0);
+<a name="line123">123: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(eps,1);
+<a name="line124">124: </a>  w = eps-&gt;work[0];
+<a name="line125">125: </a>  <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv;i++) {
+<a name="line126">126: </a>    <a href="../../../docs/manualpages/BV/BVCopyVec.html#BVCopyVec">BVCopyVec</a>(eps-&gt;W,i,w);
+<a name="line127">127: </a>    VecConjugate(w);
+<a name="line128">128: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;W,i,&amp;y);
+<a name="line129">129: </a>    <a href="../../../docs/manualpages/ST/STMatSolveTranspose.html#STMatSolveTranspose">STMatSolveTranspose</a>(eps-&gt;st,w,y);
+<a name="line130">130: </a>    VecConjugate(y);
+<a name="line131">131: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;W,i,&amp;y);
+<a name="line132">132: </a>  }
+<a name="line133">133: </a>  <font color="#4169E1">return</font>(0);
+<a name="line134">134: </a>}
+
+<a name="line136">136: </a><font color="#B22222">/*</font>
+<a name="line137">137: </a><font color="#B22222">  EPSComputeVectors_Schur - Compute eigenvectors from the vectors</font>
+<a name="line138">138: </a><font color="#B22222">  provided by the eigensolver. This version is intended for solvers</font>
+<a name="line139">139: </a><font color="#B22222">  that provide Schur vectors. Given the partial Schur decomposition</font>
+<a name="line140">140: </a><font color="#B22222">  OP*V=V*T, the following steps are performed:</font>
+<a name="line141">141: </a><font color="#B22222">      1) compute eigenvectors of T: T*Z=Z*D</font>
+<a name="line142">142: </a><font color="#B22222">      2) compute eigenvectors of OP: X=V*Z</font>
+<a name="line143">143: </a><font color="#B22222"> */</font>
+<a name="line144">144: </a><strong><font color="#4169E1"><a name="EPSComputeVectors_Schur"></a>PetscErrorCode EPSComputeVectors_Schur(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line145">145: </a>{
+<a name="line147">147: </a>  PetscInt       n,i;
+<a name="line148">148: </a>  Mat            Z;
+<a name="line149">149: </a>  Vec            z,v;
+<a name="line150">150: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line151">151: </a>  Vec            v1;
+<a name="line152">152: </a><font color="#A020F0">#endif</font>
+
+<a name="line155">155: </a>  <font color="#4169E1">if</font> (eps-&gt;ishermitian) {
+<a name="line156">156: </a>    <font color="#4169E1">if</font> (eps-&gt;isgeneralized &amp;&amp; !eps-&gt;ispositive) {
+<a name="line157">157: </a>       EPSComputeVectors_Indefinite(eps);
+<a name="line158">158: </a>    } <font color="#4169E1">else</font> {
+<a name="line159">159: </a>      EPSComputeVectors_Hermitian(eps);
+<a name="line160">160: </a>    }
+<a name="line161">161: </a>    <font color="#4169E1">return</font>(0);
+<a name="line162">162: </a>  }
+<a name="line163">163: </a>  <a href="../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(eps-&gt;ds,&amp;n,NULL,NULL,NULL,NULL);
+
+<a name="line165">165: </a>  <font color="#B22222">/* right eigenvectors */</font>
+<a name="line166">166: </a>  <a href="../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+
+<a name="line168">168: </a>  <font color="#B22222">/* V = V * Z */</font>
+<a name="line169">169: </a>  <a href="../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;ds,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;Z);
+<a name="line170">170: </a>  <a href="../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;V,0,n);
+<a name="line171">171: </a>  <a href="../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;V,Z,0,n);
+<a name="line172">172: </a>  MatDestroy(&amp;Z);
+
+<a name="line174">174: </a>  <font color="#B22222">/* Purify eigenvectors */</font>
+<a name="line175">175: </a>  <font color="#4169E1">if</font> (eps-&gt;purify) { EPS_Purify(eps,eps-&gt;nconv); }
+
+<a name="line177">177: </a>  <font color="#B22222">/* Fix eigenvectors if balancing was used */</font>
+<a name="line178">178: </a>  <font color="#4169E1">if</font> (eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D) {
+<a name="line179">179: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line180">180: </a>      <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;z);
+<a name="line181">181: </a>      VecPointwiseDivide(z,z,eps-&gt;D);
+<a name="line182">182: </a>      <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;z);
+<a name="line183">183: </a>    }
+<a name="line184">184: </a>  }
+
+<a name="line186">186: </a>  <font color="#B22222">/* normalize eigenvectors (when using purification or balancing) */</font>
+<a name="line187">187: </a>  <font color="#4169E1">if</font> (eps-&gt;purify || (eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D)) {
+<a name="line188">188: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line189">189: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line190">190: </a>      <font color="#4169E1">if</font> (eps-&gt;eigi[i] != 0.0) {
+<a name="line191">191: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line192">192: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i+1,&amp;v1);
+<a name="line193">193: </a>        <a href="../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(v,v1,PETSC_TRUE,NULL);
+<a name="line194">194: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line195">195: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i+1,&amp;v1);
+<a name="line196">196: </a>        i++;
+<a name="line197">197: </a>      } <font color="#4169E1">else</font>
+<a name="line198">198: </a><font color="#A020F0">#endif</font>
+<a name="line199">199: </a>      {
+<a name="line200">200: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line201">201: </a>        VecNormalize(v,NULL);
+<a name="line202">202: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,i,&amp;v);
+<a name="line203">203: </a>      }
+<a name="line204">204: </a>    }
+<a name="line205">205: </a>  }
+
+<a name="line207">207: </a>  <font color="#B22222">/* left eigenvectors from eps-&gt;dsts */</font>
+<a name="line208">208: </a>  <font color="#4169E1">if</font> (eps-&gt;twosided) {
+<a name="line209">209: </a>    <a href="../../../docs/manualpages/DS/DSVectors.html#DSVectors">DSVectors</a>(eps-&gt;dsts,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,NULL,NULL);
+<a name="line210">210: </a>    <font color="#B22222">/* W = W * Z */</font>
+<a name="line211">211: </a>    <a href="../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(eps-&gt;dsts,<a href="../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;Z);
+<a name="line212">212: </a>    <a href="../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(eps-&gt;W,0,n);
+<a name="line213">213: </a>    <a href="../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(eps-&gt;W,Z,0,n);
+<a name="line214">214: </a>    MatDestroy(&amp;Z);
+<a name="line215">215: </a>    <font color="#B22222">/* Fix left eigenvectors if balancing was used */</font>
+<a name="line216">216: </a>    <font color="#4169E1">if</font> (eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D) {
+<a name="line217">217: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line218">218: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;W,i,&amp;z);
+<a name="line219">219: </a>        VecPointwiseMult(z,z,eps-&gt;D);
+<a name="line220">220: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;W,i,&amp;z);
+<a name="line221">221: </a>      }
+<a name="line222">222: </a>    }
+<a name="line223">223: </a>    EPSComputeVectors_Twosided(eps);
+<a name="line224">224: </a>    <font color="#B22222">/* normalize */</font>
+<a name="line225">225: </a>    <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv;i++) {
+<a name="line226">226: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line227">227: </a>      <font color="#4169E1">if</font> (eps-&gt;eigi[i]!=0.0) {   <font color="#B22222">/* first eigenvalue of a complex conjugate pair */</font>
+<a name="line228">228: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;W,i,&amp;v);
+<a name="line229">229: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;W,i+1,&amp;v1);
+<a name="line230">230: </a>        <a href="../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(v,v1,PETSC_TRUE,NULL);
+<a name="line231">231: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;W,i,&amp;v);
+<a name="line232">232: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;W,i+1,&amp;v1);
+<a name="line233">233: </a>        i++;
+<a name="line234">234: </a>      } <font color="#4169E1">else</font>   <font color="#B22222">/* real eigenvalue */</font>
+<a name="line235">235: </a><font color="#A020F0">#endif</font>
+<a name="line236">236: </a>      {
+<a name="line237">237: </a>        <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;W,i,&amp;v);
+<a name="line238">238: </a>        VecNormalize(v,NULL);
+<a name="line239">239: </a>        <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;W,i,&amp;v);
+<a name="line240">240: </a>      }
+<a name="line241">241: </a>    }
+<a name="line242">242: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line243">243: </a>    <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nconv-1;i++) {
+<a name="line244">244: </a>      <font color="#4169E1">if</font> (eps-&gt;eigi[i] != 0.0) {
+<a name="line245">245: </a>        <font color="#4169E1">if</font> (eps-&gt;eigi[i] &gt; 0.0) { <a href="../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(eps-&gt;W,i+1,-1.0); }
+<a name="line246">246: </a>        i++;
+<a name="line247">247: </a>      }
+<a name="line248">248: </a>    }
+<a name="line249">249: </a><font color="#A020F0">#endif</font>
+<a name="line250">250: </a>  }
+<a name="line251">251: </a>  <font color="#4169E1">return</font>(0);
+<a name="line252">252: </a>}
+
+<a name="line254">254: </a><font color="#B22222">/*@</font>
+<a name="line255">255: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a> - Sets a number of work vectors into an <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> object.</font>
+
+<a name="line257">257: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line259">259: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line260">260: </a><font color="#B22222">+  eps - eigensolver context</font>
+<a name="line261">261: </a><font color="#B22222">-  nw  - number of work vectors to allocate</font>
+
+<a name="line263">263: </a><font color="#B22222">   Developers Note:</font>
+<a name="line264">264: </a><font color="#B22222">   This is SLEPC_EXTERN because it may be required by user plugin <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a></font>
+<a name="line265">265: </a><font color="#B22222">   implementations.</font>
+
+<a name="line267">267: </a><font color="#B22222">   Level: developer</font>
+<a name="line268">268: </a><font color="#B22222">@*/</font>
+<a name="line269">269: </a><strong><font color="#4169E1"><a name="EPSSetWorkVecs"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt nw)</font></strong>
+<a name="line270">270: </a>{
+<a name="line272">272: </a>  Vec            t;
+
+<a name="line277">277: </a>  <font color="#4169E1">if</font> (nw &lt;= 0) SETERRQ1(PetscObjectComm((PetscObject)eps),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"nw must be &gt; 0: nw = %D"</font>,nw);
+<a name="line278">278: </a>  <font color="#4169E1">if</font> (eps-&gt;nwork &lt; nw) {
+<a name="line279">279: </a>    VecDestroyVecs(eps-&gt;nwork,&amp;eps-&gt;work);
+<a name="line280">280: </a>    eps-&gt;nwork = nw;
+<a name="line281">281: </a>    <a href="../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(eps-&gt;V,0,&amp;t);
+<a name="line282">282: </a>    VecDuplicateVecs(t,nw,&amp;eps-&gt;work);
+<a name="line283">283: </a>    <a href="../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(eps-&gt;V,0,&amp;t);
+<a name="line284">284: </a>    PetscLogObjectParents(eps,nw,eps-&gt;work);
+<a name="line285">285: </a>  }
+<a name="line286">286: </a>  <font color="#4169E1">return</font>(0);
+<a name="line287">287: </a>}
+
+<a name="line289">289: </a><font color="#B22222">/*</font>
+<a name="line290">290: </a><font color="#B22222">  EPSSetWhichEigenpairs_Default - Sets the default value for which,</font>
+<a name="line291">291: </a><font color="#B22222">  depending on the <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>.</font>
+<a name="line292">292: </a><font color="#B22222"> */</font>
+<a name="line293">293: </a><strong><font color="#4169E1"><a name="EPSSetWhichEigenpairs_Default"></a>PetscErrorCode EPSSetWhichEigenpairs_Default(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line294">294: </a>{
+<a name="line295">295: </a>  PetscBool      target;
+
+<a name="line299">299: </a>  PetscObjectTypeCompareAny((PetscObject)eps-&gt;st,&amp;target,STSINVERT,STCAYLEY,<font color="#666666">""</font>);
+<a name="line300">300: </a>  <font color="#4169E1">if</font> (target) eps-&gt;which = <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_TARGET_MAGNITUDE</a>;
+<a name="line301">301: </a>  <font color="#4169E1">else</font> eps-&gt;which = <a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_LARGEST_MAGNITUDE</a>;
+<a name="line302">302: </a>  <font color="#4169E1">return</font>(0);
+<a name="line303">303: </a>}
+
+<a name="line305">305: </a><font color="#B22222">/*</font>
+<a name="line306">306: </a><font color="#B22222">  EPSConvergedRelative - Checks convergence relative to the eigenvalue.</font>
+<a name="line307">307: </a><font color="#B22222">*/</font>
+<a name="line308">308: </a><strong><font color="#4169E1"><a name="EPSConvergedRelative"></a>PetscErrorCode EPSConvergedRelative(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscScalar eigr,PetscScalar eigi,PetscReal res,PetscReal *errest,void *ctx)</font></strong>
+<a name="line309">309: </a>{
+<a name="line310">310: </a>  PetscReal w;
+
+<a name="line313">313: </a>  w = SlepcAbsEigenvalue(eigr,eigi);
+<a name="line314">314: </a>  *errest = res/w;
+<a name="line315">315: </a>  <font color="#4169E1">return</font>(0);
+<a name="line316">316: </a>}
+
+<a name="line318">318: </a><font color="#B22222">/*</font>
+<a name="line319">319: </a><font color="#B22222">  EPSConvergedAbsolute - Checks convergence absolutely.</font>
+<a name="line320">320: </a><font color="#B22222">*/</font>
+<a name="line321">321: </a><strong><font color="#4169E1"><a name="EPSConvergedAbsolute"></a>PetscErrorCode EPSConvergedAbsolute(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscScalar eigr,PetscScalar eigi,PetscReal res,PetscReal *errest,void *ctx)</font></strong>
+<a name="line322">322: </a>{
+<a name="line324">324: </a>  *errest = res;
+<a name="line325">325: </a>  <font color="#4169E1">return</font>(0);
+<a name="line326">326: </a>}
+
+<a name="line328">328: </a><font color="#B22222">/*</font>
+<a name="line329">329: </a><font color="#B22222">  EPSConvergedNorm - Checks convergence relative to the eigenvalue and</font>
+<a name="line330">330: </a><font color="#B22222">  the matrix norms.</font>
+<a name="line331">331: </a><font color="#B22222">*/</font>
+<a name="line332">332: </a><strong><font color="#4169E1"><a name="EPSConvergedNorm"></a>PetscErrorCode EPSConvergedNorm(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscScalar eigr,PetscScalar eigi,PetscReal res,PetscReal *errest,void *ctx)</font></strong>
+<a name="line333">333: </a>{
+<a name="line334">334: </a>  PetscReal w;
+
+<a name="line337">337: </a>  w = SlepcAbsEigenvalue(eigr,eigi);
+<a name="line338">338: </a>  *errest = res / (eps-&gt;nrma + w*eps-&gt;nrmb);
+<a name="line339">339: </a>  <font color="#4169E1">return</font>(0);
+<a name="line340">340: </a>}
+
+<a name="line342">342: </a><font color="#B22222">/*@C</font>
+<a name="line343">343: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a> - Default routine to determine whether the outer eigensolver</font>
+<a name="line344">344: </a><font color="#B22222">   iteration must be stopped.</font>
+
+<a name="line346">346: </a><font color="#B22222">   Collective on eps</font>
+
+<a name="line348">348: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line349">349: </a><font color="#B22222">+  eps    - eigensolver context obtained from <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>()</font>
+<a name="line350">350: </a><font color="#B22222">.  its    - current number of iterations</font>
+<a name="line351">351: </a><font color="#B22222">.  max_it - maximum number of iterations</font>
+<a name="line352">352: </a><font color="#B22222">.  nconv  - number of currently converged eigenpairs</font>
+<a name="line353">353: </a><font color="#B22222">.  nev    - number of requested eigenpairs</font>
+<a name="line354">354: </a><font color="#B22222">-  ctx    - context (not used here)</font>
+
+<a name="line356">356: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line357">357: </a><font color="#B22222">.  reason - result of the stopping test</font>
+
+<a name="line359">359: </a><font color="#B22222">   Notes:</font>
+<a name="line360">360: </a><font color="#B22222">   A positive value of reason indicates that the iteration has finished successfully</font>
+<a name="line361">361: </a><font color="#B22222">   (converged), and a negative value indicates an error condition (diverged). If</font>
+<a name="line362">362: </a><font color="#B22222">   the iteration needs to be continued, reason must be set to <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a></font>
+<a name="line363">363: </a><font color="#B22222">   (zero).</font>
+
+<a name="line365">365: </a><font color="#B22222">   <a href="../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a>() will stop if all requested eigenvalues are converged, or if</font>
+<a name="line366">366: </a><font color="#B22222">   the maximum number of iterations has been reached.</font>
+
+<a name="line368">368: </a><font color="#B22222">   Use <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>() to provide your own test instead of using this one.</font>
+
+<a name="line370">370: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line372">372: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/EPS/EPSSetStoppingTest.html#EPSSetStoppingTest">EPSSetStoppingTest</a>(), <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a>, <a href="../../../docs/manualpages/EPS/EPSGetConvergedReason.html#EPSGetConvergedReason">EPSGetConvergedReason</a>()</font>
+<a name="line373">373: </a><font color="#B22222">@*/</font>
+<a name="line374">374: </a><strong><font color="#4169E1"><a name="EPSStoppingBasic"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSStoppingBasic.html#EPSStoppingBasic">EPSStoppingBasic</a>(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscInt its,PetscInt max_it,PetscInt nconv,PetscInt nev,<a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a> *reason,void *ctx)</font></strong>
+<a name="line375">375: </a>{
+
+<a name="line379">379: </a>  *reason = <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_ITERATING</a>;
+<a name="line380">380: </a>  <font color="#4169E1">if</font> (nconv &gt;= nev) {
+<a name="line381">381: </a>    PetscInfo2(eps,<font color="#666666">"Linear eigensolver finished successfully: %D eigenpairs converged at iteration %D\n"</font>,nconv,its);
+<a name="line382">382: </a>    *reason = <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_CONVERGED_TOL</a>;
+<a name="line383">383: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (its &gt;= max_it) {
+<a name="line384">384: </a>    *reason = <a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPS_DIVERGED_ITS</a>;
+<a name="line385">385: </a>    PetscInfo1(eps,<font color="#666666">"Linear eigensolver iteration reached maximum number of iterations (%D)\n"</font>,its);
+<a name="line386">386: </a>  }
+<a name="line387">387: </a>  <font color="#4169E1">return</font>(0);
+<a name="line388">388: </a>}
+
+<a name="line390">390: </a><font color="#B22222">/*</font>
+<a name="line391">391: </a><font color="#B22222">  EPSComputeRitzVector - Computes the current Ritz vector.</font>
+
+<a name="line393">393: </a><font color="#B22222">  Simple case (complex scalars or real scalars with Zi=NULL):</font>
+<a name="line394">394: </a><font color="#B22222">    x = V*Zr  (V is a basis of nv vectors, Zr has length nv)</font>
+
+<a name="line396">396: </a><font color="#B22222">  Split case:</font>
+<a name="line397">397: </a><font color="#B22222">    x = V*Zr  y = V*Zi  (Zr and Zi have length nv)</font>
+<a name="line398">398: </a><font color="#B22222">*/</font>
+<a name="line399">399: </a><strong><font color="#4169E1"><a name="EPSComputeRitzVector"></a>PetscErrorCode EPSComputeRitzVector(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps,PetscScalar *Zr,PetscScalar *Zi,<a href="../../../docs/manualpages/BV/BV.html#BV">BV</a> V,Vec x,Vec y)</font></strong>
+<a name="line400">400: </a>{
+<a name="line402">402: </a>  PetscInt       l,k;
+<a name="line403">403: </a>  PetscReal      norm;
+<a name="line404">404: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line405">405: </a>  Vec            z;
+<a name="line406">406: </a><font color="#A020F0">#endif</font>
+
+<a name="line409">409: </a>  <font color="#B22222">/* compute eigenvector */</font>
+<a name="line410">410: </a>  <a href="../../../docs/manualpages/BV/BVGetActiveColumns.html#BVGetActiveColumns">BVGetActiveColumns</a>(V,&amp;l,&amp;k);
+<a name="line411">411: </a>  <a href="../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,0,k);
+<a name="line412">412: </a>  <a href="../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(V,1.0,0.0,x,Zr);
+
+<a name="line414">414: </a>  <font color="#B22222">/* purify eigenvector if necessary */</font>
+<a name="line415">415: </a>  <font color="#4169E1">if</font> (eps-&gt;purify) {
+<a name="line416">416: </a>    <a href="../../../docs/manualpages/ST/STApply.html#STApply">STApply</a>(eps-&gt;st,x,y);
+<a name="line417">417: </a>    <font color="#4169E1">if</font> (eps-&gt;ishermitian) {
+<a name="line418">418: </a>      <a href="../../../docs/manualpages/BV/BVNormVec.html#BVNormVec">BVNormVec</a>(eps-&gt;V,y,NORM_2,&amp;norm);
+<a name="line419">419: </a>    } <font color="#4169E1">else</font> {
+<a name="line420">420: </a>      VecNorm(y,NORM_2,&amp;norm);
+<a name="line421">421: </a>    }
+<a name="line422">422: </a>    VecScale(y,1.0/norm);
+<a name="line423">423: </a>    VecCopy(y,x);
+<a name="line424">424: </a>  }
+<a name="line425">425: </a>  <font color="#B22222">/* fix eigenvector if balancing is used */</font>
+<a name="line426">426: </a>  <font color="#4169E1">if</font> (!eps-&gt;ishermitian &amp;&amp; eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D) {
+<a name="line427">427: </a>    VecPointwiseDivide(x,x,eps-&gt;D);
+<a name="line428">428: </a>  }
+<a name="line429">429: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line430">430: </a>  <font color="#B22222">/* compute imaginary part of eigenvector */</font>
+<a name="line431">431: </a>  <font color="#4169E1">if</font> (Zi) {
+<a name="line432">432: </a>    <a href="../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(V,1.0,0.0,y,Zi);
+<a name="line433">433: </a>    <font color="#4169E1">if</font> (eps-&gt;ispositive) {
+<a name="line434">434: </a>      <a href="../../../docs/manualpages/BV/BVCreateVec.html#BVCreateVec">BVCreateVec</a>(V,&amp;z);
+<a name="line435">435: </a>      <a href="../../../docs/manualpages/ST/STApply.html#STApply">STApply</a>(eps-&gt;st,y,z);
+<a name="line436">436: </a>      VecNorm(z,NORM_2,&amp;norm);
+<a name="line437">437: </a>      VecScale(z,1.0/norm);
+<a name="line438">438: </a>      VecCopy(z,y);
+<a name="line439">439: </a>      VecDestroy(&amp;z);
+<a name="line440">440: </a>    }
+<a name="line441">441: </a>    <font color="#4169E1">if</font> (eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D) {
+<a name="line442">442: </a>      VecPointwiseDivide(y,y,eps-&gt;D);
+<a name="line443">443: </a>    }
+<a name="line444">444: </a>  } <font color="#4169E1">else</font>
+<a name="line445">445: </a><font color="#A020F0">#endif</font>
+<a name="line446">446: </a>  { VecSet(y,0.0); }
+
+<a name="line448">448: </a>  <font color="#B22222">/* normalize eigenvectors (when using balancing) */</font>
+<a name="line449">449: </a>  <font color="#4169E1">if</font> (eps-&gt;balance!=<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_NONE</a> &amp;&amp; eps-&gt;D) {
+<a name="line450">450: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line451">451: </a>    <font color="#4169E1">if</font> (Zi) {
+<a name="line452">452: </a>      <a href="../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(x,y,PETSC_TRUE,NULL);
+<a name="line453">453: </a>    } <font color="#4169E1">else</font>
+<a name="line454">454: </a><font color="#A020F0">#endif</font>
+<a name="line455">455: </a>    {
+<a name="line456">456: </a>      VecNormalize(x,NULL);
+<a name="line457">457: </a>    }
+<a name="line458">458: </a>  }
+<a name="line459">459: </a>  <a href="../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(V,l,k);
+<a name="line460">460: </a>  <font color="#4169E1">return</font>(0);
+<a name="line461">461: </a>}
+
+<a name="line463">463: </a><font color="#B22222">/*</font>
+<a name="line464">464: </a><font color="#B22222">  EPSBuildBalance_Krylov - uses a Krylov subspace method to compute the</font>
+<a name="line465">465: </a><font color="#B22222">  diagonal matrix to be applied for balancing in non-Hermitian problems.</font>
+<a name="line466">466: </a><font color="#B22222">*/</font>
+<a name="line467">467: </a><strong><font color="#4169E1"><a name="EPSBuildBalance_Krylov"></a>PetscErrorCode EPSBuildBalance_Krylov(<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> eps)</font></strong>
+<a name="line468">468: </a>{
+<a name="line469">469: </a>  Vec               z,p,r;
+<a name="line470">470: </a>  PetscInt          i,j;
+<a name="line471">471: </a>  PetscReal         norma;
+<a name="line472">472: </a>  PetscScalar       *pz,*pD;
+<a name="line473">473: </a>  const PetscScalar *pr,*pp;
+<a name="line474">474: </a>  PetscRandom       rand;
+<a name="line475">475: </a>  PetscErrorCode    ierr;
+
+<a name="line478">478: </a>  <a href="../../../docs/manualpages/EPS/EPSSetWorkVecs.html#EPSSetWorkVecs">EPSSetWorkVecs</a>(eps,3);
+<a name="line479">479: </a>  <a href="../../../docs/manualpages/BV/BVGetRandomContext.html#BVGetRandomContext">BVGetRandomContext</a>(eps-&gt;V,&amp;rand);
+<a name="line480">480: </a>  r = eps-&gt;work[0];
+<a name="line481">481: </a>  p = eps-&gt;work[1];
+<a name="line482">482: </a>  z = eps-&gt;work[2];
+<a name="line483">483: </a>  VecSet(eps-&gt;D,1.0);
+
+<a name="line485">485: </a>  <font color="#4169E1">for</font> (j=0;j&lt;eps-&gt;balance_its;j++) {
+
+<a name="line487">487: </a>    <font color="#B22222">/* Build a random vector of +-1's */</font>
+<a name="line488">488: </a>    VecSetRandom(z,rand);
+<a name="line489">489: </a>    VecGetArray(z,&amp;pz);
+<a name="line490">490: </a>    <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nloc;i++) {
+<a name="line491">491: </a>      <font color="#4169E1">if</font> (PetscRealPart(pz[i])&lt;0.5) pz[i]=-1.0;
+<a name="line492">492: </a>      <font color="#4169E1">else</font> pz[i]=1.0;
+<a name="line493">493: </a>    }
+<a name="line494">494: </a>    VecRestoreArray(z,&amp;pz);
+
+<a name="line496">496: </a>    <font color="#B22222">/* Compute p=DA(D\z) */</font>
+<a name="line497">497: </a>    VecPointwiseDivide(r,z,eps-&gt;D);
+<a name="line498">498: </a>    <a href="../../../docs/manualpages/ST/STApply.html#STApply">STApply</a>(eps-&gt;st,r,p);
+<a name="line499">499: </a>    VecPointwiseMult(p,p,eps-&gt;D);
+<a name="line500">500: </a>    <font color="#4169E1">if</font> (eps-&gt;balance == <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_TWOSIDE</a>) {
+<a name="line501">501: </a>      <font color="#4169E1">if</font> (j==0) {
+<a name="line502">502: </a>        <font color="#B22222">/* Estimate the matrix inf-norm */</font>
+<a name="line503">503: </a>        VecAbs(p);
+<a name="line504">504: </a>        VecMax(p,NULL,&amp;norma);
+<a name="line505">505: </a>      }
+<a name="line506">506: </a>      <font color="#B22222">/* Compute r=D\(A'Dz) */</font>
+<a name="line507">507: </a>      VecPointwiseMult(z,z,eps-&gt;D);
+<a name="line508">508: </a>      <a href="../../../docs/manualpages/ST/STApplyHermitianTranspose.html#STApplyHermitianTranspose">STApplyHermitianTranspose</a>(eps-&gt;st,z,r);
+<a name="line509">509: </a>      VecPointwiseDivide(r,r,eps-&gt;D);
+<a name="line510">510: </a>    }
+
+<a name="line512">512: </a>    <font color="#B22222">/* Adjust values of D */</font>
+<a name="line513">513: </a>    VecGetArrayRead(r,&amp;pr);
+<a name="line514">514: </a>    VecGetArrayRead(p,&amp;pp);
+<a name="line515">515: </a>    VecGetArray(eps-&gt;D,&amp;pD);
+<a name="line516">516: </a>    <font color="#4169E1">for</font> (i=0;i&lt;eps-&gt;nloc;i++) {
+<a name="line517">517: </a>      <font color="#4169E1">if</font> (eps-&gt;balance == <a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPS_BALANCE_TWOSIDE</a>) {
+<a name="line518">518: </a>        <font color="#4169E1">if</font> (PetscAbsScalar(pp[i])&gt;eps-&gt;balance_cutoff*norma &amp;&amp; pr[i]!=0.0)
+<a name="line519">519: </a>          pD[i] *= PetscSqrtReal(PetscAbsScalar(pr[i]/pp[i]));
+<a name="line520">520: </a>      } <font color="#4169E1">else</font> {
+<a name="line521">521: </a>        <font color="#4169E1">if</font> (pp[i]!=0.0) pD[i] /= PetscAbsScalar(pp[i]);
+<a name="line522">522: </a>      }
+<a name="line523">523: </a>    }
+<a name="line524">524: </a>    VecRestoreArrayRead(r,&amp;pr);
+<a name="line525">525: </a>    VecRestoreArrayRead(p,&amp;pp);
+<a name="line526">526: </a>    VecRestoreArray(eps-&gt;D,&amp;pD);
+<a name="line527">527: </a>  }
+<a name="line528">528: </a>  <font color="#4169E1">return</font>(0);
+<a name="line529">529: </a>}
+
+</pre>
+</body>
+
+</html>

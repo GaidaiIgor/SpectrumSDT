@@ -1,0 +1,311 @@
+<center><a href="test17f.F90">Actual source code: test17f.F90</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tests/test17f.F90.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:57+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tests/test17f.F90.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a>!
+<a name="line2">  2: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line3">  3: </a>!  SLEPc - Scalable Library <font color="#4169E1">for</font> Eigenvalue Problem Computations
+<a name="line4">  4: </a>!  Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain
+<a name="line5">  5: </a>!
+<a name="line6">  6: </a>!  This file is part of SLEPc.
+<a name="line7">  7: </a>!  SLEPc is distributed under a 2-clause BSD license (see LICENSE).
+<a name="line8">  8: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line9">  9: </a>!
+<a name="line10"> 10: </a>!  Description: Test Fortran interface of spectrum-slicing Krylov-Schur.
+<a name="line11"> 11: </a>!
+<a name="line12"> 12: </a>! ----------------------------------------------------------------------
+<a name="line13"> 13: </a>!
+<a name="line14"> 14: </a>      program main
+<a name="line15"> 15: </a> #include <A href="../../../include/slepc/finclude/slepceps.h.html">&lt;slepc/finclude/slepceps.h&gt;</A>
+<a name="line16"> 16: </a>      use slepceps
+<a name="line17"> 17: </a>      implicit none
+
+<a name="line19"> 19: </a><strong><font color="#228B22">#define MAXSUB 16</font></strong>
+<a name="line20"> 20: </a><strong><font color="#228B22">#define MAXSHI 16</font></strong>
+
+<a name="line22"> 22: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line23"> 23: </a>!     Declarations
+<a name="line24"> 24: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line25"> 25: </a>      Mat            A,B,As,Bs,Au
+<a name="line26"> 26: </a>      <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps
+<a name="line27"> 27: </a>      <a href="../../../docs/manualpages/ST/ST.html#ST">ST</a>             st
+<a name="line28"> 28: </a>      KSP            ksp
+<a name="line29"> 29: </a>      PC             pc
+<a name="line30"> 30: </a>      Vec            v
+<a name="line31"> 31: </a>      PetscScalar    value
+<a name="line32"> 32: </a>      PetscInt       n,m,i,j,k,Istart,Iend
+<a name="line33"> 33: </a>      PetscInt       nev,ncv,mpd,nval
+<a name="line34"> 34: </a>      PetscInt       row,col,nloc,nlocs,mlocs
+<a name="line35"> 35: </a>      PetscInt       II,npart,inertias(MAXSHI)
+<a name="line36"> 36: </a>      PetscBool      flg,lock
+<a name="line37"> 37: </a>      PetscMPIInt    size,rank
+<a name="line38"> 38: </a>      PetscReal      int0,int1,keep,subint(MAXSUB)
+<a name="line39"> 39: </a>      PetscReal      shifts(MAXSHI)
+<a name="line40"> 40: </a>      PetscScalar    eval,one,mone,zero
+<a name="line41"> 41: </a>      PetscErrorCode ierr
+<a name="line42"> 42: </a>      MPI_Comm       comm
+
+<a name="line44"> 44: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line45"> 45: </a>!     Beginning of program
+<a name="line46"> 46: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line48"> 48: </a>      call <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(PETSC_NULL_CHARACTER,ierr)
+<a name="line49"> 49: </a>      <font color="#4169E1">if</font> (ierr .ne. 0) then
+<a name="line50"> 50: </a>        print*,'<a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a> failed'
+<a name="line51"> 51: </a>        stop
+<a name="line52"> 52: </a>      endif
+<a name="line53"> 53: </a>      call <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PETSC_COMM_WORLD,size,ierr);CHKERRA(ierr)
+<a name="line54"> 54: </a>      call <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PETSC_COMM_WORLD,rank,ierr);CHKERRA(ierr)
+<a name="line55"> 55: </a>      n = 35
+<a name="line56"> 56: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-n',n,flg,ierr);CHKERRA(ierr)
+<a name="line57"> 57: </a>      m = n*n
+<a name="line58"> 58: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line59"> 59: </a>        write(*,100) n
+<a name="line60"> 60: </a>      endif
+<a name="line61"> 61: </a> 100  format (/'Spectrum-slicing test, n =',I3,' (Fortran)'/)
+
+<a name="line63"> 63: </a>      call MatCreate(PETSC_COMM_WORLD,A,ierr);CHKERRA(ierr)
+<a name="line64"> 64: </a>      call MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,m,m,ierr);CHKERRA(ierr)
+<a name="line65"> 65: </a>      call MatSetFromOptions(A,ierr);CHKERRA(ierr)
+<a name="line66"> 66: </a>      call MatSetUp(A,ierr);CHKERRA(ierr)
+<a name="line67"> 67: </a>      call MatCreate(PETSC_COMM_WORLD,B,ierr);CHKERRA(ierr)
+<a name="line68"> 68: </a>      call MatSetSizes(B,PETSC_DECIDE,PETSC_DECIDE,m,m,ierr);CHKERRA(ierr)
+<a name="line69"> 69: </a>      call MatSetFromOptions(B,ierr);CHKERRA(ierr)
+<a name="line70"> 70: </a>      call MatSetUp(B,ierr);CHKERRA(ierr)
+<a name="line71"> 71: </a>      call MatGetOwnershipRange(A,Istart,Iend,ierr);CHKERRA(ierr)
+<a name="line72"> 72: </a>      <font color="#4169E1">do</font> II=Istart,Iend-1
+<a name="line73"> 73: </a>        i = II/n
+<a name="line74"> 74: </a>        j = II-i*n
+<a name="line75"> 75: </a>        value = -1.0
+<a name="line76"> 76: </a>        row = II
+<a name="line77"> 77: </a>        <font color="#4169E1">if</font> (i&gt;0) then
+<a name="line78"> 78: </a>          col = II-n
+<a name="line79"> 79: </a>          call MatSetValue(A,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line80"> 80: </a>        endif
+<a name="line81"> 81: </a>        <font color="#4169E1">if</font> (i&lt;n-1) then
+<a name="line82"> 82: </a>          col = II+n
+<a name="line83"> 83: </a>          call MatSetValue(A,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line84"> 84: </a>        endif
+<a name="line85"> 85: </a>        <font color="#4169E1">if</font> (j&gt;0) then
+<a name="line86"> 86: </a>          col = II-1
+<a name="line87"> 87: </a>          call MatSetValue(A,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line88"> 88: </a>        endif
+<a name="line89"> 89: </a>        <font color="#4169E1">if</font> (j&lt;n-1) then
+<a name="line90"> 90: </a>          col = II+1
+<a name="line91"> 91: </a>          call MatSetValue(A,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line92"> 92: </a>        endif
+<a name="line93"> 93: </a>        col = II
+<a name="line94"> 94: </a>        value = 4.0
+<a name="line95"> 95: </a>        call MatSetValue(A,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line96"> 96: </a>        value = 2.0
+<a name="line97"> 97: </a>        call MatSetValue(B,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line98"> 98: </a>      enddo
+<a name="line99"> 99: </a>      <font color="#4169E1">if</font> (Istart .eq. 0) then
+<a name="line100">100: </a>        row = 0
+<a name="line101">101: </a>        col = 0
+<a name="line102">102: </a>        value = 6.0
+<a name="line103">103: </a>        call MatSetValue(B,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line104">104: </a>        row = 0
+<a name="line105">105: </a>        col = 1
+<a name="line106">106: </a>        value = -1.0
+<a name="line107">107: </a>        call MatSetValue(B,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line108">108: </a>        row = 1
+<a name="line109">109: </a>        col = 0
+<a name="line110">110: </a>        value = -1.0
+<a name="line111">111: </a>        call MatSetValue(B,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line112">112: </a>        row = 1
+<a name="line113">113: </a>        col = 1
+<a name="line114">114: </a>        value = 1.0
+<a name="line115">115: </a>        call MatSetValue(B,row,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line116">116: </a>      endif
+<a name="line117">117: </a>      call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line118">118: </a>      call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line119">119: </a>      call MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line120">120: </a>      call MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+
+<a name="line122">122: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line123">123: </a>!     Create eigensolver and set various options
+<a name="line124">124: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line126">126: </a>      call <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,eps,ierr);CHKERRA(ierr)
+<a name="line127">127: </a>      call <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,B,ierr);CHKERRA(ierr)
+<a name="line128">128: </a>      call <a href="../../../docs/manualpages/EPS/EPSSetProblemType.html#EPSSetProblemType">EPSSetProblemType</a>(eps,<a href="../../../docs/manualpages/EPS/EPSProblemType.html#EPSProblemType">EPS_GHEP</a>,ierr);CHKERRA(ierr)
+<a name="line129">129: </a>      call <a href="../../../docs/manualpages/EPS/EPSSetType.html#EPSSetType">EPSSetType</a>(eps,EPSKRYLOVSCHUR,ierr);CHKERRA(ierr)
+
+<a name="line131">131: </a>!     Set interval and other settings <font color="#4169E1">for</font> spectrum slicing
+
+<a name="line133">133: </a>      call <a href="../../../docs/manualpages/EPS/EPSSetWhichEigenpairs.html#EPSSetWhichEigenpairs">EPSSetWhichEigenpairs</a>(eps,<a href="../../../docs/manualpages/EPS/EPSWhich.html#EPSWhich">EPS_ALL</a>,ierr);CHKERRA(ierr)
+<a name="line134">134: </a>      int0 = 1.1
+<a name="line135">135: </a>      int1 = 1.3
+<a name="line136">136: </a>      call <a href="../../../docs/manualpages/EPS/EPSSetInterval.html#EPSSetInterval">EPSSetInterval</a>(eps,int0,int1,ierr);CHKERRA(ierr)
+<a name="line137">137: </a>      call <a href="../../../docs/manualpages/EPS/EPSGetST.html#EPSGetST">EPSGetST</a>(eps,st,ierr);CHKERRA(ierr)
+<a name="line138">138: </a>      call <a href="../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(st,STSINVERT,ierr);CHKERRA(ierr)
+<a name="line139">139: </a>      call <a href="../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(st,ksp,ierr);CHKERRA(ierr)
+<a name="line140">140: </a>      call KSPGetPC(ksp,pc,ierr);CHKERRA(ierr)
+<a name="line141">141: </a>      call KSPSetType(ksp,KSPPREONLY,ierr);CHKERRA(ierr)
+<a name="line142">142: </a>      call PCSetType(pc,PCCHOLESKY,ierr);CHKERRA(ierr)
+
+<a name="line144">144: </a>!     Test interface functions of Krylov-Schur solver
+
+<a name="line146">146: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetRestart.html#EPSKrylovSchurGetRestart">EPSKrylovSchurGetRestart</a>(eps,keep,ierr);CHKERRA(ierr)
+<a name="line147">147: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line148">148: </a>        write(*,110) keep
+<a name="line149">149: </a>      endif
+<a name="line150">150: </a> 110  format (' Restart parameter before changing = ',f7.4)
+<a name="line151">151: </a>      keep = 0.4
+<a name="line152">152: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetRestart.html#EPSKrylovSchurSetRestart">EPSKrylovSchurSetRestart</a>(eps,keep,ierr);CHKERRA(ierr)
+<a name="line153">153: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetRestart.html#EPSKrylovSchurGetRestart">EPSKrylovSchurGetRestart</a>(eps,keep,ierr);CHKERRA(ierr)
+<a name="line154">154: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line155">155: </a>        write(*,120) keep
+<a name="line156">156: </a>      endif
+<a name="line157">157: </a> 120  format (' ... changed to ',f7.4)
+
+<a name="line159">159: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetLocking.html#EPSKrylovSchurGetLocking">EPSKrylovSchurGetLocking</a>(eps,lock,ierr);CHKERRA(ierr)
+<a name="line160">160: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line161">161: </a>        write(*,130) lock
+<a name="line162">162: </a>      endif
+<a name="line163">163: </a> 130  format (' Locking flag before changing = ',L)
+<a name="line164">164: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetLocking.html#EPSKrylovSchurSetLocking">EPSKrylovSchurSetLocking</a>(eps,PETSC_FALSE,ierr);CHKERRA(ierr)
+<a name="line165">165: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetLocking.html#EPSKrylovSchurGetLocking">EPSKrylovSchurGetLocking</a>(eps,lock,ierr);CHKERRA(ierr)
+<a name="line166">166: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line167">167: </a>        write(*,140) lock
+<a name="line168">168: </a>      endif
+<a name="line169">169: </a> 140  format (' ... changed to ',L)
+
+<a name="line171">171: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetDimensions.html#EPSKrylovSchurGetDimensions">EPSKrylovSchurGetDimensions</a>(eps,nev,ncv,mpd,ierr);CHKERRA(ierr)
+<a name="line172">172: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line173">173: </a>        write(*,150) nev,ncv,mpd
+<a name="line174">174: </a>      endif
+<a name="line175">175: </a> 150  format (' Sub-solve dimensions before changing: nev=',I2,', ncv=',I2,', mpd=',I2)
+<a name="line176">176: </a>      nev = 30
+<a name="line177">177: </a>      ncv = 60
+<a name="line178">178: </a>      mpd = 60
+<a name="line179">179: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetDimensions.html#EPSKrylovSchurSetDimensions">EPSKrylovSchurSetDimensions</a>(eps,nev,ncv,mpd,ierr);CHKERRA(ierr)
+<a name="line180">180: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetDimensions.html#EPSKrylovSchurGetDimensions">EPSKrylovSchurGetDimensions</a>(eps,nev,ncv,mpd,ierr);CHKERRA(ierr)
+<a name="line181">181: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line182">182: </a>        write(*,160) nev,ncv,mpd
+<a name="line183">183: </a>      endif
+<a name="line184">184: </a> 160  format (' ... changed to: nev=',I2,', ncv=',I2,', mpd=',I2)
+
+<a name="line186">186: </a>      <font color="#4169E1">if</font> (size&gt;0) then
+<a name="line187">187: </a>        npart = size
+<a name="line188">188: </a>        call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetPartitions.html#EPSKrylovSchurSetPartitions">EPSKrylovSchurSetPartitions</a>(eps,npart,ierr);CHKERRA(ierr)
+<a name="line189">189: </a>        call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetPartitions.html#EPSKrylovSchurGetPartitions">EPSKrylovSchurGetPartitions</a>(eps,npart,ierr);CHKERRA(ierr)
+<a name="line190">190: </a>        <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line191">191: </a>          write(*,170) npart
+<a name="line192">192: </a>        endif
+<a name="line193">193: </a> 170    format (' Using ',I2,' partitions')
+<a name="line194">194: </a>        <font color="#4169E1">if</font> (npart&gt;MAXSUB) then; SETERRA(PETSC_COMM_SELF,1,'Too many subintervals'); endif
+
+<a name="line196">196: </a>        subint(1) = int0
+<a name="line197">197: </a>        subint(npart+1) = int1
+<a name="line198">198: </a>        <font color="#4169E1">do</font> i=2,npart
+<a name="line199">199: </a>          subint(i) = int0+(i-1)*(int1-int0)/npart
+<a name="line200">200: </a>        enddo
+<a name="line201">201: </a>        call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurSetSubintervals.html#EPSKrylovSchurSetSubintervals">EPSKrylovSchurSetSubintervals</a>(eps,subint,ierr);CHKERRA(ierr)
+<a name="line202">202: </a>        call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubintervals.html#EPSKrylovSchurGetSubintervals">EPSKrylovSchurGetSubintervals</a>(eps,subint,ierr);CHKERRA(ierr)
+<a name="line203">203: </a>        <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line204">204: </a>          write(*,*) 'Using sub-interval separations ='
+<a name="line205">205: </a>          <font color="#4169E1">do</font> i=2,npart
+<a name="line206">206: </a>            write(*,180) subint(i)
+<a name="line207">207: </a>          enddo
+<a name="line208">208: </a>        endif
+<a name="line209">209: </a> 180    format (f7.4)
+<a name="line210">210: </a>      endif
+
+<a name="line212">212: </a>      call <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps,ierr);CHKERRA(ierr)
+
+<a name="line214">214: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line215">215: </a>!     Compute all eigenvalues in interval and display info
+<a name="line216">216: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line218">218: </a>      call <a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>(eps,ierr);CHKERRA(ierr)
+<a name="line219">219: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetInertias.html#EPSKrylovSchurGetInertias">EPSKrylovSchurGetInertias</a>(eps,k,PETSC_NULL_REAL,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line220">220: </a>      <font color="#4169E1">if</font> (k&gt;MAXSHI) then; SETERRA(PETSC_COMM_SELF,1,'Too many shifts'); endif
+<a name="line221">221: </a>      call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetInertias.html#EPSKrylovSchurGetInertias">EPSKrylovSchurGetInertias</a>(eps,k,shifts,inertias,ierr);CHKERRA(ierr)
+<a name="line222">222: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line223">223: </a>        write(*,*) 'Inertias after <a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>:'
+<a name="line224">224: </a>        <font color="#4169E1">do</font> i=1,k
+<a name="line225">225: </a>          write(*,185) shifts(i),inertias(i)
+<a name="line226">226: </a>        enddo
+<a name="line227">227: </a>      endif
+<a name="line228">228: </a> 185  format (' .. ',f4.1,' (',I3,')')
+
+<a name="line230">230: </a>      call <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps,ierr);CHKERRA(ierr)
+<a name="line231">231: </a>      call <a href="../../../docs/manualpages/EPS/EPSGetDimensions.html#EPSGetDimensions">EPSGetDimensions</a>(eps,nev,ncv,mpd,ierr);CHKERRA(ierr)
+<a name="line232">232: </a>      call <a href="../../../docs/manualpages/EPS/EPSGetInterval.html#EPSGetInterval">EPSGetInterval</a>(eps,int0,int1,ierr);CHKERRA(ierr)
+<a name="line233">233: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line234">234: </a>        write(*,190) nev,int0,int1
+<a name="line235">235: </a>      endif
+<a name="line236">236: </a> 190  format (' Found ',I2,' eigenvalues in interval [',f7.4,',',f7.4,']')
+
+<a name="line238">238: </a>      <font color="#4169E1">if</font> (size&gt;0) then
+<a name="line239">239: </a>        call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubcommInfo.html#EPSKrylovSchurGetSubcommInfo">EPSKrylovSchurGetSubcommInfo</a>(eps,k,nval,v,ierr);CHKERRA(ierr)
+<a name="line240">240: </a>        <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line241">241: </a>          write(*,200) rank,k,nval
+<a name="line242">242: </a>          <font color="#4169E1">do</font> i=0,nval-1
+<a name="line243">243: </a>            call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubcommPairs.html#EPSKrylovSchurGetSubcommPairs">EPSKrylovSchurGetSubcommPairs</a>(eps,i,eval,v,ierr);CHKERRA(ierr)
+<a name="line244">244: </a>            write(*,210) PetscRealPart(eval)
+<a name="line245">245: </a>          enddo
+<a name="line246">246: </a>        endif
+<a name="line247">247: </a> 200    format (' Process ',I2,' has worked in sub-interval ',I2,', containing ',I2,' eigenvalues')
+<a name="line248">248: </a> 210    format (f7.4)
+<a name="line249">249: </a>        call VecDestroy(v,ierr);CHKERRA(ierr)
+
+<a name="line251">251: </a>        call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurGetSubcommMats.html#EPSKrylovSchurGetSubcommMats">EPSKrylovSchurGetSubcommMats</a>(eps,As,Bs,ierr);CHKERRA(ierr)
+<a name="line252">252: </a>        call MatGetLocalSize(A,nloc,PETSC_NULL_INTEGER,ierr);CHKERRA(ierr)
+<a name="line253">253: </a>        call MatGetLocalSize(As,nlocs,mlocs,ierr);CHKERRA(ierr)
+<a name="line254">254: </a>        <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line255">255: </a>          write(*,220) rank,nloc,nlocs
+<a name="line256">256: </a>        endif
+<a name="line257">257: </a> 220    format (' Process ',I2,' owns ',I5,', rows of the global',' matrices, and ',I5,' rows in the subcommunicator')
+
+
+<a name="line260">260: </a>!       modify A on subcommunicators
+<a name="line261">261: </a>        call PetscObjectGetComm(As,comm,ierr);CHKERRA(ierr)
+<a name="line262">262: </a>        call MatCreate(comm,Au,ierr);CHKERRA(ierr)
+<a name="line263">263: </a>        call MatSetSizes(Au,nlocs,mlocs,m,m,ierr);CHKERRA(ierr)
+<a name="line264">264: </a>        call MatSetFromOptions(Au,ierr);CHKERRA(ierr)
+<a name="line265">265: </a>        call MatSetUp(Au,ierr);CHKERRA(ierr)
+<a name="line266">266: </a>        call MatGetOwnershipRange(Au,Istart,Iend,ierr);CHKERRA(ierr)
+<a name="line267">267: </a>        <font color="#4169E1">do</font> II=Istart,Iend-1
+<a name="line268">268: </a>          value = 0.5
+<a name="line269">269: </a>          call MatSetValue(Au,II,II,value,INSERT_VALUES,ierr);CHKERRA(ierr)
+<a name="line270">270: </a>        end <font color="#4169E1">do</font>
+<a name="line271">271: </a>        call MatAssemblyBegin(Au,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line272">272: </a>        call MatAssemblyEnd(Au,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+<a name="line273">273: </a>        one = 1.0
+<a name="line274">274: </a>        mone = -1.0
+<a name="line275">275: </a>        zero = 0.0
+<a name="line276">276: </a>        call <a href="../../../docs/manualpages/EPS/EPSKrylovSchurUpdateSubcommMats.html#EPSKrylovSchurUpdateSubcommMats">EPSKrylovSchurUpdateSubcommMats</a>(eps,one,mone,Au,zero,zero, &amp;
+<a name="line277">277: </a>     &amp; PETSC_NULL_MAT,DIFFERENT_NONZERO_PATTERN,PETSC_TRUE,ierr);CHKERRA(ierr)
+<a name="line278">278: </a>        call MatDestroy(Au,ierr);CHKERRA(ierr)
+<a name="line279">279: </a>      endif
+
+<a name="line281">281: </a>      call <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(eps,ierr);CHKERRA(ierr)
+<a name="line282">282: </a>      call MatDestroy(A,ierr);CHKERRA(ierr)
+<a name="line283">283: </a>      call MatDestroy(B,ierr);CHKERRA(ierr)
+
+<a name="line285">285: </a>      call <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>(ierr)
+<a name="line286">286: </a>      end
+
+<a name="line288">288: </a>!<font color="#B22222">/*TEST</font>
+<a name="line289">289: </a><font color="#B22222">!</font>
+<a name="line290">290: </a><font color="#B22222">!   test:</font>
+<a name="line291">291: </a><font color="#B22222">!      suffix: 1</font>
+<a name="line292">292: </a><font color="#B22222">!      nsize: 2</font>
+<a name="line293">293: </a><font color="#B22222">!</font>
+<a name="line294">294: </a><font color="#B22222">!TEST*/</font>
+</pre>
+</body>
+
+</html>

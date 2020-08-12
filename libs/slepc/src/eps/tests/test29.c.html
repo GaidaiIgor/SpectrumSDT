@@ -1,0 +1,281 @@
+<center><a href="test29.c">Actual source code: test29.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/tests/test29.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:56+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/tests/test29.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a>static char help[] = <font color="#666666">"Illustrates the computation of left eigenvectors for generalized eigenproblems.\n\n"</font>
+<a name="line12"> 12: </a>  <font color="#666666">"The command line options are:\n"</font>
+<a name="line13"> 13: </a>  <font color="#666666">"  -f1 &lt;filename&gt; -f2 &lt;filename&gt;, PETSc binary files containing A and B\n\n"</font>;
+
+<a name="line15"> 15: </a> #include <A href="../../../include/slepceps.h.html">&lt;slepceps.h&gt;</A>
+
+<a name="line17"> 17: </a><font color="#B22222">/*</font>
+<a name="line18"> 18: </a><font color="#B22222">   User-defined routines</font>
+<a name="line19"> 19: </a><font color="#B22222">*/</font>
+<a name="line20"> 20: </a><strong><font color="#4169E1">PetscErrorCode ComputeResidualNorm(Mat,Mat,PetscBool,PetscScalar,PetscScalar,Vec,Vec,Vec*,PetscReal*)</font></strong>;
+
+<a name="line22"> 22: </a><strong><font color="#4169E1"><a name="main"></a>int main(int argc,char **argv)</font></strong>
+<a name="line23"> 23: </a>{
+<a name="line24"> 24: </a>  Mat            A,B;
+<a name="line25"> 25: </a>  <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a>            eps;
+<a name="line26"> 26: </a>  <a href="../../../docs/manualpages/EPS/EPSType.html#EPSType">EPSType</a>        type;
+<a name="line27"> 27: </a>  PetscInt       i,nconv;
+<a name="line28"> 28: </a>  PetscBool      twosided,flg;
+<a name="line29"> 29: </a>  PetscReal      nrmr,nrml=0.0,re,im,lev;
+<a name="line30"> 30: </a>  PetscScalar    *kr,*ki;
+<a name="line31"> 31: </a>  Vec            t,*xr,*xi,*yr,*yi,*z;
+<a name="line32"> 32: </a>  char           filename[PETSC_MAX_PATH_LEN];
+<a name="line33"> 33: </a>  PetscViewer    viewer;
+
+<a name="line36"> 36: </a>  <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(&amp;argc,&amp;argv,(char*)0,help);<font color="#4169E1">if</font> (ierr) <font color="#4169E1">return</font> ierr;
+
+<a name="line38"> 38: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line39"> 39: </a><font color="#B22222">        Load the matrices that define the eigensystem, Ax=kBx</font>
+<a name="line40"> 40: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line42"> 42: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\nGeneralized eigenproblem stored in file.\n\n"</font>);
+<a name="line43"> 43: </a>  PetscOptionsGetString(NULL,NULL,<font color="#666666">"-f1"</font>,filename,PETSC_MAX_PATH_LEN,&amp;flg);
+<a name="line44"> 44: </a>  <font color="#4169E1">if</font> (!flg) SETERRQ(PETSC_COMM_WORLD,1,<font color="#666666">"Must indicate a file name for matrix A with the -f1 option"</font>);
+
+<a name="line46"> 46: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line47"> 47: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Reading COMPLEX matrices from binary files...\n"</font>);
+<a name="line48"> 48: </a><font color="#A020F0">#else</font>
+<a name="line49"> 49: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Reading REAL matrices from binary files...\n"</font>);
+<a name="line50"> 50: </a><font color="#A020F0">#endif</font>
+<a name="line51"> 51: </a>  PetscViewerBinaryOpen(PETSC_COMM_WORLD,filename,FILE_MODE_READ,&amp;viewer);
+<a name="line52"> 52: </a>  MatCreate(PETSC_COMM_WORLD,&amp;A);
+<a name="line53"> 53: </a>  MatSetFromOptions(A);
+<a name="line54"> 54: </a>  MatLoad(A,viewer);
+<a name="line55"> 55: </a>  PetscViewerDestroy(&amp;viewer);
+
+<a name="line57"> 57: </a>  PetscOptionsGetString(NULL,NULL,<font color="#666666">"-f2"</font>,filename,PETSC_MAX_PATH_LEN,&amp;flg);
+<a name="line58"> 58: </a>  <font color="#4169E1">if</font> (flg) {
+<a name="line59"> 59: </a>    PetscViewerBinaryOpen(PETSC_COMM_WORLD,filename,FILE_MODE_READ,&amp;viewer);
+<a name="line60"> 60: </a>    MatCreate(PETSC_COMM_WORLD,&amp;B);
+<a name="line61"> 61: </a>    MatSetFromOptions(B);
+<a name="line62"> 62: </a>    MatLoad(B,viewer);
+<a name="line63"> 63: </a>    PetscViewerDestroy(&amp;viewer);
+<a name="line64"> 64: </a>  } <font color="#4169E1">else</font> {
+<a name="line65"> 65: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Matrix B was not provided, setting B=I\n\n"</font>);
+<a name="line66"> 66: </a>    B = NULL;
+<a name="line67"> 67: </a>  }
+<a name="line68"> 68: </a>  MatCreateVecs(A,NULL,&amp;t);
+
+<a name="line70"> 70: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line71"> 71: </a><font color="#B22222">                Create the eigensolver and set various options</font>
+<a name="line72"> 72: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line74"> 74: </a>  <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>(PETSC_COMM_WORLD,&amp;eps);
+<a name="line75"> 75: </a>  <a href="../../../docs/manualpages/EPS/EPSSetOperators.html#EPSSetOperators">EPSSetOperators</a>(eps,A,B);
+
+<a name="line77"> 77: </a>  <font color="#B22222">/* use a two-sided algorithm to compute left eigenvectors as well */</font>
+<a name="line78"> 78: </a>  <a href="../../../docs/manualpages/EPS/EPSSetTwoSided.html#EPSSetTwoSided">EPSSetTwoSided</a>(eps,PETSC_TRUE);
+
+<a name="line80"> 80: </a>  <font color="#B22222">/* allow user to change settings at run time */</font>
+<a name="line81"> 81: </a>  <a href="../../../docs/manualpages/EPS/EPSSetFromOptions.html#EPSSetFromOptions">EPSSetFromOptions</a>(eps);
+<a name="line82"> 82: </a>  <a href="../../../docs/manualpages/EPS/EPSGetTwoSided.html#EPSGetTwoSided">EPSGetTwoSided</a>(eps,&amp;twosided);
+
+<a name="line84"> 84: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line85"> 85: </a><font color="#B22222">                      Solve the eigensystem</font>
+<a name="line86"> 86: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line88"> 88: </a>  <a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>(eps);
+
+<a name="line90"> 90: </a>  <font color="#B22222">/*</font>
+<a name="line91"> 91: </a><font color="#B22222">     Optional: Get some information from the solver and display it</font>
+<a name="line92"> 92: </a><font color="#B22222">  */</font>
+<a name="line93"> 93: </a>  <a href="../../../docs/manualpages/EPS/EPSGetType.html#EPSGetType">EPSGetType</a>(eps,&amp;type);
+<a name="line94"> 94: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Solution method: %s\n\n"</font>,type);
+
+<a name="line96"> 96: </a>  <font color="#B22222">/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line97"> 97: </a><font color="#B22222">                    Display solution and clean up</font>
+<a name="line98"> 98: </a><font color="#B22222">     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */</font>
+
+<a name="line100">100: </a>  <font color="#B22222">/*</font>
+<a name="line101">101: </a><font color="#B22222">     Get number of converged approximate eigenpairs</font>
+<a name="line102">102: </a><font color="#B22222">  */</font>
+<a name="line103">103: </a>  <a href="../../../docs/manualpages/EPS/EPSGetConverged.html#EPSGetConverged">EPSGetConverged</a>(eps,&amp;nconv);
+<a name="line104">104: </a>  PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" Number of converged eigenpairs: %D\n\n"</font>,nconv);
+<a name="line105">105: </a>  PetscMalloc2(nconv,&amp;kr,nconv,&amp;ki);
+<a name="line106">106: </a>  VecDuplicateVecs(t,3,&amp;z);
+<a name="line107">107: </a>  VecDuplicateVecs(t,nconv,&amp;xr);
+<a name="line108">108: </a>  VecDuplicateVecs(t,nconv,&amp;xi);
+<a name="line109">109: </a>  <font color="#4169E1">if</font> (twosided) {
+<a name="line110">110: </a>    VecDuplicateVecs(t,nconv,&amp;yr);
+<a name="line111">111: </a>    VecDuplicateVecs(t,nconv,&amp;yi);
+<a name="line112">112: </a>  }
+
+<a name="line114">114: </a>  <font color="#4169E1">if</font> (nconv&gt;0) {
+<a name="line115">115: </a>    <font color="#B22222">/*</font>
+<a name="line116">116: </a><font color="#B22222">       Display eigenvalues and relative errors</font>
+<a name="line117">117: </a><font color="#B22222">    */</font>
+<a name="line118">118: </a>    PetscPrintf(PETSC_COMM_WORLD,
+<a name="line119">119: </a>         <font color="#666666">"           k            ||Ax-kBx||         ||y'A-y'Bk||\n"</font>
+<a name="line120">120: </a>         <font color="#666666">"   ---------------- ------------------ ------------------\n"</font>);
+
+<a name="line122">122: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) {
+<a name="line123">123: </a>      <font color="#B22222">/*</font>
+<a name="line124">124: </a><font color="#B22222">        Get converged eigenpairs: i-th eigenvalue is stored in kr (real part) and</font>
+<a name="line125">125: </a><font color="#B22222">        ki (imaginary part)</font>
+<a name="line126">126: </a><font color="#B22222">      */</font>
+<a name="line127">127: </a>      <a href="../../../docs/manualpages/EPS/EPSGetEigenpair.html#EPSGetEigenpair">EPSGetEigenpair</a>(eps,i,&amp;kr[i],&amp;ki[i],xr[i],xi[i]);
+<a name="line128">128: </a>      <font color="#4169E1">if</font> (twosided) {
+<a name="line129">129: </a>        <a href="../../../docs/manualpages/EPS/EPSGetLeftEigenvector.html#EPSGetLeftEigenvector">EPSGetLeftEigenvector</a>(eps,i,yr[i],yi[i]);
+<a name="line130">130: </a>      }
+<a name="line131">131: </a>      <font color="#B22222">/*</font>
+<a name="line132">132: </a><font color="#B22222">         Compute the residual norms associated to each eigenpair</font>
+<a name="line133">133: </a><font color="#B22222">      */</font>
+<a name="line134">134: </a>      ComputeResidualNorm(A,B,PETSC_FALSE,kr[i],ki[i],xr[i],xi[i],z,&amp;nrmr);
+<a name="line135">135: </a>      <font color="#4169E1">if</font> (twosided) {
+<a name="line136">136: </a>        ComputeResidualNorm(A,B,PETSC_TRUE,kr[i],ki[i],yr[i],yi[i],z,&amp;nrml);
+<a name="line137">137: </a>      }
+
+<a name="line139">139: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line140">140: </a>      re = PetscRealPart(kr[i]);
+<a name="line141">141: </a>      im = PetscImaginaryPart(kr[i]);
+<a name="line142">142: </a><font color="#A020F0">#else</font>
+<a name="line143">143: </a>      re = kr[i];
+<a name="line144">144: </a>      im = ki[i];
+<a name="line145">145: </a><font color="#A020F0">#endif</font>
+<a name="line146">146: </a>      <font color="#4169E1">if</font> (im!=0.0) {
+<a name="line147">147: </a>        PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">" %8f%+8fi %12g       %12g\n"</font>,(double)re,(double)im,(double)nrmr,(double)nrml);
+<a name="line148">148: </a>      } <font color="#4169E1">else</font> {
+<a name="line149">149: </a>        PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"   %12f       %12g       %12g\n"</font>,(double)re,(double)nrmr,(double)nrml);
+<a name="line150">150: </a>      }
+<a name="line151">151: </a>    }
+<a name="line152">152: </a>    PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"\n"</font>);
+<a name="line153">153: </a>    <font color="#B22222">/*</font>
+<a name="line154">154: </a><font color="#B22222">       Check bi-orthogonality of eigenvectors</font>
+<a name="line155">155: </a><font color="#B22222">    */</font>
+<a name="line156">156: </a>    <font color="#4169E1">if</font> (twosided) {
+<a name="line157">157: </a>      <a href="../../../docs/manualpages/sys/VecCheckOrthogonality.html#VecCheckOrthogonality">VecCheckOrthogonality</a>(xr,nconv,yr,nconv,B,NULL,&amp;lev);
+<a name="line158">158: </a>      <font color="#4169E1">if</font> (lev&lt;100*PETSC_MACHINE_EPSILON) {
+<a name="line159">159: </a>        PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"  Level of bi-orthogonality of eigenvectors &lt; 100*eps\n\n"</font>);
+<a name="line160">160: </a>      } <font color="#4169E1">else</font> {
+<a name="line161">161: </a>        PetscPrintf(PETSC_COMM_WORLD,<font color="#666666">"  Level of bi-orthogonality of eigenvectors: %g\n\n"</font>,(double)lev);
+<a name="line162">162: </a>      }
+<a name="line163">163: </a>    }
+<a name="line164">164: </a>  }
+
+<a name="line166">166: </a>  <a href="../../../docs/manualpages/EPS/EPSDestroy.html#EPSDestroy">EPSDestroy</a>(&amp;eps);
+<a name="line167">167: </a>  MatDestroy(&amp;A);
+<a name="line168">168: </a>  MatDestroy(&amp;B);
+<a name="line169">169: </a>  VecDestroy(&amp;t);
+<a name="line170">170: </a>  PetscFree2(kr,ki);
+<a name="line171">171: </a>  VecDestroyVecs(3,&amp;z);
+<a name="line172">172: </a>  VecDestroyVecs(nconv,&amp;xr);
+<a name="line173">173: </a>  VecDestroyVecs(nconv,&amp;xi);
+<a name="line174">174: </a>  <font color="#4169E1">if</font> (twosided) {
+<a name="line175">175: </a>    VecDestroyVecs(nconv,&amp;yr);
+<a name="line176">176: </a>    VecDestroyVecs(nconv,&amp;yi);
+<a name="line177">177: </a>  }
+<a name="line178">178: </a>  <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>();
+<a name="line179">179: </a>  <font color="#4169E1">return</font> ierr;
+<a name="line180">180: </a>}
+
+<a name="line182">182: </a><font color="#B22222">/*</font>
+<a name="line183">183: </a><font color="#B22222">   ComputeResidualNorm - Computes the norm of the residual vector</font>
+<a name="line184">184: </a><font color="#B22222">   associated with an eigenpair.</font>
+
+<a name="line186">186: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line187">187: </a><font color="#B22222">     trans - whether A' must be used instead of A</font>
+<a name="line188">188: </a><font color="#B22222">     kr,ki - eigenvalue</font>
+<a name="line189">189: </a><font color="#B22222">     xr,xi - eigenvector</font>
+<a name="line190">190: </a><font color="#B22222">     z     - three work vectors (the second one not referenced in complex scalars)</font>
+<a name="line191">191: </a><font color="#B22222">*/</font>
+<a name="line192">192: </a><strong><font color="#4169E1"><a name="ComputeResidualNorm"></a>PetscErrorCode ComputeResidualNorm(Mat A,Mat B,PetscBool trans,PetscScalar kr,PetscScalar ki,Vec xr,Vec xi,Vec *z,PetscReal *norm)</font></strong>
+<a name="line193">193: </a>{
+<a name="line195">195: </a>  Vec            u,w=NULL;
+<a name="line196">196: </a>  PetscScalar    alpha;
+<a name="line197">197: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line198">198: </a>  Vec            v;
+<a name="line199">199: </a>  PetscReal      ni,nr;
+<a name="line200">200: </a><font color="#A020F0">#endif</font>
+<a name="line201">201: </a>  PetscErrorCode (*matmult)(Mat,Vec,Vec) = trans? MatMultHermitianTranspose: MatMult;
+
+<a name="line204">204: </a>  u = z[0];
+<a name="line205">205: </a>  <font color="#4169E1">if</font> (B) w = z[2];
+
+<a name="line207">207: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line208">208: </a>  v = z[1];
+<a name="line209">209: </a>  <font color="#4169E1">if</font> (ki == 0 || PetscAbsScalar(ki) &lt; PetscAbsScalar(kr*PETSC_MACHINE_EPSILON)) {
+<a name="line210">210: </a><font color="#A020F0">#endif</font>
+<a name="line211">211: </a>    (*matmult)(A,xr,u);                          <font color="#B22222">/* u=A*x */</font>
+<a name="line212">212: </a>    <font color="#4169E1">if</font> (PetscAbsScalar(kr) &gt; PETSC_MACHINE_EPSILON) {
+<a name="line213">213: </a>      <font color="#4169E1">if</font> (B) { (*matmult)(B,xr,w); }             <font color="#B22222">/* w=B*x */</font>
+<a name="line214">214: </a>      <font color="#4169E1">else</font> w = xr;
+<a name="line215">215: </a>      alpha = trans? -PetscConj(kr): -kr;
+<a name="line216">216: </a>      VecAXPY(u,alpha,w);                        <font color="#B22222">/* u=A*x-k*B*x */</font>
+<a name="line217">217: </a>    }
+<a name="line218">218: </a>    VecNorm(u,NORM_2,norm);
+<a name="line219">219: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line220">220: </a>  } <font color="#4169E1">else</font> {
+<a name="line221">221: </a>    (*matmult)(A,xr,u);                          <font color="#B22222">/* u=A*xr */</font>
+<a name="line222">222: </a>    <font color="#4169E1">if</font> (SlepcAbsEigenvalue(kr,ki) &gt; PETSC_MACHINE_EPSILON) {
+<a name="line223">223: </a>      <font color="#4169E1">if</font> (B) { (*matmult)(B,xr,v); }             <font color="#B22222">/* v=B*xr */</font>
+<a name="line224">224: </a>      <font color="#4169E1">else</font> { VecCopy(xr,v); }
+<a name="line225">225: </a>      VecAXPY(u,-kr,v);                          <font color="#B22222">/* u=A*xr-kr*B*xr */</font>
+<a name="line226">226: </a>      <font color="#4169E1">if</font> (B) { (*matmult)(B,xi,w); }             <font color="#B22222">/* w=B*xi */</font>
+<a name="line227">227: </a>      <font color="#4169E1">else</font> w = xi;
+<a name="line228">228: </a>      VecAXPY(u,trans?-ki:ki,w);                 <font color="#B22222">/* u=A*xr-kr*B*xr+ki*B*xi */</font>
+<a name="line229">229: </a>    }
+<a name="line230">230: </a>    VecNorm(u,NORM_2,&amp;nr);
+<a name="line231">231: </a>    (*matmult)(A,xi,u);                          <font color="#B22222">/* u=A*xi */</font>
+<a name="line232">232: </a>    <font color="#4169E1">if</font> (SlepcAbsEigenvalue(kr,ki) &gt; PETSC_MACHINE_EPSILON) {
+<a name="line233">233: </a>      VecAXPY(u,-kr,w);                          <font color="#B22222">/* u=A*xi-kr*B*xi */</font>
+<a name="line234">234: </a>      VecAXPY(u,trans?ki:-ki,v);                 <font color="#B22222">/* u=A*xi-kr*B*xi-ki*B*xr */</font>
+<a name="line235">235: </a>    }
+<a name="line236">236: </a>    VecNorm(u,NORM_2,&amp;ni);
+<a name="line237">237: </a>    *norm = SlepcAbsEigenvalue(nr,ni);
+<a name="line238">238: </a>  }
+<a name="line239">239: </a><font color="#A020F0">#endif</font>
+<a name="line240">240: </a>  <font color="#4169E1">return</font>(0);
+<a name="line241">241: </a>}
+
+<a name="line243">243: </a><font color="#B22222">/*TEST</font>
+
+<a name="line245">245: </a><font color="#B22222">   testset:</font>
+<a name="line246">246: </a><font color="#B22222">      args: -f1 ${SLEPC_DIR}/share/slepc/datafiles/matrices/bfw62a.petsc -f2 ${SLEPC_DIR}/share/slepc/datafiles/matrices/bfw62b.petsc -eps_nev 4 -st_type sinvert -eps_target -190000</font>
+<a name="line247">247: </a><font color="#B22222">      filter: grep -v "method" | sed -e "s/[+-]0.0*i//" | sed -e "s/[0-9]\.[0-9]*e[+-]\([0-9]*\)/removed/g"</font>
+<a name="line248">248: </a><font color="#B22222">      requires: double !complex !define(PETSC_USE_64BIT_INDICES)</font>
+<a name="line249">249: </a><font color="#B22222">      test:</font>
+<a name="line250">250: </a><font color="#B22222">         suffix: 1</font>
+<a name="line251">251: </a><font color="#B22222">      test:</font>
+<a name="line252">252: </a><font color="#B22222">         suffix: 1_rqi</font>
+<a name="line253">253: </a><font color="#B22222">         TODO: gives differences after adding EPSGetLeftStartVector()</font>
+<a name="line254">254: </a><font color="#B22222">         args: -eps_type power -eps_power_shift_type rayleigh</font>
+<a name="line255">255: </a><font color="#B22222">         output_file: output/test29_1.out</font>
+<a name="line256">256: </a><font color="#B22222">      test:</font>
+<a name="line257">257: </a><font color="#B22222">         suffix: 1_rqi_singular</font>
+<a name="line258">258: </a><font color="#B22222">         args: -eps_type power -eps_power_shift_type rayleigh -eps_nev 1 -eps_target -195500</font>
+
+<a name="line260">260: </a><font color="#B22222">   test:</font>
+<a name="line261">261: </a><font color="#B22222">      suffix: 2</font>
+<a name="line262">262: </a><font color="#B22222">      args: -f1 ${DATAFILESPATH}/matrices/complex/mhd1280a.petsc -f2 ${DATAFILESPATH}/matrices/complex/mhd1280b.petsc -eps_nev 6 -eps_tol 1e-11</font>
+<a name="line263">263: </a><font color="#B22222">      filter: sed -e "s/[0-9]\.[0-9]*e[+-]\([0-9]*\)/removed/g"</font>
+<a name="line264">264: </a><font color="#B22222">      requires: complex datafilespath !define(PETSC_USE_64BIT_INDICES)</font>
+<a name="line265">265: </a><font color="#B22222">      timeoutfactor: 2</font>
+
+<a name="line267">267: </a><font color="#B22222">TEST*/</font>
+</pre>
+</body>
+
+</html>

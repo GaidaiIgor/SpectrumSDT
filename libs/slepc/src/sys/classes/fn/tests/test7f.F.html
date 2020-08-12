@@ -1,0 +1,191 @@
+<center><a href="test7f.F">Actual source code: test7f.F</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/fn/tests/test7f.F.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:38+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/fn/tests/test7f.F.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a>!
+<a name="line2">  2: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line3">  3: </a>!  SLEPc - Scalable Library <font color="#4169E1">for</font> Eigenvalue Problem Computations
+<a name="line4">  4: </a>!  Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain
+<a name="line5">  5: </a>!
+<a name="line6">  6: </a>!  This file is part of SLEPc.
+<a name="line7">  7: </a>!  SLEPc is distributed under a 2-clause BSD license (see LICENSE).
+<a name="line8">  8: </a>!  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line9">  9: </a>!
+<a name="line10"> 10: </a>!  Program usage: mpiexec -n &lt;np&gt; ./test7f [-help] [-n &lt;n&gt;] [-verbose] [-inplace]
+<a name="line11"> 11: </a>!
+<a name="line12"> 12: </a>!  Description: Simple example that tests the matrix square root.
+<a name="line13"> 13: </a>!
+<a name="line14"> 14: </a>! ----------------------------------------------------------------------
+<a name="line15"> 15: </a>!
+<a name="line16"> 16: </a>      program main
+<a name="line17"> 17: </a> #include <A href="../../../../../include/slepc/finclude/slepcfn.h.html">&lt;slepc/finclude/slepcfn.h&gt;</A>
+<a name="line18"> 18: </a>      use slepcfn
+<a name="line19"> 19: </a>      implicit none
+
+<a name="line21"> 21: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line22"> 22: </a>!     Declarations
+<a name="line23"> 23: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line25"> 25: </a>      Mat            A,S,R
+<a name="line26"> 26: </a>      <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a>             fn
+<a name="line27"> 27: </a>      PetscInt       n
+<a name="line28"> 28: </a>      PetscMPIInt    rank
+<a name="line29"> 29: </a>      PetscErrorCode ierr
+<a name="line30"> 30: </a>      PetscBool      flg,verbose,inplace
+<a name="line31"> 31: </a>      PetscReal      re,im,nrm
+<a name="line32"> 32: </a>      PetscScalar    aa(1),tau,eta,alpha,x,y,yp
+<a name="line33"> 33: </a>      PetscOffset    ia
+
+<a name="line35"> 35: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line36"> 36: </a>!     Beginning of program
+<a name="line37"> 37: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line39"> 39: </a>      call <a href="../../../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>(PETSC_NULL_CHARACTER,ierr)
+<a name="line40"> 40: </a>      call <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PETSC_COMM_WORLD,rank,ierr)
+<a name="line41"> 41: </a>      n = 10
+<a name="line42"> 42: </a>      call PetscOptionsGetInt(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,  &amp;
+<a name="line43"> 43: </a>     &amp;                        '-n',n,flg,ierr)
+<a name="line44"> 44: </a>      call PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &amp;
+<a name="line45"> 45: </a>     &amp;                        '-verbose',verbose,ierr)
+<a name="line46"> 46: </a>      call PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &amp;
+<a name="line47"> 47: </a>     &amp;                        '-inplace',inplace,ierr)
+
+<a name="line49"> 49: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line50"> 50: </a>        write(*,100) n
+<a name="line51"> 51: </a>      endif
+<a name="line52"> 52: </a> 100  format (/'Matrix square root, n =',I3,' (Fortran)')
+
+<a name="line54"> 54: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line55"> 55: </a>!     Create <a href="../../../../../docs/manualpages/FN/FN.html#FN">FN</a> object and matrix
+<a name="line56"> 56: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line58"> 58: </a>      call <a href="../../../../../docs/manualpages/FN/FNCreate.html#FNCreate">FNCreate</a>(PETSC_COMM_WORLD,fn,ierr)
+<a name="line59"> 59: </a>      call <a href="../../../../../docs/manualpages/FN/FNSetType.html#FNSetType">FNSetType</a>(fn,FNSQRT,ierr)
+<a name="line60"> 60: </a>      tau = 0.15
+<a name="line61"> 61: </a>      eta = 1.0
+<a name="line62"> 62: </a>      call <a href="../../../../../docs/manualpages/FN/FNSetScale.html#FNSetScale">FNSetScale</a>(fn,tau,eta,ierr)
+<a name="line63"> 63: </a>      call <a href="../../../../../docs/manualpages/FN/FNSetFromOptions.html#FNSetFromOptions">FNSetFromOptions</a>(fn,ierr)
+<a name="line64"> 64: </a>      call <a href="../../../../../docs/manualpages/FN/FNGetScale.html#FNGetScale">FNGetScale</a>(fn,tau,eta,ierr)
+<a name="line65"> 65: </a>      call <a href="../../../../../docs/manualpages/FN/FNView.html#FNView">FNView</a>(fn,PETSC_NULL_VIEWER,ierr)
+
+<a name="line67"> 67: </a>      call MatCreateSeqDense(PETSC_COMM_SELF,n,n,PETSC_NULL_SCALAR,A,   &amp;
+<a name="line68"> 68: </a>     &amp;     ierr)
+<a name="line69"> 69: </a>      call PetscObjectSetName(A,'A',ierr)
+<a name="line70"> 70: </a>      call MatDenseGetArray(A,aa,ia,ierr)
+<a name="line71"> 71: </a>      call FillUpMatrix(n,aa(ia+1))
+<a name="line72"> 72: </a>      call MatDenseRestoreArray(A,aa,ia,ierr)
+<a name="line73"> 73: </a>      call MatSetOption(A,MAT_HERMITIAN,PETSC_TRUE,ierr)
+
+<a name="line75"> 75: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line76"> 76: </a>!     Scalar evaluation
+<a name="line77"> 77: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line79"> 79: </a>      x = 2.2
+<a name="line80"> 80: </a>      call <a href="../../../../../docs/manualpages/FN/FNEvaluateFunction.html#FNEvaluateFunction">FNEvaluateFunction</a>(fn,x,y,ierr)
+<a name="line81"> 81: </a>      call <a href="../../../../../docs/manualpages/FN/FNEvaluateDerivative.html#FNEvaluateDerivative">FNEvaluateDerivative</a>(fn,x,yp,ierr)
+
+<a name="line83"> 83: </a>      <font color="#4169E1">if</font> (rank .eq. 0) then
+<a name="line84"> 84: </a>        re = PetscRealPart(y)
+<a name="line85"> 85: </a>        im = PetscImaginaryPart(y)
+<a name="line86"> 86: </a>        <font color="#4169E1">if</font> (abs(im).lt.1.d-10) then
+<a name="line87"> 87: </a>          write(*,110) 'f', PetscRealPart(x), re
+<a name="line88"> 88: </a>        <font color="#4169E1">else</font>
+<a name="line89"> 89: </a>          write(*,120) 'f', PetscRealPart(x), re, im
+<a name="line90"> 90: </a>        endif
+<a name="line91"> 91: </a>        re = PetscRealPart(yp)
+<a name="line92"> 92: </a>        im = PetscImaginaryPart(yp)
+<a name="line93"> 93: </a>        <font color="#4169E1">if</font> (abs(im).lt.1.d-10) then
+<a name="line94"> 94: </a>          write(*,110) 'f''', PetscRealPart(x), re
+<a name="line95"> 95: </a>        <font color="#4169E1">else</font>
+<a name="line96"> 96: </a>          write(*,120) 'f''', PetscRealPart(x), re, im
+<a name="line97"> 97: </a>        endif
+<a name="line98"> 98: </a>      endif
+<a name="line99"> 99: </a> 110  format (A2,'(',F4.1,') = ',F8.5)
+<a name="line100">100: </a> 120  format (A2,'(',F4.1,') = ',F8.5,SP,F8.5,'i')
+
+<a name="line102">102: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<a name="line103">103: </a>!     Compute matrix square root
+<a name="line104">104: </a>! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+<a name="line106">106: </a>      call MatCreateSeqDense(PETSC_COMM_SELF,n,n,PETSC_NULL_SCALAR,S,   &amp;
+<a name="line107">107: </a>     &amp;     ierr)
+<a name="line108">108: </a>      call PetscObjectSetName(S,'S',ierr)
+<a name="line109">109: </a>      <font color="#4169E1">if</font> (inplace) then
+<a name="line110">110: </a>        call MatCopy(A,S,SAME_NONZERO_PATTERN,ierr)
+<a name="line111">111: </a>        call MatSetOption(S,MAT_HERMITIAN,PETSC_TRUE,ierr)
+<a name="line112">112: </a>        call <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>(fn,S,PETSC_NULL_MAT,ierr)
+<a name="line113">113: </a>      <font color="#4169E1">else</font>
+<a name="line114">114: </a>        call <a href="../../../../../docs/manualpages/FN/FNEvaluateFunctionMat.html#FNEvaluateFunctionMat">FNEvaluateFunctionMat</a>(fn,A,S,ierr)
+<a name="line115">115: </a>      endif
+<a name="line116">116: </a>      <font color="#4169E1">if</font> (verbose) then
+<a name="line117">117: </a>        <font color="#4169E1">if</font> (rank .eq. 0) write (*,*) 'Matrix A - - - - - - - -'
+<a name="line118">118: </a>        call MatView(A,PETSC_NULL_VIEWER,ierr)
+<a name="line119">119: </a>        <font color="#4169E1">if</font> (rank .eq. 0) write (*,*) 'Computed sqrtm(A) - - - - - - - -'
+<a name="line120">120: </a>        call MatView(S,PETSC_NULL_VIEWER,ierr)
+<a name="line121">121: </a>      endif
+
+<a name="line123">123: </a>!     *** check error ||S*S-A||_F
+<a name="line124">124: </a>      call MatMatMult(S,S,MAT_INITIAL_MATRIX,PETSC_DEFAULT_REAL,R,ierr)
+<a name="line125">125: </a>      <font color="#4169E1">if</font> (eta .ne. 1.0) then
+<a name="line126">126: </a>        alpha = 1.0/(eta*eta)
+<a name="line127">127: </a>        call MatScale(R,alpha,ierr)
+<a name="line128">128: </a>      endif
+<a name="line129">129: </a>      alpha = -tau
+<a name="line130">130: </a>      call MatAXPY(R,alpha,A,SAME_NONZERO_PATTERN,ierr)
+<a name="line131">131: </a>      call MatNorm(R,NORM_FROBENIUS,nrm,ierr)
+<a name="line132">132: </a>      <font color="#4169E1">if</font> (nrm&lt;100*PETSC_MACHINE_EPSILON) then
+<a name="line133">133: </a>        write (*,*) '||S*S-A||_F < 100*eps'
+<a name="line134">134: </a>      <font color="#4169E1">else</font>
+<a name="line135">135: </a>        write (*,130) nrm
+<a name="line136">136: </a>      endif
+<a name="line137">137: </a> 130  format ('||S*S-A||_F = ',F8.5)
+
+<a name="line139">139: </a>!     *** Clean up
+<a name="line140">140: </a>      call MatDestroy(S,ierr)
+<a name="line141">141: </a>      call MatDestroy(R,ierr)
+<a name="line142">142: </a>      call MatDestroy(A,ierr)
+<a name="line143">143: </a>      call <a href="../../../../../docs/manualpages/FN/FNDestroy.html#FNDestroy">FNDestroy</a>(fn,ierr)
+<a name="line144">144: </a>      call <a href="../../../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>(ierr)
+<a name="line145">145: </a>      end
+
+<a name="line147">147: </a>! -----------------------------------------------------------------
+
+<a name="line149">149: </a>      subroutine FillUpMatrix(n,X)
+<a name="line150">150: </a>      PetscInt    n,i,j
+<a name="line151">151: </a>      PetscScalar X(n,n)
+
+<a name="line153">153: </a>      <font color="#4169E1">do</font> i=1,n
+<a name="line154">154: </a>        X(i,i) = 2.5
+<a name="line155">155: </a>      end <font color="#4169E1">do</font>
+<a name="line156">156: </a>      <font color="#4169E1">do</font> j=1,2
+<a name="line157">157: </a>        <font color="#4169E1">do</font> i=1,n-j
+<a name="line158">158: </a>          X(i,i+j) = 1.d0
+<a name="line159">159: </a>          X(i+j,i) = 1.d0
+<a name="line160">160: </a>        end <font color="#4169E1">do</font>
+<a name="line161">161: </a>      end <font color="#4169E1">do</font>
+<a name="line162">162: </a>      <font color="#4169E1">return</font>
+<a name="line163">163: </a>      end
+
+<a name="line165">165: </a>!<font color="#B22222">/*TEST</font>
+<a name="line166">166: </a><font color="#B22222">!</font>
+<a name="line167">167: </a><font color="#B22222">!   test:</font>
+<a name="line168">168: </a><font color="#B22222">!      suffix: 1</font>
+<a name="line169">169: </a><font color="#B22222">!      nsize: 1</font>
+<a name="line170">170: </a><font color="#B22222">!      args: -fn_scale .13,2 -n 19 -fn_method {{0 1 2 3}shared output}</font>
+<a name="line171">171: </a><font color="#B22222">!      filter: grep -v "computing matrix functions"</font>
+<a name="line172">172: </a><font color="#B22222">!      output_file: output/test7f_1.out</font>
+<a name="line173">173: </a><font color="#B22222">!</font>
+<a name="line174">174: </a><font color="#B22222">!TEST*/</font>
+</pre>
+</body>
+
+</html>

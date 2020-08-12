@@ -1,0 +1,2041 @@
+<center><a href="pjd.c">Actual source code: pjd.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/pep/impls/jd/pjd.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:44:06+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/pep/impls/jd/pjd.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+<a name="line10"> 10: </a><font color="#B22222">/*</font>
+<a name="line11"> 11: </a><font color="#B22222">   SLEPc polynomial eigensolver: "jd"</font>
+
+<a name="line13"> 13: </a><font color="#B22222">   Method: Jacobi-Davidson</font>
+
+<a name="line15"> 15: </a><font color="#B22222">   Algorithm:</font>
+
+<a name="line17"> 17: </a><font color="#B22222">       Jacobi-Davidson for polynomial eigenvalue problems.</font>
+
+<a name="line19"> 19: </a><font color="#B22222">   References:</font>
+
+<a name="line21"> 21: </a><font color="#B22222">       [1] C. Campos and J.E. Roman, "A polynomial Jacobi-Davidson solver</font>
+<a name="line22"> 22: </a><font color="#B22222">           with support for non-monomial bases and deflation", BIT Numer.</font>
+<a name="line23"> 23: </a><font color="#B22222">           Math. (in press), 2019.</font>
+
+<a name="line25"> 25: </a><font color="#B22222">       [2] G.L.G. Sleijpen et al., "Jacobi-Davidson type methods for</font>
+<a name="line26"> 26: </a><font color="#B22222">           generalized eigenproblems and polynomial eigenproblems", BIT</font>
+<a name="line27"> 27: </a><font color="#B22222">           36(3):595-633, 1996.</font>
+
+<a name="line29"> 29: </a><font color="#B22222">       [3] Feng-Nan Hwang, Zih-Hao Wei, Tsung-Ming Huang, Weichung Wang,</font>
+<a name="line30"> 30: </a><font color="#B22222">           "A Parallel Additive Schwarz Preconditioned Jacobi-Davidson</font>
+<a name="line31"> 31: </a><font color="#B22222">           Algorithm for Polynomial Eigenvalue Problems in Quantum Dot</font>
+<a name="line32"> 32: </a><font color="#B22222">           Simulation", J. Comput. Phys. 229(8):2932-2947, 2010.</font>
+<a name="line33"> 33: </a><font color="#B22222">*/</font>
+
+<a name="line35"> 35: </a> #include <A href="../../../../include/slepc/private/pepimpl.h.html">&lt;slepc/private/pepimpl.h&gt;</A>
+<a name="line36"> 36: </a> #include <A href="../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line38"> 38: </a>static PetscBool  cited = PETSC_FALSE;
+<a name="line39"> 39: </a>static const char citation[] =
+<a name="line40"> 40: </a>  <font color="#666666">"@Article{slepc-slice-qep,\n"</font>
+<a name="line41"> 41: </a>  <font color="#666666">"   author = \"C. Campos and J. E. Roman\",\n"</font>
+<a name="line42"> 42: </a>  <font color="#666666">"   title = \"A polynomial {Jacobi-Davidson} solver with support for non-monomial bases and deflation\",\n"</font>
+<a name="line43"> 43: </a>  <font color="#666666">"   journal = \"{BIT} Numer. Math.\",\n"</font>
+<a name="line44"> 44: </a>  <font color="#666666">"   volume = \"IP\",\n"</font>
+<a name="line45"> 45: </a>  <font color="#666666">"   number = \"-\",\n"</font>
+<a name="line46"> 46: </a>  <font color="#666666">"   pages = \"1--24\",\n"</font>
+<a name="line47"> 47: </a>  <font color="#666666">"   year = \"2019,\"\n"</font>
+<a name="line48"> 48: </a>  <font color="#666666">"   doi = \"https://doi.org/10.1007/s10543-019-00778-z\"\n"</font>
+<a name="line49"> 49: </a>  <font color="#666666">"}\n"</font>;
+
+<a name="line51"> 51: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line52"> 52: </a>  PetscReal   keep;          <font color="#B22222">/* restart parameter */</font>
+<a name="line53"> 53: </a>  PetscReal   fix;           <font color="#B22222">/* fix parameter */</font>
+<a name="line54"> 54: </a>  PetscBool   reusepc;       <font color="#B22222">/* flag indicating whether pc is rebuilt or not */</font>
+<a name="line55"> 55: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>          V;             <font color="#B22222">/* work basis vectors to store the search space */</font>
+<a name="line56"> 56: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>          W;             <font color="#B22222">/* work basis vectors to store the test space */</font>
+<a name="line57"> 57: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>          *TV;           <font color="#B22222">/* work basis vectors to store T*V (each TV[i] is the coefficient for \lambda^i of T*V for the extended T) */</font>
+<a name="line58"> 58: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>          *AX;           <font color="#B22222">/* work basis vectors to store A_i*X for locked eigenvectors */</font>
+<a name="line59"> 59: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>          N[2];          <font color="#B22222">/* auxiliary work BVs */</font>
+<a name="line60"> 60: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>          X;             <font color="#B22222">/* locked eigenvectors */</font>
+<a name="line61"> 61: </a>  PetscScalar *T;            <font color="#B22222">/* matrix of the invariant pair */</font>
+<a name="line62"> 62: </a>  PetscScalar *Tj;           <font color="#B22222">/* matrix containing the powers of the invariant pair matrix */</font>
+<a name="line63"> 63: </a>  PetscScalar *XpX;          <font color="#B22222">/* X^H*X */</font>
+<a name="line64"> 64: </a>  PetscInt    ld;            <font color="#B22222">/* leading dimension for Tj and XpX */</font>
+<a name="line65"> 65: </a>  PC          pcshell;       <font color="#B22222">/* preconditioner including basic precond+projector */</font>
+<a name="line66"> 66: </a>  Mat         Pshell;        <font color="#B22222">/* auxiliary shell matrix */</font>
+<a name="line67"> 67: </a>  PetscInt    nlock;         <font color="#B22222">/* number of locked vectors in the invariant pair */</font>
+<a name="line68"> 68: </a>  Vec         vtempl;        <font color="#B22222">/* reference nested vector */</font>
+<a name="line69"> 69: </a>  PetscInt    midx;          <font color="#B22222">/* minimality index */</font>
+<a name="line70"> 70: </a>  PetscInt    mmidx;         <font color="#B22222">/* maximum allowed minimality index */</font>
+<a name="line71"> 71: </a>  <a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a> proj;      <font color="#B22222">/* projection type (orthogonal, harmonic) */</font>
+<a name="line72"> 72: </a>} PEP_JD;
+
+<a name="line74"> 74: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line75"> 75: </a>  <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>         pep;
+<a name="line76"> 76: </a>  PC          pc;            <font color="#B22222">/* basic preconditioner */</font>
+<a name="line77"> 77: </a>  Vec         Bp[2];         <font color="#B22222">/* preconditioned residual of derivative polynomial, B\p */</font>
+<a name="line78"> 78: </a>  Vec         u[2];          <font color="#B22222">/* Ritz vector */</font>
+<a name="line79"> 79: </a>  PetscScalar gamma[2];      <font color="#B22222">/* precomputed scalar u'*B\p */</font>
+<a name="line80"> 80: </a>  PetscScalar theta;
+<a name="line81"> 81: </a>  PetscScalar *M;
+<a name="line82"> 82: </a>  PetscScalar *ps;
+<a name="line83"> 83: </a>  PetscInt    ld;
+<a name="line84"> 84: </a>  Vec         *work;
+<a name="line85"> 85: </a>  Mat         PPr;
+<a name="line86"> 86: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>          X;
+<a name="line87"> 87: </a>  PetscInt    n;
+<a name="line88"> 88: </a>} PEP_JD_PCSHELL;
+
+<a name="line90"> 90: </a><font color="#4169E1">typedef</font> <font color="#4169E1">struct</font> {
+<a name="line91"> 91: </a>  Mat         Pr,Pi;         <font color="#B22222">/* matrix polynomial evaluated at theta */</font>
+<a name="line92"> 92: </a>  <a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>         pep;
+<a name="line93"> 93: </a>  Vec         *work;
+<a name="line94"> 94: </a>  PetscScalar theta[2];
+<a name="line95"> 95: </a>} PEP_JD_MATSHELL;
+
+<a name="line97"> 97: </a><font color="#B22222">/*</font>
+<a name="line98"> 98: </a><font color="#B22222">   Duplicate and resize auxiliary basis</font>
+<a name="line99"> 99: </a><font color="#B22222">*/</font>
+<a name="line100">100: </a><strong><font color="#4169E1"><a name="PEPJDDuplicateBasis"></a>static PetscErrorCode PEPJDDuplicateBasis(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a> *basis)</font></strong>
+<a name="line101">101: </a>{
+<a name="line102">102: </a>  PetscErrorCode     ierr;
+<a name="line103">103: </a>  PEP_JD             *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line104">104: </a>  PetscInt           nloc,m;
+<a name="line105">105: </a>  <a href="../../../../docs/manualpages/BV/BVType.html#BVType">BVType</a>             type;
+<a name="line106">106: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogType.html#BVOrthogType">BVOrthogType</a>       otype;
+<a name="line107">107: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogRefineType.html#BVOrthogRefineType">BVOrthogRefineType</a> oref;
+<a name="line108">108: </a>  PetscReal          oeta;
+<a name="line109">109: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogBlockType.html#BVOrthogBlockType">BVOrthogBlockType</a>  oblock;
+
+<a name="line112">112: </a>  <font color="#4169E1">if</font> (pjd-&gt;ld&gt;1) {
+<a name="line113">113: </a>    <a href="../../../../docs/manualpages/BV/BVCreate.html#BVCreate">BVCreate</a>(PetscObjectComm((PetscObject)pep),basis);
+<a name="line114">114: </a>    <a href="../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(pep-&gt;V,&amp;nloc,NULL,&amp;m);
+<a name="line115">115: </a>    nloc += pjd-&gt;ld-1;
+<a name="line116">116: </a>    <a href="../../../../docs/manualpages/BV/BVSetSizes.html#BVSetSizes">BVSetSizes</a>(*basis,nloc,PETSC_DECIDE,m);
+<a name="line117">117: </a>    <a href="../../../../docs/manualpages/BV/BVGetType.html#BVGetType">BVGetType</a>(pep-&gt;V,&amp;type);
+<a name="line118">118: </a>    <a href="../../../../docs/manualpages/BV/BVSetType.html#BVSetType">BVSetType</a>(*basis,type);
+<a name="line119">119: </a>    <a href="../../../../docs/manualpages/BV/BVGetOrthogonalization.html#BVGetOrthogonalization">BVGetOrthogonalization</a>(pep-&gt;V,&amp;otype,&amp;oref,&amp;oeta,&amp;oblock);
+<a name="line120">120: </a>    <a href="../../../../docs/manualpages/BV/BVSetOrthogonalization.html#BVSetOrthogonalization">BVSetOrthogonalization</a>(*basis,otype,oref,oeta,oblock);
+<a name="line121">121: </a>    PetscObjectStateIncrease((PetscObject)*basis);
+<a name="line122">122: </a>  } <font color="#4169E1">else</font> {
+<a name="line123">123: </a>    <a href="../../../../docs/manualpages/BV/BVDuplicate.html#BVDuplicate">BVDuplicate</a>(pep-&gt;V,basis);
+<a name="line124">124: </a>  }
+<a name="line125">125: </a>  <font color="#4169E1">return</font>(0);
+<a name="line126">126: </a>}
+
+<a name="line128">128: </a><strong><font color="#4169E1"><a name="PEPSetUp_JD"></a>PetscErrorCode PEPSetUp_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line129">129: </a>{
+<a name="line131">131: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line132">132: </a>  PetscBool      isprecond,flg;
+<a name="line133">133: </a>  PetscInt       i;
+
+<a name="line136">136: </a>  pep-&gt;lineariz = PETSC_FALSE;
+<a name="line137">137: </a>  PEPSetDimensions_Default(pep,pep-&gt;nev,&amp;pep-&gt;ncv,&amp;pep-&gt;mpd);
+<a name="line138">138: </a>  <font color="#4169E1">if</font> (pep-&gt;max_it==PETSC_DEFAULT) pep-&gt;max_it = PetscMax(100,2*pep-&gt;n/pep-&gt;ncv);
+<a name="line139">139: </a>  <font color="#4169E1">if</font> (!pep-&gt;which) pep-&gt;which = <a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_MAGNITUDE</a>;
+<a name="line140">140: </a>  <font color="#4169E1">if</font> (pep-&gt;which!=<a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_MAGNITUDE</a> &amp;&amp; pep-&gt;which!=<a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_REAL</a> &amp;&amp; pep-&gt;which!=<a href="../../../../docs/manualpages/PEP/PEPWhich.html#PEPWhich">PEP_TARGET_IMAGINARY</a>) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Wrong value of pep-&gt;which"</font>);
+
+<a name="line142">142: </a>  PetscObjectTypeCompare((PetscObject)pep-&gt;st,STPRECOND,&amp;isprecond);
+<a name="line143">143: </a>  <font color="#4169E1">if</font> (!isprecond) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"JD only works with PRECOND spectral transformation"</font>);
+
+<a name="line145">145: </a>  <a href="../../../../docs/manualpages/ST/STGetTransform.html#STGetTransform">STGetTransform</a>(pep-&gt;st,&amp;flg);
+<a name="line146">146: </a>  <font color="#4169E1">if</font> (flg) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_SUP,<font color="#666666">"Solver requires the <a href="../../../../docs/manualpages/ST/ST.html#ST">ST</a> transformation flag unset, see <a href="../../../../docs/manualpages/ST/STSetTransform.html#STSetTransform">STSetTransform</a>()"</font>);
+
+<a name="line148">148: </a>  <font color="#4169E1">if</font> (!pjd-&gt;mmidx) pjd-&gt;mmidx = pep-&gt;nmat-1;
+<a name="line149">149: </a>  pjd-&gt;mmidx = PetscMin(pjd-&gt;mmidx,pep-&gt;nmat-1);
+<a name="line150">150: </a>  <font color="#4169E1">if</font> (!pjd-&gt;keep) pjd-&gt;keep = 0.5;
+<a name="line151">151: </a>  PEPBasisCoefficients(pep,pep-&gt;pbc);
+<a name="line152">152: </a>  <a href="../../../../docs/manualpages/PEP/PEPAllocateSolution.html#PEPAllocateSolution">PEPAllocateSolution</a>(pep,0);
+<a name="line153">153: </a>  <a href="../../../../docs/manualpages/PEP/PEPSetWorkVecs.html#PEPSetWorkVecs">PEPSetWorkVecs</a>(pep,5);
+<a name="line154">154: </a>  pjd-&gt;ld = pep-&gt;nev;
+<a name="line155">155: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line156">156: </a>  pjd-&gt;ld++;
+<a name="line157">157: </a><font color="#A020F0">#endif</font>
+<a name="line158">158: </a>  PetscMalloc2(pep-&gt;nmat,&amp;pjd-&gt;TV,pep-&gt;nmat,&amp;pjd-&gt;AX);
+<a name="line159">159: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line160">160: </a>    PEPJDDuplicateBasis(pep,pjd-&gt;TV+i);
+<a name="line161">161: </a>  }
+<a name="line162">162: </a>  <font color="#4169E1">if</font> (pjd-&gt;ld&gt;1) {
+<a name="line163">163: </a>    PEPJDDuplicateBasis(pep,&amp;pjd-&gt;V);
+<a name="line164">164: </a>    <a href="../../../../docs/manualpages/BV/BVSetFromOptions.html#BVSetFromOptions">BVSetFromOptions</a>(pjd-&gt;V);
+<a name="line165">165: </a>    <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line166">166: </a>      <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(pep-&gt;V,pjd-&gt;ld-1,pjd-&gt;AX+i);
+<a name="line167">167: </a>    }
+<a name="line168">168: </a>    <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(pep-&gt;V,pjd-&gt;ld-1,pjd-&gt;N);
+<a name="line169">169: </a>    <a href="../../../../docs/manualpages/BV/BVDuplicateResize.html#BVDuplicateResize">BVDuplicateResize</a>(pep-&gt;V,pjd-&gt;ld-1,pjd-&gt;N+1);
+<a name="line170">170: </a>    pjd-&gt;X = pep-&gt;V;
+<a name="line171">171: </a>    PetscCalloc3((pjd-&gt;ld)*(pjd-&gt;ld),&amp;pjd-&gt;XpX,pep-&gt;ncv*pep-&gt;ncv,&amp;pjd-&gt;T,pjd-&gt;ld*pjd-&gt;ld*pep-&gt;nmat,&amp;pjd-&gt;Tj);
+<a name="line172">172: </a>  } <font color="#4169E1">else</font> pjd-&gt;V = pep-&gt;V;
+<a name="line173">173: </a>  <font color="#4169E1">if</font> (pjd-&gt;proj==<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>) { PEPJDDuplicateBasis(pep,&amp;pjd-&gt;W); }
+<a name="line174">174: </a>  <font color="#4169E1">else</font> pjd-&gt;W = pjd-&gt;V;
+<a name="line175">175: </a>  <a href="../../../../docs/manualpages/DS/DSSetType.html#DSSetType">DSSetType</a>(pep-&gt;ds,DSPEP);
+<a name="line176">176: </a>  <a href="../../../../docs/manualpages/DS/DSPEPSetDegree.html#DSPEPSetDegree">DSPEPSetDegree</a>(pep-&gt;ds,pep-&gt;nmat-1);
+<a name="line177">177: </a>  <font color="#4169E1">if</font> (pep-&gt;basis!=<a href="../../../../docs/manualpages/PEP/PEPBasis.html#PEPBasis">PEP_BASIS_MONOMIAL</a>) {
+<a name="line178">178: </a>    <a href="../../../../docs/manualpages/DS/DSPEPSetCoefficients.html#DSPEPSetCoefficients">DSPEPSetCoefficients</a>(pep-&gt;ds,pep-&gt;pbc);
+<a name="line179">179: </a>  }
+<a name="line180">180: </a>  <a href="../../../../docs/manualpages/DS/DSAllocate.html#DSAllocate">DSAllocate</a>(pep-&gt;ds,pep-&gt;ncv);
+<a name="line181">181: </a>  <font color="#4169E1">return</font>(0);
+<a name="line182">182: </a>}
+
+<a name="line184">184: </a><font color="#B22222">/*</font>
+<a name="line185">185: </a><font color="#B22222">   Updates columns (low to (high-1)) of TV[i]</font>
+<a name="line186">186: </a><font color="#B22222">*/</font>
+<a name="line187">187: </a><strong><font color="#4169E1"><a name="PEPJDUpdateTV"></a>static PetscErrorCode PEPJDUpdateTV(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt low,PetscInt high,Vec *w)</font></strong>
+<a name="line188">188: </a>{
+<a name="line190">190: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line191">191: </a>  PetscInt       pp,col,i,nloc,nconv;
+<a name="line192">192: </a>  Vec            v1,v2,t1,t2;
+<a name="line193">193: </a>  PetscScalar    *array1,*array2,*x2,*xx,*N,*Np,*y2=NULL,zero=0.0,sone=1.0,*pT,fact,*psc;
+<a name="line194">194: </a>  PetscReal      *cg,*ca,*cb;
+<a name="line195">195: </a>  PetscMPIInt    rk,np;
+<a name="line196">196: </a>  PetscBLASInt   n_,ld_,one=1;
+<a name="line197">197: </a>  Mat            T;
+<a name="line198">198: </a>  <a href="../../../../docs/manualpages/BV/BV.html#BV">BV</a>             pbv;
+
+<a name="line201">201: </a>  ca = pep-&gt;pbc; cb = ca+pep-&gt;nmat; cg = cb + pep-&gt;nmat;
+<a name="line202">202: </a>  nconv = pjd-&gt;nlock;
+<a name="line203">203: </a>  PetscMalloc5(nconv,&amp;x2,nconv,&amp;xx,nconv*nconv,&amp;pT,nconv*nconv,&amp;N,nconv*nconv,&amp;Np);
+<a name="line204">204: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)pep),&amp;rk);
+<a name="line205">205: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)pep),&amp;np);
+<a name="line206">206: </a>  <a href="../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(pep-&gt;V,&amp;nloc,NULL,NULL);
+<a name="line207">207: </a>  t1 = w[0];
+<a name="line208">208: </a>  t2 = w[1];
+<a name="line209">209: </a>  PetscBLASIntCast(pjd-&gt;nlock,&amp;n_);
+<a name="line210">210: </a>  PetscBLASIntCast(pjd-&gt;ld,&amp;ld_);
+<a name="line211">211: </a>  <font color="#4169E1">if</font> (nconv){
+<a name="line212">212: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) {
+<a name="line213">213: </a>      PetscArraycpy(pT+i*nconv,pjd-&gt;T+i*pep-&gt;ncv,nconv);
+<a name="line214">214: </a>    }
+<a name="line215">215: </a>    MatCreateSeqDense(PETSC_COMM_SELF,nconv,nconv,pT,&amp;T);
+<a name="line216">216: </a>  }
+<a name="line217">217: </a>  <font color="#4169E1">for</font> (col=low;col&lt;high;col++) {
+<a name="line218">218: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,col,&amp;v1);
+<a name="line219">219: </a>    VecGetArray(v1,&amp;array1);
+<a name="line220">220: </a>    <font color="#4169E1">if</font> (nconv&gt;0) {
+<a name="line221">221: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) x2[i] = array1[nloc+i]* PetscSqrtReal(np);
+<a name="line222">222: </a>    }
+<a name="line223">223: </a>    VecPlaceArray(t1,array1);
+<a name="line224">224: </a>    <font color="#4169E1">if</font> (nconv) {
+<a name="line225">225: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;N[0],0,nconv);
+<a name="line226">226: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;N[1],0,nconv);
+<a name="line227">227: </a>      <a href="../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(pjd-&gt;X,t1,xx);
+<a name="line228">228: </a>    }
+<a name="line229">229: </a>    <font color="#4169E1">for</font> (pp=pep-&gt;nmat-1;pp&gt;=0;pp--) {
+<a name="line230">230: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;TV[pp],col,&amp;v2);
+<a name="line231">231: </a>      VecGetArray(v2,&amp;array2);
+<a name="line232">232: </a>      VecPlaceArray(t2,array2);
+<a name="line233">233: </a>      MatMult(pep-&gt;A[pp],t1,t2);
+<a name="line234">234: </a>      <font color="#4169E1">if</font> (nconv) {
+<a name="line235">235: </a>        <font color="#4169E1">if</font> (pp&lt;pep-&gt;nmat-3) {
+<a name="line236">236: </a>          <a href="../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(pjd-&gt;N[0],1.0,-cg[pp+2],pjd-&gt;AX[pp+1],NULL);
+<a name="line237">237: </a>          MatShift(T,-cb[pp+1]);
+<a name="line238">238: </a>          <a href="../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(pjd-&gt;N[0],1.0/ca[pp],1.0/ca[pp],pjd-&gt;N[1],T);
+<a name="line239">239: </a>          pbv = pjd-&gt;N[0]; pjd-&gt;N[0] = pjd-&gt;N[1]; pjd-&gt;N[1] = pbv;
+<a name="line240">240: </a>          <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;N[1],1.0,1.0,t2,x2);
+<a name="line241">241: </a>          MatShift(T,cb[pp+1]);
+<a name="line242">242: </a>        } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (pp==pep-&gt;nmat-3) {
+<a name="line243">243: </a>          <a href="../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(pjd-&gt;AX[pp+2],pjd-&gt;N[0]);
+<a name="line244">244: </a>          <a href="../../../../docs/manualpages/BV/BVScale.html#BVScale">BVScale</a>(pjd-&gt;N[0],1/ca[pp+1]);
+<a name="line245">245: </a>          <a href="../../../../docs/manualpages/BV/BVCopy.html#BVCopy">BVCopy</a>(pjd-&gt;AX[pp+1],pjd-&gt;N[1]);
+<a name="line246">246: </a>          MatShift(T,-cb[pp+1]);
+<a name="line247">247: </a>          <a href="../../../../docs/manualpages/BV/BVMult.html#BVMult">BVMult</a>(pjd-&gt;N[1],1.0/ca[pp],1.0/ca[pp],pjd-&gt;N[0],T);
+<a name="line248">248: </a>          <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;N[1],1.0,1.0,t2,x2);
+<a name="line249">249: </a>          MatShift(T,cb[pp+1]);
+<a name="line250">250: </a>        } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (pp==pep-&gt;nmat-2) {
+<a name="line251">251: </a>          <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;AX[pp+1],1.0/ca[pp],1.0,t2,x2);
+<a name="line252">252: </a>        }
+<a name="line253">253: </a>        <font color="#4169E1">if</font> (pp&lt;pjd-&gt;midx) {
+<a name="line254">254: </a>          y2 = array2+nloc;
+<a name="line255">255: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"C"</font>,&amp;n_,&amp;n_,&amp;sone,pjd-&gt;Tj+pjd-&gt;ld*pjd-&gt;ld*pp,&amp;ld_,xx,&amp;one,&amp;zero,y2,&amp;one));
+<a name="line256">256: </a>          <font color="#4169E1">if</font> (pp&lt;pjd-&gt;midx-2) {
+<a name="line257">257: </a>            fact = -cg[pp+2];
+<a name="line258">258: </a>            PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;sone,pjd-&gt;Tj+(pp+1)*pjd-&gt;ld*pjd-&gt;ld,&amp;ld_,pjd-&gt;XpX,&amp;ld_,&amp;fact,Np,&amp;n_));
+<a name="line259">259: </a>            fact = 1/ca[pp];
+<a name="line260">260: </a>            MatShift(T,-cb[pp+1]);
+<a name="line261">261: </a>            PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;fact,N,&amp;n_,pT,&amp;n_,&amp;fact,Np,&amp;n_));
+<a name="line262">262: </a>            MatShift(T,cb[pp+1]);
+<a name="line263">263: </a>            psc = Np; Np = N; N = psc;
+<a name="line264">264: </a>            PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;sone,N,&amp;n_,x2,&amp;one,&amp;sone,y2,&amp;one));
+<a name="line265">265: </a>          } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (pp==pjd-&gt;midx-2) {
+<a name="line266">266: </a>            fact = 1/ca[pp];
+<a name="line267">267: </a>            PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;fact,pjd-&gt;Tj+(pp+1)*pjd-&gt;ld*pjd-&gt;ld,&amp;ld_,pjd-&gt;XpX,&amp;ld_,&amp;zero,N,&amp;n_));
+<a name="line268">268: </a>            PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;sone,N,&amp;n_,x2,&amp;one,&amp;sone,y2,&amp;one));
+<a name="line269">269: </a>          } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (pp==pjd-&gt;midx-1) {
+<a name="line270">270: </a>            PetscArrayzero(Np,nconv*nconv);
+<a name="line271">271: </a>          }
+<a name="line272">272: </a>        }
+<a name="line273">273: </a>        <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) array2[nloc+i] /= PetscSqrtReal(np);
+<a name="line274">274: </a>      }
+<a name="line275">275: </a>      VecResetArray(t2);
+<a name="line276">276: </a>      VecRestoreArray(v2,&amp;array2);
+<a name="line277">277: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;TV[pp],col,&amp;v2);
+<a name="line278">278: </a>    }
+<a name="line279">279: </a>    VecResetArray(t1);
+<a name="line280">280: </a>    VecRestoreArray(v1,&amp;array1);
+<a name="line281">281: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,col,&amp;v1);
+<a name="line282">282: </a>  }
+<a name="line283">283: </a>  <font color="#4169E1">if</font> (nconv) {MatDestroy(&amp;T);}
+<a name="line284">284: </a>  PetscFree5(x2,xx,pT,N,Np);
+<a name="line285">285: </a>  <font color="#4169E1">return</font>(0);
+<a name="line286">286: </a>}
+
+<a name="line288">288: </a><font color="#B22222">/*</font>
+<a name="line289">289: </a><font color="#B22222">   RRQR of X. Xin*P=Xou*R. Rank of R is rk</font>
+<a name="line290">290: </a><font color="#B22222">*/</font>
+<a name="line291">291: </a><strong><font color="#4169E1"><a name="PEPJDOrthogonalize"></a>static PetscErrorCode PEPJDOrthogonalize(PetscInt row,PetscInt col,PetscScalar *X,PetscInt ldx,PetscInt *rk,PetscInt *P,PetscScalar *R,PetscInt ldr)</font></strong>
+<a name="line292">292: </a>{
+<a name="line294">294: </a>  PetscInt       i,j,n,r;
+<a name="line295">295: </a>  PetscBLASInt   row_,col_,ldx_,*p,lwork,info,n_;
+<a name="line296">296: </a>  PetscScalar    *tau,*work;
+<a name="line297">297: </a>  PetscReal      tol,*rwork;
+
+<a name="line300">300: </a>  PetscBLASIntCast(row,&amp;row_);
+<a name="line301">301: </a>  PetscBLASIntCast(col,&amp;col_);
+<a name="line302">302: </a>  PetscBLASIntCast(ldx,&amp;ldx_);
+<a name="line303">303: </a>  n = PetscMin(row,col);
+<a name="line304">304: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line305">305: </a>  lwork = 3*col_+1;
+<a name="line306">306: </a>  PetscMalloc4(col,&amp;p,n,&amp;tau,lwork,&amp;work,2*col,&amp;rwork);
+<a name="line307">307: </a>  <font color="#4169E1">for</font> (i=1;i&lt;col;i++) p[i] = 0;
+<a name="line308">308: </a>  p[0] = 1;
+
+<a name="line310">310: </a>  <font color="#B22222">/* rank revealing QR */</font>
+<a name="line311">311: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line312">312: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgeqp3"</font>,LAPACKgeqp3_(&amp;row_,&amp;col_,X,&amp;ldx_,p,tau,work,&amp;lwork,rwork,&amp;info));
+<a name="line313">313: </a><font color="#A020F0">#else</font>
+<a name="line314">314: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKgeqp3"</font>,LAPACKgeqp3_(&amp;row_,&amp;col_,X,&amp;ldx_,p,tau,work,&amp;lwork,&amp;info));
+<a name="line315">315: </a><font color="#A020F0">#endif</font>
+<a name="line316">316: </a>  SlepcCheckLapackInfo(<font color="#666666">"geqp3"</font>,info);
+<a name="line317">317: </a>  <font color="#4169E1">if</font> (P) <font color="#4169E1">for</font> (i=0;i&lt;col;i++) P[i] = p[i]-1;
+
+<a name="line319">319: </a>  <font color="#B22222">/* rank computation */</font>
+<a name="line320">320: </a>  tol = PetscMax(row,col)*PETSC_MACHINE_EPSILON*PetscAbsScalar(X[0]);
+<a name="line321">321: </a>  r = 1;
+<a name="line322">322: </a>  <font color="#4169E1">for</font> (i=1;i&lt;n;i++) {
+<a name="line323">323: </a>    <font color="#4169E1">if</font> (PetscAbsScalar(X[i+ldx*i])&gt;tol) r++;
+<a name="line324">324: </a>    <font color="#4169E1">else</font> <font color="#4169E1">break</font>;
+<a name="line325">325: </a>  }
+<a name="line326">326: </a>  <font color="#4169E1">if</font> (rk) *rk=r;
+
+<a name="line328">328: </a>  <font color="#B22222">/* copy upper triangular matrix if requested */</font>
+<a name="line329">329: </a>  <font color="#4169E1">if</font> (R) {
+<a name="line330">330: </a>     <font color="#4169E1">for</font> (i=0;i&lt;r;i++) {
+<a name="line331">331: </a>       PetscArrayzero(R+i*ldr,r);
+<a name="line332">332: </a>       <font color="#4169E1">for</font> (j=0;j&lt;=i;j++) R[i*ldr+j] = X[i*ldx+j];
+<a name="line333">333: </a>     }
+<a name="line334">334: </a>  }
+<a name="line335">335: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKorgqr"</font>,LAPACKorgqr_(&amp;row_,&amp;n_,&amp;n_,X,&amp;ldx_,tau,work,&amp;lwork,&amp;info));
+<a name="line336">336: </a>  SlepcCheckLapackInfo(<font color="#666666">"orgqr"</font>,info);
+<a name="line337">337: </a>  PetscFree4(p,tau,work,rwork);
+<a name="line338">338: </a>  <font color="#4169E1">return</font>(0);
+<a name="line339">339: </a>}
+
+<a name="line341">341: </a><font color="#B22222">/*</font>
+<a name="line342">342: </a><font color="#B22222">   Application of extended preconditioner</font>
+<a name="line343">343: </a><font color="#B22222">*/</font>
+<a name="line344">344: </a><strong><font color="#4169E1"><a name="PEPJDExtendedPCApply"></a>static PetscErrorCode PEPJDExtendedPCApply(PC pc,Vec x,Vec y)</font></strong>
+<a name="line345">345: </a>{
+<a name="line346">346: </a>  PetscInt          i,j,nloc,n,ld=0;
+<a name="line347">347: </a>  PetscMPIInt       np;
+<a name="line348">348: </a>  Vec               tx,ty;
+<a name="line349">349: </a>  PEP_JD_PCSHELL    *ctx;
+<a name="line350">350: </a>  PetscErrorCode    ierr;
+<a name="line351">351: </a>  const PetscScalar *array1;
+<a name="line352">352: </a>  PetscScalar       *x2=NULL,*t=NULL,*ps=NULL,*array2,zero=0.0,sone=1.0;
+<a name="line353">353: </a>  PetscBLASInt      one=1,ld_,n_,ncv_;
+<a name="line354">354: </a>  PEP_JD            *pjd=NULL;
+
+<a name="line357">357: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)pc),&amp;np);
+<a name="line358">358: </a>  PCShellGetContext(pc,(void**)&amp;ctx);
+<a name="line359">359: </a>  n  = ctx-&gt;n;
+<a name="line360">360: </a>  <font color="#4169E1">if</font> (n) {
+<a name="line361">361: </a>    pjd = (PEP_JD*)ctx-&gt;pep-&gt;data;
+<a name="line362">362: </a>    ps = ctx-&gt;ps;
+<a name="line363">363: </a>    ld = pjd-&gt;ld;
+<a name="line364">364: </a>    PetscMalloc2(n,&amp;x2,n,&amp;t);
+<a name="line365">365: </a>    VecGetLocalSize(ctx-&gt;work[0],&amp;nloc);
+<a name="line366">366: </a>    VecGetArrayRead(x,&amp;array1);
+<a name="line367">367: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) x2[i] = array1[nloc+i]* PetscSqrtReal(np);
+<a name="line368">368: </a>    VecRestoreArrayRead(x,&amp;array1);
+<a name="line369">369: </a>  }
+
+<a name="line371">371: </a>  <font color="#B22222">/* y = B\x apply PC */</font>
+<a name="line372">372: </a>  tx = ctx-&gt;work[0];
+<a name="line373">373: </a>  ty = ctx-&gt;work[1];
+<a name="line374">374: </a>  VecGetArrayRead(x,&amp;array1);
+<a name="line375">375: </a>  VecPlaceArray(tx,array1);
+<a name="line376">376: </a>  VecGetArray(y,&amp;array2);
+<a name="line377">377: </a>  VecPlaceArray(ty,array2);
+<a name="line378">378: </a>  PCApply(ctx-&gt;pc,tx,ty);
+<a name="line379">379: </a>  <font color="#4169E1">if</font> (n) {
+<a name="line380">380: </a>    PetscBLASIntCast(ld,&amp;ld_);
+<a name="line381">381: </a>    PetscBLASIntCast(n,&amp;n_);
+<a name="line382">382: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line383">383: </a>      t[i] = 0.0;
+<a name="line384">384: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) t[i] += ctx-&gt;M[i+j*ld]*x2[j];
+<a name="line385">385: </a>    }
+<a name="line386">386: </a>    <font color="#4169E1">if</font> (pjd-&gt;midx==1) {
+<a name="line387">387: </a>      PetscBLASIntCast(ctx-&gt;pep-&gt;ncv,&amp;ncv_);
+<a name="line388">388: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) pjd-&gt;T[i*(1+ctx-&gt;pep-&gt;ncv)] -= ctx-&gt;theta;
+<a name="line389">389: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;sone,pjd-&gt;T,&amp;ncv_,t,&amp;one,&amp;zero,x2,&amp;one));
+<a name="line390">390: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) pjd-&gt;T[i*(1+ctx-&gt;pep-&gt;ncv)] += ctx-&gt;theta;
+<a name="line391">391: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) array2[nloc+i] = x2[i];
+<a name="line392">392: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) x2[i] = -t[i];
+<a name="line393">393: </a>    } <font color="#4169E1">else</font> {
+<a name="line394">394: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) array2[nloc+i] = t[i];
+<a name="line395">395: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;sone,ps,&amp;ld_,t,&amp;one,&amp;zero,x2,&amp;one));
+<a name="line396">396: </a>    }
+<a name="line397">397: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) array2[nloc+i] /= PetscSqrtReal(np);
+<a name="line398">398: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;X,0,n);
+<a name="line399">399: </a>    <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;X,-1.0,1.0,ty,x2);
+<a name="line400">400: </a>    PetscFree2(x2,t);
+<a name="line401">401: </a>  }
+<a name="line402">402: </a>  VecResetArray(tx);
+<a name="line403">403: </a>  VecResetArray(ty);
+<a name="line404">404: </a>  VecRestoreArrayRead(x,&amp;array1);
+<a name="line405">405: </a>  VecRestoreArray(y,&amp;array2);
+<a name="line406">406: </a>  <font color="#4169E1">return</font>(0);
+<a name="line407">407: </a>}
+
+<a name="line409">409: </a><font color="#B22222">/*</font>
+<a name="line410">410: </a><font color="#B22222">   Application of shell preconditioner:</font>
+<a name="line411">411: </a><font color="#B22222">      y = B\x - eta*B\p,  with eta = (u'*B\x)/(u'*B\p)</font>
+<a name="line412">412: </a><font color="#B22222">*/</font>
+<a name="line413">413: </a><strong><font color="#4169E1"><a name="PCShellApply_PEPJD"></a>static PetscErrorCode PCShellApply_PEPJD(PC pc,Vec x,Vec y)</font></strong>
+<a name="line414">414: </a>{
+<a name="line416">416: </a>  PetscScalar    rr,eta;
+<a name="line417">417: </a>  PEP_JD_PCSHELL *ctx;
+<a name="line418">418: </a>  PetscInt       sz;
+<a name="line419">419: </a>  const Vec      *xs,*ys;
+<a name="line420">420: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line421">421: </a>  PetscScalar    rx,xr,xx;
+<a name="line422">422: </a><font color="#A020F0">#endif</font>
+
+<a name="line425">425: </a>  PCShellGetContext(pc,(void**)&amp;ctx);
+<a name="line426">426: </a>  <a href="../../../../docs/manualpages/sys/VecCompGetSubVecs.html#VecCompGetSubVecs">VecCompGetSubVecs</a>(x,&amp;sz,&amp;xs);
+<a name="line427">427: </a>  <a href="../../../../docs/manualpages/sys/VecCompGetSubVecs.html#VecCompGetSubVecs">VecCompGetSubVecs</a>(y,NULL,&amp;ys);
+<a name="line428">428: </a>  <font color="#B22222">/* y = B\x apply extended PC */</font>
+<a name="line429">429: </a>  PEPJDExtendedPCApply(pc,xs[0],ys[0]);
+<a name="line430">430: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line431">431: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line432">432: </a>    PEPJDExtendedPCApply(pc,xs[1],ys[1]);
+<a name="line433">433: </a>  }
+<a name="line434">434: </a><font color="#A020F0">#endif</font>
+
+<a name="line436">436: </a>  <font color="#B22222">/* Compute eta = u'*y / u'*Bp */</font>
+<a name="line437">437: </a>  VecDot(ys[0],ctx-&gt;u[0],&amp;rr);
+<a name="line438">438: </a>  eta  = -rr*ctx-&gt;gamma[0];
+<a name="line439">439: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line440">440: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line441">441: </a>    VecDot(ys[0],ctx-&gt;u[1],&amp;xr);
+<a name="line442">442: </a>    VecDot(ys[1],ctx-&gt;u[0],&amp;rx);
+<a name="line443">443: </a>    VecDot(ys[1],ctx-&gt;u[1],&amp;xx);
+<a name="line444">444: </a>    eta += -ctx-&gt;gamma[0]*xx-ctx-&gt;gamma[1]*(-xr+rx);
+<a name="line445">445: </a>  }
+<a name="line446">446: </a><font color="#A020F0">#endif</font>
+<a name="line447">447: </a>  eta /= ctx-&gt;gamma[0]*ctx-&gt;gamma[0]+ctx-&gt;gamma[1]*ctx-&gt;gamma[1];
+
+<a name="line449">449: </a>  <font color="#B22222">/* y = y - eta*Bp */</font>
+<a name="line450">450: </a>  VecAXPY(ys[0],eta,ctx-&gt;Bp[0]);
+<a name="line451">451: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line452">452: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line453">453: </a>    VecAXPY(ys[1],eta,ctx-&gt;Bp[1]);
+<a name="line454">454: </a>    eta = -ctx-&gt;gamma[1]*(rr+xx)+ctx-&gt;gamma[0]*(-xr+rx);
+<a name="line455">455: </a>    eta /= ctx-&gt;gamma[0]*ctx-&gt;gamma[0]+ctx-&gt;gamma[1]*ctx-&gt;gamma[1];
+<a name="line456">456: </a>    VecAXPY(ys[0],eta,ctx-&gt;Bp[1]);
+<a name="line457">457: </a>    VecAXPY(ys[1],-eta,ctx-&gt;Bp[0]);
+<a name="line458">458: </a>  }
+<a name="line459">459: </a><font color="#A020F0">#endif</font>
+<a name="line460">460: </a>  <font color="#4169E1">return</font>(0);
+<a name="line461">461: </a>}
+
+<a name="line463">463: </a><strong><font color="#4169E1"><a name="PEPJDCopyToExtendedVec"></a>static PetscErrorCode PEPJDCopyToExtendedVec(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,Vec v,PetscScalar *a,PetscInt na,PetscInt off,Vec vex,PetscBool back)</font></strong>
+<a name="line464">464: </a>{
+<a name="line466">466: </a>  PetscMPIInt    np,rk,count;
+<a name="line467">467: </a>  PetscScalar    *array1,*array2;
+<a name="line468">468: </a>  PetscInt       nloc;
+
+<a name="line471">471: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)pep),&amp;rk);
+<a name="line472">472: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)pep),&amp;np);
+<a name="line473">473: </a>  <a href="../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(pep-&gt;V,&amp;nloc,NULL,NULL);
+<a name="line474">474: </a>  <font color="#4169E1">if</font> (v) {
+<a name="line475">475: </a>    VecGetArray(v,&amp;array1);
+<a name="line476">476: </a>    VecGetArray(vex,&amp;array2);
+<a name="line477">477: </a>    <font color="#4169E1">if</font> (back) {
+<a name="line478">478: </a>      PetscArraycpy(array1,array2,nloc);
+<a name="line479">479: </a>    } <font color="#4169E1">else</font> {
+<a name="line480">480: </a>      PetscArraycpy(array2,array1,nloc);
+<a name="line481">481: </a>    }
+<a name="line482">482: </a>    VecRestoreArray(v,&amp;array1);
+<a name="line483">483: </a>    VecRestoreArray(vex,&amp;array2);
+<a name="line484">484: </a>  }
+<a name="line485">485: </a>  <font color="#4169E1">if</font> (a) {
+<a name="line486">486: </a>    VecGetArray(vex,&amp;array2);
+<a name="line487">487: </a>    <font color="#4169E1">if</font> (back) {
+<a name="line488">488: </a>      PetscArraycpy(a,array2+nloc+off,na);
+<a name="line489">489: </a>      PetscMPIIntCast(na,&amp;count);
+<a name="line490">490: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(a,count,MPIU_SCALAR,np-1,PetscObjectComm((PetscObject)pep));
+<a name="line491">491: </a>    } <font color="#4169E1">else</font> {
+<a name="line492">492: </a>      PetscArraycpy(array2+nloc+off,a,na);
+<a name="line493">493: </a>      PetscMPIIntCast(na,&amp;count);
+<a name="line494">494: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(array2+nloc+off,count,MPIU_SCALAR,np-1,PetscObjectComm((PetscObject)pep));
+<a name="line495">495: </a>    }
+<a name="line496">496: </a>    VecRestoreArray(vex,&amp;array2);
+<a name="line497">497: </a>  }
+<a name="line498">498: </a>  <font color="#4169E1">return</font>(0);
+<a name="line499">499: </a>}
+
+<a name="line501">501: </a><font color="#B22222">/* Computes Phi^hat(lambda) times a vector or its derivative (depends on beval)</font>
+<a name="line502">502: </a><font color="#B22222">     if no vector is provided returns a matrix</font>
+<a name="line503">503: </a><font color="#B22222"> */</font>
+<a name="line504">504: </a><strong><font color="#4169E1"><a name="PEPJDEvaluateHatBasis"></a>static PetscErrorCode PEPJDEvaluateHatBasis(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt n,PetscScalar *H,PetscInt ldh,PetscScalar *beval,PetscScalar *t,PetscInt idx,PetscScalar *qpp,PetscScalar *qp,PetscScalar *q)</font></strong>
+<a name="line505">505: </a>{
+<a name="line507">507: </a>  PetscInt       j,i;
+<a name="line508">508: </a>  PetscBLASInt   n_,ldh_,one=1;
+<a name="line509">509: </a>  PetscReal      *a,*b,*g;
+<a name="line510">510: </a>  PetscScalar    sone=1.0,zero=0.0;
+
+<a name="line513">513: </a>  a = pep-&gt;pbc; b=a+pep-&gt;nmat; g=b+pep-&gt;nmat;
+<a name="line514">514: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line515">515: </a>  PetscBLASIntCast(ldh,&amp;ldh_);
+<a name="line516">516: </a>  <font color="#4169E1">if</font> (idx&lt;1) {
+<a name="line517">517: </a>    PetscArrayzero(q,t?n:n*n);
+<a name="line518">518: </a>  } <font color="#4169E1">else</font> <font color="#4169E1">if</font> (idx==1) {
+<a name="line519">519: </a>    <font color="#4169E1">if</font> (t) {<font color="#4169E1">for</font> (j=0;j&lt;n;j++) q[j] = t[j]*beval[idx-1]/a[0];}
+<a name="line520">520: </a>    <font color="#4169E1">else</font> {
+<a name="line521">521: </a>      PetscArrayzero(q,n*n);
+<a name="line522">522: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) q[(j+1)*n] = beval[idx-1]/a[0];
+<a name="line523">523: </a>    }
+<a name="line524">524: </a>  } <font color="#4169E1">else</font> {
+<a name="line525">525: </a>    <font color="#4169E1">if</font> (t) {
+<a name="line526">526: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;sone,H,&amp;ldh_,qp,&amp;one,&amp;zero,q,&amp;one));
+<a name="line527">527: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line528">528: </a>        q[j] += beval[idx-1]*t[j]-b[idx-1]*qp[j]-g[idx-1]*qpp[j];
+<a name="line529">529: </a>        q[j] /= a[idx-1];
+<a name="line530">530: </a>      }
+<a name="line531">531: </a>    } <font color="#4169E1">else</font> {
+<a name="line532">532: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;sone,H,&amp;ldh_,qp,&amp;n_,&amp;zero,q,&amp;n_));
+<a name="line533">533: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line534">534: </a>        q[j+n*j] += beval[idx-1];
+<a name="line535">535: </a>        <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line536">536: </a>          q[i+n*j] += -b[idx-1]*qp[j*n+i]-g[idx-1]*qpp[j*n+i];
+<a name="line537">537: </a>          q[i+n*j] /= a[idx-1];
+<a name="line538">538: </a>        }
+<a name="line539">539: </a>      }
+<a name="line540">540: </a>    }
+<a name="line541">541: </a>  }
+<a name="line542">542: </a>  <font color="#4169E1">return</font>(0);
+<a name="line543">543: </a>}
+
+<a name="line545">545: </a><strong><font color="#4169E1"><a name="PEPJDComputeResidual"></a>static PetscErrorCode PEPJDComputeResidual(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool derivative,PetscInt sz,Vec *u,PetscScalar *theta,Vec *p,Vec *work)</font></strong>
+<a name="line546">546: </a>{
+<a name="line547">547: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line549">549: </a>  PetscMPIInt    rk,np,count;
+<a name="line550">550: </a>  Vec            tu,tp,w;
+<a name="line551">551: </a>  PetscScalar    *dval,*dvali,*array1,*array2,*x2=NULL,*y2,*qj=NULL,*tt=NULL,*xx=NULL,*xxi=NULL,sone=1.0;
+<a name="line552">552: </a>  PetscInt       i,j,nconv,nloc;
+<a name="line553">553: </a>  PetscBLASInt   n,ld,one=1;
+<a name="line554">554: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line555">555: </a>  Vec            tui=NULL,tpi=NULL;
+<a name="line556">556: </a>  PetscScalar    *x2i=NULL,*qji=NULL,*qq,*y2i,*arrayi1,*arrayi2;
+<a name="line557">557: </a><font color="#A020F0">#endif</font>
+
+<a name="line560">560: </a>  nconv = pjd-&gt;nlock;
+<a name="line561">561: </a>  <font color="#4169E1">if</font> (!nconv) {
+<a name="line562">562: </a>    PetscMalloc1(2*sz*pep-&gt;nmat,&amp;dval);
+<a name="line563">563: </a>  } <font color="#4169E1">else</font> {
+<a name="line564">564: </a>    PetscMalloc5(2*pep-&gt;nmat,&amp;dval,2*nconv,&amp;xx,nconv,&amp;tt,sz*nconv,&amp;x2,(sz==2?3:1)*nconv*pep-&gt;nmat,&amp;qj);
+<a name="line565">565: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_rank.html#MPI_Comm_rank">MPI_Comm_rank</a>(PetscObjectComm((PetscObject)pep),&amp;rk);
+<a name="line566">566: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)pep),&amp;np);
+<a name="line567">567: </a>    <a href="../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(pep-&gt;V,&amp;nloc,NULL,NULL);
+<a name="line568">568: </a>    VecGetArray(u[0],&amp;array1);
+<a name="line569">569: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) x2[i] = array1[nloc+i]*PetscSqrtReal(np);
+<a name="line570">570: </a>    VecRestoreArray(u[0],&amp;array1);
+<a name="line571">571: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line572">572: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line573">573: </a>      x2i = x2+nconv;
+<a name="line574">574: </a>      VecGetArray(u[1],&amp;arrayi1);
+<a name="line575">575: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) x2i[i] = arrayi1[nloc+i]*PetscSqrtReal(np);
+<a name="line576">576: </a>      VecRestoreArray(u[1],&amp;arrayi1);
+<a name="line577">577: </a>    }
+<a name="line578">578: </a><font color="#A020F0">#endif</font>
+<a name="line579">579: </a>  }
+<a name="line580">580: </a>  dvali = dval+pep-&gt;nmat;
+<a name="line581">581: </a>  tu = work[0];
+<a name="line582">582: </a>  tp = work[1];
+<a name="line583">583: </a>  w  = work[2];
+<a name="line584">584: </a>  VecGetArray(u[0],&amp;array1);
+<a name="line585">585: </a>  VecPlaceArray(tu,array1);
+<a name="line586">586: </a>  VecGetArray(p[0],&amp;array2);
+<a name="line587">587: </a>  VecPlaceArray(tp,array2);
+<a name="line588">588: </a>  VecSet(tp,0.0);
+<a name="line589">589: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line590">590: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line591">591: </a>    tui = work[3];
+<a name="line592">592: </a>    tpi = work[4];
+<a name="line593">593: </a>    VecGetArray(u[1],&amp;arrayi1);
+<a name="line594">594: </a>    VecPlaceArray(tui,arrayi1);
+<a name="line595">595: </a>    VecGetArray(p[1],&amp;arrayi2);
+<a name="line596">596: </a>    VecPlaceArray(tpi,arrayi2);
+<a name="line597">597: </a>    VecSet(tpi,0.0);
+<a name="line598">598: </a>  }
+<a name="line599">599: </a><font color="#A020F0">#endif</font>
+<a name="line600">600: </a>  <font color="#4169E1">if</font> (derivative) {
+<a name="line601">601: </a>    PEPEvaluateBasisDerivative(pep,theta[0],theta[1],dval,dvali);
+<a name="line602">602: </a>  } <font color="#4169E1">else</font> {
+<a name="line603">603: </a>    PEPEvaluateBasis(pep,theta[0],theta[1],dval,dvali);
+<a name="line604">604: </a>  }
+<a name="line605">605: </a>  <font color="#4169E1">for</font> (i=derivative?1:0;i&lt;pep-&gt;nmat;i++) {
+<a name="line606">606: </a>    MatMult(pep-&gt;A[i],tu,w);
+<a name="line607">607: </a>    VecAXPY(tp,dval[i],w);
+<a name="line608">608: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line609">609: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line610">610: </a>      VecAXPY(tpi,dvali[i],w);
+<a name="line611">611: </a>      MatMult(pep-&gt;A[i],tui,w);
+<a name="line612">612: </a>      VecAXPY(tpi,dval[i],w);
+<a name="line613">613: </a>      VecAXPY(tp,-dvali[i],w);
+<a name="line614">614: </a>    }
+<a name="line615">615: </a><font color="#A020F0">#endif</font>
+<a name="line616">616: </a>  }
+<a name="line617">617: </a>  <font color="#4169E1">if</font> (nconv) {
+<a name="line618">618: </a>    <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line619">619: </a>      PEPJDEvaluateHatBasis(pep,nconv,pjd-&gt;T,pep-&gt;ncv,dval,x2,i,i&gt;1?qj+(i-2)*nconv:NULL,i&gt;0?qj+(i-1)*nconv:NULL,qj+i*nconv);
+<a name="line620">620: </a>    }
+<a name="line621">621: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line622">622: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line623">623: </a>      qji = qj+nconv*pep-&gt;nmat;
+<a name="line624">624: </a>      qq = qji+nconv*pep-&gt;nmat;
+<a name="line625">625: </a>      <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line626">626: </a>        PEPJDEvaluateHatBasis(pep,nconv,pjd-&gt;T,pep-&gt;ncv,dvali,x2i,i,i&gt;1?qji+(i-2)*nconv:NULL,i&gt;0?qji+(i-1)*nconv:NULL,qji+i*nconv);
+<a name="line627">627: </a>      }
+<a name="line628">628: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv*pep-&gt;nmat;i++) qj[i] -= qji[i];
+<a name="line629">629: </a>      <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line630">630: </a>        PEPJDEvaluateHatBasis(pep,nconv,pjd-&gt;T,pep-&gt;ncv,dval,x2i,i,i&gt;1?qji+(i-2)*nconv:NULL,i&gt;0?qji+(i-1)*nconv:NULL,qji+i*nconv);
+<a name="line631">631: </a>        PEPJDEvaluateHatBasis(pep,nconv,pjd-&gt;T,pep-&gt;ncv,dvali,x2,i,i&gt;1?qq+(i-2)*nconv:NULL,i&gt;0?qq+(i-1)*nconv:NULL,qq+i*nconv);
+<a name="line632">632: </a>      }
+<a name="line633">633: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv*pep-&gt;nmat;i++) qji[i] += qq[i];
+<a name="line634">634: </a>      <font color="#4169E1">for</font> (i=derivative?2:1;i&lt;pep-&gt;nmat;i++) {
+<a name="line635">635: </a>        <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;AX[i],1.0,1.0,tpi,qji+i*nconv);
+<a name="line636">636: </a>      }
+<a name="line637">637: </a>    }
+<a name="line638">638: </a><font color="#A020F0">#endif</font>
+<a name="line639">639: </a>    <font color="#4169E1">for</font> (i=derivative?2:1;i&lt;pep-&gt;nmat;i++) {
+<a name="line640">640: </a>      <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;AX[i],1.0,1.0,tp,qj+i*nconv);
+<a name="line641">641: </a>    }
+
+<a name="line643">643: </a>    <font color="#B22222">/* extended vector part */</font>
+<a name="line644">644: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;X,0,nconv);
+<a name="line645">645: </a>    <a href="../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(pjd-&gt;X,tu,xx);
+<a name="line646">646: </a>    xxi = xx+nconv;
+<a name="line647">647: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line648">648: </a>    <font color="#4169E1">if</font> (sz==2) { <a href="../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(pjd-&gt;X,tui,xxi); }
+<a name="line649">649: </a><font color="#A020F0">#endif</font>
+<a name="line650">650: </a>    <font color="#4169E1">if</font> (sz==1) { PetscArrayzero(xxi,nconv); }
+<a name="line651">651: </a>    <font color="#4169E1">if</font> (rk==np-1) {
+<a name="line652">652: </a>      PetscBLASIntCast(nconv,&amp;n);
+<a name="line653">653: </a>      PetscBLASIntCast(pjd-&gt;ld,&amp;ld);
+<a name="line654">654: </a>      y2  = array2+nloc;
+<a name="line655">655: </a>      PetscArrayzero(y2,nconv);
+<a name="line656">656: </a>      <font color="#4169E1">for</font> (j=derivative?1:0;j&lt;pjd-&gt;midx;j++) {
+<a name="line657">657: </a>        <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) tt[i] = dval[j]*xx[i]-dvali[j]*xxi[i];
+<a name="line658">658: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;XpX,&amp;ld,qj+j*nconv,&amp;one,&amp;sone,tt,&amp;one));
+<a name="line659">659: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;Tj+j*ld*ld,&amp;ld,tt,&amp;one,&amp;sone,y2,&amp;one));
+<a name="line660">660: </a>      }
+<a name="line661">661: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) array2[nloc+i] /= PetscSqrtReal(np);
+<a name="line662">662: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line663">663: </a>      <font color="#4169E1">if</font> (sz==2) {
+<a name="line664">664: </a>        y2i = arrayi2+nloc;
+<a name="line665">665: </a>        PetscArrayzero(y2i,nconv);
+<a name="line666">666: </a>        <font color="#4169E1">for</font> (j=derivative?1:0;j&lt;pjd-&gt;midx;j++) {
+<a name="line667">667: </a>          <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) tt[i] = dval[j]*xxi[i]+dvali[j]*xx[i];
+<a name="line668">668: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;XpX,&amp;ld,qji+j*nconv,&amp;one,&amp;sone,tt,&amp;one));
+<a name="line669">669: </a>          PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;Tj+j*ld*ld,&amp;ld,tt,&amp;one,&amp;sone,y2i,&amp;one));
+<a name="line670">670: </a>        }
+<a name="line671">671: </a>        <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) arrayi2[nloc+i] /= PetscSqrtReal(np);
+<a name="line672">672: </a>      }
+<a name="line673">673: </a><font color="#A020F0">#endif</font>
+<a name="line674">674: </a>    }
+<a name="line675">675: </a>    PetscMPIIntCast(nconv,&amp;count);
+<a name="line676">676: </a>    <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(array2+nloc,count,MPIU_SCALAR,np-1,PetscObjectComm((PetscObject)pep));
+<a name="line677">677: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line678">678: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line679">679: </a>      <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(arrayi2+nloc,count,MPIU_SCALAR,np-1,PetscObjectComm((PetscObject)pep));
+<a name="line680">680: </a>    }
+<a name="line681">681: </a><font color="#A020F0">#endif</font>
+<a name="line682">682: </a>  }
+<a name="line683">683: </a>  <font color="#4169E1">if</font> (nconv) {
+<a name="line684">684: </a>    PetscFree5(dval,xx,tt,x2,qj);
+<a name="line685">685: </a>  } <font color="#4169E1">else</font> {
+<a name="line686">686: </a>    PetscFree(dval);
+<a name="line687">687: </a>  }
+<a name="line688">688: </a>  VecResetArray(tu);
+<a name="line689">689: </a>  VecRestoreArray(u[0],&amp;array1);
+<a name="line690">690: </a>  VecResetArray(tp);
+<a name="line691">691: </a>  VecRestoreArray(p[0],&amp;array2);
+<a name="line692">692: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line693">693: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line694">694: </a>    VecResetArray(tui);
+<a name="line695">695: </a>    VecRestoreArray(u[1],&amp;arrayi1);
+<a name="line696">696: </a>    VecResetArray(tpi);
+<a name="line697">697: </a>    VecRestoreArray(p[1],&amp;arrayi2);
+<a name="line698">698: </a>  }
+<a name="line699">699: </a><font color="#A020F0">#endif</font>
+<a name="line700">700: </a>  <font color="#4169E1">return</font>(0);
+<a name="line701">701: </a>}
+
+<a name="line703">703: </a><strong><font color="#4169E1"><a name="PEPJDProcessInitialSpace"></a>static PetscErrorCode PEPJDProcessInitialSpace(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,Vec *w)</font></strong>
+<a name="line704">704: </a>{
+<a name="line705">705: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line707">707: </a>  PetscScalar    *tt,target[2];
+<a name="line708">708: </a>  Vec            vg,wg;
+<a name="line709">709: </a>  PetscInt       i;
+<a name="line710">710: </a>  PetscReal      norm;
+
+<a name="line713">713: </a>  PetscMalloc1(pjd-&gt;ld-1,&amp;tt);
+<a name="line714">714: </a>  <font color="#4169E1">if</font> (pep-&gt;nini==0) {
+<a name="line715">715: </a>    <a href="../../../../docs/manualpages/BV/BVSetRandomColumn.html#BVSetRandomColumn">BVSetRandomColumn</a>(pjd-&gt;V,0);
+<a name="line716">716: </a>    <font color="#4169E1">for</font> (i=0;i&lt;pjd-&gt;ld-1;i++) tt[i] = 0.0;
+<a name="line717">717: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,0,&amp;vg);
+<a name="line718">718: </a>    PEPJDCopyToExtendedVec(pep,NULL,tt,pjd-&gt;ld-1,0,vg,PETSC_FALSE);
+<a name="line719">719: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,0,&amp;vg);
+<a name="line720">720: </a>    <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(pjd-&gt;V,0,NORM_2,&amp;norm);
+<a name="line721">721: </a>    <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;V,0,1.0/norm);
+<a name="line722">722: </a>    <font color="#4169E1">if</font> (pjd-&gt;proj==<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>) {
+<a name="line723">723: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,0,&amp;vg);
+<a name="line724">724: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;W,0,&amp;wg);
+<a name="line725">725: </a>      VecSet(wg,0.0);
+<a name="line726">726: </a>      target[0] = pep-&gt;target; target[1] = 0.0;
+<a name="line727">727: </a>      PEPJDComputeResidual(pep,PETSC_TRUE,1,&amp;vg,target,&amp;wg,w);
+<a name="line728">728: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;W,0,&amp;wg);
+<a name="line729">729: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,0,&amp;vg);
+<a name="line730">730: </a>      <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(pjd-&gt;W,0,NORM_2,&amp;norm);
+<a name="line731">731: </a>      <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;W,0,1.0/norm);
+<a name="line732">732: </a>    }
+<a name="line733">733: </a>  } <font color="#4169E1">else</font> SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,<font color="#666666">"Support for initial vectors not implemented yet"</font>);
+<a name="line734">734: </a>  PetscFree(tt);
+<a name="line735">735: </a>  <font color="#4169E1">return</font>(0);
+<a name="line736">736: </a>}
+
+<a name="line738">738: </a><strong><font color="#4169E1"><a name="MatMult_PEPJD"></a>static PetscErrorCode MatMult_PEPJD(Mat P,Vec x,Vec y)</font></strong>
+<a name="line739">739: </a>{
+<a name="line740">740: </a>  PetscErrorCode  ierr;
+<a name="line741">741: </a>  PEP_JD_MATSHELL *matctx;
+<a name="line742">742: </a>  PEP_JD          *pjd;
+<a name="line743">743: </a>  PetscInt        i,j,nconv,nloc,nmat,ldt,ncv,sz;
+<a name="line744">744: </a>  Vec             tx,ty;
+<a name="line745">745: </a>  const Vec       *xs,*ys;
+<a name="line746">746: </a>  PetscScalar     *array1,*array2,*x2=NULL,*y2,*tt=NULL,*xx=NULL,*xxi,theta[2],sone=1.0,*qj,*val,*vali=NULL;
+<a name="line747">747: </a>  PetscBLASInt    n,ld,one=1;
+<a name="line748">748: </a>  PetscMPIInt     np;
+<a name="line749">749: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line750">750: </a>  Vec             txi=NULL,tyi=NULL;
+<a name="line751">751: </a>  PetscScalar     *x2i=NULL,*qji=NULL,*qq,*y2i,*arrayi1,*arrayi2;
+<a name="line752">752: </a><font color="#A020F0">#endif</font>
+
+<a name="line755">755: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)P),&amp;np);
+<a name="line756">756: </a>  MatShellGetContext(P,(void**)&amp;matctx);
+<a name="line757">757: </a>  pjd   = (PEP_JD*)(matctx-&gt;pep-&gt;data);
+<a name="line758">758: </a>  nconv = pjd-&gt;nlock;
+<a name="line759">759: </a>  nmat  = matctx-&gt;pep-&gt;nmat;
+<a name="line760">760: </a>  ncv   = matctx-&gt;pep-&gt;ncv;
+<a name="line761">761: </a>  ldt   = pjd-&gt;ld;
+<a name="line762">762: </a>  <a href="../../../../docs/manualpages/sys/VecCompGetSubVecs.html#VecCompGetSubVecs">VecCompGetSubVecs</a>(x,&amp;sz,&amp;xs);
+<a name="line763">763: </a>  <a href="../../../../docs/manualpages/sys/VecCompGetSubVecs.html#VecCompGetSubVecs">VecCompGetSubVecs</a>(y,NULL,&amp;ys);
+<a name="line764">764: </a>  theta[0] = matctx-&gt;theta[0];
+<a name="line765">765: </a>  theta[1] = (sz==2)?matctx-&gt;theta[1]:0.0;
+<a name="line766">766: </a>  <font color="#4169E1">if</font> (nconv&gt;0) {
+<a name="line767">767: </a>    PetscMalloc5(nconv,&amp;tt,sz*nconv,&amp;x2,(sz==2?3:1)*nconv*nmat,&amp;qj,2*nconv,&amp;xx,2*nmat,&amp;val);
+<a name="line768">768: </a>    <a href="../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(matctx-&gt;pep-&gt;V,&amp;nloc,NULL,NULL);
+<a name="line769">769: </a>    VecGetArray(xs[0],&amp;array1);
+<a name="line770">770: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) x2[i] = array1[nloc+i]* PetscSqrtReal(np);
+<a name="line771">771: </a>    VecRestoreArray(xs[0],&amp;array1);
+<a name="line772">772: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line773">773: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line774">774: </a>      x2i = x2+nconv;
+<a name="line775">775: </a>      VecGetArray(xs[1],&amp;arrayi1);
+<a name="line776">776: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) x2i[i] = arrayi1[nloc+i]* PetscSqrtReal(np);
+<a name="line777">777: </a>      VecRestoreArray(xs[1],&amp;arrayi1);
+<a name="line778">778: </a>    }
+<a name="line779">779: </a><font color="#A020F0">#endif</font>
+<a name="line780">780: </a>    vali = val+nmat;
+<a name="line781">781: </a>  }
+<a name="line782">782: </a>  tx = matctx-&gt;work[0];
+<a name="line783">783: </a>  ty = matctx-&gt;work[1];
+<a name="line784">784: </a>  VecGetArray(xs[0],&amp;array1);
+<a name="line785">785: </a>  VecPlaceArray(tx,array1);
+<a name="line786">786: </a>  VecGetArray(ys[0],&amp;array2);
+<a name="line787">787: </a>  VecPlaceArray(ty,array2);
+<a name="line788">788: </a>  MatMult(matctx-&gt;Pr,tx,ty);
+<a name="line789">789: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line790">790: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line791">791: </a>    txi = matctx-&gt;work[2];
+<a name="line792">792: </a>    tyi = matctx-&gt;work[3];
+<a name="line793">793: </a>    VecGetArray(xs[1],&amp;arrayi1);
+<a name="line794">794: </a>    VecPlaceArray(txi,arrayi1);
+<a name="line795">795: </a>    VecGetArray(ys[1],&amp;arrayi2);
+<a name="line796">796: </a>    VecPlaceArray(tyi,arrayi2);
+<a name="line797">797: </a>    MatMult(matctx-&gt;Pr,txi,tyi);
+<a name="line798">798: </a>    <font color="#4169E1">if</font> (theta[1]!=0.0) {
+<a name="line799">799: </a>      MatMult(matctx-&gt;Pi,txi,matctx-&gt;work[4]);
+<a name="line800">800: </a>      VecAXPY(ty,-1.0,matctx-&gt;work[4]);
+<a name="line801">801: </a>      MatMult(matctx-&gt;Pi,tx,matctx-&gt;work[4]);
+<a name="line802">802: </a>      VecAXPY(tyi,1.0,matctx-&gt;work[4]);
+<a name="line803">803: </a>    }
+<a name="line804">804: </a>  }
+<a name="line805">805: </a><font color="#A020F0">#endif</font>
+<a name="line806">806: </a>  <font color="#4169E1">if</font> (nconv&gt;0) {
+<a name="line807">807: </a>    PEPEvaluateBasis(matctx-&gt;pep,theta[0],theta[1],val,vali);
+<a name="line808">808: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nmat;i++) {
+<a name="line809">809: </a>      PEPJDEvaluateHatBasis(matctx-&gt;pep,nconv,pjd-&gt;T,ncv,val,x2,i,i&gt;1?qj+(i-2)*nconv:NULL,i&gt;0?qj+(i-1)*nconv:NULL,qj+i*nconv);
+<a name="line810">810: </a>    }
+<a name="line811">811: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line812">812: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line813">813: </a>      qji = qj+nconv*nmat;
+<a name="line814">814: </a>      qq = qji+nconv*nmat;
+<a name="line815">815: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nmat;i++) {
+<a name="line816">816: </a>        PEPJDEvaluateHatBasis(matctx-&gt;pep,nconv,pjd-&gt;T,matctx-&gt;pep-&gt;ncv,vali,x2i,i,i&gt;1?qji+(i-2)*nconv:NULL,i&gt;0?qji+(i-1)*nconv:NULL,qji+i*nconv);
+<a name="line817">817: </a>      }
+<a name="line818">818: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv*nmat;i++) qj[i] -= qji[i];
+<a name="line819">819: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nmat;i++) {
+<a name="line820">820: </a>        PEPJDEvaluateHatBasis(matctx-&gt;pep,nconv,pjd-&gt;T,matctx-&gt;pep-&gt;ncv,val,x2i,i,i&gt;1?qji+(i-2)*nconv:NULL,i&gt;0?qji+(i-1)*nconv:NULL,qji+i*nconv);
+<a name="line821">821: </a>        PEPJDEvaluateHatBasis(matctx-&gt;pep,nconv,pjd-&gt;T,matctx-&gt;pep-&gt;ncv,vali,x2,i,i&gt;1?qq+(i-2)*nconv:NULL,i&gt;0?qq+(i-1)*nconv:NULL,qq+i*nconv);
+<a name="line822">822: </a>      }
+<a name="line823">823: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv*nmat;i++) qji[i] += qq[i];
+<a name="line824">824: </a>      <font color="#4169E1">for</font> (i=1;i&lt;matctx-&gt;pep-&gt;nmat;i++) {
+<a name="line825">825: </a>        <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;AX[i],1.0,1.0,tyi,qji+i*nconv);
+<a name="line826">826: </a>      }
+<a name="line827">827: </a>    }
+<a name="line828">828: </a><font color="#A020F0">#endif</font>
+<a name="line829">829: </a>    <font color="#4169E1">for</font> (i=1;i&lt;nmat;i++) {
+<a name="line830">830: </a>      <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;AX[i],1.0,1.0,ty,qj+i*nconv);
+<a name="line831">831: </a>    }
+
+<a name="line833">833: </a>    <font color="#B22222">/* extended vector part */</font>
+<a name="line834">834: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;X,0,nconv);
+<a name="line835">835: </a>    <a href="../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(pjd-&gt;X,tx,xx);
+<a name="line836">836: </a>    xxi = xx+nconv;
+<a name="line837">837: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line838">838: </a>    <font color="#4169E1">if</font> (sz==2) { <a href="../../../../docs/manualpages/BV/BVDotVec.html#BVDotVec">BVDotVec</a>(pjd-&gt;X,txi,xxi); }
+<a name="line839">839: </a><font color="#A020F0">#endif</font>
+<a name="line840">840: </a>    <font color="#4169E1">if</font> (sz==1) { PetscArrayzero(xxi,nconv); }
+<a name="line841">841: </a>    PetscBLASIntCast(pjd-&gt;nlock,&amp;n);
+<a name="line842">842: </a>    PetscBLASIntCast(ldt,&amp;ld);
+<a name="line843">843: </a>    y2 = array2+nloc;
+<a name="line844">844: </a>    PetscArrayzero(y2,nconv);
+<a name="line845">845: </a>    <font color="#4169E1">for</font> (j=0;j&lt;pjd-&gt;midx;j++) {
+<a name="line846">846: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) tt[i] = val[j]*xx[i]-vali[j]*xxi[i];
+<a name="line847">847: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;XpX,&amp;ld,qj+j*nconv,&amp;one,&amp;sone,tt,&amp;one));
+<a name="line848">848: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;Tj+j*ld*ld,&amp;ld,tt,&amp;one,&amp;sone,y2,&amp;one));
+<a name="line849">849: </a>    }
+<a name="line850">850: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line851">851: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line852">852: </a>      y2i = arrayi2+nloc;
+<a name="line853">853: </a>      PetscArrayzero(y2i,nconv);
+<a name="line854">854: </a>      <font color="#4169E1">for</font> (j=0;j&lt;pjd-&gt;midx;j++) {
+<a name="line855">855: </a>        <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) tt[i] = val[j]*xxi[i]+vali[j]*xx[i];
+<a name="line856">856: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"N"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;XpX,&amp;ld,qji+j*nconv,&amp;one,&amp;sone,tt,&amp;one));
+<a name="line857">857: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemv"</font>,BLASgemv_(<font color="#666666">"C"</font>,&amp;n,&amp;n,&amp;sone,pjd-&gt;Tj+j*ld*ld,&amp;ld,tt,&amp;one,&amp;sone,y2i,&amp;one));
+<a name="line858">858: </a>      }
+<a name="line859">859: </a>      <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) arrayi2[nloc+i] /= PetscSqrtReal(np);
+<a name="line860">860: </a>    }
+<a name="line861">861: </a><font color="#A020F0">#endif</font>
+<a name="line862">862: </a>    <font color="#4169E1">for</font> (i=0;i&lt;nconv;i++) array2[nloc+i] /= PetscSqrtReal(np);
+<a name="line863">863: </a>    PetscFree5(tt,x2,qj,xx,val);
+<a name="line864">864: </a>  }
+<a name="line865">865: </a>  VecResetArray(tx);
+<a name="line866">866: </a>  VecRestoreArray(xs[0],&amp;array1);
+<a name="line867">867: </a>  VecResetArray(ty);
+<a name="line868">868: </a>  VecRestoreArray(ys[0],&amp;array2);
+<a name="line869">869: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line870">870: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line871">871: </a>    VecResetArray(txi);
+<a name="line872">872: </a>    VecRestoreArray(xs[1],&amp;arrayi1);
+<a name="line873">873: </a>    VecResetArray(tyi);
+<a name="line874">874: </a>    VecRestoreArray(ys[1],&amp;arrayi2);
+<a name="line875">875: </a>  }
+<a name="line876">876: </a><font color="#A020F0">#endif</font>
+<a name="line877">877: </a>  <font color="#4169E1">return</font>(0);
+<a name="line878">878: </a>}
+
+<a name="line880">880: </a><strong><font color="#4169E1"><a name="MatCreateVecs_PEPJD"></a>static PetscErrorCode MatCreateVecs_PEPJD(Mat A,Vec *right,Vec *left)</font></strong>
+<a name="line881">881: </a>{
+<a name="line882">882: </a>  PetscErrorCode  ierr;
+<a name="line883">883: </a>  PEP_JD_MATSHELL *matctx;
+<a name="line884">884: </a>  PEP_JD          *pjd;
+<a name="line885">885: </a>  PetscInt        kspsf=1,i;
+<a name="line886">886: </a>  Vec             v[2];
+
+<a name="line889">889: </a>  MatShellGetContext(A,(void**)&amp;matctx);
+<a name="line890">890: </a>  pjd   = (PEP_JD*)(matctx-&gt;pep-&gt;data);
+<a name="line891">891: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line892">892: </a>  kspsf = 2;
+<a name="line893">893: </a><font color="#A020F0">#endif</font>
+<a name="line894">894: </a>  <font color="#4169E1">for</font> (i=0;i&lt;kspsf;i++){
+<a name="line895">895: </a>    <a href="../../../../docs/manualpages/BV/BVCreateVec.html#BVCreateVec">BVCreateVec</a>(pjd-&gt;V,v+i);
+<a name="line896">896: </a>  }
+<a name="line897">897: </a>  <font color="#4169E1">if</font> (right) {
+<a name="line898">898: </a>    <a href="../../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a>(v,kspsf,pjd-&gt;vtempl,right);
+<a name="line899">899: </a>  }
+<a name="line900">900: </a>  <font color="#4169E1">if</font> (left) {
+<a name="line901">901: </a>    <a href="../../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a>(v,kspsf,pjd-&gt;vtempl,left);
+<a name="line902">902: </a>  }
+<a name="line903">903: </a>  <font color="#4169E1">for</font> (i=0;i&lt;kspsf;i++) {
+<a name="line904">904: </a>    VecDestroy(&amp;v[i]);
+<a name="line905">905: </a>  }
+<a name="line906">906: </a>  <font color="#4169E1">return</font>(0);
+<a name="line907">907: </a>}
+
+<a name="line909">909: </a><strong><font color="#4169E1"><a name="PEPJDUpdateExtendedPC"></a>static PetscErrorCode PEPJDUpdateExtendedPC(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscScalar theta)</font></strong>
+<a name="line910">910: </a>{
+<a name="line912">912: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line913">913: </a>  PEP_JD_PCSHELL *pcctx;
+<a name="line914">914: </a>  PetscInt       i,j,k,n=pjd-&gt;nlock,ld=pjd-&gt;ld,deg=pep-&gt;nmat-1;
+<a name="line915">915: </a>  PetscScalar    *M,*ps,*work,*U,*V,*S,*Sp,*Spp,snone=-1.0,sone=1.0,zero=0.0,*val;
+<a name="line916">916: </a>  PetscReal      tol,maxeig=0.0,*sg,*rwork;
+<a name="line917">917: </a>  PetscBLASInt   n_,info,ld_,*p,lw_,rk=0;
+
+<a name="line920">920: </a>  <font color="#4169E1">if</font> (n) {
+<a name="line921">921: </a>    PCShellGetContext(pjd-&gt;pcshell,(void**)&amp;pcctx);
+<a name="line922">922: </a>    pcctx-&gt;theta = theta;
+<a name="line923">923: </a>    pcctx-&gt;n = n;
+<a name="line924">924: </a>    M  = pcctx-&gt;M;
+<a name="line925">925: </a>    PetscBLASIntCast(n,&amp;n_);
+<a name="line926">926: </a>    PetscBLASIntCast(ld,&amp;ld_);
+<a name="line927">927: </a>    <font color="#4169E1">if</font> (pjd-&gt;midx==1) {
+<a name="line928">928: </a>      PetscArraycpy(M,pjd-&gt;XpX,ld*ld);
+<a name="line929">929: </a>      PetscCalloc2(10*n,&amp;work,n,&amp;p);
+<a name="line930">930: </a>    } <font color="#4169E1">else</font> {
+<a name="line931">931: </a>      ps = pcctx-&gt;ps;
+<a name="line932">932: </a>      PetscCalloc7(2*n*n,&amp;U,3*n*n,&amp;S,n,&amp;sg,10*n,&amp;work,5*n,&amp;rwork,n,&amp;p,deg+1,&amp;val);
+<a name="line933">933: </a>      V = U+n*n;
+<a name="line934">934: </a>      <font color="#B22222">/* pseudo-inverse */</font>
+<a name="line935">935: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line936">936: </a>        <font color="#4169E1">for</font> (i=0;i&lt;n;i++) S[n*j+i] = -pjd-&gt;T[pep-&gt;ncv*j+i];
+<a name="line937">937: </a>        S[n*j+j] += theta;
+<a name="line938">938: </a>      }
+<a name="line939">939: </a>      lw_ = 10*n_;
+<a name="line940">940: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line941">941: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"S"</font>,&amp;n_,&amp;n_,S,&amp;n_,sg,U,&amp;n_,V,&amp;n_,work,&amp;lw_,&amp;info));
+<a name="line942">942: </a><font color="#A020F0">#else</font>
+<a name="line943">943: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKgesvd"</font>,LAPACKgesvd_(<font color="#666666">"S"</font>,<font color="#666666">"S"</font>,&amp;n_,&amp;n_,S,&amp;n_,sg,U,&amp;n_,V,&amp;n_,work,&amp;lw_,rwork,&amp;info));
+<a name="line944">944: </a><font color="#A020F0">#endif</font>
+<a name="line945">945: </a>      SlepcCheckLapackInfo(<font color="#666666">"gesvd"</font>,info);
+<a name="line946">946: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) maxeig = PetscMax(maxeig,sg[i]);
+<a name="line947">947: </a>      tol = 10*PETSC_MACHINE_EPSILON*n*maxeig;
+<a name="line948">948: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) {
+<a name="line949">949: </a>        <font color="#4169E1">if</font> (sg[j]&gt;tol) {
+<a name="line950">950: </a>          <font color="#4169E1">for</font> (i=0;i&lt;n;i++) U[j*n+i] /= sg[j];
+<a name="line951">951: </a>          rk++;
+<a name="line952">952: </a>        } <font color="#4169E1">else</font> <font color="#4169E1">break</font>;
+<a name="line953">953: </a>      }
+<a name="line954">954: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;rk,&amp;sone,U,&amp;n_,V,&amp;n_,&amp;zero,ps,&amp;ld_));
+
+<a name="line956">956: </a>      <font color="#B22222">/* compute M */</font>
+<a name="line957">957: </a>      PEPEvaluateBasis(pep,theta,0.0,val,NULL);
+<a name="line958">958: </a>      PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;snone,pjd-&gt;XpX,&amp;ld_,ps,&amp;ld_,&amp;zero,M,&amp;ld_));
+<a name="line959">959: </a>      PetscArrayzero(S,2*n*n);
+<a name="line960">960: </a>      Sp = S+n*n;
+<a name="line961">961: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++) S[j*(n+1)] = 1.0;
+<a name="line962">962: </a>      <font color="#4169E1">for</font> (k=1;k&lt;pjd-&gt;midx;k++) {
+<a name="line963">963: </a>        <font color="#4169E1">for</font> (j=0;j&lt;n;j++) <font color="#4169E1">for</font> (i=0;i&lt;n;i++) V[j*n+i] = S[j*n+i] - ps[j*ld+i]*val[k];
+<a name="line964">964: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;sone,pjd-&gt;XpX,&amp;ld_,V,&amp;n_,&amp;zero,U,&amp;n_));
+<a name="line965">965: </a>        PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;n_,&amp;n_,&amp;sone,pjd-&gt;Tj+k*ld*ld,&amp;ld_,U,&amp;n_,&amp;sone,M,&amp;ld_));
+<a name="line966">966: </a>        Spp = Sp; Sp = S;
+<a name="line967">967: </a>        PEPJDEvaluateHatBasis(pep,n,pjd-&gt;T,pep-&gt;ncv,val,NULL,k+1,Spp,Sp,S);
+<a name="line968">968: </a>      }
+<a name="line969">969: </a>    }
+<a name="line970">970: </a>    <font color="#B22222">/* inverse */</font>
+<a name="line971">971: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKgetrf"</font>,LAPACKgetrf_(&amp;n_,&amp;n_,M,&amp;ld_,p,&amp;info));
+<a name="line972">972: </a>    SlepcCheckLapackInfo(<font color="#666666">"getrf"</font>,info);
+<a name="line973">973: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKgetri"</font>,LAPACKgetri_(&amp;n_,M,&amp;ld_,p,work,&amp;n_,&amp;info));
+<a name="line974">974: </a>    SlepcCheckLapackInfo(<font color="#666666">"getri"</font>,info);
+<a name="line975">975: </a>    <font color="#4169E1">if</font> (pjd-&gt;midx==1) {
+<a name="line976">976: </a>      PetscFree2(work,p);
+<a name="line977">977: </a>    } <font color="#4169E1">else</font> {
+<a name="line978">978: </a>      PetscFree7(U,S,sg,work,rwork,p,val);
+<a name="line979">979: </a>    }
+<a name="line980">980: </a>  }
+<a name="line981">981: </a>  <font color="#4169E1">return</font>(0);
+<a name="line982">982: </a>}
+
+<a name="line984">984: </a><strong><font color="#4169E1"><a name="PEPJDMatSetUp"></a>static PetscErrorCode PEPJDMatSetUp(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt sz,PetscScalar *theta)</font></strong>
+<a name="line985">985: </a>{
+<a name="line986">986: </a>  PetscErrorCode  ierr;
+<a name="line987">987: </a>  PEP_JD          *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line988">988: </a>  PEP_JD_MATSHELL *matctx;
+<a name="line989">989: </a>  PEP_JD_PCSHELL  *pcctx;
+<a name="line990">990: </a>  MatStructure    str;
+<a name="line991">991: </a>  PetscScalar     *vals,*valsi;
+<a name="line992">992: </a>  PetscBool       skipmat=PETSC_FALSE;
+<a name="line993">993: </a>  PetscInt        i;
+<a name="line994">994: </a>  Mat             Pr=NULL;
+
+<a name="line997">997: </a>  <font color="#4169E1">if</font> (sz==2 &amp;&amp; theta[1]==0.0) sz = 1;
+<a name="line998">998: </a>  MatShellGetContext(pjd-&gt;Pshell,(void**)&amp;matctx);
+<a name="line999">999: </a>  PCShellGetContext(pjd-&gt;pcshell,(void**)&amp;pcctx);
+<a name="line1000">1000: </a>  <font color="#4169E1">if</font> (matctx-&gt;Pr &amp;&amp; matctx-&gt;theta[0]==theta[0] &amp;&amp; ((!matctx-&gt;Pi &amp;&amp; sz==1) || (sz==2 &amp;&amp; matctx-&gt;theta[1]==theta[1]))) {
+<a name="line1001">1001: </a>    <font color="#4169E1">if</font> (pcctx-&gt;n == pjd-&gt;nlock) <font color="#4169E1">return</font>(0);
+<a name="line1002">1002: </a>    skipmat = PETSC_TRUE;
+<a name="line1003">1003: </a>  }
+<a name="line1004">1004: </a>  <font color="#4169E1">if</font> (!skipmat) {
+<a name="line1005">1005: </a>    PetscMalloc2(pep-&gt;nmat,&amp;vals,pep-&gt;nmat,&amp;valsi);
+<a name="line1006">1006: </a>    <a href="../../../../docs/manualpages/ST/STGetMatStructure.html#STGetMatStructure">STGetMatStructure</a>(pep-&gt;st,&amp;str);
+<a name="line1007">1007: </a>    PEPEvaluateBasis(pep,theta[0],theta[1],vals,valsi);
+<a name="line1008">1008: </a>    <font color="#4169E1">if</font> (!matctx-&gt;Pr) {
+<a name="line1009">1009: </a>      MatDuplicate(pep-&gt;A[0],MAT_COPY_VALUES,&amp;matctx-&gt;Pr);
+<a name="line1010">1010: </a>    } <font color="#4169E1">else</font> {
+<a name="line1011">1011: </a>      MatCopy(pep-&gt;A[0],matctx-&gt;Pr,str);
+<a name="line1012">1012: </a>    }
+<a name="line1013">1013: </a>    <font color="#4169E1">for</font> (i=1;i&lt;pep-&gt;nmat;i++) {
+<a name="line1014">1014: </a>      MatAXPY(matctx-&gt;Pr,vals[i],pep-&gt;A[i],str);
+<a name="line1015">1015: </a>    }
+<a name="line1016">1016: </a>    <font color="#4169E1">if</font> (!pjd-&gt;reusepc) {
+<a name="line1017">1017: </a>      <font color="#4169E1">if</font> (pcctx-&gt;PPr &amp;&amp; sz==2) {
+<a name="line1018">1018: </a>        MatCopy(matctx-&gt;Pr,pcctx-&gt;PPr,str);
+<a name="line1019">1019: </a>        Pr = pcctx-&gt;PPr;
+<a name="line1020">1020: </a>      } <font color="#4169E1">else</font> Pr = matctx-&gt;Pr;
+<a name="line1021">1021: </a>    }
+<a name="line1022">1022: </a>    matctx-&gt;theta[0] = theta[0];
+<a name="line1023">1023: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1024">1024: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line1025">1025: </a>      <font color="#4169E1">if</font> (!matctx-&gt;Pi) {
+<a name="line1026">1026: </a>        MatDuplicate(pep-&gt;A[0],MAT_COPY_VALUES,&amp;matctx-&gt;Pi);
+<a name="line1027">1027: </a>      } <font color="#4169E1">else</font> {
+<a name="line1028">1028: </a>        MatCopy(pep-&gt;A[1],matctx-&gt;Pi,str);
+<a name="line1029">1029: </a>      }
+<a name="line1030">1030: </a>      MatScale(matctx-&gt;Pi,valsi[1]);
+<a name="line1031">1031: </a>      <font color="#4169E1">for</font> (i=2;i&lt;pep-&gt;nmat;i++) {
+<a name="line1032">1032: </a>        MatAXPY(matctx-&gt;Pi,valsi[i],pep-&gt;A[i],str);
+<a name="line1033">1033: </a>      }
+<a name="line1034">1034: </a>      matctx-&gt;theta[1] = theta[1];
+<a name="line1035">1035: </a>    }
+<a name="line1036">1036: </a><font color="#A020F0">#endif</font>
+<a name="line1037">1037: </a>    PetscFree2(vals,valsi);
+<a name="line1038">1038: </a>  }
+<a name="line1039">1039: </a>  <font color="#4169E1">if</font> (!pjd-&gt;reusepc) {
+<a name="line1040">1040: </a>    <font color="#4169E1">if</font> (!skipmat) {
+<a name="line1041">1041: </a>      PCSetOperators(pcctx-&gt;pc,Pr,Pr);
+<a name="line1042">1042: </a>      PCSetUp(pcctx-&gt;pc);
+<a name="line1043">1043: </a>    }
+<a name="line1044">1044: </a>    PEPJDUpdateExtendedPC(pep,theta[0]);
+<a name="line1045">1045: </a>  }
+<a name="line1046">1046: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1047">1047: </a>}
+
+<a name="line1049">1049: </a><strong><font color="#4169E1"><a name="PEPJDCreateShellPC"></a>static PetscErrorCode PEPJDCreateShellPC(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,Vec *ww)</font></strong>
+<a name="line1050">1050: </a>{
+<a name="line1051">1051: </a>  PEP_JD          *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line1052">1052: </a>  PEP_JD_PCSHELL  *pcctx;
+<a name="line1053">1053: </a>  PEP_JD_MATSHELL *matctx;
+<a name="line1054">1054: </a>  KSP             ksp;
+<a name="line1055">1055: </a>  PetscInt        nloc,mloc,kspsf=1;
+<a name="line1056">1056: </a>  Vec             v[2];
+<a name="line1057">1057: </a>  PetscScalar     target[2];
+<a name="line1058">1058: </a>  PetscErrorCode  ierr;
+<a name="line1059">1059: </a>  Mat             Pr;
+
+<a name="line1062">1062: </a>  <font color="#B22222">/* Create the reference vector */</font>
+<a name="line1063">1063: </a>  <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,0,&amp;v[0]);
+<a name="line1064">1064: </a>  v[1] = v[0];
+<a name="line1065">1065: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line1066">1066: </a>  kspsf = 2;
+<a name="line1067">1067: </a><font color="#A020F0">#endif</font>
+<a name="line1068">1068: </a>  <a href="../../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a>(v,kspsf,NULL,&amp;pjd-&gt;vtempl);
+<a name="line1069">1069: </a>  <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,0,&amp;v[0]);
+<a name="line1070">1070: </a>  PetscLogObjectParent((PetscObject)pep,(PetscObject)pjd-&gt;vtempl);
+
+<a name="line1072">1072: </a>  <font color="#B22222">/* Replace preconditioner with one containing projectors */</font>
+<a name="line1073">1073: </a>  PCCreate(PetscObjectComm((PetscObject)pep),&amp;pjd-&gt;pcshell);
+<a name="line1074">1074: </a>  PCSetType(pjd-&gt;pcshell,PCSHELL);
+<a name="line1075">1075: </a>  PCShellSetName(pjd-&gt;pcshell,<font color="#666666">"PCPEPJD"</font>);
+<a name="line1076">1076: </a>  PCShellSetApply(pjd-&gt;pcshell,PCShellApply_PEPJD);
+<a name="line1077">1077: </a>  PetscNew(&amp;pcctx);
+<a name="line1078">1078: </a>  PCShellSetContext(pjd-&gt;pcshell,pcctx);
+<a name="line1079">1079: </a>  <a href="../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(pep-&gt;st,&amp;ksp);
+<a name="line1080">1080: </a>  <a href="../../../../docs/manualpages/BV/BVCreateVec.html#BVCreateVec">BVCreateVec</a>(pjd-&gt;V,&amp;pcctx-&gt;Bp[0]);
+<a name="line1081">1081: </a>  VecDuplicate(pcctx-&gt;Bp[0],&amp;pcctx-&gt;Bp[1]);
+<a name="line1082">1082: </a>  KSPGetPC(ksp,&amp;pcctx-&gt;pc);
+<a name="line1083">1083: </a>  PetscObjectReference((PetscObject)pcctx-&gt;pc);
+<a name="line1084">1084: </a>  MatGetLocalSize(pep-&gt;A[0],&amp;mloc,&amp;nloc);
+<a name="line1085">1085: </a>  <font color="#4169E1">if</font> (pjd-&gt;ld&gt;1) {
+<a name="line1086">1086: </a>    nloc += pjd-&gt;ld-1; mloc += pjd-&gt;ld-1;
+<a name="line1087">1087: </a>  }
+<a name="line1088">1088: </a>  PetscNew(&amp;matctx);
+<a name="line1089">1089: </a>  MatCreateShell(PetscObjectComm((PetscObject)pep),kspsf*nloc,kspsf*mloc,PETSC_DETERMINE,PETSC_DETERMINE,matctx,&amp;pjd-&gt;Pshell);
+<a name="line1090">1090: </a>  MatShellSetOperation(pjd-&gt;Pshell,MATOP_MULT,(void(*)(void))MatMult_PEPJD);
+<a name="line1091">1091: </a>  MatShellSetOperation(pjd-&gt;Pshell,MATOP_CREATE_VECS,(void(*)(void))MatCreateVecs_PEPJD);
+<a name="line1092">1092: </a>  matctx-&gt;pep = pep;
+<a name="line1093">1093: </a>  target[0] = pep-&gt;target; target[1] = 0.0;
+<a name="line1094">1094: </a>  PEPJDMatSetUp(pep,1,target);
+<a name="line1095">1095: </a>  Pr = matctx-&gt;Pr;
+<a name="line1096">1096: </a>  pcctx-&gt;PPr = NULL;
+<a name="line1097">1097: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1098">1098: </a>  <font color="#4169E1">if</font> (!pjd-&gt;reusepc) {
+<a name="line1099">1099: </a>    MatDuplicate(matctx-&gt;Pr,MAT_COPY_VALUES,&amp;pcctx-&gt;PPr);
+<a name="line1100">1100: </a>    Pr = pcctx-&gt;PPr;
+<a name="line1101">1101: </a>  }
+<a name="line1102">1102: </a><font color="#A020F0">#endif</font>
+<a name="line1103">1103: </a>  PCSetOperators(pcctx-&gt;pc,Pr,Pr);
+<a name="line1104">1104: </a>  PCSetErrorIfFailure(pcctx-&gt;pc,PETSC_TRUE);
+<a name="line1105">1105: </a>  KSPSetPC(ksp,pjd-&gt;pcshell);
+<a name="line1106">1106: </a>  <font color="#4169E1">if</font> (pjd-&gt;reusepc) {
+<a name="line1107">1107: </a>    PCSetReusePreconditioner(pcctx-&gt;pc,PETSC_TRUE);
+<a name="line1108">1108: </a>    KSPSetReusePreconditioner(ksp,PETSC_TRUE);
+<a name="line1109">1109: </a>  }
+<a name="line1110">1110: </a>  KSPSetOperators(ksp,pjd-&gt;Pshell,pjd-&gt;Pshell);
+<a name="line1111">1111: </a>  KSPSetUp(ksp);
+<a name="line1112">1112: </a>  <font color="#4169E1">if</font> (pjd-&gt;ld&gt;1) {
+<a name="line1113">1113: </a>    PetscMalloc2(pjd-&gt;ld*pjd-&gt;ld,&amp;pcctx-&gt;M,pjd-&gt;ld*pjd-&gt;ld,&amp;pcctx-&gt;ps);
+<a name="line1114">1114: </a>    pcctx-&gt;pep = pep;
+<a name="line1115">1115: </a>  }
+<a name="line1116">1116: </a>  matctx-&gt;work = ww;
+<a name="line1117">1117: </a>  pcctx-&gt;work  = ww;
+<a name="line1118">1118: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1119">1119: </a>}
+
+<a name="line1121">1121: </a><strong><font color="#4169E1"><a name="PEPJDEigenvectors"></a>static PetscErrorCode PEPJDEigenvectors(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line1122">1122: </a>{
+<a name="line1124">1124: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line1125">1125: </a>  PetscBLASInt   ld,nconv,info,nc;
+<a name="line1126">1126: </a>  PetscScalar    *Z,*w;
+<a name="line1127">1127: </a>  PetscReal      *wr,norm;
+<a name="line1128">1128: </a>  PetscInt       i;
+<a name="line1129">1129: </a>  Mat            U;
+<a name="line1130">1130: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1131">1131: </a>  Vec            v,v1;
+<a name="line1132">1132: </a><font color="#A020F0">#endif</font>
+
+<a name="line1135">1135: </a>  PetscMalloc3(pep-&gt;nconv*pep-&gt;nconv,&amp;Z,3*pep-&gt;ncv,&amp;wr,2*pep-&gt;ncv,&amp;w);
+<a name="line1136">1136: </a>  PetscBLASIntCast(pep-&gt;ncv,&amp;ld);
+<a name="line1137">1137: </a>  PetscBLASIntCast(pep-&gt;nconv,&amp;nconv);
+<a name="line1138">1138: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1139">1139: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKtrevc"</font>,LAPACKtrevc_(<font color="#666666">"R"</font>,<font color="#666666">"A"</font>,NULL,&amp;nconv,pjd-&gt;T,&amp;ld,NULL,&amp;nconv,Z,&amp;nconv,&amp;nconv,&amp;nc,wr,&amp;info));
+<a name="line1140">1140: </a><font color="#A020F0">#else</font>
+<a name="line1141">1141: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKtrevc"</font>,LAPACKtrevc_(<font color="#666666">"R"</font>,<font color="#666666">"A"</font>,NULL,&amp;nconv,pjd-&gt;T,&amp;ld,NULL,&amp;nconv,Z,&amp;nconv,&amp;nconv,&amp;nc,w,wr,&amp;info));
+<a name="line1142">1142: </a><font color="#A020F0">#endif</font>
+<a name="line1143">1143: </a>  SlepcCheckLapackInfo(<font color="#666666">"trevc"</font>,info);
+<a name="line1144">1144: </a>  MatCreateSeqDense(PETSC_COMM_SELF,nconv,nconv,Z,&amp;U);
+<a name="line1145">1145: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;X,0,pep-&gt;nconv);
+<a name="line1146">1146: </a>  <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(pjd-&gt;X,U,0,pep-&gt;nconv);
+<a name="line1147">1147: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nconv;i++) {
+<a name="line1148">1148: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1149">1149: </a>    <font color="#4169E1">if</font> (pep-&gt;eigi[i]!=0.0) {   <font color="#B22222">/* first eigenvalue of a complex conjugate pair */</font>
+<a name="line1150">1150: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;X,i,&amp;v);
+<a name="line1151">1151: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;X,i+1,&amp;v1);
+<a name="line1152">1152: </a>      <a href="../../../../docs/manualpages/sys/VecNormalizeComplex.html#VecNormalizeComplex">VecNormalizeComplex</a>(v,v1,PETSC_TRUE,NULL);
+<a name="line1153">1153: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;X,i,&amp;v);
+<a name="line1154">1154: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;X,i+1,&amp;v1);
+<a name="line1155">1155: </a>      i++;
+<a name="line1156">1156: </a>    } <font color="#4169E1">else</font>   <font color="#B22222">/* real eigenvalue */</font>
+<a name="line1157">1157: </a><font color="#A020F0">#endif</font>
+<a name="line1158">1158: </a>    {
+<a name="line1159">1159: </a>      <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(pjd-&gt;X,i,NORM_2,&amp;norm);
+<a name="line1160">1160: </a>      <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;X,i,1.0/norm);
+<a name="line1161">1161: </a>    }
+<a name="line1162">1162: </a>  }
+<a name="line1163">1163: </a>  MatDestroy(&amp;U);
+<a name="line1164">1164: </a>  PetscFree3(Z,wr,w);
+<a name="line1165">1165: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1166">1166: </a>}
+
+<a name="line1168">1168: </a><strong><font color="#4169E1"><a name="PEPJDLockConverged"></a>static PetscErrorCode PEPJDLockConverged(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt *nv,PetscInt sz)</font></strong>
+<a name="line1169">1169: </a>{
+<a name="line1171">1171: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line1172">1172: </a>  PetscInt       j,i,*P,ldds,rk=0,nvv=*nv;
+<a name="line1173">1173: </a>  Vec            v,x,w;
+<a name="line1174">1174: </a>  PetscScalar    *R,*r,*pX,target[2];
+<a name="line1175">1175: </a>  Mat            X;
+<a name="line1176">1176: </a>  PetscBLASInt   sz_,rk_,nv_,info;
+<a name="line1177">1177: </a>  PetscMPIInt    np;
+
+<a name="line1180">1180: </a>  <font color="#B22222">/* update AX and XpX */</font>
+<a name="line1181">1181: </a>  <font color="#4169E1">for</font> (i=sz;i&gt;0;i--) {
+<a name="line1182">1182: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;X,pjd-&gt;nlock-i,&amp;x);
+<a name="line1183">1183: </a>    <font color="#4169E1">for</font> (j=0;j&lt;pep-&gt;nmat;j++) {
+<a name="line1184">1184: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;AX[j],pjd-&gt;nlock-i,&amp;v);
+<a name="line1185">1185: </a>      MatMult(pep-&gt;A[j],x,v);
+<a name="line1186">1186: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;AX[j],pjd-&gt;nlock-i,&amp;v);
+<a name="line1187">1187: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;AX[j],0,pjd-&gt;nlock-i+1);
+<a name="line1188">1188: </a>    }
+<a name="line1189">1189: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;X,pjd-&gt;nlock-i,&amp;x);
+<a name="line1190">1190: </a>    <a href="../../../../docs/manualpages/BV/BVDotColumn.html#BVDotColumn">BVDotColumn</a>(pjd-&gt;X,(pjd-&gt;nlock-i),pjd-&gt;XpX+(pjd-&gt;nlock-i)*(pjd-&gt;ld));
+<a name="line1191">1191: </a>    pjd-&gt;XpX[(pjd-&gt;nlock-i)*(1+pjd-&gt;ld)] = 1.0;
+<a name="line1192">1192: </a>    <font color="#4169E1">for</font> (j=0;j&lt;pjd-&gt;nlock-i;j++) pjd-&gt;XpX[j*(pjd-&gt;ld)+pjd-&gt;nlock-i] = PetscConj(pjd-&gt;XpX[(pjd-&gt;nlock-i)*(pjd-&gt;ld)+j]);
+<a name="line1193">1193: </a>  }
+
+<a name="line1195">1195: </a>  <font color="#B22222">/* minimality index */</font>
+<a name="line1196">1196: </a>  pjd-&gt;midx = PetscMin(pjd-&gt;mmidx,pjd-&gt;nlock);
+
+<a name="line1198">1198: </a>  <font color="#B22222">/* evaluate the polynomial basis in T */</font>
+<a name="line1199">1199: </a>  PetscArrayzero(pjd-&gt;Tj,pjd-&gt;ld*pjd-&gt;ld*pep-&gt;nmat);
+<a name="line1200">1200: </a>  <font color="#4169E1">for</font> (j=0;j&lt;pep-&gt;nmat;j++) {
+<a name="line1201">1201: </a>    PEPEvaluateBasisMat(pep,pjd-&gt;nlock,pjd-&gt;T,pep-&gt;ncv,j,(j&gt;1)?pjd-&gt;Tj+(j-2)*pjd-&gt;ld*pjd-&gt;ld:NULL,pjd-&gt;ld,j?pjd-&gt;Tj+(j-1)*pjd-&gt;ld*pjd-&gt;ld:NULL,pjd-&gt;ld,pjd-&gt;Tj+j*pjd-&gt;ld*pjd-&gt;ld,pjd-&gt;ld);
+<a name="line1202">1202: </a>  }
+
+<a name="line1204">1204: </a>  <font color="#B22222">/* Extend search space */</font>
+<a name="line1205">1205: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)pep),&amp;np);
+<a name="line1206">1206: </a>  PetscCalloc3(nvv,&amp;P,nvv*nvv,&amp;R,nvv*sz,&amp;r);
+<a name="line1207">1207: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(pep-&gt;ds,&amp;ldds);
+<a name="line1208">1208: </a>  <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line1209">1209: </a>  PEPJDOrthogonalize(nvv,nvv,pX,ldds,&amp;rk,P,R,nvv);
+<a name="line1210">1210: </a>  <font color="#4169E1">for</font> (j=0;j&lt;sz;j++) {
+<a name="line1211">1211: </a>    <font color="#4169E1">for</font> (i=0;i&lt;rk;i++) r[i*sz+j] = PetscConj(R[nvv*i+j]*pep-&gt;eigr[P[i]]); <font color="#B22222">/* first row scaled with permuted diagonal */</font>
+<a name="line1212">1212: </a>  }
+<a name="line1213">1213: </a>  PetscBLASIntCast(rk,&amp;rk_);
+<a name="line1214">1214: </a>  PetscBLASIntCast(sz,&amp;sz_);
+<a name="line1215">1215: </a>  PetscBLASIntCast(nvv,&amp;nv_);
+<a name="line1216">1216: </a>  PetscStackCallBLAS(<font color="#666666">"LAPACKtrtri"</font>,LAPACKtrtri_(<font color="#666666">"U"</font>,<font color="#666666">"N"</font>,&amp;rk_,R,&amp;nv_,&amp;info));
+<a name="line1217">1217: </a>  SlepcCheckLapackInfo(<font color="#666666">"trtri"</font>,info);
+<a name="line1218">1218: </a>  <font color="#4169E1">for</font> (i=0;i&lt;sz;i++) PetscStackCallBLAS(<font color="#666666">"BLAStrmv"</font>,BLAStrmv_(<font color="#666666">"U"</font>,<font color="#666666">"C"</font>,<font color="#666666">"N"</font>,&amp;rk_,R,&amp;nv_,r+i,&amp;sz_));
+<a name="line1219">1219: </a>  <font color="#4169E1">for</font> (i=0;i&lt;sz*rk;i++) r[i] = PetscConj(r[i])/PetscSqrtReal(np); <font color="#B22222">/* revert */</font>
+<a name="line1220">1220: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;V,0,nvv);
+<a name="line1221">1221: </a>  rk -= sz;
+<a name="line1222">1222: </a>  <font color="#4169E1">for</font> (j=0;j&lt;rk;j++) {
+<a name="line1223">1223: </a>    PetscArraycpy(R+j*nvv,pX+(j+sz)*ldds,nvv);
+<a name="line1224">1224: </a>  }
+<a name="line1225">1225: </a>  <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line1226">1226: </a>  MatCreateSeqDense(PETSC_COMM_SELF,nvv,rk,R,&amp;X);
+<a name="line1227">1227: </a>  <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(pjd-&gt;V,X,0,rk);
+<a name="line1228">1228: </a>  MatDestroy(&amp;X);
+<a name="line1229">1229: </a>  <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;V,0,rk);
+<a name="line1230">1230: </a>  <font color="#4169E1">for</font> (j=0;j&lt;rk;j++) {
+<a name="line1231">1231: </a>    <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,j,&amp;v);
+<a name="line1232">1232: </a>    PEPJDCopyToExtendedVec(pep,NULL,r+sz*(j+sz),sz,pjd-&gt;nlock-sz,v,PETSC_FALSE);
+<a name="line1233">1233: </a>    <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,j,&amp;v);
+<a name="line1234">1234: </a>  }
+<a name="line1235">1235: </a>  <a href="../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(pjd-&gt;V,NULL);
+
+<a name="line1237">1237: </a>  <font color="#4169E1">if</font> (pjd-&gt;proj==<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>) {
+<a name="line1238">1238: </a>    <font color="#4169E1">for</font> (j=0;j&lt;rk;j++) {
+<a name="line1239">1239: </a>      <font color="#B22222">/* W = P(target)*V */</font>
+<a name="line1240">1240: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;W,j,&amp;w);
+<a name="line1241">1241: </a>      <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,j,&amp;v);
+<a name="line1242">1242: </a>      target[0] = pep-&gt;target; target[1] = 0.0;
+<a name="line1243">1243: </a>      PEPJDComputeResidual(pep,PETSC_FALSE,1,&amp;v,target,&amp;w,pep-&gt;work);
+<a name="line1244">1244: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,j,&amp;v);
+<a name="line1245">1245: </a>      <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;W,j,&amp;w);
+<a name="line1246">1246: </a>    }
+<a name="line1247">1247: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;W,0,rk);
+<a name="line1248">1248: </a>    <a href="../../../../docs/manualpages/BV/BVOrthogonalize.html#BVOrthogonalize">BVOrthogonalize</a>(pjd-&gt;W,NULL);
+<a name="line1249">1249: </a>  }
+<a name="line1250">1250: </a>  *nv = rk;
+<a name="line1251">1251: </a>  PetscFree3(P,R,r);
+<a name="line1252">1252: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1253">1253: </a>}
+
+<a name="line1255">1255: </a><strong><font color="#4169E1"><a name="PEPJDSystemSetUp"></a>PetscErrorCode PEPJDSystemSetUp(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt sz,PetscScalar *theta,Vec *u,Vec *p,Vec *ww)</font></strong>
+<a name="line1256">1256: </a>{
+<a name="line1258">1258: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line1259">1259: </a>  PEP_JD_PCSHELL *pcctx;
+<a name="line1260">1260: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1261">1261: </a>  PetscScalar    s[2];
+<a name="line1262">1262: </a><font color="#A020F0">#endif</font>
+
+<a name="line1265">1265: </a>  PCShellGetContext(pjd-&gt;pcshell,(void**)&amp;pcctx);
+<a name="line1266">1266: </a>  PEPJDMatSetUp(pep,sz,theta);
+<a name="line1267">1267: </a>  pcctx-&gt;u[0] = u[0]; pcctx-&gt;u[1] = u[1];
+<a name="line1268">1268: </a>  <font color="#B22222">/* Compute r'. p is a work space vector */</font>
+<a name="line1269">1269: </a>  PEPJDComputeResidual(pep,PETSC_TRUE,sz,u,theta,p,ww);
+<a name="line1270">1270: </a>  PEPJDExtendedPCApply(pjd-&gt;pcshell,p[0],pcctx-&gt;Bp[0]);
+<a name="line1271">1271: </a>  VecDot(pcctx-&gt;Bp[0],u[0],pcctx-&gt;gamma);
+<a name="line1272">1272: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1273">1273: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line1274">1274: </a>    PEPJDExtendedPCApply(pjd-&gt;pcshell,p[1],pcctx-&gt;Bp[1]);
+<a name="line1275">1275: </a>    VecDot(pcctx-&gt;Bp[0],u[1],pcctx-&gt;gamma+1);
+<a name="line1276">1276: </a>    VecMDot(pcctx-&gt;Bp[1],2,u,s);
+<a name="line1277">1277: </a>    pcctx-&gt;gamma[0] += s[1];
+<a name="line1278">1278: </a>    pcctx-&gt;gamma[1] = -pcctx-&gt;gamma[1]+s[0];
+<a name="line1279">1279: </a>  }
+<a name="line1280">1280: </a><font color="#A020F0">#endif</font>
+<a name="line1281">1281: </a>  <font color="#4169E1">if</font> (sz==1) {
+<a name="line1282">1282: </a>    VecZeroEntries(pcctx-&gt;Bp[1]);
+<a name="line1283">1283: </a>    pcctx-&gt;gamma[1] = 0.0;
+<a name="line1284">1284: </a>  }
+<a name="line1285">1285: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1286">1286: </a>}
+
+<a name="line1288">1288: </a><strong><font color="#4169E1"><a name="PEPSolve_JD"></a>PetscErrorCode PEPSolve_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line1289">1289: </a>{
+<a name="line1290">1290: </a>  PetscErrorCode  ierr;
+<a name="line1291">1291: </a>  PEP_JD          *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line1292">1292: </a>  PetscInt        k,nv,nvc,ld,minv,dim,bupdated=0,sz=1,kspsf=1,idx,off,maxits,nloc;
+<a name="line1293">1293: </a>  PetscMPIInt     np,count;
+<a name="line1294">1294: </a>  PetscScalar     theta[2]={0.0,0.0},ritz[2]={0.0,0.0},*pX,*eig,*eigi,*array;
+<a name="line1295">1295: </a>  PetscReal       norm,*res,tol=0.0,rtol,abstol, dtol;
+<a name="line1296">1296: </a>  PetscBool       lindep,ini=PETSC_TRUE;
+<a name="line1297">1297: </a>  Vec             tc,t[2]={NULL,NULL},u[2]={NULL,NULL},p[2]={NULL,NULL};
+<a name="line1298">1298: </a>  Vec             rc,rr[2],r[2]={NULL,NULL},*ww=pep-&gt;work,v[2];
+<a name="line1299">1299: </a>  Mat             G,X,Y;
+<a name="line1300">1300: </a>  KSP             ksp;
+<a name="line1301">1301: </a>  PEP_JD_PCSHELL  *pcctx;
+<a name="line1302">1302: </a>  PEP_JD_MATSHELL *matctx;
+<a name="line1303">1303: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1304">1304: </a>  PetscReal       norm1;
+<a name="line1305">1305: </a><font color="#A020F0">#endif</font>
+
+<a name="line1308">1308: </a>  PetscCitationsRegister(citation,&amp;cited);
+<a name="line1309">1309: </a>  <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Comm_size.html#MPI_Comm_size">MPI_Comm_size</a>(PetscObjectComm((PetscObject)pep),&amp;np);
+<a name="line1310">1310: </a>  <a href="../../../../docs/manualpages/BV/BVGetSizes.html#BVGetSizes">BVGetSizes</a>(pep-&gt;V,&amp;nloc,NULL,NULL);
+<a name="line1311">1311: </a>  <a href="../../../../docs/manualpages/DS/DSGetLeadingDimension.html#DSGetLeadingDimension">DSGetLeadingDimension</a>(pep-&gt;ds,&amp;ld);
+<a name="line1312">1312: </a>  PetscCalloc3(pep-&gt;ncv+pep-&gt;nev,&amp;eig,pep-&gt;ncv+pep-&gt;nev,&amp;eigi,pep-&gt;ncv+pep-&gt;nev,&amp;res);
+<a name="line1313">1313: </a>  pjd-&gt;nlock = 0;
+<a name="line1314">1314: </a>  <a href="../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(pep-&gt;st,&amp;ksp);
+<a name="line1315">1315: </a>  KSPGetTolerances(ksp,&amp;rtol,&amp;abstol,&amp;dtol,&amp;maxits);
+<a name="line1316">1316: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line1317">1317: </a>  kspsf = 2;
+<a name="line1318">1318: </a><font color="#A020F0">#endif</font>
+<a name="line1319">1319: </a>  PEPJDProcessInitialSpace(pep,ww);
+<a name="line1320">1320: </a>  nv = (pep-&gt;nini)?pep-&gt;nini:1;
+
+<a name="line1322">1322: </a>  <font color="#B22222">/* Replace preconditioner with one containing projectors */</font>
+<a name="line1323">1323: </a>  PEPJDCreateShellPC(pep,ww);
+<a name="line1324">1324: </a>  PCShellGetContext(pjd-&gt;pcshell,(void**)&amp;pcctx);
+
+<a name="line1326">1326: </a>  <font color="#B22222">/* Create auxiliar vectors */</font>
+<a name="line1327">1327: </a>  <a href="../../../../docs/manualpages/BV/BVCreateVec.html#BVCreateVec">BVCreateVec</a>(pjd-&gt;V,&amp;u[0]);
+<a name="line1328">1328: </a>  VecDuplicate(u[0],&amp;p[0]);
+<a name="line1329">1329: </a>  VecDuplicate(u[0],&amp;r[0]);
+<a name="line1330">1330: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line1331">1331: </a>  VecDuplicate(u[0],&amp;u[1]);
+<a name="line1332">1332: </a>  VecDuplicate(u[0],&amp;p[1]);
+<a name="line1333">1333: </a>  VecDuplicate(u[0],&amp;r[1]);
+<a name="line1334">1334: </a><font color="#A020F0">#endif</font>
+
+<a name="line1336">1336: </a>  <font color="#B22222">/* Restart loop */</font>
+<a name="line1337">1337: </a>  <font color="#4169E1">while</font> (pep-&gt;reason == <a href="../../../../docs/manualpages/PEP/PEPConvergedReason.html#PEPConvergedReason">PEP_CONVERGED_ITERATING</a>) {
+<a name="line1338">1338: </a>    pep-&gt;its++;
+<a name="line1339">1339: </a>    <a href="../../../../docs/manualpages/DS/DSSetDimensions.html#DSSetDimensions">DSSetDimensions</a>(pep-&gt;ds,nv,0,0,0);
+<a name="line1340">1340: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;V,bupdated,nv);
+<a name="line1341">1341: </a>    PEPJDUpdateTV(pep,bupdated,nv,ww);
+<a name="line1342">1342: </a>    <font color="#4169E1">if</font> (pjd-&gt;proj==<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>) { <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;W,bupdated,nv); }
+<a name="line1343">1343: </a>    <font color="#4169E1">for</font> (k=0;k&lt;pep-&gt;nmat;k++) {
+<a name="line1344">1344: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;TV[k],bupdated,nv);
+<a name="line1345">1345: </a>      <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(pep-&gt;ds,DSMatExtra[k],&amp;G);
+<a name="line1346">1346: </a>      <a href="../../../../docs/manualpages/BV/BVMatProject.html#BVMatProject">BVMatProject</a>(pjd-&gt;TV[k],NULL,pjd-&gt;W,G);
+<a name="line1347">1347: </a>      <a href="../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(pep-&gt;ds,DSMatExtra[k],&amp;G);
+<a name="line1348">1348: </a>    }
+<a name="line1349">1349: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;V,0,nv);
+<a name="line1350">1350: </a>    <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;W,0,nv);
+
+<a name="line1352">1352: </a>    <font color="#B22222">/* Solve projected problem */</font>
+<a name="line1353">1353: </a>    <a href="../../../../docs/manualpages/DS/DSSetState.html#DSSetState">DSSetState</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_RAW</a>);
+<a name="line1354">1354: </a>    <a href="../../../../docs/manualpages/DS/DSSolve.html#DSSolve">DSSolve</a>(pep-&gt;ds,pep-&gt;eigr,pep-&gt;eigi);
+<a name="line1355">1355: </a>    <a href="../../../../docs/manualpages/DS/DSSort.html#DSSort">DSSort</a>(pep-&gt;ds,pep-&gt;eigr,pep-&gt;eigi,NULL,NULL,NULL);
+<a name="line1356">1356: </a>    <a href="../../../../docs/manualpages/DS/DSSynchronize.html#DSSynchronize">DSSynchronize</a>(pep-&gt;ds,pep-&gt;eigr,pep-&gt;eigi);
+<a name="line1357">1357: </a>    idx = 0;
+<a name="line1358">1358: </a>    <font color="#4169E1">do</font> {
+<a name="line1359">1359: </a>      ritz[0] = pep-&gt;eigr[idx];
+<a name="line1360">1360: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1361">1361: </a>      ritz[1] = pep-&gt;eigi[idx];
+<a name="line1362">1362: </a>      sz = (ritz[1]==0.0)?1:2;
+<a name="line1363">1363: </a><font color="#A020F0">#endif</font>
+<a name="line1364">1364: </a>      <font color="#B22222">/* Compute Ritz vector u=V*X(:,1) */</font>
+<a name="line1365">1365: </a>      <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line1366">1366: </a>      <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;V,0,nv);
+<a name="line1367">1367: </a>      <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;V,1.0,0.0,u[0],pX+idx*ld);
+<a name="line1368">1368: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1369">1369: </a>      <font color="#4169E1">if</font> (sz==2) {
+<a name="line1370">1370: </a>        <a href="../../../../docs/manualpages/BV/BVMultVec.html#BVMultVec">BVMultVec</a>(pjd-&gt;V,1.0,0.0,u[1],pX+(idx+1)*ld);
+<a name="line1371">1371: </a>      }
+<a name="line1372">1372: </a><font color="#A020F0">#endif</font>
+<a name="line1373">1373: </a>      <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line1374">1374: </a>      PEPJDComputeResidual(pep,PETSC_FALSE,sz,u,ritz,r,ww);
+<a name="line1375">1375: </a>      <font color="#B22222">/* Check convergence */</font>
+<a name="line1376">1376: </a>      VecNorm(r[0],NORM_2,&amp;norm);
+<a name="line1377">1377: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1378">1378: </a>      <font color="#4169E1">if</font> (sz==2) {
+<a name="line1379">1379: </a>        VecNorm(r[1],NORM_2,&amp;norm1);
+<a name="line1380">1380: </a>        norm = SlepcAbs(norm,norm1);
+<a name="line1381">1381: </a>      }
+<a name="line1382">1382: </a><font color="#A020F0">#endif</font>
+<a name="line1383">1383: </a>      (*pep-&gt;converged)(pep,ritz[0],ritz[1],norm,&amp;pep-&gt;errest[pep-&gt;nconv],pep-&gt;convergedctx);
+<a name="line1384">1384: </a>      <font color="#4169E1">if</font> (sz==2) pep-&gt;errest[pep-&gt;nconv+1] = pep-&gt;errest[pep-&gt;nconv];
+<a name="line1385">1385: </a>      <font color="#4169E1">if</font> (ini) {
+<a name="line1386">1386: </a>        tol = PetscMin(.1,pep-&gt;errest[pep-&gt;nconv]); ini = PETSC_FALSE;
+<a name="line1387">1387: </a>      } <font color="#4169E1">else</font> tol = PetscMin(pep-&gt;errest[pep-&gt;nconv],tol/2);
+<a name="line1388">1388: </a>      (*pep-&gt;stopping)(pep,pep-&gt;its,pep-&gt;max_it,(pep-&gt;errest[pep-&gt;nconv]&lt;pep-&gt;tol)?pep-&gt;nconv+sz:pep-&gt;nconv,pep-&gt;nev,&amp;pep-&gt;reason,pep-&gt;stoppingctx);
+<a name="line1389">1389: </a>      <font color="#4169E1">if</font> (pep-&gt;errest[pep-&gt;nconv]&lt;pep-&gt;tol) {
+<a name="line1390">1390: </a>        <font color="#B22222">/* Ritz pair converged */</font>
+<a name="line1391">1391: </a>        ini = PETSC_TRUE;
+<a name="line1392">1392: </a>        minv = PetscMin(nv,(PetscInt)(pjd-&gt;keep*pep-&gt;ncv));
+<a name="line1393">1393: </a>        <font color="#4169E1">if</font> (pjd-&gt;ld&gt;1) {
+<a name="line1394">1394: </a>          <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;X,pep-&gt;nconv,&amp;v[0]);
+<a name="line1395">1395: </a>          PEPJDCopyToExtendedVec(pep,v[0],pjd-&gt;T+pep-&gt;ncv*pep-&gt;nconv,pjd-&gt;ld-1,0,u[0],PETSC_TRUE);
+<a name="line1396">1396: </a>          <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;X,pep-&gt;nconv,&amp;v[0]);
+<a name="line1397">1397: </a>          <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;X,0,pep-&gt;nconv+1);
+<a name="line1398">1398: </a>          <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(pjd-&gt;X,pep-&gt;nconv,NORM_2,&amp;norm);
+<a name="line1399">1399: </a>          <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;X,pep-&gt;nconv,1.0/norm);
+<a name="line1400">1400: </a>          <font color="#4169E1">for</font> (k=0;k&lt;pep-&gt;nconv;k++) pjd-&gt;T[pep-&gt;ncv*pep-&gt;nconv+k] *= PetscSqrtReal(np)/norm;
+<a name="line1401">1401: </a>          pjd-&gt;T[(pep-&gt;ncv+1)*pep-&gt;nconv] = ritz[0];
+<a name="line1402">1402: </a>          eig[pep-&gt;nconv] = ritz[0];
+<a name="line1403">1403: </a>          idx++;
+<a name="line1404">1404: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1405">1405: </a>          <font color="#4169E1">if</font> (sz==2) {
+<a name="line1406">1406: </a>            <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;X,pep-&gt;nconv+1,&amp;v[0]);
+<a name="line1407">1407: </a>            PEPJDCopyToExtendedVec(pep,v[0],pjd-&gt;T+pep-&gt;ncv*(pep-&gt;nconv+1),pjd-&gt;ld-1,0,u[1],PETSC_TRUE);
+<a name="line1408">1408: </a>            <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;X,pep-&gt;nconv+1,&amp;v[0]);
+<a name="line1409">1409: </a>            <a href="../../../../docs/manualpages/BV/BVSetActiveColumns.html#BVSetActiveColumns">BVSetActiveColumns</a>(pjd-&gt;X,0,pep-&gt;nconv+2);
+<a name="line1410">1410: </a>            <a href="../../../../docs/manualpages/BV/BVNormColumn.html#BVNormColumn">BVNormColumn</a>(pjd-&gt;X,pep-&gt;nconv+1,NORM_2,&amp;norm1);
+<a name="line1411">1411: </a>            <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;X,pep-&gt;nconv+1,1.0/norm1);
+<a name="line1412">1412: </a>            <font color="#4169E1">for</font> (k=0;k&lt;pep-&gt;nconv;k++) pjd-&gt;T[pep-&gt;ncv*(pep-&gt;nconv+1)+k] *= PetscSqrtReal(np)/norm1;
+<a name="line1413">1413: </a>            pjd-&gt;T[(pep-&gt;ncv+1)*(pep-&gt;nconv+1)] = ritz[0];
+<a name="line1414">1414: </a>            pjd-&gt;T[(pep-&gt;ncv+1)*pep-&gt;nconv+1] = -ritz[1]*norm1/norm;
+<a name="line1415">1415: </a>            pjd-&gt;T[(pep-&gt;ncv+1)*(pep-&gt;nconv+1)-1] = ritz[1]*norm/norm1;
+<a name="line1416">1416: </a>            eig[pep-&gt;nconv+1] = ritz[0];
+<a name="line1417">1417: </a>            eigi[pep-&gt;nconv] = ritz[1]; eigi[pep-&gt;nconv+1] = -ritz[1];
+<a name="line1418">1418: </a>            idx++;
+<a name="line1419">1419: </a>          }
+<a name="line1420">1420: </a><font color="#A020F0">#endif</font>
+<a name="line1421">1421: </a>        } <font color="#4169E1">else</font> {
+<a name="line1422">1422: </a>          <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pep-&gt;V,pep-&gt;nconv,u[0]);
+<a name="line1423">1423: </a>        }
+<a name="line1424">1424: </a>        pep-&gt;nconv += sz;
+<a name="line1425">1425: </a>      }
+<a name="line1426">1426: </a>    } <font color="#4169E1">while</font> (pep-&gt;errest[pep-&gt;nconv]&lt;pep-&gt;tol &amp;&amp; pep-&gt;nconv&lt;nv);
+
+<a name="line1428">1428: </a>    <font color="#4169E1">if</font> (pep-&gt;reason==<a href="../../../../docs/manualpages/PEP/PEPConvergedReason.html#PEPConvergedReason">PEP_CONVERGED_ITERATING</a>) {
+<a name="line1429">1429: </a>      nvc = nv;
+<a name="line1430">1430: </a>      <font color="#4169E1">if</font> (idx) {
+<a name="line1431">1431: </a>        pjd-&gt;nlock +=idx;
+<a name="line1432">1432: </a>        PEPJDLockConverged(pep,&amp;nv,idx);
+<a name="line1433">1433: </a>      }
+<a name="line1434">1434: </a>      <font color="#4169E1">if</font> (nv+sz&gt;=pep-&gt;ncv-1) {
+<a name="line1435">1435: </a>        <font color="#B22222">/* Basis full, force restart */</font>
+<a name="line1436">1436: </a>        minv = PetscMin(nv,(PetscInt)(pjd-&gt;keep*pep-&gt;ncv));
+<a name="line1437">1437: </a>        <a href="../../../../docs/manualpages/DS/DSGetDimensions.html#DSGetDimensions">DSGetDimensions</a>(pep-&gt;ds,&amp;dim,NULL,NULL,NULL,NULL);
+<a name="line1438">1438: </a>        <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line1439">1439: </a>        PEPJDOrthogonalize(dim,minv,pX,ld,&amp;minv,NULL,NULL,ld);
+<a name="line1440">1440: </a>        <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;pX);
+<a name="line1441">1441: </a>        <a href="../../../../docs/manualpages/DS/DSGetArray.html#DSGetArray">DSGetArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Y</a>,&amp;pX);
+<a name="line1442">1442: </a>        PEPJDOrthogonalize(dim,minv,pX,ld,&amp;minv,NULL,NULL,ld);
+<a name="line1443">1443: </a>        <a href="../../../../docs/manualpages/DS/DSRestoreArray.html#DSRestoreArray">DSRestoreArray</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Y</a>,&amp;pX);
+<a name="line1444">1444: </a>        <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_X</a>,&amp;X);
+<a name="line1445">1445: </a>        <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(pjd-&gt;V,X,0,minv);
+<a name="line1446">1446: </a>        <font color="#4169E1">if</font> (pjd-&gt;proj==<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>) {
+<a name="line1447">1447: </a>         <a href="../../../../docs/manualpages/DS/DSGetMat.html#DSGetMat">DSGetMat</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Y</a>,&amp;Y);
+<a name="line1448">1448: </a>         <a href="../../../../docs/manualpages/BV/BVMultInPlace.html#BVMultInPlace">BVMultInPlace</a>(pjd-&gt;W,Y,pep-&gt;nconv,minv);
+<a name="line1449">1449: </a>         <a href="../../../../docs/manualpages/DS/DSRestoreMat.html#DSRestoreMat">DSRestoreMat</a>(pep-&gt;ds,<a href="../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Y</a>,&amp;Y);
+<a name="line1450">1450: </a>        }
+<a name="line1451">1451: </a>        MatDestroy(&amp;X);
+<a name="line1452">1452: </a>        nv = minv;
+<a name="line1453">1453: </a>        bupdated = 0;
+<a name="line1454">1454: </a>      } <font color="#4169E1">else</font> {
+<a name="line1455">1455: </a>        <font color="#4169E1">if</font> (!idx &amp;&amp; pep-&gt;errest[pep-&gt;nconv]&lt;pjd-&gt;fix) {theta[0] = ritz[0]; theta[1] = ritz[1];}
+<a name="line1456">1456: </a>        <font color="#4169E1">else</font> {theta[0] = pep-&gt;target; theta[1] = 0.0;}
+<a name="line1457">1457: </a>        <font color="#B22222">/* Update system mat */</font>
+<a name="line1458">1458: </a>        PEPJDSystemSetUp(pep,sz,theta,u,p,ww);
+<a name="line1459">1459: </a>        <font color="#B22222">/* Solve correction equation to expand basis */</font>
+<a name="line1460">1460: </a>        <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,nv,&amp;t[0]);
+<a name="line1461">1461: </a>        rr[0] = r[0];
+<a name="line1462">1462: </a>        <font color="#4169E1">if</font> (sz==2) {
+<a name="line1463">1463: </a>          <a href="../../../../docs/manualpages/BV/BVGetColumn.html#BVGetColumn">BVGetColumn</a>(pjd-&gt;V,nv+1,&amp;t[1]);
+<a name="line1464">1464: </a>          rr[1] = r[1];
+<a name="line1465">1465: </a>        } <font color="#4169E1">else</font> {
+<a name="line1466">1466: </a>          t[1] = NULL;
+<a name="line1467">1467: </a>          rr[1] = NULL;
+<a name="line1468">1468: </a>        }
+<a name="line1469">1469: </a>        <a href="../../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a>(t,kspsf,pjd-&gt;vtempl,&amp;tc);
+<a name="line1470">1470: </a>        <a href="../../../../docs/manualpages/sys/VecCreateCompWithVecs.html#VecCreateCompWithVecs">VecCreateCompWithVecs</a>(rr,kspsf,pjd-&gt;vtempl,&amp;rc);
+<a name="line1471">1471: </a>        <a href="../../../../docs/manualpages/sys/VecCompSetSubVecs.html#VecCompSetSubVecs">VecCompSetSubVecs</a>(pjd-&gt;vtempl,sz,NULL);
+<a name="line1472">1472: </a>        tol  = PetscMax(rtol,tol/2);
+<a name="line1473">1473: </a>        KSPSetTolerances(ksp,tol,abstol,dtol,maxits);
+<a name="line1474">1474: </a>        KSPSolve(ksp,rc,tc);
+<a name="line1475">1475: </a>        VecDestroy(&amp;tc);
+<a name="line1476">1476: </a>        VecDestroy(&amp;rc);
+<a name="line1477">1477: </a>        VecGetArray(t[0],&amp;array);
+<a name="line1478">1478: </a>        PetscMPIIntCast(pep-&gt;nconv,&amp;count);
+<a name="line1479">1479: </a>        <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(array+nloc,count,MPIU_SCALAR,np-1,PetscObjectComm((PetscObject)pep));
+<a name="line1480">1480: </a>        VecRestoreArray(t[0],&amp;array);
+<a name="line1481">1481: </a>        <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,nv,&amp;t[0]);
+<a name="line1482">1482: </a>        <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(pjd-&gt;V,nv,NULL,&amp;norm,&amp;lindep);
+<a name="line1483">1483: </a>        <font color="#4169E1">if</font> (lindep || norm==0.0) {
+<a name="line1484">1484: </a>          <font color="#4169E1">if</font> (sz==1) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Linearly dependent continuation vector"</font>);
+<a name="line1485">1485: </a>          <font color="#4169E1">else</font> off = 1;
+<a name="line1486">1486: </a>        } <font color="#4169E1">else</font> {
+<a name="line1487">1487: </a>          off = 0;
+<a name="line1488">1488: </a>          <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;V,nv,1.0/norm);
+<a name="line1489">1489: </a>        }
+<a name="line1490">1490: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1491">1491: </a>        <font color="#4169E1">if</font> (sz==2) {
+<a name="line1492">1492: </a>          VecGetArray(t[1],&amp;array);
+<a name="line1493">1493: </a>          <a href="http://www.mpich.org/static/docs/latest/www3/MPI_Bcast.html#MPI_Bcast">MPI_Bcast</a>(array+nloc,count,MPIU_SCALAR,np-1,PetscObjectComm((PetscObject)pep));
+<a name="line1494">1494: </a>          VecRestoreArray(t[1],&amp;array);
+<a name="line1495">1495: </a>          <a href="../../../../docs/manualpages/BV/BVRestoreColumn.html#BVRestoreColumn">BVRestoreColumn</a>(pjd-&gt;V,nv+1,&amp;t[1]);
+<a name="line1496">1496: </a>          <font color="#4169E1">if</font> (off) {
+<a name="line1497">1497: </a>            <a href="../../../../docs/manualpages/BV/BVCopyColumn.html#BVCopyColumn">BVCopyColumn</a>(pjd-&gt;V,nv+1,nv);
+<a name="line1498">1498: </a>          }
+<a name="line1499">1499: </a>          <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(pjd-&gt;V,nv+1-off,NULL,&amp;norm,&amp;lindep);
+<a name="line1500">1500: </a>          <font color="#4169E1">if</font> (lindep || norm==0.0) {
+<a name="line1501">1501: </a>            <font color="#4169E1">if</font> (off) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Linearly dependent continuation vector"</font>);
+<a name="line1502">1502: </a>            <font color="#4169E1">else</font> off = 1;
+<a name="line1503">1503: </a>          } <font color="#4169E1">else</font> {
+<a name="line1504">1504: </a>            <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;V,nv+1-off,1.0/norm);
+<a name="line1505">1505: </a>          }
+<a name="line1506">1506: </a>        }
+<a name="line1507">1507: </a><font color="#A020F0">#endif</font>
+<a name="line1508">1508: </a>        <font color="#4169E1">if</font> (pjd-&gt;proj==<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>) {
+<a name="line1509">1509: </a>          <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pjd-&gt;W,nv,r[0]);
+<a name="line1510">1510: </a>          <font color="#4169E1">if</font> (sz==2 &amp;&amp; !off) {
+<a name="line1511">1511: </a>            <a href="../../../../docs/manualpages/BV/BVInsertVec.html#BVInsertVec">BVInsertVec</a>(pjd-&gt;W,nv+1,r[1]);
+<a name="line1512">1512: </a>          }
+<a name="line1513">1513: </a>          <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(pjd-&gt;W,nv,NULL,&amp;norm,&amp;lindep);
+<a name="line1514">1514: </a>          <font color="#4169E1">if</font> (lindep || norm==0.0) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Linearly dependent continuation vector"</font>);
+<a name="line1515">1515: </a>          <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;W,nv,1.0/norm);
+<a name="line1516">1516: </a>          <font color="#4169E1">if</font> (sz==2 &amp;&amp; !off) {
+<a name="line1517">1517: </a>            <a href="../../../../docs/manualpages/BV/BVOrthogonalizeColumn.html#BVOrthogonalizeColumn">BVOrthogonalizeColumn</a>(pjd-&gt;W,nv+1,NULL,&amp;norm,&amp;lindep);
+<a name="line1518">1518: </a>            <font color="#4169E1">if</font> (lindep || norm==0.0) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Linearly dependent continuation vector"</font>);
+<a name="line1519">1519: </a>            <a href="../../../../docs/manualpages/BV/BVScaleColumn.html#BVScaleColumn">BVScaleColumn</a>(pjd-&gt;W,nv+1,1.0/norm);
+<a name="line1520">1520: </a>          }
+<a name="line1521">1521: </a>        }
+<a name="line1522">1522: </a>        bupdated = idx?0:nv;
+<a name="line1523">1523: </a>        nv += sz-off;
+<a name="line1524">1524: </a>      }
+<a name="line1525">1525: </a>      <font color="#4169E1">for</font> (k=0;k&lt;nvc;k++) {
+<a name="line1526">1526: </a>        eig[pep-&gt;nconv-idx+k] = pep-&gt;eigr[k];
+<a name="line1527">1527: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line1528">1528: </a>        eigi[pep-&gt;nconv-idx+k] = pep-&gt;eigi[k];
+<a name="line1529">1529: </a><font color="#A020F0">#endif</font>
+<a name="line1530">1530: </a>      }
+<a name="line1531">1531: </a>      PEPMonitor(pep,pep-&gt;its,pep-&gt;nconv,eig,eigi,pep-&gt;errest,pep-&gt;nconv+1);
+<a name="line1532">1532: </a>    }
+<a name="line1533">1533: </a>  }
+<a name="line1534">1534: </a>  <font color="#4169E1">if</font> (pjd-&gt;ld&gt;1) {
+<a name="line1535">1535: </a>    <font color="#4169E1">for</font> (k=0;k&lt;pep-&gt;nconv;k++) {
+<a name="line1536">1536: </a>      pep-&gt;eigr[k] = eig[k];
+<a name="line1537">1537: </a>      pep-&gt;eigi[k] = eigi[k];
+<a name="line1538">1538: </a>    }
+<a name="line1539">1539: </a>    <font color="#4169E1">if</font> (pep-&gt;nconv&gt;0) { PEPJDEigenvectors(pep); }
+<a name="line1540">1540: </a>    PetscFree2(pcctx-&gt;M,pcctx-&gt;ps);
+<a name="line1541">1541: </a>  }
+<a name="line1542">1542: </a>  VecDestroy(&amp;u[0]);
+<a name="line1543">1543: </a>  VecDestroy(&amp;r[0]);
+<a name="line1544">1544: </a>  VecDestroy(&amp;p[0]);
+<a name="line1545">1545: </a><font color="#A020F0">#if !defined (PETSC_USE_COMPLEX)</font>
+<a name="line1546">1546: </a>  VecDestroy(&amp;u[1]);
+<a name="line1547">1547: </a>  VecDestroy(&amp;r[1]);
+<a name="line1548">1548: </a>  VecDestroy(&amp;p[1]);
+<a name="line1549">1549: </a><font color="#A020F0">#endif</font>
+<a name="line1550">1550: </a>  KSPSetTolerances(ksp,rtol,abstol,dtol,maxits);
+<a name="line1551">1551: </a>  KSPSetPC(ksp,pcctx-&gt;pc);
+<a name="line1552">1552: </a>  VecDestroy(&amp;pcctx-&gt;Bp[0]);
+<a name="line1553">1553: </a>  VecDestroy(&amp;pcctx-&gt;Bp[1]);
+<a name="line1554">1554: </a>  MatShellGetContext(pjd-&gt;Pshell,(void**)&amp;matctx);
+<a name="line1555">1555: </a>  MatDestroy(&amp;matctx-&gt;Pr);
+<a name="line1556">1556: </a>  MatDestroy(&amp;matctx-&gt;Pi);
+<a name="line1557">1557: </a>  MatDestroy(&amp;pjd-&gt;Pshell);
+<a name="line1558">1558: </a>  MatDestroy(&amp;pcctx-&gt;PPr);
+<a name="line1559">1559: </a>  PCDestroy(&amp;pcctx-&gt;pc);
+<a name="line1560">1560: </a>  PetscFree(pcctx);
+<a name="line1561">1561: </a>  PetscFree(matctx);
+<a name="line1562">1562: </a>  PCDestroy(&amp;pjd-&gt;pcshell);
+<a name="line1563">1563: </a>  PetscFree3(eig,eigi,res);
+<a name="line1564">1564: </a>  VecDestroy(&amp;pjd-&gt;vtempl);
+<a name="line1565">1565: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1566">1566: </a>}
+
+<a name="line1568">1568: </a><strong><font color="#4169E1"><a name="PEPJDSetRestart_JD"></a>PetscErrorCode PEPJDSetRestart_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal keep)</font></strong>
+<a name="line1569">1569: </a>{
+<a name="line1570">1570: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1573">1573: </a>  <font color="#4169E1">if</font> (keep==PETSC_DEFAULT) pjd-&gt;keep = 0.5;
+<a name="line1574">1574: </a>  <font color="#4169E1">else</font> {
+<a name="line1575">1575: </a>    <font color="#4169E1">if</font> (keep&lt;0.1 || keep&gt;0.9) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"The keep argument must be in the range [0.1,0.9]"</font>);
+<a name="line1576">1576: </a>    pjd-&gt;keep = keep;
+<a name="line1577">1577: </a>  }
+<a name="line1578">1578: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1579">1579: </a>}
+
+<a name="line1581">1581: </a><font color="#B22222">/*@</font>
+<a name="line1582">1582: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDSetRestart.html#PEPJDSetRestart">PEPJDSetRestart</a> - Sets the restart parameter for the Jacobi-Davidson</font>
+<a name="line1583">1583: </a><font color="#B22222">   method, in particular the proportion of basis vectors that must be kept</font>
+<a name="line1584">1584: </a><font color="#B22222">   after restart.</font>
+
+<a name="line1586">1586: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line1588">1588: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1589">1589: </a><font color="#B22222">+  pep  - the eigenproblem solver context</font>
+<a name="line1590">1590: </a><font color="#B22222">-  keep - the number of vectors to be kept at restart</font>
+
+<a name="line1592">1592: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line1593">1593: </a><font color="#B22222">.  -pep_jd_restart - Sets the restart parameter</font>
+
+<a name="line1595">1595: </a><font color="#B22222">   Notes:</font>
+<a name="line1596">1596: </a><font color="#B22222">   Allowed values are in the range [0.1,0.9]. The default is 0.5.</font>
+
+<a name="line1598">1598: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1600">1600: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDGetRestart.html#PEPJDGetRestart">PEPJDGetRestart</a>()</font>
+<a name="line1601">1601: </a><font color="#B22222">@*/</font>
+<a name="line1602">1602: </a><strong><font color="#4169E1"><a name="PEPJDSetRestart"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDSetRestart.html#PEPJDSetRestart">PEPJDSetRestart</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal keep)</font></strong>
+<a name="line1603">1603: </a>{
+
+<a name="line1609">1609: </a>  PetscTryMethod(pep,<font color="#666666">"PEPJDSetRestart_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal),(pep,keep));
+<a name="line1610">1610: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1611">1611: </a>}
+
+<a name="line1613">1613: </a><strong><font color="#4169E1"><a name="PEPJDGetRestart_JD"></a>PetscErrorCode PEPJDGetRestart_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *keep)</font></strong>
+<a name="line1614">1614: </a>{
+<a name="line1615">1615: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1618">1618: </a>  *keep = pjd-&gt;keep;
+<a name="line1619">1619: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1620">1620: </a>}
+
+<a name="line1622">1622: </a><font color="#B22222">/*@</font>
+<a name="line1623">1623: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDGetRestart.html#PEPJDGetRestart">PEPJDGetRestart</a> - Gets the restart parameter used in the Jacobi-Davidson method.</font>
+
+<a name="line1625">1625: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1627">1627: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1628">1628: </a><font color="#B22222">.  pep - the eigenproblem solver context</font>
+
+<a name="line1630">1630: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1631">1631: </a><font color="#B22222">.  keep - the restart parameter</font>
+
+<a name="line1633">1633: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1635">1635: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDSetRestart.html#PEPJDSetRestart">PEPJDSetRestart</a>()</font>
+<a name="line1636">1636: </a><font color="#B22222">@*/</font>
+<a name="line1637">1637: </a><strong><font color="#4169E1"><a name="PEPJDGetRestart"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDGetRestart.html#PEPJDGetRestart">PEPJDGetRestart</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *keep)</font></strong>
+<a name="line1638">1638: </a>{
+
+<a name="line1644">1644: </a>  PetscUseMethod(pep,<font color="#666666">"PEPJDGetRestart_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal*),(pep,keep));
+<a name="line1645">1645: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1646">1646: </a>}
+
+<a name="line1648">1648: </a><strong><font color="#4169E1"><a name="PEPJDSetFix_JD"></a>PetscErrorCode PEPJDSetFix_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal fix)</font></strong>
+<a name="line1649">1649: </a>{
+<a name="line1650">1650: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1653">1653: </a>  <font color="#4169E1">if</font> (fix == PETSC_DEFAULT || fix == PETSC_DECIDE) pjd-&gt;fix = 0.01;
+<a name="line1654">1654: </a>  <font color="#4169E1">else</font> {
+<a name="line1655">1655: </a>    <font color="#4169E1">if</font> (fix &lt; 0.0) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid fix value"</font>);
+<a name="line1656">1656: </a>    pjd-&gt;fix = fix;
+<a name="line1657">1657: </a>  }
+<a name="line1658">1658: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1659">1659: </a>}
+
+<a name="line1661">1661: </a><font color="#B22222">/*@</font>
+<a name="line1662">1662: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDSetFix.html#PEPJDSetFix">PEPJDSetFix</a> - Sets the threshold for changing the target in the correction</font>
+<a name="line1663">1663: </a><font color="#B22222">   equation.</font>
+
+<a name="line1665">1665: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line1667">1667: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1668">1668: </a><font color="#B22222">+  pep - the eigenproblem solver context</font>
+<a name="line1669">1669: </a><font color="#B22222">-  fix - threshold for changing the target</font>
+
+<a name="line1671">1671: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line1672">1672: </a><font color="#B22222">.  -pep_jd_fix - the fix value</font>
+
+<a name="line1674">1674: </a><font color="#B22222">   Note:</font>
+<a name="line1675">1675: </a><font color="#B22222">   The target in the correction equation is fixed at the first iterations.</font>
+<a name="line1676">1676: </a><font color="#B22222">   When the norm of the residual vector is lower than the fix value,</font>
+<a name="line1677">1677: </a><font color="#B22222">   the target is set to the corresponding eigenvalue.</font>
+
+<a name="line1679">1679: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1681">1681: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDGetFix.html#PEPJDGetFix">PEPJDGetFix</a>()</font>
+<a name="line1682">1682: </a><font color="#B22222">@*/</font>
+<a name="line1683">1683: </a><strong><font color="#4169E1"><a name="PEPJDSetFix"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDSetFix.html#PEPJDSetFix">PEPJDSetFix</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal fix)</font></strong>
+<a name="line1684">1684: </a>{
+
+<a name="line1690">1690: </a>  PetscTryMethod(pep,<font color="#666666">"PEPJDSetFix_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal),(pep,fix));
+<a name="line1691">1691: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1692">1692: </a>}
+
+<a name="line1694">1694: </a><strong><font color="#4169E1"><a name="PEPJDGetFix_JD"></a>PetscErrorCode PEPJDGetFix_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *fix)</font></strong>
+<a name="line1695">1695: </a>{
+<a name="line1696">1696: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1699">1699: </a>  *fix = pjd-&gt;fix;
+<a name="line1700">1700: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1701">1701: </a>}
+
+<a name="line1703">1703: </a><font color="#B22222">/*@</font>
+<a name="line1704">1704: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDGetFix.html#PEPJDGetFix">PEPJDGetFix</a> - Returns the threshold for changing the target in the correction</font>
+<a name="line1705">1705: </a><font color="#B22222">   equation.</font>
+
+<a name="line1707">1707: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1709">1709: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1710">1710: </a><font color="#B22222">.  pep - the eigenproblem solver context</font>
+
+<a name="line1712">1712: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1713">1713: </a><font color="#B22222">.  fix - threshold for changing the target</font>
+
+<a name="line1715">1715: </a><font color="#B22222">   Note:</font>
+<a name="line1716">1716: </a><font color="#B22222">   The target in the correction equation is fixed at the first iterations.</font>
+<a name="line1717">1717: </a><font color="#B22222">   When the norm of the residual vector is lower than the fix value,</font>
+<a name="line1718">1718: </a><font color="#B22222">   the target is set to the corresponding eigenvalue.</font>
+
+<a name="line1720">1720: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1722">1722: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDSetFix.html#PEPJDSetFix">PEPJDSetFix</a>()</font>
+<a name="line1723">1723: </a><font color="#B22222">@*/</font>
+<a name="line1724">1724: </a><strong><font color="#4169E1"><a name="PEPJDGetFix"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDGetFix.html#PEPJDGetFix">PEPJDGetFix</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscReal *fix)</font></strong>
+<a name="line1725">1725: </a>{
+
+<a name="line1731">1731: </a>  PetscUseMethod(pep,<font color="#666666">"PEPJDGetFix_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscReal*),(pep,fix));
+<a name="line1732">1732: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1733">1733: </a>}
+
+<a name="line1735">1735: </a><strong><font color="#4169E1"><a name="PEPJDSetReusePreconditioner_JD"></a>PetscErrorCode PEPJDSetReusePreconditioner_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool reusepc)</font></strong>
+<a name="line1736">1736: </a>{
+<a name="line1737">1737: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1740">1740: </a>  pjd-&gt;reusepc = reusepc;
+<a name="line1741">1741: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1742">1742: </a>}
+
+<a name="line1744">1744: </a><font color="#B22222">/*@</font>
+<a name="line1745">1745: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDSetReusePreconditioner.html#PEPJDSetReusePreconditioner">PEPJDSetReusePreconditioner</a> - Sets a flag indicating whether the preconditioner</font>
+<a name="line1746">1746: </a><font color="#B22222">   must be reused or not.</font>
+
+<a name="line1748">1748: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line1750">1750: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1751">1751: </a><font color="#B22222">+  pep     - the eigenproblem solver context</font>
+<a name="line1752">1752: </a><font color="#B22222">-  reusepc - the reuse flag</font>
+
+<a name="line1754">1754: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line1755">1755: </a><font color="#B22222">.  -pep_jd_reuse_preconditioner - the reuse flag</font>
+
+<a name="line1757">1757: </a><font color="#B22222">   Note:</font>
+<a name="line1758">1758: </a><font color="#B22222">   The default value is False. If set to True, the preconditioner is built</font>
+<a name="line1759">1759: </a><font color="#B22222">   only at the beginning, using the target value. Otherwise, it may be rebuilt</font>
+<a name="line1760">1760: </a><font color="#B22222">   (depending on the fix parameter) at each iteration from the Ritz value.</font>
+
+<a name="line1762">1762: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1764">1764: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDGetReusePreconditioner.html#PEPJDGetReusePreconditioner">PEPJDGetReusePreconditioner</a>(), <a href="../../../../docs/manualpages/PEP/PEPJDSetFix.html#PEPJDSetFix">PEPJDSetFix</a>()</font>
+<a name="line1765">1765: </a><font color="#B22222">@*/</font>
+<a name="line1766">1766: </a><strong><font color="#4169E1"><a name="PEPJDSetReusePreconditioner"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDSetReusePreconditioner.html#PEPJDSetReusePreconditioner">PEPJDSetReusePreconditioner</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool reusepc)</font></strong>
+<a name="line1767">1767: </a>{
+
+<a name="line1773">1773: </a>  PetscTryMethod(pep,<font color="#666666">"PEPJDSetReusePreconditioner_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscBool),(pep,reusepc));
+<a name="line1774">1774: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1775">1775: </a>}
+
+<a name="line1777">1777: </a><strong><font color="#4169E1"><a name="PEPJDGetReusePreconditioner_JD"></a>PetscErrorCode PEPJDGetReusePreconditioner_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool *reusepc)</font></strong>
+<a name="line1778">1778: </a>{
+<a name="line1779">1779: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1782">1782: </a>  *reusepc = pjd-&gt;reusepc;
+<a name="line1783">1783: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1784">1784: </a>}
+
+<a name="line1786">1786: </a><font color="#B22222">/*@</font>
+<a name="line1787">1787: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDGetReusePreconditioner.html#PEPJDGetReusePreconditioner">PEPJDGetReusePreconditioner</a> - Returns the flag for reusing the preconditioner.</font>
+
+<a name="line1789">1789: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1791">1791: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1792">1792: </a><font color="#B22222">.  pep - the eigenproblem solver context</font>
+
+<a name="line1794">1794: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1795">1795: </a><font color="#B22222">.  reusepc - the reuse flag</font>
+
+<a name="line1797">1797: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1799">1799: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDSetReusePreconditioner.html#PEPJDSetReusePreconditioner">PEPJDSetReusePreconditioner</a>()</font>
+<a name="line1800">1800: </a><font color="#B22222">@*/</font>
+<a name="line1801">1801: </a><strong><font color="#4169E1"><a name="PEPJDGetReusePreconditioner"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDGetReusePreconditioner.html#PEPJDGetReusePreconditioner">PEPJDGetReusePreconditioner</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscBool *reusepc)</font></strong>
+<a name="line1802">1802: </a>{
+
+<a name="line1808">1808: </a>  PetscUseMethod(pep,<font color="#666666">"PEPJDGetReusePreconditioner_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscBool*),(pep,reusepc));
+<a name="line1809">1809: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1810">1810: </a>}
+
+<a name="line1812">1812: </a><strong><font color="#4169E1"><a name="PEPJDSetMinimalityIndex_JD"></a>PetscErrorCode PEPJDSetMinimalityIndex_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt mmidx)</font></strong>
+<a name="line1813">1813: </a>{
+<a name="line1814">1814: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1817">1817: </a>  <font color="#4169E1">if</font> (mmidx == PETSC_DEFAULT || mmidx == PETSC_DECIDE) pjd-&gt;mmidx = 1;
+<a name="line1818">1818: </a>  <font color="#4169E1">else</font> {
+<a name="line1819">1819: </a>    <font color="#4169E1">if</font> (mmidx &lt; 1) SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid mmidx value"</font>);
+<a name="line1820">1820: </a>    pjd-&gt;mmidx = mmidx;
+<a name="line1821">1821: </a>    pep-&gt;state = PEP_STATE_INITIAL;
+<a name="line1822">1822: </a>  }
+<a name="line1823">1823: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1824">1824: </a>}
+
+<a name="line1826">1826: </a><font color="#B22222">/*@</font>
+<a name="line1827">1827: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDSetMinimalityIndex.html#PEPJDSetMinimalityIndex">PEPJDSetMinimalityIndex</a> - Sets the maximum allowed value for the minimality index.</font>
+
+<a name="line1829">1829: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line1831">1831: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1832">1832: </a><font color="#B22222">+  pep   - the eigenproblem solver context</font>
+<a name="line1833">1833: </a><font color="#B22222">-  mmidx - maximum minimality index</font>
+
+<a name="line1835">1835: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line1836">1836: </a><font color="#B22222">.  -pep_jd_minimality_index - the minimality index value</font>
+
+<a name="line1838">1838: </a><font color="#B22222">   Note:</font>
+<a name="line1839">1839: </a><font color="#B22222">   The default value is equal to the degree of the polynomial. A smaller value</font>
+<a name="line1840">1840: </a><font color="#B22222">   can be used if the wanted eigenvectors are known to be linearly independent.</font>
+
+<a name="line1842">1842: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1844">1844: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDGetMinimalityIndex.html#PEPJDGetMinimalityIndex">PEPJDGetMinimalityIndex</a>()</font>
+<a name="line1845">1845: </a><font color="#B22222">@*/</font>
+<a name="line1846">1846: </a><strong><font color="#4169E1"><a name="PEPJDSetMinimalityIndex"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDSetMinimalityIndex.html#PEPJDSetMinimalityIndex">PEPJDSetMinimalityIndex</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt mmidx)</font></strong>
+<a name="line1847">1847: </a>{
+
+<a name="line1853">1853: </a>  PetscTryMethod(pep,<font color="#666666">"PEPJDSetMinimalityIndex_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscInt),(pep,mmidx));
+<a name="line1854">1854: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1855">1855: </a>}
+
+<a name="line1857">1857: </a><strong><font color="#4169E1"><a name="PEPJDGetMinimalityIndex_JD"></a>PetscErrorCode PEPJDGetMinimalityIndex_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt *mmidx)</font></strong>
+<a name="line1858">1858: </a>{
+<a name="line1859">1859: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1862">1862: </a>  *mmidx = pjd-&gt;mmidx;
+<a name="line1863">1863: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1864">1864: </a>}
+
+<a name="line1866">1866: </a><font color="#B22222">/*@</font>
+<a name="line1867">1867: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDGetMinimalityIndex.html#PEPJDGetMinimalityIndex">PEPJDGetMinimalityIndex</a> - Returns the maximum allowed value of the minimality</font>
+<a name="line1868">1868: </a><font color="#B22222">   index.</font>
+
+<a name="line1870">1870: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1872">1872: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1873">1873: </a><font color="#B22222">.  pep - the eigenproblem solver context</font>
+
+<a name="line1875">1875: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1876">1876: </a><font color="#B22222">.  mmidx - minimality index</font>
+
+<a name="line1878">1878: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1880">1880: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDSetMinimalityIndex.html#PEPJDSetMinimalityIndex">PEPJDSetMinimalityIndex</a>()</font>
+<a name="line1881">1881: </a><font color="#B22222">@*/</font>
+<a name="line1882">1882: </a><strong><font color="#4169E1"><a name="PEPJDGetMinimalityIndex"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDGetMinimalityIndex.html#PEPJDGetMinimalityIndex">PEPJDGetMinimalityIndex</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscInt *mmidx)</font></strong>
+<a name="line1883">1883: </a>{
+
+<a name="line1889">1889: </a>  PetscUseMethod(pep,<font color="#666666">"PEPJDGetMinimalityIndex_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,PetscInt*),(pep,mmidx));
+<a name="line1890">1890: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1891">1891: </a>}
+
+<a name="line1893">1893: </a><strong><font color="#4169E1"><a name="PEPJDSetProjection_JD"></a>PetscErrorCode PEPJDSetProjection_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a> proj)</font></strong>
+<a name="line1894">1894: </a>{
+<a name="line1895">1895: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1898">1898: </a>  <font color="#4169E1">switch</font> (proj) {
+<a name="line1899">1899: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>:
+<a name="line1900">1900: </a>    <font color="#4169E1">case</font> <a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_ORTHOGONAL</a>:
+<a name="line1901">1901: </a>      <font color="#4169E1">if</font> (pjd-&gt;proj != proj) {
+<a name="line1902">1902: </a>        pep-&gt;state = PEP_STATE_INITIAL;
+<a name="line1903">1903: </a>        pjd-&gt;proj = proj;
+<a name="line1904">1904: </a>      }
+<a name="line1905">1905: </a>      <font color="#4169E1">break</font>;
+<a name="line1906">1906: </a><strong><font color="#FF0000">    default:</font></strong>
+<a name="line1907">1907: </a>      SETERRQ(PetscObjectComm((PetscObject)pep),PETSC_ERR_ARG_OUTOFRANGE,<font color="#666666">"Invalid 'proj' value"</font>);
+<a name="line1908">1908: </a>  }
+<a name="line1909">1909: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1910">1910: </a>}
+
+<a name="line1912">1912: </a><font color="#B22222">/*@</font>
+<a name="line1913">1913: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDSetProjection.html#PEPJDSetProjection">PEPJDSetProjection</a> - Sets the type of projection to be used in the Jacobi-Davidson solver.</font>
+
+<a name="line1915">1915: </a><font color="#B22222">   Logically Collective on pep</font>
+
+<a name="line1917">1917: </a><font color="#B22222">   Input Parameters:</font>
+<a name="line1918">1918: </a><font color="#B22222">+  pep  - the eigenproblem solver context</font>
+<a name="line1919">1919: </a><font color="#B22222">-  proj - the type of projection</font>
+
+<a name="line1921">1921: </a><font color="#B22222">   Options Database Key:</font>
+<a name="line1922">1922: </a><font color="#B22222">.  -pep_jd_projection - the projection type, either orthogonal or harmonic</font>
+
+<a name="line1924">1924: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1926">1926: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDGetProjection.html#PEPJDGetProjection">PEPJDGetProjection</a>()</font>
+<a name="line1927">1927: </a><font color="#B22222">@*/</font>
+<a name="line1928">1928: </a><strong><font color="#4169E1"><a name="PEPJDSetProjection"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDSetProjection.html#PEPJDSetProjection">PEPJDSetProjection</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a> proj)</font></strong>
+<a name="line1929">1929: </a>{
+
+<a name="line1935">1935: </a>  PetscTryMethod(pep,<font color="#666666">"PEPJDSetProjection_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a>),(pep,proj));
+<a name="line1936">1936: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1937">1937: </a>}
+
+<a name="line1939">1939: </a><strong><font color="#4169E1"><a name="PEPJDGetProjection_JD"></a>PetscErrorCode PEPJDGetProjection_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a> *proj)</font></strong>
+<a name="line1940">1940: </a>{
+<a name="line1941">1941: </a>  PEP_JD *pjd = (PEP_JD*)pep-&gt;data;
+
+<a name="line1944">1944: </a>  *proj = pjd-&gt;proj;
+<a name="line1945">1945: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1946">1946: </a>}
+
+<a name="line1948">1948: </a><font color="#B22222">/*@</font>
+<a name="line1949">1949: </a><font color="#B22222">   <a href="../../../../docs/manualpages/PEP/PEPJDGetProjection.html#PEPJDGetProjection">PEPJDGetProjection</a> - Returns the type of projection used by the Jacobi-Davidson solver.</font>
+
+<a name="line1951">1951: </a><font color="#B22222">   Not Collective</font>
+
+<a name="line1953">1953: </a><font color="#B22222">   Input Parameter:</font>
+<a name="line1954">1954: </a><font color="#B22222">.  pep - the eigenproblem solver context</font>
+
+<a name="line1956">1956: </a><font color="#B22222">   Output Parameter:</font>
+<a name="line1957">1957: </a><font color="#B22222">.  proj - the type of projection</font>
+
+<a name="line1959">1959: </a><font color="#B22222">   Level: advanced</font>
+
+<a name="line1961">1961: </a><font color="#B22222">.seealso: <a href="../../../../docs/manualpages/PEP/PEPJDSetProjection.html#PEPJDSetProjection">PEPJDSetProjection</a>()</font>
+<a name="line1962">1962: </a><font color="#B22222">@*/</font>
+<a name="line1963">1963: </a><strong><font color="#4169E1"><a name="PEPJDGetProjection"></a>PetscErrorCode <a href="../../../../docs/manualpages/PEP/PEPJDGetProjection.html#PEPJDGetProjection">PEPJDGetProjection</a>(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a> *proj)</font></strong>
+<a name="line1964">1964: </a>{
+
+<a name="line1970">1970: </a>  PetscUseMethod(pep,<font color="#666666">"PEPJDGetProjection_C"</font>,(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a>,<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a>*),(pep,proj));
+<a name="line1971">1971: </a>  <font color="#4169E1">return</font>(0);
+<a name="line1972">1972: </a>}
+
+<a name="line1974">1974: </a><strong><font color="#4169E1"><a name="PEPSetFromOptions_JD"></a>PetscErrorCode PEPSetFromOptions_JD(PetscOptionItems *PetscOptionsObject,<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line1975">1975: </a>{
+<a name="line1976">1976: </a>  PetscErrorCode  ierr;
+<a name="line1977">1977: </a>  PetscBool       flg,b1;
+<a name="line1978">1978: </a>  PetscReal       r1;
+<a name="line1979">1979: </a>  PetscInt        i1;
+<a name="line1980">1980: </a>  <a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEPJDProjection</a> proj;
+
+<a name="line1983">1983: </a>  PetscOptionsHead(PetscOptionsObject,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> JD Options"</font>);
+
+<a name="line1985">1985: </a>    PetscOptionsReal(<font color="#666666">"-pep_jd_restart"</font>,<font color="#666666">"Proportion of vectors kept after restart"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEPJDSetRestart.html#PEPJDSetRestart">PEPJDSetRestart</a>"</font>,0.5,&amp;r1,&amp;flg);
+<a name="line1986">1986: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/PEP/PEPJDSetRestart.html#PEPJDSetRestart">PEPJDSetRestart</a>(pep,r1); }
+
+<a name="line1988">1988: </a>    PetscOptionsReal(<font color="#666666">"-pep_jd_fix"</font>,<font color="#666666">"Tolerance for changing the target in the correction equation"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEPJDSetFix.html#PEPJDSetFix">PEPJDSetFix</a>"</font>,0.01,&amp;r1,&amp;flg);
+<a name="line1989">1989: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/PEP/PEPJDSetFix.html#PEPJDSetFix">PEPJDSetFix</a>(pep,r1); }
+
+<a name="line1991">1991: </a>    PetscOptionsBool(<font color="#666666">"-pep_jd_reuse_preconditioner"</font>,<font color="#666666">"Whether to reuse the preconditioner"</font>,<font color="#666666">"PEPJDSetReusePreconditoiner"</font>,PETSC_FALSE,&amp;b1,&amp;flg);
+<a name="line1992">1992: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/PEP/PEPJDSetReusePreconditioner.html#PEPJDSetReusePreconditioner">PEPJDSetReusePreconditioner</a>(pep,b1); }
+
+<a name="line1994">1994: </a>    PetscOptionsInt(<font color="#666666">"-pep_jd_minimality_index"</font>,<font color="#666666">"Maximum allowed minimality index"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEPJDSetMinimalityIndex.html#PEPJDSetMinimalityIndex">PEPJDSetMinimalityIndex</a>"</font>,1,&amp;i1,&amp;flg);
+<a name="line1995">1995: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/PEP/PEPJDSetMinimalityIndex.html#PEPJDSetMinimalityIndex">PEPJDSetMinimalityIndex</a>(pep,i1); }
+
+<a name="line1997">1997: </a>    PetscOptionsEnum(<font color="#666666">"-pep_jd_projection"</font>,<font color="#666666">"Type of projection"</font>,<font color="#666666">"<a href="../../../../docs/manualpages/PEP/PEPJDSetProjection.html#PEPJDSetProjection">PEPJDSetProjection</a>"</font>,PEPJDProjectionTypes,(PetscEnum)<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>,(PetscEnum*)&amp;proj,&amp;flg);
+<a name="line1998">1998: </a>    <font color="#4169E1">if</font> (flg) { <a href="../../../../docs/manualpages/PEP/PEPJDSetProjection.html#PEPJDSetProjection">PEPJDSetProjection</a>(pep,proj); }
+
+<a name="line2000">2000: </a>  PetscOptionsTail();
+<a name="line2001">2001: </a>  <font color="#4169E1">return</font>(0);
+<a name="line2002">2002: </a>}
+
+<a name="line2004">2004: </a><strong><font color="#4169E1"><a name="PEPView_JD"></a>PetscErrorCode PEPView_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep,PetscViewer viewer)</font></strong>
+<a name="line2005">2005: </a>{
+<a name="line2007">2007: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line2008">2008: </a>  PetscBool      isascii;
+
+<a name="line2011">2011: </a>  PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&amp;isascii);
+<a name="line2012">2012: </a>  <font color="#4169E1">if</font> (isascii) {
+<a name="line2013">2013: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  %d%% of basis vectors kept after restart\n"</font>,(int)(100*pjd-&gt;keep));
+<a name="line2014">2014: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  threshold for changing the target in the correction equation (fix): %g\n"</font>,(double)pjd-&gt;fix);
+<a name="line2015">2015: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  projection type: %s\n"</font>,PEPJDProjectionTypes[pjd-&gt;proj]);
+<a name="line2016">2016: </a>    PetscViewerASCIIPrintf(viewer,<font color="#666666">"  maximum allowed minimality index: %d\n"</font>,pjd-&gt;mmidx);
+<a name="line2017">2017: </a>    <font color="#4169E1">if</font> (pjd-&gt;reusepc) { PetscViewerASCIIPrintf(viewer,<font color="#666666">"  reusing the preconditioner\n"</font>); }
+<a name="line2018">2018: </a>  }
+<a name="line2019">2019: </a>  <font color="#4169E1">return</font>(0);
+<a name="line2020">2020: </a>}
+
+<a name="line2022">2022: </a><strong><font color="#4169E1"><a name="PEPSetDefaultST_JD"></a>PetscErrorCode PEPSetDefaultST_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line2023">2023: </a>{
+<a name="line2025">2025: </a>  KSP            ksp;
+
+<a name="line2028">2028: </a>  <font color="#4169E1">if</font> (!((PetscObject)pep-&gt;st)-&gt;type_name) {
+<a name="line2029">2029: </a>    <a href="../../../../docs/manualpages/ST/STSetType.html#STSetType">STSetType</a>(pep-&gt;st,STPRECOND);
+<a name="line2030">2030: </a>    <a href="../../../../docs/manualpages/ST/STPrecondSetKSPHasMat.html#STPrecondSetKSPHasMat">STPrecondSetKSPHasMat</a>(pep-&gt;st,PETSC_TRUE);
+<a name="line2031">2031: </a>  }
+<a name="line2032">2032: </a>  <a href="../../../../docs/manualpages/ST/STSetTransform.html#STSetTransform">STSetTransform</a>(pep-&gt;st,PETSC_FALSE);
+<a name="line2033">2033: </a>  <a href="../../../../docs/manualpages/ST/STGetKSP.html#STGetKSP">STGetKSP</a>(pep-&gt;st,&amp;ksp);
+<a name="line2034">2034: </a>  <font color="#4169E1">if</font> (!((PetscObject)ksp)-&gt;type_name) {
+<a name="line2035">2035: </a>    KSPSetType(ksp,KSPBCGSL);
+<a name="line2036">2036: </a>    KSPSetTolerances(ksp,1e-5,PETSC_DEFAULT,PETSC_DEFAULT,100);
+<a name="line2037">2037: </a>  }
+<a name="line2038">2038: </a>  <font color="#4169E1">return</font>(0);
+<a name="line2039">2039: </a>}
+
+<a name="line2041">2041: </a><strong><font color="#4169E1"><a name="PEPReset_JD"></a>PetscErrorCode PEPReset_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line2042">2042: </a>{
+<a name="line2044">2044: </a>  PEP_JD         *pjd = (PEP_JD*)pep-&gt;data;
+<a name="line2045">2045: </a>  PetscInt       i;
+
+<a name="line2048">2048: </a>  <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line2049">2049: </a>    <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(pjd-&gt;TV+i);
+<a name="line2050">2050: </a>  }
+<a name="line2051">2051: </a>  <font color="#4169E1">if</font> (pjd-&gt;proj==<a href="../../../../docs/manualpages/PEP/PEPJDProjection.html#PEPJDProjection">PEP_JD_PROJECTION_HARMONIC</a>) { <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;pjd-&gt;W); }
+<a name="line2052">2052: </a>  <font color="#4169E1">if</font> (pjd-&gt;ld&gt;1) {
+<a name="line2053">2053: </a>    <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;pjd-&gt;V);
+<a name="line2054">2054: </a>    <font color="#4169E1">for</font> (i=0;i&lt;pep-&gt;nmat;i++) {
+<a name="line2055">2055: </a>      <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(pjd-&gt;AX+i);
+<a name="line2056">2056: </a>    }
+<a name="line2057">2057: </a>    <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;pjd-&gt;N[0]);
+<a name="line2058">2058: </a>    <a href="../../../../docs/manualpages/BV/BVDestroy.html#BVDestroy">BVDestroy</a>(&amp;pjd-&gt;N[1]);
+<a name="line2059">2059: </a>    PetscFree3(pjd-&gt;XpX,pjd-&gt;T,pjd-&gt;Tj);
+<a name="line2060">2060: </a>  }
+<a name="line2061">2061: </a>  PetscFree2(pjd-&gt;TV,pjd-&gt;AX);
+<a name="line2062">2062: </a>  <font color="#4169E1">return</font>(0);
+<a name="line2063">2063: </a>}
+
+<a name="line2065">2065: </a><strong><font color="#4169E1"><a name="PEPDestroy_JD"></a>PetscErrorCode PEPDestroy_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line2066">2066: </a>{
+
+<a name="line2070">2070: </a>  PetscFree(pep-&gt;data);
+<a name="line2071">2071: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetRestart_C"</font>,NULL);
+<a name="line2072">2072: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetRestart_C"</font>,NULL);
+<a name="line2073">2073: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetFix_C"</font>,NULL);
+<a name="line2074">2074: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetFix_C"</font>,NULL);
+<a name="line2075">2075: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetReusePreconditioner_C"</font>,NULL);
+<a name="line2076">2076: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetReusePreconditioner_C"</font>,NULL);
+<a name="line2077">2077: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetMinimalityIndex_C"</font>,NULL);
+<a name="line2078">2078: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetMinimalityIndex_C"</font>,NULL);
+<a name="line2079">2079: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetProjection_C"</font>,NULL);
+<a name="line2080">2080: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetProjection_C"</font>,NULL);
+<a name="line2081">2081: </a>  <font color="#4169E1">return</font>(0);
+<a name="line2082">2082: </a>}
+
+<a name="line2084">2084: </a><strong><font color="#4169E1"><a name="PEPCreate_JD"></a>SLEPC_EXTERN PetscErrorCode PEPCreate_JD(<a href="../../../../docs/manualpages/PEP/PEP.html#PEP">PEP</a> pep)</font></strong>
+<a name="line2085">2085: </a>{
+<a name="line2086">2086: </a>  PEP_JD         *pjd;
+
+<a name="line2090">2090: </a>  PetscNewLog(pep,&amp;pjd);
+<a name="line2091">2091: </a>  pep-&gt;data = (void*)pjd;
+
+<a name="line2093">2093: </a>  pjd-&gt;fix   = 0.01;
+<a name="line2094">2094: </a>  pjd-&gt;mmidx = 0;
+
+<a name="line2096">2096: </a>  pep-&gt;ops-&gt;solve          = PEPSolve_JD;
+<a name="line2097">2097: </a>  pep-&gt;ops-&gt;setup          = PEPSetUp_JD;
+<a name="line2098">2098: </a>  pep-&gt;ops-&gt;setfromoptions = PEPSetFromOptions_JD;
+<a name="line2099">2099: </a>  pep-&gt;ops-&gt;destroy        = PEPDestroy_JD;
+<a name="line2100">2100: </a>  pep-&gt;ops-&gt;reset          = PEPReset_JD;
+<a name="line2101">2101: </a>  pep-&gt;ops-&gt;view           = PEPView_JD;
+<a name="line2102">2102: </a>  pep-&gt;ops-&gt;setdefaultst   = PEPSetDefaultST_JD;
+
+<a name="line2104">2104: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetRestart_C"</font>,PEPJDSetRestart_JD);
+<a name="line2105">2105: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetRestart_C"</font>,PEPJDGetRestart_JD);
+<a name="line2106">2106: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetFix_C"</font>,PEPJDSetFix_JD);
+<a name="line2107">2107: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetFix_C"</font>,PEPJDGetFix_JD);
+<a name="line2108">2108: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetReusePreconditioner_C"</font>,PEPJDSetReusePreconditioner_JD);
+<a name="line2109">2109: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetReusePreconditioner_C"</font>,PEPJDGetReusePreconditioner_JD);
+<a name="line2110">2110: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetMinimalityIndex_C"</font>,PEPJDSetMinimalityIndex_JD);
+<a name="line2111">2111: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetMinimalityIndex_C"</font>,PEPJDGetMinimalityIndex_JD);
+<a name="line2112">2112: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDSetProjection_C"</font>,PEPJDSetProjection_JD);
+<a name="line2113">2113: </a>  PetscObjectComposeFunction((PetscObject)pep,<font color="#666666">"PEPJDGetProjection_C"</font>,PEPJDGetProjection_JD);
+<a name="line2114">2114: </a>  <font color="#4169E1">return</font>(0);
+<a name="line2115">2115: </a>}
+
+</pre>
+</body>
+
+</html>

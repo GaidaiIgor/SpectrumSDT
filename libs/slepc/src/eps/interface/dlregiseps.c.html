@@ -1,0 +1,112 @@
+<center><a href="dlregiseps.c">Actual source code: dlregiseps.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/interface/dlregiseps.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:51+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/interface/dlregiseps.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a> #include <A href="../../../include/slepc/private/epsimpl.h.html">&lt;slepc/private/epsimpl.h&gt;</A>
+
+<a name="line13"> 13: </a>static PetscBool EPSPackageInitialized = PETSC_FALSE;
+
+<a name="line15"> 15: </a>const char *EPSBalanceTypes[] = {<font color="#666666">"NONE"</font>,<font color="#666666">"ONESIDE"</font>,<font color="#666666">"TWOSIDE"</font>,<font color="#666666">"USER"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSBalance.html#EPSBalance">EPSBalance</a>"</font>,<font color="#666666">"EPS_BALANCE_"</font>,0};
+<a name="line16"> 16: </a>const char *EPSErrorTypes[] = {<font color="#666666">"ABSOLUTE"</font>,<font color="#666666">"RELATIVE"</font>,<font color="#666666">"BACKWARD"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSErrorType.html#EPSErrorType">EPSErrorType</a>"</font>,<font color="#666666">"EPS_ERROR_"</font>,0};
+<a name="line17"> 17: </a>const char *EPSPowerShiftTypes[] = {<font color="#666666">"CONSTANT"</font>,<font color="#666666">"RAYLEIGH"</font>,<font color="#666666">"WILKINSON"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSPowerShiftType.html#EPSPowerShiftType">EPSPowerShiftType</a>"</font>,<font color="#666666">"EPS_POWER_SHIFT_"</font>,0};
+<a name="line18"> 18: </a>const char *EPSLanczosReorthogTypes[] = {<font color="#666666">"LOCAL"</font>,<font color="#666666">"FULL"</font>,<font color="#666666">"SELECTIVE"</font>,<font color="#666666">"PERIODIC"</font>,<font color="#666666">"PARTIAL"</font>,<font color="#666666">"DELAYED"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSLanczosReorthogType.html#EPSLanczosReorthogType">EPSLanczosReorthogType</a>"</font>,<font color="#666666">"EPS_LANCZOS_REORTHOG_"</font>,0};
+<a name="line19"> 19: </a>const char *EPSPRIMMEMethods[] = {<font color="#666666">""</font>,<font color="#666666">"DYNAMIC"</font>,<font color="#666666">"DEFAULT_MIN_TIME"</font>,<font color="#666666">"DEFAULT_MIN_MATVECS"</font>,<font color="#666666">"ARNOLDI"</font>,<font color="#666666">"GD"</font>,<font color="#666666">"GD_PLUSK"</font>,<font color="#666666">"GD_OLSEN_PLUSK"</font>,<font color="#666666">"JD_OLSEN_PLUSK"</font>,<font color="#666666">"RQI"</font>,<font color="#666666">"JDQR"</font>,<font color="#666666">"JDQMR"</font>,<font color="#666666">"JDQMR_ETOL"</font>,<font color="#666666">"SUBSPACE_ITERATION"</font>,<font color="#666666">"LOBPCG_ORTHOBASIS"</font>,<font color="#666666">"LOBPCG_ORTHOBASISW"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSPRIMMEMethod.html#EPSPRIMMEMethod">EPSPRIMMEMethod</a>"</font>,<font color="#666666">"EPS_PRIMME_"</font>,0};
+<a name="line20"> 20: </a>const char *EPSCISSQuadRules[] = {<font color="#666666">"(not set yet)"</font>,<font color="#666666">"TRAPEZOIDAL"</font>,<font color="#666666">"CHEBYSHEV"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSCISSQuadRule.html#EPSCISSQuadRule">EPSCISSQuadRule</a>"</font>,<font color="#666666">"EPS_CISS_QUADRULE_"</font>,0};
+<a name="line21"> 21: </a>const char *EPSCISSExtractions[] = {<font color="#666666">"RITZ"</font>,<font color="#666666">"HANKEL"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSCISSExtraction.html#EPSCISSExtraction">EPSCISSExtraction</a>"</font>,<font color="#666666">"EPS_CISS_EXTRACTION_"</font>,0};
+<a name="line22"> 22: </a>const char *const EPSConvergedReasons_Shifted[] = {<font color="#666666">""</font>,<font color="#666666">"DIVERGED_SYMMETRY_LOST"</font>,<font color="#666666">"DIVERGED_BREAKDOWN"</font>,<font color="#666666">"DIVERGED_ITS"</font>,<font color="#666666">"CONVERGED_ITERATING"</font>,<font color="#666666">"CONVERGED_TOL"</font>,<font color="#666666">"CONVERGED_USER"</font>,<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSConvergedReason.html#EPSConvergedReason">EPSConvergedReason</a>"</font>,<font color="#666666">"EPS_"</font>,0};
+<a name="line23"> 23: </a>const char *const*EPSConvergedReasons = EPSConvergedReasons_Shifted + 4;
+
+<a name="line25"> 25: </a><font color="#B22222">/*@C</font>
+<a name="line26"> 26: </a><font color="#B22222">  <a href="../../../docs/manualpages/EPS/EPSFinalizePackage.html#EPSFinalizePackage">EPSFinalizePackage</a> - This function destroys everything in the SLEPc interface</font>
+<a name="line27"> 27: </a><font color="#B22222">  to the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> package. It is called from <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>().</font>
+
+<a name="line29"> 29: </a><font color="#B22222">  Level: developer</font>
+
+<a name="line31"> 31: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/SlepcFinalize.html#SlepcFinalize">SlepcFinalize</a>()</font>
+<a name="line32"> 32: </a><font color="#B22222">@*/</font>
+<a name="line33"> 33: </a><strong><font color="#4169E1"><a name="EPSFinalizePackage"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSFinalizePackage.html#EPSFinalizePackage">EPSFinalizePackage</a>(void)</font></strong>
+<a name="line34"> 34: </a>{
+
+<a name="line38"> 38: </a>  PetscFunctionListDestroy(&amp;EPSList);
+<a name="line39"> 39: </a>  EPSPackageInitialized = PETSC_FALSE;
+<a name="line40"> 40: </a>  EPSRegisterAllCalled  = PETSC_FALSE;
+<a name="line41"> 41: </a>  <font color="#4169E1">return</font>(0);
+<a name="line42"> 42: </a>}
+
+<a name="line44"> 44: </a><font color="#B22222">/*@C</font>
+<a name="line45"> 45: </a><font color="#B22222">  <a href="../../../docs/manualpages/EPS/EPSInitializePackage.html#EPSInitializePackage">EPSInitializePackage</a> - This function initializes everything in the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> package.</font>
+<a name="line46"> 46: </a><font color="#B22222">  It is called from PetscDLLibraryRegister() when using dynamic libraries, and</font>
+<a name="line47"> 47: </a><font color="#B22222">  on the first call to <a href="../../../docs/manualpages/EPS/EPSCreate.html#EPSCreate">EPSCreate</a>() when using static libraries.</font>
+
+<a name="line49"> 49: </a><font color="#B22222">  Level: developer</font>
+
+<a name="line51"> 51: </a><font color="#B22222">.seealso: <a href="../../../docs/manualpages/sys/SlepcInitialize.html#SlepcInitialize">SlepcInitialize</a>()</font>
+<a name="line52"> 52: </a><font color="#B22222">@*/</font>
+<a name="line53"> 53: </a><strong><font color="#4169E1"><a name="EPSInitializePackage"></a>PetscErrorCode <a href="../../../docs/manualpages/EPS/EPSInitializePackage.html#EPSInitializePackage">EPSInitializePackage</a>()</font></strong>
+<a name="line54"> 54: </a>{
+<a name="line55"> 55: </a>  char           logList[256];
+<a name="line56"> 56: </a>  PetscBool      opt,pkg;
+<a name="line57"> 57: </a>  PetscClassId   classids[1];
+
+<a name="line61"> 61: </a>  <font color="#4169E1">if</font> (EPSPackageInitialized) <font color="#4169E1">return</font>(0);
+<a name="line62"> 62: </a>  EPSPackageInitialized = PETSC_TRUE;
+<a name="line63"> 63: </a>  <font color="#B22222">/* Register Classes */</font>
+<a name="line64"> 64: </a>  PetscClassIdRegister(<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> Solver"</font>,&amp;EPS_CLASSID);
+<a name="line65"> 65: </a>  <font color="#B22222">/* Register Constructors */</font>
+<a name="line66"> 66: </a>  <a href="../../../docs/manualpages/EPS/EPSRegisterAll.html#EPSRegisterAll">EPSRegisterAll</a>();
+<a name="line67"> 67: </a>  <font color="#B22222">/* Register Events */</font>
+<a name="line68"> 68: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSetUp.html#EPSSetUp">EPSSetUp</a>"</font>,EPS_CLASSID,&amp;EPS_SetUp);
+<a name="line69"> 69: </a>  PetscLogEventRegister(<font color="#666666">"<a href="../../../docs/manualpages/EPS/EPSSolve.html#EPSSolve">EPSSolve</a>"</font>,EPS_CLASSID,&amp;EPS_Solve);
+<a name="line70"> 70: </a>  <font color="#B22222">/* Process Info */</font>
+<a name="line71"> 71: </a>  classids[0] = EPS_CLASSID;
+<a name="line72"> 72: </a>  PetscInfoProcessClass(<font color="#666666">"eps"</font>,1,&amp;classids[0]);
+<a name="line73"> 73: </a>  <font color="#B22222">/* Process summary exclusions */</font>
+<a name="line74"> 74: </a>  PetscOptionsGetString(NULL,NULL,<font color="#666666">"-log_exclude"</font>,logList,<font color="#4169E1">sizeof</font>(logList),&amp;opt);
+<a name="line75"> 75: </a>  <font color="#4169E1">if</font> (opt) {
+<a name="line76"> 76: </a>    PetscStrInList(<font color="#666666">"eps"</font>,logList,',',&amp;pkg);
+<a name="line77"> 77: </a>    <font color="#4169E1">if</font> (pkg) { PetscLogEventDeactivateClass(EPS_CLASSID); }
+<a name="line78"> 78: </a>  }
+<a name="line79"> 79: </a>  <font color="#B22222">/* Register package finalizer */</font>
+<a name="line80"> 80: </a>  PetscRegisterFinalize(<a href="../../../docs/manualpages/EPS/EPSFinalizePackage.html#EPSFinalizePackage">EPSFinalizePackage</a>);
+<a name="line81"> 81: </a>  <font color="#4169E1">return</font>(0);
+<a name="line82"> 82: </a>}
+
+<a name="line84"> 84: </a><font color="#A020F0">#if defined(PETSC_HAVE_DYNAMIC_LIBRARIES)</font>
+<a name="line85"> 85: </a><font color="#B22222">/*</font>
+<a name="line86"> 86: </a><font color="#B22222">  PetscDLLibraryRegister - This function is called when the dynamic library</font>
+<a name="line87"> 87: </a><font color="#B22222">  it is in is opened.</font>
+
+<a name="line89"> 89: </a><font color="#B22222">  This one registers all the <a href="../../../docs/manualpages/EPS/EPS.html#EPS">EPS</a> methods that are in the basic SLEPc libslepceps</font>
+<a name="line90"> 90: </a><font color="#B22222">  library.</font>
+<a name="line91"> 91: </a><font color="#B22222"> */</font>
+<a name="line92"> 92: </a><strong><font color="#4169E1"><a name="PetscDLLibraryRegister_slepceps"></a>SLEPC_EXTERN PetscErrorCode PetscDLLibraryRegister_slepceps()</font></strong>
+<a name="line93"> 93: </a>{
+
+<a name="line97"> 97: </a>  <a href="../../../docs/manualpages/EPS/EPSInitializePackage.html#EPSInitializePackage">EPSInitializePackage</a>();
+<a name="line98"> 98: </a>  <font color="#4169E1">return</font>(0);
+<a name="line99"> 99: </a>}
+<a name="line100">100: </a><font color="#A020F0">#endif </font><font color="#B22222">/* PETSC_HAVE_DYNAMIC_LIBRARIES */</font><font color="#A020F0"></font>
+
+</pre>
+</body>
+
+</html>

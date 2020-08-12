@@ -1,0 +1,104 @@
+<center><a href="dvdschm.c">Actual source code: dvdschm.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/eps/impls/davidson/dvdschm.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:52+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/eps/impls/davidson/dvdschm.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a><font color="#A020F0">#include </font><font color="#666666">"davidson.h"</font><font color="#A020F0"></font>
+
+<a name="line13"> 13: </a><strong><font color="#228B22">#define DVD_CHECKSUM(b) ((b)-&gt;max_size_V + (b)-&gt;max_size_oldX)</font></strong>
+
+<a name="line15"> 15: </a><strong><font color="#4169E1"><a name="dvd_schm_basic_preconf"></a>PetscErrorCode dvd_schm_basic_preconf(dvdDashboard *d,dvdBlackboard *b,PetscInt mpd,PetscInt min_size_V,PetscInt bs,PetscInt ini_size_V,PetscInt size_initV,PetscInt plusk,HarmType_t harmMode,KSP ksp,InitType_t init,PetscBool allResiduals,PetscBool orth,PetscBool doubleexp)</font></strong>
+<a name="line16"> 16: </a>{
+<a name="line18"> 18: </a>  PetscInt       check_sum0,check_sum1;
+
+<a name="line21"> 21: </a>  PetscMemzero(b,<font color="#4169E1">sizeof</font>(dvdBlackboard));
+<a name="line22"> 22: </a>  b-&gt;state = DVD_STATE_PRECONF;
+
+<a name="line24"> 24: </a>  <font color="#4169E1">for</font> (check_sum0=-1,check_sum1=DVD_CHECKSUM(b); check_sum0 != check_sum1; check_sum0 = check_sum1, check_sum1 = DVD_CHECKSUM(b)) {
+
+<a name="line26"> 26: </a>    <font color="#B22222">/* Setup basic management of V */</font>
+<a name="line27"> 27: </a>    dvd_managementV_basic(d,b,bs,mpd,min_size_V,plusk,PetscNot(harmMode==DVD_HARM_NONE),allResiduals);
+
+<a name="line29"> 29: </a>    <font color="#B22222">/* Setup the initial subspace for V */</font>
+<a name="line30"> 30: </a>    dvd_initV(d,b,ini_size_V,size_initV,(init==DVD_INITV_KRYLOV)?PETSC_TRUE:PETSC_FALSE);
+
+<a name="line32"> 32: </a>    <font color="#B22222">/* Setup the convergence in order to use the SLEPc convergence test */</font>
+<a name="line33"> 33: </a>    dvd_testconv_slepc(d,b);
+
+<a name="line35"> 35: </a>    <font color="#B22222">/* Setup Raileigh-Ritz for selecting the best eigenpairs in V */</font>
+<a name="line36"> 36: </a>    dvd_calcpairs_qz(d,b,orth,PetscNot(harmMode==DVD_HARM_NONE));
+<a name="line37"> 37: </a>    <font color="#4169E1">if</font> (harmMode != DVD_HARM_NONE) {
+<a name="line38"> 38: </a>      dvd_harm_conf(d,b,harmMode,PETSC_FALSE,0.0);
+<a name="line39"> 39: </a>    }
+
+<a name="line41"> 41: </a>    <font color="#B22222">/* Setup the method for improving the eigenvectors */</font>
+<a name="line42"> 42: </a>    <font color="#4169E1">if</font> (doubleexp) {
+<a name="line43"> 43: </a>      dvd_improvex_gd2(d,b,ksp,bs);
+<a name="line44"> 44: </a>    } <font color="#4169E1">else</font> {
+<a name="line45"> 45: </a>      dvd_improvex_jd(d,b,ksp,bs,PETSC_FALSE);
+<a name="line46"> 46: </a>      dvd_improvex_jd_proj_uv(d,b);
+<a name="line47"> 47: </a>      dvd_improvex_jd_lit_const(d,b,0,0.0,0.0);
+<a name="line48"> 48: </a>    }
+<a name="line49"> 49: </a>  }
+<a name="line50"> 50: </a>  <font color="#4169E1">return</font>(0);
+<a name="line51"> 51: </a>}
+
+<a name="line53"> 53: </a><strong><font color="#4169E1"><a name="dvd_schm_basic_conf"></a>PetscErrorCode dvd_schm_basic_conf(dvdDashboard *d,dvdBlackboard *b,PetscInt mpd,PetscInt min_size_V,PetscInt bs,PetscInt ini_size_V,PetscInt size_initV,PetscInt plusk,HarmType_t harmMode,PetscBool fixedTarget,PetscScalar t,KSP ksp,PetscReal fix,InitType_t init,PetscBool allResiduals,PetscBool orth,PetscBool dynamic,PetscBool doubleexp)</font></strong>
+<a name="line54"> 54: </a>{
+<a name="line55"> 55: </a>  PetscInt       check_sum0,check_sum1,maxits;
+<a name="line56"> 56: </a>  PetscReal      tol;
+
+<a name="line60"> 60: </a>  b-&gt;state = DVD_STATE_CONF;
+<a name="line61"> 61: </a>  check_sum0 = DVD_CHECKSUM(b);
+
+<a name="line63"> 63: </a>  <font color="#B22222">/* Setup basic management of V */</font>
+<a name="line64"> 64: </a>  dvd_managementV_basic(d,b,bs,mpd,min_size_V,plusk,PetscNot(harmMode==DVD_HARM_NONE),allResiduals);
+
+<a name="line66"> 66: </a>  <font color="#B22222">/* Setup the initial subspace for V */</font>
+<a name="line67"> 67: </a>  dvd_initV(d,b,ini_size_V,size_initV,(init==DVD_INITV_KRYLOV)?PETSC_TRUE:PETSC_FALSE);
+
+<a name="line69"> 69: </a>  <font color="#B22222">/* Setup the convergence in order to use the SLEPc convergence test */</font>
+<a name="line70"> 70: </a>  dvd_testconv_slepc(d,b);
+
+<a name="line72"> 72: </a>  <font color="#B22222">/* Setup Raileigh-Ritz for selecting the best eigenpairs in V */</font>
+<a name="line73"> 73: </a>  dvd_calcpairs_qz(d,b,orth,PetscNot(harmMode==DVD_HARM_NONE));
+<a name="line74"> 74: </a>  <font color="#4169E1">if</font> (harmMode != DVD_HARM_NONE) {
+<a name="line75"> 75: </a>    dvd_harm_conf(d,b,harmMode,fixedTarget,t);
+<a name="line76"> 76: </a>  }
+
+<a name="line78"> 78: </a>  <font color="#B22222">/* Setup the method for improving the eigenvectors */</font>
+<a name="line79"> 79: </a>  <font color="#4169E1">if</font> (doubleexp) {
+<a name="line80"> 80: </a>    dvd_improvex_gd2(d,b,ksp,bs);
+<a name="line81"> 81: </a>  } <font color="#4169E1">else</font> {
+<a name="line82"> 82: </a>    dvd_improvex_jd(d,b,ksp,bs,dynamic);
+<a name="line83"> 83: </a>    dvd_improvex_jd_proj_uv(d,b);
+<a name="line84"> 84: </a>    KSPGetTolerances(ksp,&amp;tol,NULL,NULL,&amp;maxits);
+<a name="line85"> 85: </a>    dvd_improvex_jd_lit_const(d,b,maxits,tol,fix);
+<a name="line86"> 86: </a>  }
+
+<a name="line88"> 88: </a>  check_sum1 = DVD_CHECKSUM(b);
+<a name="line89"> 89: </a>  <font color="#4169E1">if</font> (check_sum0 != check_sum1) SETERRQ(PETSC_COMM_SELF,1,<font color="#666666">"Something awful happened"</font>);
+<a name="line90"> 90: </a>  <font color="#4169E1">return</font>(0);
+<a name="line91"> 91: </a>}
+</pre>
+</body>
+
+</html>

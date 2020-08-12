@@ -1,0 +1,743 @@
+<center><a href="invit.c">Actual source code: invit.c</a></center><br>
+
+<html>
+<head> <link rel="canonical" href="https://slepc.upv.es/documentation/current/src/sys/classes/ds/impls/ghiep/invit.c.html" />
+<title></title>
+<meta name="generator" content="c2html 0.9.4">
+<meta name="date" content="2020-06-14T16:43:40+00:00">
+</head>
+
+<body bgcolor="#FFFFFF">
+   <div id="version" align=right><b>slepc-3.13.3 2020-06-14</b></div>
+   <div id="bugreport" align=right><a href="mailto:slepc-maint@upv.es?subject=Typo or Error in Documentation &body=Please describe the typo or error in the documentation: slepc-3.13.3 v3.13.3 src/sys/classes/ds/impls/ghiep/invit.c.html "><small>Report Typos and Errors</small></a></div>
+<pre width="80">
+<a name="line1">  1: </a><font color="#B22222">/*</font>
+<a name="line2">  2: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line3">  3: </a><font color="#B22222">   SLEPc - Scalable Library for Eigenvalue Problem Computations</font>
+<a name="line4">  4: </a><font color="#B22222">   Copyright (c) 2002-2020, Universitat Politecnica de Valencia, Spain</font>
+
+<a name="line6">  6: </a><font color="#B22222">   This file is part of SLEPc.</font>
+<a name="line7">  7: </a><font color="#B22222">   SLEPc is distributed under a 2-clause BSD license (see LICENSE).</font>
+<a name="line8">  8: </a><font color="#B22222">   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</font>
+<a name="line9">  9: </a><font color="#B22222">*/</font>
+
+<a name="line11"> 11: </a> #include <A href="../../../../../../include/slepc/private/dsimpl.h.html">&lt;slepc/private/dsimpl.h&gt;</A>
+<a name="line12"> 12: </a> #include <A href="../../../../../../include/slepcblaslapack.h.html">&lt;slepcblaslapack.h&gt;</A>
+
+<a name="line14"> 14: </a><font color="#4169E1"><a name="HRtr"></a>struct HRtr</font>
+<a name="line15"> 15: </a>{
+<a name="line16"> 16: </a>  PetscScalar *data;
+<a name="line17"> 17: </a>  PetscInt    m;
+<a name="line18"> 18: </a>  PetscInt    idx[2];
+<a name="line19"> 19: </a>  PetscInt    n[2];
+<a name="line20"> 20: </a>  PetscScalar tau[2];
+<a name="line21"> 21: </a>  PetscReal   alpha;
+<a name="line22"> 22: </a>  PetscReal   cs;
+<a name="line23"> 23: </a>  PetscReal   sn;
+<a name="line24"> 24: </a>  PetscInt    type;
+<a name="line25"> 25: </a>};
+
+<a name="line27"> 27: </a><font color="#B22222">/*</font>
+<a name="line28"> 28: </a><font color="#B22222">  Generates a hyperbolic rotation</font>
+<a name="line29"> 29: </a><font color="#B22222">    if x1*x1 - x2*x2 != 0</font>
+<a name="line30"> 30: </a><font color="#B22222">      r = sqrt(|x1*x1 - x2*x2|)</font>
+<a name="line31"> 31: </a><font color="#B22222">      c = x1/r  s = x2/r</font>
+
+<a name="line33"> 33: </a><font color="#B22222">      | c -s||x1|   |d*r|</font>
+<a name="line34"> 34: </a><font color="#B22222">      |-s  c||x2| = | 0 |</font>
+<a name="line35"> 35: </a><font color="#B22222">      where d = 1 for type==1 and -1 for type==2</font>
+<a name="line36"> 36: </a><font color="#B22222">  Returns the condition number of the reduction</font>
+<a name="line37"> 37: </a><font color="#B22222">*/</font>
+<a name="line38"> 38: </a><strong><font color="#4169E1"><a name="HRGen"></a>static PetscErrorCode HRGen(PetscReal x1,PetscReal x2,PetscInt *type,PetscReal *c,PetscReal *s,PetscReal *r,PetscReal *cond)</font></strong>
+<a name="line39"> 39: </a>{
+<a name="line40"> 40: </a>  PetscReal t,n2,xa,xb;
+<a name="line41"> 41: </a>  PetscInt  type_;
+
+<a name="line44"> 44: </a>  <font color="#4169E1">if</font> (x2==0.0) {
+<a name="line45"> 45: </a>    *r = PetscAbsReal(x1); *c = (x1&gt;=0.0)?1.0:-1.0; *s = 0.0;
+<a name="line46"> 46: </a>    <font color="#4169E1">if</font> (type) *type = 1;
+<a name="line47"> 47: </a>    <font color="#4169E1">return</font>(0);
+<a name="line48"> 48: </a>  }
+<a name="line49"> 49: </a>  <font color="#4169E1">if</font> (PetscAbsReal(x1) == PetscAbsReal(x2)) {
+<a name="line50"> 50: </a>    <font color="#B22222">/* hyperbolic rotation doesn't exist */</font>
+<a name="line51"> 51: </a>    *c = *s = *r = 0.0;
+<a name="line52"> 52: </a>    <font color="#4169E1">if</font> (type) *type = 0;
+<a name="line53"> 53: </a>    *cond = PETSC_MAX_REAL;
+<a name="line54"> 54: </a>    <font color="#4169E1">return</font>(0);
+<a name="line55"> 55: </a>  }
+
+<a name="line57"> 57: </a>  <font color="#4169E1">if</font> (PetscAbsReal(x1)&gt;PetscAbsReal(x2)) {
+<a name="line58"> 58: </a>    xa = x1; xb = x2; type_ = 1;
+<a name="line59"> 59: </a>  } <font color="#4169E1">else</font> {
+<a name="line60"> 60: </a>    xa = x2; xb = x1; type_ = 2;
+<a name="line61"> 61: </a>  }
+<a name="line62"> 62: </a>  t = xb/xa;
+<a name="line63"> 63: </a>  n2 = PetscAbsReal(1 - t*t);
+<a name="line64"> 64: </a>  *r = PetscSqrtReal(n2)*PetscAbsReal(xa);
+<a name="line65"> 65: </a>  *c = x1/(*r);
+<a name="line66"> 66: </a>  *s = x2/(*r);
+<a name="line67"> 67: </a>  <font color="#4169E1">if</font> (type_ == 2) *r *= -1;
+<a name="line68"> 68: </a>  <font color="#4169E1">if</font> (type) *type = type_;
+<a name="line69"> 69: </a>  <font color="#4169E1">if</font> (cond) *cond = (PetscAbsReal(*c) + PetscAbsReal(*s))/PetscAbsReal(PetscAbsReal(*c) - PetscAbsReal(*s));
+<a name="line70"> 70: </a>  <font color="#4169E1">return</font>(0);
+<a name="line71"> 71: </a>}
+
+<a name="line73"> 73: </a><font color="#B22222">/*</font>
+<a name="line74"> 74: </a><font color="#B22222">                                |c  s|</font>
+<a name="line75"> 75: </a><font color="#B22222">  Applies an hyperbolic rotator |s  c|</font>
+<a name="line76"> 76: </a><font color="#B22222">           |c  s|</font>
+<a name="line77"> 77: </a><font color="#B22222">    [x1 x2]|s  c|</font>
+<a name="line78"> 78: </a><font color="#B22222">*/</font>
+<a name="line79"> 79: </a><strong><font color="#4169E1"><a name="HRApply"></a>static PetscErrorCode HRApply(PetscInt n,PetscScalar *x1,PetscInt inc1,PetscScalar *x2,PetscInt inc2,PetscReal c,PetscReal s)</font></strong>
+<a name="line80"> 80: </a>{
+<a name="line81"> 81: </a>  PetscInt    i;
+<a name="line82"> 82: </a>  PetscReal   t;
+<a name="line83"> 83: </a>  PetscScalar tmp;
+
+<a name="line86"> 86: </a>  <font color="#4169E1">if</font> (PetscAbsReal(c)&gt;PetscAbsReal(s)) { <font color="#B22222">/* Type I */</font>
+<a name="line87"> 87: </a>    t = s/c;
+<a name="line88"> 88: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line89"> 89: </a>      x1[i*inc1] = c*x1[i*inc1] + s*x2[i*inc2];
+<a name="line90"> 90: </a>      x2[i*inc2] = t*x1[i*inc1] + x2[i*inc2]/c;
+<a name="line91"> 91: </a>    }
+<a name="line92"> 92: </a>  } <font color="#4169E1">else</font> { <font color="#B22222">/* Type II */</font>
+<a name="line93"> 93: </a>    t = c/s;
+<a name="line94"> 94: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line95"> 95: </a>      tmp = x1[i*inc1];
+<a name="line96"> 96: </a>      x1[i*inc1] = c*x1[i*inc1] + s*x2[i*inc2];
+<a name="line97"> 97: </a>      x2[i*inc2] = t*x1[i*inc1] + tmp/s;
+<a name="line98"> 98: </a>    }
+<a name="line99"> 99: </a>  }
+<a name="line100">100: </a>  <font color="#4169E1">return</font>(0);
+<a name="line101">101: </a>}
+
+<a name="line103">103: </a><font color="#B22222">/*</font>
+<a name="line104">104: </a><font color="#B22222">  Reduction to tridiagonal-diagonal form (see F. Tisseur, SIMAX 26(1), 2004).</font>
+
+<a name="line106">106: </a><font color="#B22222">  Input:</font>
+<a name="line107">107: </a><font color="#B22222">    A symmetric (only lower triangular part is referred)</font>
+<a name="line108">108: </a><font color="#B22222">    s vector +1 and -1 (signature matrix)</font>
+<a name="line109">109: </a><font color="#B22222">  Output:</font>
+<a name="line110">110: </a><font color="#B22222">    d,e</font>
+<a name="line111">111: </a><font color="#B22222">    s</font>
+<a name="line112">112: </a><font color="#B22222">    Q s-orthogonal matrix with Q^T*A*Q = T (symmetric tridiagonal matrix)</font>
+<a name="line113">113: </a><font color="#B22222">*/</font>
+<a name="line114">114: </a><strong><font color="#4169E1"><a name="TridiagDiag_HHR"></a>static PetscErrorCode TridiagDiag_HHR(PetscInt n,PetscScalar *A,PetscInt lda,PetscReal *s,PetscScalar* Q,PetscInt ldq,PetscBool flip,PetscReal *d,PetscReal *e,PetscInt *perm_,PetscScalar *work,PetscReal *rwork,PetscBLASInt *iwork)</font></strong>
+<a name="line115">115: </a>{
+<a name="line117">117: </a>  PetscInt       i,j,k,*ii,*jj,i0=0,ik=0,tmp,type;
+<a name="line118">118: </a>  PetscInt       nwu=0;
+<a name="line119">119: </a>  PetscReal      *ss,cond=1.0,cs,sn,r;
+<a name="line120">120: </a>  PetscScalar    tau,t,*AA;
+<a name="line121">121: </a>  PetscBLASInt   n0,n1,ni,inc=1,m,n_,lda_,ldq_,*perm;
+<a name="line122">122: </a>  PetscBool      breakdown = PETSC_TRUE;
+
+<a name="line125">125: </a>  <font color="#4169E1">if</font> (n&lt;3) {
+<a name="line126">126: </a>    <font color="#4169E1">if</font> (n==1) Q[0]=1;
+<a name="line127">127: </a>    <font color="#4169E1">if</font> (n==2) {
+<a name="line128">128: </a>      Q[0] = Q[1+ldq] = 1;
+<a name="line129">129: </a>      Q[1] = Q[ldq] = 0;
+<a name="line130">130: </a>    }
+<a name="line131">131: </a>    <font color="#4169E1">return</font>(0);
+<a name="line132">132: </a>  }
+<a name="line133">133: </a>  PetscBLASIntCast(lda,&amp;lda_);
+<a name="line134">134: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line135">135: </a>  PetscBLASIntCast(ldq,&amp;ldq_);
+<a name="line136">136: </a>  ss = rwork;
+<a name="line137">137: </a>  perm = iwork;
+<a name="line138">138: </a>  AA = work;
+<a name="line139">139: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line140">140: </a>    PetscArraycpy(AA+i*n,A+i*lda,n);
+<a name="line141">141: </a>  }
+<a name="line142">142: </a>  nwu += n*n;
+<a name="line143">143: </a>  k=0;
+<a name="line144">144: </a>  <font color="#4169E1">while</font> (breakdown &amp;&amp; k&lt;n) {
+<a name="line145">145: </a>    breakdown = PETSC_FALSE;
+<a name="line146">146: </a>    <font color="#B22222">/* Classify (and flip) A and s according to sign */</font>
+<a name="line147">147: </a>    <font color="#4169E1">if</font> (flip) {
+<a name="line148">148: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line149">149: </a>        perm[i] = n-1-perm_[i];
+<a name="line150">150: </a>        <font color="#4169E1">if</font> (perm[i]==0) i0 = i;
+<a name="line151">151: </a>        <font color="#4169E1">if</font> (perm[i]==k) ik = i;
+<a name="line152">152: </a>      }
+<a name="line153">153: </a>    } <font color="#4169E1">else</font> {
+<a name="line154">154: </a>      <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line155">155: </a>        perm[i] = perm_[i];
+<a name="line156">156: </a>        <font color="#4169E1">if</font> (perm[i]==0) i0 = i;
+<a name="line157">157: </a>        <font color="#4169E1">if</font> (perm[i]==k) ik = i;
+<a name="line158">158: </a>      }
+<a name="line159">159: </a>    }
+<a name="line160">160: </a>    perm[ik] = 0;
+<a name="line161">161: </a>    perm[i0] = k;
+<a name="line162">162: </a>    i=1;
+<a name="line163">163: </a>    <font color="#4169E1">while</font> (i&lt;n-1 &amp;&amp; s[perm[i-1]]==s[perm[0]]) {
+<a name="line164">164: </a>      <font color="#4169E1">if</font> (s[perm[i]]!=s[perm[0]]) {
+<a name="line165">165: </a>        j=i+1;
+<a name="line166">166: </a>        <font color="#4169E1">while</font> (j&lt;n-1 &amp;&amp; s[perm[j]]!=s[perm[0]])j++;
+<a name="line167">167: </a>        tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
+<a name="line168">168: </a>      }
+<a name="line169">169: </a>      i++;
+<a name="line170">170: </a>    }
+<a name="line171">171: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line172">172: </a>      ss[i] = s[perm[i]];
+<a name="line173">173: </a>    }
+<a name="line174">174: </a>    <font color="#4169E1">if</font> (flip) {
+<a name="line175">175: </a>      ii = &amp;j;
+<a name="line176">176: </a>      jj = &amp;i;
+<a name="line177">177: </a>    } <font color="#4169E1">else</font> {
+<a name="line178">178: </a>      ii = &amp;i;
+<a name="line179">179: </a>      jj = &amp;j;
+<a name="line180">180: </a>    }
+<a name="line181">181: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++)
+<a name="line182">182: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++)
+<a name="line183">183: </a>        A[i+j*lda] = AA[perm[*ii]+perm[*jj]*n];
+<a name="line184">184: </a>    <font color="#B22222">/* Initialize Q */</font>
+<a name="line185">185: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line186">186: </a>      PetscArrayzero(Q+i*ldq,n);
+<a name="line187">187: </a>      Q[perm[i]+i*ldq] = 1.0;
+<a name="line188">188: </a>    }
+<a name="line189">189: </a>    <font color="#4169E1">for</font> (ni=1;ni&lt;n &amp;&amp; ss[ni]==ss[0]; ni++);
+<a name="line190">190: </a>    n0 = ni-1;
+<a name="line191">191: </a>    n1 = n_-ni;
+<a name="line192">192: </a>    <font color="#4169E1">for</font> (j=0;j&lt;n-2;j++) {
+<a name="line193">193: </a>      PetscBLASIntCast(n-j-1,&amp;m);
+<a name="line194">194: </a>      <font color="#B22222">/* Forming and applying reflectors */</font>
+<a name="line195">195: </a>      <font color="#4169E1">if</font> (n0 &gt; 1) {
+<a name="line196">196: </a>        PetscStackCallBLAS(<font color="#666666">"LAPACKlarfg"</font>,LAPACKlarfg_(&amp;n0,A+ni-n0+j*lda,A+ni-n0+j*lda+1,&amp;inc,&amp;tau));
+<a name="line197">197: </a>        <font color="#B22222">/* Apply reflector */</font>
+<a name="line198">198: </a>        <font color="#4169E1">if</font> (PetscAbsScalar(tau) != 0.0) {
+<a name="line199">199: </a>          t=*(A+ni-n0+j*lda);  *(A+ni-n0+j*lda)=1.0;
+<a name="line200">200: </a>          PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;m,&amp;n0,A+ni-n0+j*lda,&amp;inc,&amp;tau,A+j+1+(j+1)*lda,&amp;lda_,work+nwu));
+<a name="line201">201: </a>          PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n0,&amp;m,A+ni-n0+j*lda,&amp;inc,&amp;tau,A+j+1+(j+1)*lda,&amp;lda_,work+nwu));
+<a name="line202">202: </a>          <font color="#B22222">/* Update Q */</font>
+<a name="line203">203: </a>          PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;n_,&amp;n0,A+ni-n0+j*lda,&amp;inc,&amp;tau,Q+(j+1)*ldq,&amp;ldq_,work+nwu));
+<a name="line204">204: </a>          *(A+ni-n0+j*lda) = t;
+<a name="line205">205: </a>          <font color="#4169E1">for</font> (i=1;i&lt;n0;i++) {
+<a name="line206">206: </a>            *(A+ni-n0+j*lda+i) = 0.0;  *(A+j+(ni-n0+i)*lda) = 0.0;
+<a name="line207">207: </a>          }
+<a name="line208">208: </a>          *(A+j+(ni-n0)*lda) = *(A+ni-n0+j*lda);
+<a name="line209">209: </a>        }
+<a name="line210">210: </a>      }
+<a name="line211">211: </a>      <font color="#4169E1">if</font> (n1 &gt; 1) {
+<a name="line212">212: </a>        PetscStackCallBLAS(<font color="#666666">"LAPACKlarfg"</font>,LAPACKlarfg_(&amp;n1,A+n-n1+j*lda,A+n-n1+j*lda+1,&amp;inc,&amp;tau));
+<a name="line213">213: </a>        <font color="#B22222">/* Apply reflector */</font>
+<a name="line214">214: </a>        <font color="#4169E1">if</font> (PetscAbsScalar(tau) != 0.0) {
+<a name="line215">215: </a>          t=*(A+n-n1+j*lda);  *(A+n-n1+j*lda)=1.0;
+<a name="line216">216: </a>          PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;m,&amp;n1,A+n-n1+j*lda,&amp;inc,&amp;tau,A+j+1+(n-n1)*lda,&amp;lda_,work+nwu));
+<a name="line217">217: </a>          PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n1,&amp;m,A+n-n1+j*lda,&amp;inc,&amp;tau,A+n-n1+(j+1)*lda,&amp;lda_,work+nwu));
+<a name="line218">218: </a>          <font color="#B22222">/* Update Q */</font>
+<a name="line219">219: </a>          PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;n_,&amp;n1,A+n-n1+j*lda,&amp;inc,&amp;tau,Q+(n-n1)*ldq,&amp;ldq_,work+nwu));
+<a name="line220">220: </a>          *(A+n-n1+j*lda) = t;
+<a name="line221">221: </a>          <font color="#4169E1">for</font> (i=1;i&lt;n1;i++) {
+<a name="line222">222: </a>            *(A+n-n1+i+j*lda) = 0.0;  *(A+j+(n-n1+i)*lda) = 0.0;
+<a name="line223">223: </a>          }
+<a name="line224">224: </a>          *(A+j+(n-n1)*lda) = *(A+n-n1+j*lda);
+<a name="line225">225: </a>        }
+<a name="line226">226: </a>      }
+<a name="line227">227: </a>      <font color="#B22222">/* Hyperbolic rotation */</font>
+<a name="line228">228: </a>      <font color="#4169E1">if</font> (n0 &gt; 0 &amp;&amp; n1 &gt; 0) {
+<a name="line229">229: </a>        HRGen(PetscRealPart(A[ni-n0+j*lda]),PetscRealPart(A[n-n1+j*lda]),&amp;type,&amp;cs,&amp;sn,&amp;r,&amp;cond);
+<a name="line230">230: </a>        <font color="#B22222">/* Check condition number */</font>
+<a name="line231">231: </a>        <font color="#4169E1">if</font> (cond &gt; 1.0/(10*PETSC_SQRT_MACHINE_EPSILON)) {
+<a name="line232">232: </a>          breakdown = PETSC_TRUE;
+<a name="line233">233: </a>          k++;
+<a name="line234">234: </a>          <font color="#4169E1">if</font> (k==n || flip) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,<font color="#666666">"Breakdown in construction of hyperbolic transformation"</font>);
+<a name="line235">235: </a>          <font color="#4169E1">break</font>;
+<a name="line236">236: </a>        }
+<a name="line237">237: </a>        A[ni-n0+j*lda] = r; A[n-n1+j*lda] = 0.0;
+<a name="line238">238: </a>        A[j+(ni-n0)*lda] = r; A[j+(n-n1)*lda] = 0.0;
+<a name="line239">239: </a>        <font color="#B22222">/* Apply to A */</font>
+<a name="line240">240: </a>        HRApply(m,A+j+1+(ni-n0)*lda,1,A+j+1+(n-n1)*lda,1,cs,-sn);
+<a name="line241">241: </a>        HRApply(m,A+ni-n0+(j+1)*lda,lda,A+n-n1+(j+1)*lda,lda,cs,-sn);
+
+<a name="line243">243: </a>        <font color="#B22222">/* Update Q */</font>
+<a name="line244">244: </a>        HRApply(n,Q+(ni-n0)*ldq,1,Q+(n-n1)*ldq,1,cs,-sn);
+<a name="line245">245: </a>        <font color="#4169E1">if</font> (type==2) {
+<a name="line246">246: </a>          ss[ni-n0] = -ss[ni-n0]; ss[n-n1] = -ss[n-n1];
+<a name="line247">247: </a>          n0++;ni++;n1--;
+<a name="line248">248: </a>        }
+<a name="line249">249: </a>      }
+<a name="line250">250: </a>      <font color="#4169E1">if</font> (n0&gt;0) n0--;
+<a name="line251">251: </a>      <font color="#4169E1">else</font> n1--;
+<a name="line252">252: </a>    }
+<a name="line253">253: </a>  }
+
+<a name="line255">255: </a>  <font color="#B22222">/* flip matrices */</font>
+<a name="line256">256: </a>  <font color="#4169E1">if</font> (flip) {
+<a name="line257">257: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n-1;i++) {
+<a name="line258">258: </a>      d[i] = PetscRealPart(A[n-i-1+(n-i-1)*lda]);
+<a name="line259">259: </a>      e[i] = PetscRealPart(A[n-i-1+(n-i-2)*lda]);
+<a name="line260">260: </a>      s[i] = ss[n-i-1];
+<a name="line261">261: </a>    }
+<a name="line262">262: </a>    s[n-1] = ss[0];
+<a name="line263">263: </a>    d[n-1] = PetscRealPart(A[0]);
+<a name="line264">264: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line265">265: </a>      ierr=PetscArraycpy(work+i*n,Q+i*ldq,n);
+<a name="line266">266: </a>    }
+<a name="line267">267: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++)
+<a name="line268">268: </a>      <font color="#4169E1">for</font> (j=0;j&lt;n;j++)
+<a name="line269">269: </a>        Q[i+j*ldq] = work[i+(n-j-1)*n];
+<a name="line270">270: </a>  } <font color="#4169E1">else</font> {
+<a name="line271">271: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n-1;i++) {
+<a name="line272">272: </a>      d[i] = PetscRealPart(A[i+i*lda]);
+<a name="line273">273: </a>      e[i] = PetscRealPart(A[i+1+i*lda]);
+<a name="line274">274: </a>      s[i] = ss[i];
+<a name="line275">275: </a>    }
+<a name="line276">276: </a>    s[n-1] = ss[n-1];
+<a name="line277">277: </a>    d[n-1] = PetscRealPart(A[n-1 + (n-1)*lda]);
+<a name="line278">278: </a>  }
+<a name="line279">279: </a>  <font color="#4169E1">return</font>(0);
+<a name="line280">280: </a>}
+
+<a name="line282">282: </a><strong><font color="#4169E1"><a name="MadeHRtr"></a>static PetscErrorCode MadeHRtr(PetscInt sz,PetscInt n,PetscInt idx0,PetscInt n0,PetscInt idx1,PetscInt n1,struct HRtr *tr1,struct HRtr *tr2,PetscReal *ncond,PetscScalar *work)</font></strong>
+<a name="line283">283: </a>{
+<a name="line285">285: </a>  PetscScalar    *x,*y;
+<a name="line286">286: </a>  PetscReal      ncond2=1.0;
+<a name="line287">287: </a>  PetscBLASInt   n0_,n1_,inc=1;
+
+<a name="line290">290: </a>  <font color="#B22222">/* Hyperbolic transformation to make zeros in x */</font>
+<a name="line291">291: </a>  x = tr1-&gt;data;
+<a name="line292">292: </a>  tr1-&gt;n[0] = n0;
+<a name="line293">293: </a>  tr1-&gt;n[1] = n1;
+<a name="line294">294: </a>  tr1-&gt;idx[0] = idx0;
+<a name="line295">295: </a>  tr1-&gt;idx[1] = idx1;
+<a name="line296">296: </a>  PetscBLASIntCast(tr1-&gt;n[0],&amp;n0_);
+<a name="line297">297: </a>  PetscBLASIntCast(tr1-&gt;n[1],&amp;n1_);
+<a name="line298">298: </a>  <font color="#4169E1">if</font> (tr1-&gt;n[0] &gt; 1) {
+<a name="line299">299: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKlarfg"</font>,LAPACKlarfg_(&amp;n0_,x+tr1-&gt;idx[0],x+tr1-&gt;idx[0]+1,&amp;inc,tr1-&gt;tau));
+<a name="line300">300: </a>  }
+<a name="line301">301: </a>  <font color="#4169E1">if</font> (tr1-&gt;n[1]&gt; 1) {
+<a name="line302">302: </a>    PetscStackCallBLAS(<font color="#666666">"LAPACKlarfg"</font>,LAPACKlarfg_(&amp;n1_,x+tr1-&gt;idx[1],x+tr1-&gt;idx[1]+1,&amp;inc,tr1-&gt;tau+1));
+<a name="line303">303: </a>  }
+<a name="line304">304: </a>  <font color="#4169E1">if</font> (tr1-&gt;idx[0]&lt;tr1-&gt;idx[1]) {
+<a name="line305">305: </a>    HRGen(PetscRealPart(x[tr1-&gt;idx[0]]),PetscRealPart(x[tr1-&gt;idx[1]]),&amp;(tr1-&gt;type),&amp;(tr1-&gt;cs),&amp;(tr1-&gt;sn),&amp;(tr1-&gt;alpha),ncond);
+<a name="line306">306: </a>  } <font color="#4169E1">else</font> {
+<a name="line307">307: </a>    tr1-&gt;alpha = PetscRealPart(x[tr1-&gt;idx[0]]);
+<a name="line308">308: </a>    *ncond = 1.0;
+<a name="line309">309: </a>  }
+<a name="line310">310: </a>  <font color="#4169E1">if</font> (sz==2) {
+<a name="line311">311: </a>    y = tr2-&gt;data;
+<a name="line312">312: </a>    <font color="#B22222">/* Apply first transformation to second column */</font>
+<a name="line313">313: </a>    <font color="#4169E1">if</font> (tr1-&gt;n[0] &gt; 1 &amp;&amp; PetscAbsScalar(tr1-&gt;tau[0])!=0.0) {
+<a name="line314">314: </a>      x[tr1-&gt;idx[0]] = 1.0;
+<a name="line315">315: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n0_,&amp;inc,x+tr1-&gt;idx[0],&amp;inc,tr1-&gt;tau,y+tr1-&gt;idx[0],&amp;n0_,work));
+<a name="line316">316: </a>    }
+<a name="line317">317: </a>    <font color="#4169E1">if</font> (tr1-&gt;n[1] &gt; 1 &amp;&amp; PetscAbsScalar(tr1-&gt;tau[1])!=0.0) {
+<a name="line318">318: </a>      x[tr1-&gt;idx[1]] = 1.0;
+<a name="line319">319: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n1_,&amp;inc,x+tr1-&gt;idx[1],&amp;inc,tr1-&gt;tau+1,y+tr1-&gt;idx[1],&amp;n1_,work));
+<a name="line320">320: </a>    }
+<a name="line321">321: </a>    <font color="#4169E1">if</font> (tr1-&gt;idx[0]&lt;tr1-&gt;idx[1]) {
+<a name="line322">322: </a>      HRApply(1,y+tr1-&gt;idx[0],1,y+tr1-&gt;idx[1],1,tr1-&gt;cs,-tr1-&gt;sn);
+<a name="line323">323: </a>    }
+<a name="line324">324: </a>    tr2-&gt;n[0] = tr1-&gt;n[0];
+<a name="line325">325: </a>    tr2-&gt;n[1] = tr1-&gt;n[1];
+<a name="line326">326: </a>    tr2-&gt;idx[0] = tr1-&gt;idx[0];
+<a name="line327">327: </a>    tr2-&gt;idx[1] = tr1-&gt;idx[1];
+<a name="line328">328: </a>    <font color="#4169E1">if</font> (tr1-&gt;idx[0]&lt;tr1-&gt;idx[1] &amp;&amp; tr1-&gt;type==2) {
+<a name="line329">329: </a>      tr2-&gt;idx[1]++; tr2-&gt;n[1]--; tr2-&gt;n[0]++;
+<a name="line330">330: </a>    }
+<a name="line331">331: </a>    <font color="#4169E1">if</font> (tr2-&gt;n[0]&gt;0) {
+<a name="line332">332: </a>      tr2-&gt;n[0]--; tr2-&gt;idx[0]++;
+<a name="line333">333: </a>      <font color="#4169E1">if</font> (tr2-&gt;n[1]==0) tr2-&gt;idx[1] = tr2-&gt;idx[0];
+<a name="line334">334: </a>    } <font color="#4169E1">else</font> {
+<a name="line335">335: </a>      tr2-&gt;n[1]--; tr2-&gt;idx[1]++; tr2-&gt;idx[0] = tr2-&gt;idx[1];
+<a name="line336">336: </a>    }
+<a name="line337">337: </a>    <font color="#B22222">/* Hyperbolic transformation to make zeros in y */</font>
+<a name="line338">338: </a>    PetscBLASIntCast(tr2-&gt;n[0],&amp;n0_);
+<a name="line339">339: </a>    PetscBLASIntCast(tr2-&gt;n[1],&amp;n1_);
+<a name="line340">340: </a>    <font color="#4169E1">if</font> (tr2-&gt;n[0] &gt; 1) {
+<a name="line341">341: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarfg"</font>,LAPACKlarfg_(&amp;n0_,y+tr2-&gt;idx[0],y+tr2-&gt;idx[0]+1,&amp;inc,tr2-&gt;tau));
+<a name="line342">342: </a>    }
+<a name="line343">343: </a>    <font color="#4169E1">if</font> (tr2-&gt;n[1]&gt; 1) {
+<a name="line344">344: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarfg"</font>,LAPACKlarfg_(&amp;n1_,y+tr2-&gt;idx[1],y+tr2-&gt;idx[1]+1,&amp;inc,tr2-&gt;tau+1));
+<a name="line345">345: </a>    }
+<a name="line346">346: </a>    <font color="#4169E1">if</font> (tr2-&gt;idx[0]&lt;tr2-&gt;idx[1]) {
+<a name="line347">347: </a>      HRGen(PetscRealPart(y[tr2-&gt;idx[0]]),PetscRealPart(y[tr2-&gt;idx[1]]),&amp;(tr2-&gt;type),&amp;(tr2-&gt;cs),&amp;(tr2-&gt;sn),&amp;(tr2-&gt;alpha),&amp;ncond2);
+<a name="line348">348: </a>    } <font color="#4169E1">else</font> {
+<a name="line349">349: </a>      tr2-&gt;alpha = PetscRealPart(y[tr2-&gt;idx[0]]);
+<a name="line350">350: </a>      ncond2 = 1.0;
+<a name="line351">351: </a>    }
+<a name="line352">352: </a>    <font color="#4169E1">if</font> (ncond2&gt;*ncond) *ncond = ncond2;
+<a name="line353">353: </a>  }
+<a name="line354">354: </a>  <font color="#4169E1">return</font>(0);
+<a name="line355">355: </a>}
+
+<a name="line357">357: </a><font color="#B22222">/*</font>
+<a name="line358">358: </a><font color="#B22222">  Auxiliary function to try perform one iteration of hr routine,</font>
+<a name="line359">359: </a><font color="#B22222">  checking condition number. If it is &lt; tolD, apply the</font>
+<a name="line360">360: </a><font color="#B22222">  transformation to H and R, if not, ok=false and it do nothing</font>
+<a name="line361">361: </a><font color="#B22222">  tolE, tolerance to exchange complex pairs to improve conditioning</font>
+<a name="line362">362: </a><font color="#B22222">*/</font>
+<a name="line363">363: </a><strong><font color="#4169E1"><a name="TryHRIt"></a>static PetscErrorCode TryHRIt(PetscInt n,PetscInt j,PetscInt sz,PetscScalar *H,PetscInt ldh,PetscScalar *R,PetscInt ldr,PetscReal *s,PetscBool *exg,PetscBool *ok,PetscInt *n0,PetscInt *n1,PetscInt *idx0,PetscInt *idx1,PetscReal *cond,PetscScalar *work)</font></strong>
+<a name="line364">364: </a>{
+<a name="line366">366: </a>  <font color="#4169E1">struct HRtr</font>    *tr1,*tr2,tr1_t,tr2_t,tr1_te,tr2_te;
+<a name="line367">367: </a>  PetscScalar    *x,*y;
+<a name="line368">368: </a>  PetscReal      ncond,ncond_e;
+<a name="line369">369: </a>  PetscInt       nwu=0,i,d=1;
+<a name="line370">370: </a>  PetscBLASInt   n0_,n1_,inc=1,mh,mr,n_,ldr_,ldh_;
+<a name="line371">371: </a>  PetscReal      tolD = 1e+5;
+
+<a name="line374">374: </a>  <font color="#4169E1">if</font> (cond) *cond = 1.0;
+<a name="line375">375: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line376">376: </a>  PetscBLASIntCast(ldr,&amp;ldr_);
+<a name="line377">377: </a>  PetscBLASIntCast(ldh,&amp;ldh_);
+<a name="line378">378: </a>  x = work+nwu;
+<a name="line379">379: </a>  nwu += n;
+<a name="line380">380: </a>  PetscArraycpy(x,R+j*ldr,n);
+<a name="line381">381: </a>  *exg = PETSC_FALSE;
+<a name="line382">382: </a>  *ok = PETSC_TRUE;
+<a name="line383">383: </a>  tr1_t.data = x;
+<a name="line384">384: </a>  <font color="#4169E1">if</font> (sz==1) {
+<a name="line385">385: </a>    <font color="#B22222">/* Hyperbolic transformation to make zeros in x */</font>
+<a name="line386">386: </a>    MadeHRtr(sz,n,*idx0,*n0,*idx1,*n1,&amp;tr1_t,NULL,&amp;ncond,work+nwu);
+<a name="line387">387: </a>    <font color="#B22222">/* Check condition number to single column*/</font>
+<a name="line388">388: </a>    <font color="#4169E1">if</font> (ncond&gt;tolD) *ok = PETSC_FALSE;
+<a name="line389">389: </a>    tr1 = &amp;tr1_t;
+<a name="line390">390: </a>    tr2 = &amp;tr2_t;
+<a name="line391">391: </a>  } <font color="#4169E1">else</font> {
+<a name="line392">392: </a>    y = work+nwu;
+<a name="line393">393: </a>    nwu += n;
+<a name="line394">394: </a>    PetscArraycpy(y,R+(j+1)*ldr,n);
+<a name="line395">395: </a>    tr2_t.data = y;
+<a name="line396">396: </a>    MadeHRtr(sz,n,*idx0,*n0,*idx1,*n1,&amp;tr1_t,&amp;tr2_t,&amp;ncond,work+nwu);
+<a name="line397">397: </a>    <font color="#B22222">/* Computing hyperbolic transformations also for exchanged vectors */</font>
+<a name="line398">398: </a>    tr1_te.data = work+nwu;
+<a name="line399">399: </a>    nwu += n;
+<a name="line400">400: </a>    PetscArraycpy(tr1_te.data,R+(j+1)*ldr,n);
+<a name="line401">401: </a>    tr2_te.data = work+nwu;
+<a name="line402">402: </a>    nwu += n;
+<a name="line403">403: </a>    PetscArraycpy(tr2_te.data,R+j*ldr,n);
+<a name="line404">404: </a>    MadeHRtr(sz,n,*idx0,*n0,*idx1,*n1,&amp;tr1_te,&amp;tr2_te,&amp;ncond_e,work+nwu);
+<a name="line405">405: </a>    <font color="#4169E1">if</font> (ncond &gt; d*ncond_e) {
+<a name="line406">406: </a>      *exg = PETSC_TRUE;
+<a name="line407">407: </a>      tr1 = &amp;tr1_te;
+<a name="line408">408: </a>      tr2 = &amp;tr2_te;
+<a name="line409">409: </a>      ncond = ncond_e;
+<a name="line410">410: </a>    } <font color="#4169E1">else</font> {
+<a name="line411">411: </a>      tr1 = &amp;tr1_t;
+<a name="line412">412: </a>      tr2 = &amp;tr2_t;
+<a name="line413">413: </a>    }
+<a name="line414">414: </a>    <font color="#4169E1">if</font> (ncond&gt;tolD) *ok = PETSC_FALSE;
+<a name="line415">415: </a>  }
+<a name="line416">416: </a>  <font color="#4169E1">if</font> (*ok) {
+<a name="line417">417: </a>    <font color="#B22222">/* Everything is OK, apply transformations to R and H */</font>
+<a name="line418">418: </a>    <font color="#B22222">/* First column */</font>
+<a name="line419">419: </a>    <font color="#4169E1">if</font> (cond &amp;&amp; *cond&lt;ncond) *cond = ncond;
+<a name="line420">420: </a>    x = tr1-&gt;data;
+<a name="line421">421: </a>    PetscBLASIntCast(tr1-&gt;n[0],&amp;n0_);
+<a name="line422">422: </a>    PetscBLASIntCast(tr1-&gt;n[1],&amp;n1_);
+<a name="line423">423: </a>    PetscBLASIntCast(n-j-sz,&amp;mr);
+<a name="line424">424: </a>    <font color="#4169E1">if</font> (tr1-&gt;n[0] &gt; 1 &amp;&amp; PetscAbsScalar(tr1-&gt;tau[0])!=0.0) {
+<a name="line425">425: </a>      x[tr1-&gt;idx[0]] = 1.0;
+<a name="line426">426: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n0_,&amp;mr,x+tr1-&gt;idx[0],&amp;inc,tr1-&gt;tau,R+(j+sz)*ldr+tr1-&gt;idx[0],&amp;ldr_,work+nwu));
+<a name="line427">427: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;n_,&amp;n0_,x+tr1-&gt;idx[0],&amp;inc,tr1-&gt;tau,H+(tr1-&gt;idx[0])*ldh,&amp;ldh_,work+nwu));
+<a name="line428">428: </a>    }
+<a name="line429">429: </a>    <font color="#4169E1">if</font> (tr1-&gt;n[1] &gt; 1 &amp;&amp; PetscAbsScalar(tr1-&gt;tau[1])!=0.0) {
+<a name="line430">430: </a>      x[tr1-&gt;idx[1]] = 1.0;
+<a name="line431">431: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n1_,&amp;mr,x+tr1-&gt;idx[1],&amp;inc,tr1-&gt;tau+1,R+(j+sz)*ldr+tr1-&gt;idx[1],&amp;ldr_,work+nwu));
+<a name="line432">432: </a>      PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;n_,&amp;n1_,x+tr1-&gt;idx[1],&amp;inc,tr1-&gt;tau+1,H+(tr1-&gt;idx[1])*ldh,&amp;ldh_,work+nwu));
+<a name="line433">433: </a>    }
+<a name="line434">434: </a>    <font color="#4169E1">if</font> (tr1-&gt;idx[0]&lt;tr1-&gt;idx[1]) {
+<a name="line435">435: </a>      HRApply(mr,R+(j+sz)*ldr+tr1-&gt;idx[0],ldr,R+(j+sz)*ldr+tr1-&gt;idx[1],ldr,tr1-&gt;cs,-tr1-&gt;sn);
+<a name="line436">436: </a>      <font color="#4169E1">if</font> (tr1-&gt;type==1) {
+<a name="line437">437: </a>        HRApply(n,H+(tr1-&gt;idx[0])*ldh,1,H+(tr1-&gt;idx[1])*ldh,1,tr1-&gt;cs,tr1-&gt;sn);
+<a name="line438">438: </a>      } <font color="#4169E1">else</font> {
+<a name="line439">439: </a>        HRApply(n,H+(tr1-&gt;idx[0])*ldh,1,H+(tr1-&gt;idx[1])*ldh,1,-tr1-&gt;cs,-tr1-&gt;sn);
+<a name="line440">440: </a>        s[tr1-&gt;idx[0]] = -s[tr1-&gt;idx[0]];
+<a name="line441">441: </a>        s[tr1-&gt;idx[1]] = -s[tr1-&gt;idx[1]];
+<a name="line442">442: </a>      }
+<a name="line443">443: </a>    }
+<a name="line444">444: </a>    <font color="#4169E1">for</font> (i=0;i&lt;tr1-&gt;idx[0];i++) *(R+j*ldr+i) = x[i];
+<a name="line445">445: </a>    <font color="#4169E1">for</font> (i=tr1-&gt;idx[0]+1;i&lt;n;i++) *(R+j*ldr+i) = 0.0;
+<a name="line446">446: </a>    *(R+j*ldr+tr1-&gt;idx[0]) = tr1-&gt;alpha;
+<a name="line447">447: </a>    <font color="#4169E1">if</font> (sz==2) {
+<a name="line448">448: </a>      y = tr2-&gt;data;
+<a name="line449">449: </a>      <font color="#B22222">/* Second column */</font>
+<a name="line450">450: </a>      PetscBLASIntCast(tr2-&gt;n[0],&amp;n0_);
+<a name="line451">451: </a>      PetscBLASIntCast(tr2-&gt;n[1],&amp;n1_);
+<a name="line452">452: </a>      PetscBLASIntCast(n-j-sz,&amp;mr);
+<a name="line453">453: </a>      PetscBLASIntCast(n-tr2-&gt;idx[0],&amp;mh);
+<a name="line454">454: </a>      <font color="#4169E1">if</font> (tr2-&gt;n[0] &gt; 1 &amp;&amp; PetscAbsScalar(tr2-&gt;tau[0])!=0.0) {
+<a name="line455">455: </a>        y[tr2-&gt;idx[0]] = 1.0;
+<a name="line456">456: </a>        PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n0_,&amp;mr,y+tr2-&gt;idx[0],&amp;inc,tr2-&gt;tau,R+(j+2)*ldr+tr2-&gt;idx[0],&amp;ldr_,work+nwu));
+<a name="line457">457: </a>        PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;n_,&amp;n0_,y+tr2-&gt;idx[0],&amp;inc,tr2-&gt;tau,H+(tr2-&gt;idx[0])*ldh,&amp;ldh_,work+nwu));
+<a name="line458">458: </a>      }
+<a name="line459">459: </a>      <font color="#4169E1">if</font> (tr2-&gt;n[1] &gt; 1 &amp;&amp; PetscAbsScalar(tr2-&gt;tau[1])!=0.0) {
+<a name="line460">460: </a>        y[tr2-&gt;idx[1]] = 1.0;
+<a name="line461">461: </a>        PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"L"</font>,&amp;n1_,&amp;mr,y+tr2-&gt;idx[1],&amp;inc,tr2-&gt;tau+1,R+(j+2)*ldr+tr2-&gt;idx[1],&amp;ldr_,work+nwu));
+<a name="line462">462: </a>        PetscStackCallBLAS(<font color="#666666">"LAPACKlarf"</font>,LAPACKlarf_(<font color="#666666">"R"</font>,&amp;n_,&amp;n1_,y+tr2-&gt;idx[1],&amp;inc,tr2-&gt;tau+1,H+(tr2-&gt;idx[1])*ldh,&amp;ldh_,work+nwu));
+<a name="line463">463: </a>      }
+<a name="line464">464: </a>      <font color="#4169E1">if</font> (tr2-&gt;idx[0]&lt;tr2-&gt;idx[1]) {
+<a name="line465">465: </a>        HRApply(mr,R+(j+2)*ldr+tr2-&gt;idx[0],ldr,R+(j+2)*ldr+tr2-&gt;idx[1],ldr,tr2-&gt;cs,-tr2-&gt;sn);
+<a name="line466">466: </a>        <font color="#4169E1">if</font> (tr2-&gt;type==1) {
+<a name="line467">467: </a>          HRApply(n,H+(tr2-&gt;idx[0])*ldh,1,H+(tr2-&gt;idx[1])*ldh,1,tr2-&gt;cs,tr2-&gt;sn);
+<a name="line468">468: </a>        } <font color="#4169E1">else</font> {
+<a name="line469">469: </a>          HRApply(n,H+(tr2-&gt;idx[0])*ldh,1,H+(tr2-&gt;idx[1])*ldh,1,-tr2-&gt;cs,-tr2-&gt;sn);
+<a name="line470">470: </a>          s[tr2-&gt;idx[0]] = -s[tr2-&gt;idx[0]];
+<a name="line471">471: </a>          s[tr2-&gt;idx[1]] = -s[tr2-&gt;idx[1]];
+<a name="line472">472: </a>        }
+<a name="line473">473: </a>      }
+<a name="line474">474: </a>      <font color="#4169E1">for</font> (i=0;i&lt;tr2-&gt;idx[0]-1;i++) *(R+(j+1)*ldr+i) = y[i];
+<a name="line475">475: </a>      *(R+(j+1)*ldr+tr2-&gt;idx[0]-1) = y[tr2-&gt;idx[0]-1];
+<a name="line476">476: </a>      <font color="#4169E1">for</font> (i=tr2-&gt;idx[0]+1;i&lt;n;i++) *(R+(j+1)*ldr+i) = 0.0;
+<a name="line477">477: </a>      *(R+(j+1)*ldr+tr2-&gt;idx[0]) = tr2-&gt;alpha;
+<a name="line478">478: </a>      *n0 = tr2-&gt;n[0];
+<a name="line479">479: </a>      *n1 = tr2-&gt;n[1];
+<a name="line480">480: </a>      *idx0 = tr2-&gt;idx[0];
+<a name="line481">481: </a>      *idx1 = tr2-&gt;idx[1];
+<a name="line482">482: </a>      <font color="#4169E1">if</font> (tr2-&gt;idx[0]&lt;tr2-&gt;idx[1] &amp;&amp; tr2-&gt;type==2) {
+<a name="line483">483: </a>        (*idx1)++; (*n1)--; (*n0)++;
+<a name="line484">484: </a>      }
+<a name="line485">485: </a>    } <font color="#4169E1">else</font> {
+<a name="line486">486: </a>      *n0 = tr1-&gt;n[0];
+<a name="line487">487: </a>      *n1 = tr1-&gt;n[1];
+<a name="line488">488: </a>      *idx0 = tr1-&gt;idx[0];
+<a name="line489">489: </a>      *idx1 = tr1-&gt;idx[1];
+<a name="line490">490: </a>      <font color="#4169E1">if</font> (tr1-&gt;idx[0]&lt;tr1-&gt;idx[1] &amp;&amp; tr1-&gt;type==2) {
+<a name="line491">491: </a>        (*idx1)++; (*n1)--; (*n0)++;
+<a name="line492">492: </a>      }
+<a name="line493">493: </a>    }
+<a name="line494">494: </a>    <font color="#4169E1">if</font> (*n0&gt;0) {
+<a name="line495">495: </a>      (*n0)--; (*idx0)++;
+<a name="line496">496: </a>      <font color="#4169E1">if</font> (*n1==0) *idx1 = *idx0;
+<a name="line497">497: </a>    } <font color="#4169E1">else</font> {
+<a name="line498">498: </a>      (*n1)--; (*idx1)++; *idx0 = *idx1;
+<a name="line499">499: </a>    }
+<a name="line500">500: </a>  }
+<a name="line501">501: </a>  <font color="#4169E1">return</font>(0);
+<a name="line502">502: </a>}
+
+<a name="line504">504: </a><font color="#B22222">/*</font>
+<a name="line505">505: </a><font color="#B22222">  compute V = HR whit H s-orthogonal and R upper triangular</font>
+<a name="line506">506: </a><font color="#B22222">*/</font>
+<a name="line507">507: </a><strong><font color="#4169E1"><a name="PseudoOrthog_HR"></a>static PetscErrorCode PseudoOrthog_HR(PetscInt *nv,PetscScalar *V,PetscInt ldv,PetscReal *s,PetscScalar *R,PetscInt ldr,PetscBLASInt *perm,PetscBLASInt *cmplxEig,PetscBool *breakdown,PetscScalar *work)</font></strong>
+<a name="line508">508: </a>{
+<a name="line510">510: </a>  PetscInt       i,j,n,n0,n1,np,idx0,idx1,sz=1,k=0,t1,t2,nwu=0;
+<a name="line511">511: </a>  PetscScalar    *col1,*col2;
+<a name="line512">512: </a>  PetscBool      exg=PETSC_FALSE,ok=PETSC_FALSE;
+
+<a name="line515">515: </a>  n = *nv;
+<a name="line516">516: </a>  col1 = work+nwu;
+<a name="line517">517: </a>  nwu += n;
+<a name="line518">518: </a>  col2 = work+nwu;
+<a name="line519">519: </a>  nwu += n;
+<a name="line520">520: </a>  <font color="#B22222">/* Sort R and s according to sing(s) */</font>
+<a name="line521">521: </a>  np = 0;
+<a name="line522">522: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) <font color="#4169E1">if</font> (s[i]&gt;0) np++;
+<a name="line523">523: </a>  <font color="#4169E1">if</font> (s[0]&gt;0) n1 = np;
+<a name="line524">524: </a>  <font color="#4169E1">else</font> n1 = n-np;
+<a name="line525">525: </a>  n0 = 0;
+<a name="line526">526: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line527">527: </a>    <font color="#4169E1">if</font> (s[i]==s[0]) {
+<a name="line528">528: </a>      s[n0] = s[0];
+<a name="line529">529: </a>      perm[n0++] = i;
+<a name="line530">530: </a>    } <font color="#4169E1">else</font> perm[n1++] = i;
+<a name="line531">531: </a>  }
+<a name="line532">532: </a>  <font color="#4169E1">for</font> (i=n0;i&lt;n;i++) s[i] = -s[0];
+<a name="line533">533: </a>  n1 -= n0;
+<a name="line534">534: </a>  idx0 = 0;
+<a name="line535">535: </a>  idx1 = n0;
+<a name="line536">536: </a>  <font color="#4169E1">if</font> (idx1==n) idx1=idx0;
+<a name="line537">537: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line538">538: </a>    <font color="#4169E1">for</font> (j=0;j&lt;n;j++) R[j*ldr+i] = V[j*ldv+perm[i]];
+<a name="line539">539: </a>  }
+<a name="line540">540: </a>  <font color="#B22222">/* Initialize H */</font>
+<a name="line541">541: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line542">542: </a>    PetscArrayzero(V+i*ldv,n);
+<a name="line543">543: </a>    V[perm[i]+i*ldv] = 1.0;
+<a name="line544">544: </a>  }
+<a name="line545">545: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) perm[i] = i;
+<a name="line546">546: </a>  j = 0;
+<a name="line547">547: </a>  <font color="#4169E1">while</font> (j&lt;n-k) {
+<a name="line548">548: </a>    <font color="#4169E1">if</font> (cmplxEig[j]==0) sz=1;
+<a name="line549">549: </a>    <font color="#4169E1">else</font> sz=2;
+<a name="line550">550: </a>    TryHRIt(n,j,sz,V,ldv,R,ldr,s,&amp;exg,&amp;ok,&amp;n0,&amp;n1,&amp;idx0,&amp;idx1,NULL,work+nwu);
+<a name="line551">551: </a>    <font color="#4169E1">if</font> (ok) {
+<a name="line552">552: </a>      <font color="#4169E1">if</font> (exg) cmplxEig[j] = -cmplxEig[j];
+<a name="line553">553: </a>      j = j+sz;
+<a name="line554">554: </a>    } <font color="#4169E1">else</font> { <font color="#B22222">/* to be discarded */</font>
+<a name="line555">555: </a>      k = k+1;
+<a name="line556">556: </a>      <font color="#4169E1">if</font> (cmplxEig[j]==0) {
+<a name="line557">557: </a>        <font color="#4169E1">if</font> (j&lt;n) {
+<a name="line558">558: </a>          t1 = perm[j];
+<a name="line559">559: </a>          <font color="#4169E1">for</font> (i=j;i&lt;n-1;i++) perm[i] = perm[i+1];
+<a name="line560">560: </a>          perm[n-1] = t1;
+<a name="line561">561: </a>          t1 = cmplxEig[j];
+<a name="line562">562: </a>          <font color="#4169E1">for</font> (i=j;i&lt;n-1;i++) cmplxEig[i] = cmplxEig[i+1];
+<a name="line563">563: </a>          cmplxEig[n-1] = t1;
+<a name="line564">564: </a>          PetscArraycpy(col1,R+j*ldr,n*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line565">565: </a>          <font color="#4169E1">for</font> (i=j;i&lt;n-1;i++) {
+<a name="line566">566: </a>            PetscArraycpy(R+i*ldr,R+(i+1)*ldr,n*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line567">567: </a>          }
+<a name="line568">568: </a>          PetscArraycpy(R+(n-1)*ldr,col1,n*<font color="#4169E1">sizeof</font>(PetscScalar));
+<a name="line569">569: </a>        }
+<a name="line570">570: </a>      } <font color="#4169E1">else</font> {
+<a name="line571">571: </a>        k = k+1;
+<a name="line572">572: </a>        <font color="#4169E1">if</font> (j&lt;n-1) {
+<a name="line573">573: </a>          t1 = perm[j]; t2 = perm[j+1];
+<a name="line574">574: </a>          <font color="#4169E1">for</font> (i=j;i&lt;n-2;i++) perm[i] = perm[i+2];
+<a name="line575">575: </a>          perm[n-2] = t1; perm[n-1] = t2;
+<a name="line576">576: </a>          t1 = cmplxEig[j]; t2 = cmplxEig[j+1];
+<a name="line577">577: </a>          <font color="#4169E1">for</font> (i=j;i&lt;n-2;i++) cmplxEig[i] = cmplxEig[i+2];
+<a name="line578">578: </a>          cmplxEig[n-2] = t1; cmplxEig[n-1] = t2;
+<a name="line579">579: </a>          PetscArraycpy(col1,R+j*ldr,n);
+<a name="line580">580: </a>          PetscArraycpy(col2,R+(j+1)*ldr,n);
+<a name="line581">581: </a>          <font color="#4169E1">for</font> (i=j;i&lt;n-2;i++) {
+<a name="line582">582: </a>            PetscArraycpy(R+i*ldr,R+(i+2)*ldr,n);
+<a name="line583">583: </a>          }
+<a name="line584">584: </a>          PetscArraycpy(R+(n-2)*ldr,col1,n);
+<a name="line585">585: </a>          PetscArraycpy(R+(n-1)*ldr,col2,n);
+<a name="line586">586: </a>        }
+<a name="line587">587: </a>      }
+<a name="line588">588: </a>    }
+<a name="line589">589: </a>  }
+<a name="line590">590: </a>  <font color="#4169E1">if</font> (k!=0) {
+<a name="line591">591: </a>    <font color="#4169E1">if</font> (breakdown) *breakdown = PETSC_TRUE;
+<a name="line592">592: </a>    *nv = n-k;
+<a name="line593">593: </a>  }
+<a name="line594">594: </a>  <font color="#4169E1">return</font>(0);
+<a name="line595">595: </a>}
+
+<a name="line597">597: </a><strong><font color="#4169E1"><a name="DSGHIEPOrthogEigenv"></a>PetscErrorCode DSGHIEPOrthogEigenv(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DSMatType</a> mat,PetscScalar *wr,PetscScalar *wi,PetscBool accum)</font></strong>
+<a name="line598">598: </a>{
+<a name="line600">600: </a>  PetscInt       lws,nwus=0,nwui=0,lwi;
+<a name="line601">601: </a>  PetscInt       off,n,nv,ld,i,ldr,l;
+<a name="line602">602: </a>  PetscScalar    *W,*X,*R,*ts,zeroS=0.0,oneS=1.0;
+<a name="line603">603: </a>  PetscReal      *s,vi,vr,tr,*d,*e;
+<a name="line604">604: </a>  PetscBLASInt   ld_,n_,nv_,*perm,*cmplxEig;
+
+<a name="line607">607: </a>  l = ds-&gt;l;
+<a name="line608">608: </a>  n = ds-&gt;n-l;
+<a name="line609">609: </a>  PetscBLASIntCast(n,&amp;n_);
+<a name="line610">610: </a>  ld = ds-&gt;ld;
+<a name="line611">611: </a>  PetscBLASIntCast(ld,&amp;ld_);
+<a name="line612">612: </a>  off = l*ld+l;
+<a name="line613">613: </a>  s = ds-&gt;rmat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_D</a>];
+<a name="line614">614: </a>  <font color="#4169E1">if</font> (!ds-&gt;compact) {
+<a name="line615">615: </a>    <font color="#4169E1">for</font> (i=l;i&lt;ds-&gt;n;i++) s[i] = PetscRealPart(*(ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>]+i*ld+i));
+<a name="line616">616: </a>  }
+<a name="line617">617: </a>  lws = n*n+7*n;
+<a name="line618">618: </a>  lwi = 2*n;
+<a name="line619">619: </a>  DSAllocateWork_Private(ds,lws,0,lwi);
+<a name="line620">620: </a>  R = ds-&gt;work+nwus;
+<a name="line621">621: </a>  nwus += n*n;
+<a name="line622">622: </a>  ldr = n;
+<a name="line623">623: </a>  perm = ds-&gt;iwork + nwui;
+<a name="line624">624: </a>  nwui += n;
+<a name="line625">625: </a>  cmplxEig = ds-&gt;iwork+nwui;
+<a name="line626">626: </a>  X = ds-&gt;mat[mat];
+<a name="line627">627: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) {
+<a name="line628">628: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line629">629: </a>    vi = PetscImaginaryPart(wr[l+i]);
+<a name="line630">630: </a><font color="#A020F0">#else</font>
+<a name="line631">631: </a>    vi = PetscRealPart(wi[l+i]);
+<a name="line632">632: </a><font color="#A020F0">#endif</font>
+<a name="line633">633: </a>    <font color="#4169E1">if</font> (vi!=0) {
+<a name="line634">634: </a>      cmplxEig[i] = 1;
+<a name="line635">635: </a>      cmplxEig[i+1] = 2;
+<a name="line636">636: </a>      i++;
+<a name="line637">637: </a>    } <font color="#4169E1">else</font> cmplxEig[i] = 0;
+<a name="line638">638: </a>  }
+<a name="line639">639: </a>  nv = n;
+
+<a name="line641">641: </a>  <font color="#B22222">/* Perform HR decomposition */</font>
+<a name="line642">642: </a>  <font color="#B22222">/* Hyperbolic rotators */</font>
+<a name="line643">643: </a>  PseudoOrthog_HR(&amp;nv,X+off,ld,s+l,R,ldr,perm,cmplxEig,NULL,ds-&gt;work+nwus);
+<a name="line644">644: </a>  <font color="#B22222">/* Sort wr,wi perm */</font>
+<a name="line645">645: </a>  ts = ds-&gt;work+nwus;
+<a name="line646">646: </a>  PetscArraycpy(ts,wr+l,n);
+<a name="line647">647: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) wr[i+l] = ts[perm[i]];
+<a name="line648">648: </a><font color="#A020F0">#if !defined(PETSC_USE_COMPLEX)</font>
+<a name="line649">649: </a>  PetscArraycpy(ts,wi+l,n);
+<a name="line650">650: </a>  <font color="#4169E1">for</font> (i=0;i&lt;n;i++) wi[i+l] = ts[perm[i]];
+<a name="line651">651: </a><font color="#A020F0">#endif</font>
+<a name="line652">652: </a>  <font color="#B22222">/* Projected Matrix */</font>
+<a name="line653">653: </a>  PetscArrayzero(ds-&gt;rmat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>]+2*ld,ld);
+<a name="line654">654: </a>  d = ds-&gt;rmat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>];
+<a name="line655">655: </a>  e = d+ld;
+<a name="line656">656: </a>  <font color="#4169E1">for</font> (i=0;i&lt;nv;i++) {
+<a name="line657">657: </a>    <font color="#4169E1">if</font> (cmplxEig[i]==0) { <font color="#B22222">/* Real */</font>
+<a name="line658">658: </a>      d[l+i] = PetscRealPart(wr[l+i]*s[l+i]);
+<a name="line659">659: </a>      e[l+i] = 0.0;
+<a name="line660">660: </a>    } <font color="#4169E1">else</font> {
+<a name="line661">661: </a>      vr = PetscRealPart(wr[l+i]);
+<a name="line662">662: </a><font color="#A020F0">#if defined(PETSC_USE_COMPLEX)</font>
+<a name="line663">663: </a>      vi = PetscImaginaryPart(wr[l+i]);
+<a name="line664">664: </a><font color="#A020F0">#else</font>
+<a name="line665">665: </a>      vi = PetscRealPart(wi[l+i]);
+<a name="line666">666: </a><font color="#A020F0">#endif</font>
+<a name="line667">667: </a>      <font color="#4169E1">if</font> (cmplxEig[i]==-1) vi = -vi;
+<a name="line668">668: </a>      tr = PetscRealPart((R[i+(i+1)*ldr]/R[i+i*ldr]))*vi;
+<a name="line669">669: </a>      d[l+i] = (vr-tr)*s[l+i];
+<a name="line670">670: </a>      d[l+i+1] = (vr+tr)*s[l+i+1];
+<a name="line671">671: </a>      e[l+i] = PetscRealPart(s[l+i]*(R[(i+1)+(i+1)*ldr]/R[i+i*ldr])*vi);
+<a name="line672">672: </a>      e[l+i+1] = 0.0;
+<a name="line673">673: </a>      i++;
+<a name="line674">674: </a>    }
+<a name="line675">675: </a>  }
+<a name="line676">676: </a>  <font color="#B22222">/* accumulate previous Q */</font>
+<a name="line677">677: </a>  <font color="#4169E1">if</font> (accum) {
+<a name="line678">678: </a>    PetscBLASIntCast(nv,&amp;nv_);
+<a name="line679">679: </a>    DSAllocateMat_Private(ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_W</a>);
+<a name="line680">680: </a>    W = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_W</a>];
+<a name="line681">681: </a>    DSCopyMatrix_Private(ds,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_W</a>,<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>);
+<a name="line682">682: </a>    PetscStackCallBLAS(<font color="#666666">"BLASgemm"</font>,BLASgemm_(<font color="#666666">"N"</font>,<font color="#666666">"N"</font>,&amp;n_,&amp;nv_,&amp;n_,&amp;oneS,W+off,&amp;ld_,X+off,&amp;ld_,&amp;zeroS,ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>]+off,&amp;ld_));
+<a name="line683">683: </a>  } <font color="#4169E1">else</font> {
+<a name="line684">684: </a>    PetscArrayzero(ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>],ld*ld);
+<a name="line685">685: </a>    <font color="#4169E1">for</font> (i=0;i&lt;ds-&gt;l;i++) *(ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>]+i+i*ld) = 1.0;
+<a name="line686">686: </a>    <font color="#4169E1">for</font> (i=0;i&lt;n;i++) { PetscArraycpy(ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>]+off+i*ld,X+off+i*ld,n); }
+<a name="line687">687: </a>  }
+<a name="line688">688: </a>  ds-&gt;t = nv+l;
+<a name="line689">689: </a>  <font color="#4169E1">if</font> (!ds-&gt;compact) { DSSwitchFormat_GHIEP(ds,PETSC_FALSE); }
+<a name="line690">690: </a>  <font color="#4169E1">return</font>(0);
+<a name="line691">691: </a>}
+
+<a name="line693">693: </a><font color="#B22222">/*</font>
+<a name="line694">694: </a><font color="#B22222">   Reduce to tridiagonal-diagonal pair by means of TridiagDiag_HHR.</font>
+<a name="line695">695: </a><font color="#B22222">*/</font>
+<a name="line696">696: </a><strong><font color="#4169E1"><a name="DSIntermediate_GHIEP"></a>PetscErrorCode DSIntermediate_GHIEP(<a href="../../../../../../docs/manualpages/DS/DS.html#DS">DS</a> ds)</font></strong>
+<a name="line697">697: </a>{
+<a name="line699">699: </a>  PetscInt       i,ld,off;
+<a name="line700">700: </a>  PetscInt       nwall,nwallr,nwalli;
+<a name="line701">701: </a>  PetscScalar    *A,*B,*Q;
+<a name="line702">702: </a>  PetscReal      *d,*e,*s;
+
+<a name="line705">705: </a>  ld = ds-&gt;ld;
+<a name="line706">706: </a>  A = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_A</a>];
+<a name="line707">707: </a>  B = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_B</a>];
+<a name="line708">708: </a>  Q = ds-&gt;mat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_Q</a>];
+<a name="line709">709: </a>  d = ds-&gt;rmat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>];
+<a name="line710">710: </a>  e = ds-&gt;rmat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_T</a>]+ld;
+<a name="line711">711: </a>  s = ds-&gt;rmat[<a href="../../../../../../docs/manualpages/DS/DSMatType.html#DSMatType">DS_MAT_D</a>];
+<a name="line712">712: </a>  off = ds-&gt;l+ds-&gt;l*ld;
+<a name="line713">713: </a>  PetscArrayzero(Q,ld*ld);
+<a name="line714">714: </a>  nwall = ld*ld+ld;
+<a name="line715">715: </a>  nwallr = ld;
+<a name="line716">716: </a>  nwalli = ld;
+<a name="line717">717: </a>  DSAllocateWork_Private(ds,nwall,nwallr,nwalli);
+<a name="line718">718: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ds-&gt;n;i++) Q[i+i*ld]=1.0;
+<a name="line719">719: </a>  <font color="#4169E1">for</font> (i=0;i&lt;ds-&gt;n-ds-&gt;l;i++) *(ds-&gt;perm+i)=i;
+<a name="line720">720: </a>  <font color="#4169E1">if</font> (ds-&gt;compact) {
+<a name="line721">721: </a>    <font color="#4169E1">if</font> (ds-&gt;state &lt; <a href="../../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>) {
+<a name="line722">722: </a>      DSSwitchFormat_GHIEP(ds,PETSC_FALSE);
+<a name="line723">723: </a>      TridiagDiag_HHR(ds-&gt;k-ds-&gt;l+1,A+off,ld,s+ds-&gt;l,Q+off,ld,PETSC_TRUE,d+ds-&gt;l,e+ds-&gt;l,ds-&gt;perm,ds-&gt;work,ds-&gt;rwork,ds-&gt;iwork);
+<a name="line724">724: </a>      ds-&gt;k = ds-&gt;l;
+<a name="line725">725: </a>      PetscArrayzero(d+2*ld+ds-&gt;l,ds-&gt;n-ds-&gt;l);
+<a name="line726">726: </a>    }
+<a name="line727">727: </a>  } <font color="#4169E1">else</font> {
+<a name="line728">728: </a>    <font color="#4169E1">if</font> (ds-&gt;state &lt; <a href="../../../../../../docs/manualpages/DS/DSStateType.html#DSStateType">DS_STATE_INTERMEDIATE</a>) {
+<a name="line729">729: </a>      <font color="#4169E1">for</font> (i=0;i&lt;ds-&gt;n;i++) s[i] = PetscRealPart(B[i+i*ld]);
+<a name="line730">730: </a>      TridiagDiag_HHR(ds-&gt;n-ds-&gt;l,A+off,ld,s+ds-&gt;l,Q+off,ld,PETSC_FALSE,d+ds-&gt;l,e+ds-&gt;l,ds-&gt;perm,ds-&gt;work,ds-&gt;rwork,ds-&gt;iwork);
+<a name="line731">731: </a>      PetscArrayzero(d+2*ld,ds-&gt;n);
+<a name="line732">732: </a>      ds-&gt;k = ds-&gt;l;
+<a name="line733">733: </a>      DSSwitchFormat_GHIEP(ds,PETSC_FALSE);
+<a name="line734">734: </a>    } <font color="#4169E1">else</font> {
+<a name="line735">735: </a>      DSSwitchFormat_GHIEP(ds,PETSC_TRUE);
+<a name="line736">736: </a>    }
+<a name="line737">737: </a>  }
+<a name="line738">738: </a>  <font color="#4169E1">return</font>(0);
+<a name="line739">739: </a>}
+
+</pre>
+</body>
+
+</html>
