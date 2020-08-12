@@ -82,7 +82,7 @@ set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools
 # include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/debug_64/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64/include)
 
 # mkl
-include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/debug_64_mkl/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64_mkl/include)
+include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc/include external/petsc/debug_64_mkl/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64_mkl/include)
 
 # opt
 # include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/opt_64/include external/slepc-3.13.1/include external/slepc-3.13.1/opt_64/include)
@@ -95,7 +95,7 @@ include_directories(external/extras/mklmods external/include external/fdict/incl
 # link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/debug_64/lib external/slepc-3.13.1/debug_64/lib)
 
 # mkl
-link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/debug_64_mkl/lib external/slepc-3.13.1/debug_64_mkl/lib)
+link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc/debug_64_mkl/lib external/slepc-3.13.1/debug_64_mkl/lib)
 
 # opt
 # link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/opt_64/lib external/slepc-3.13.1/opt_64/lib)
