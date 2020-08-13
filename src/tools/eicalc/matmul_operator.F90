@@ -3,11 +3,12 @@
 ! Operator signatures are restricted, so they cannot be made local
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module matmul_operator_mod
-  use blas95 ! matrix-vector product
+  ! use blas95 ! matrix-vector product
   use distributed_rovib_hamiltonian_mod
   use input_params_mod
   use matrix_block_info_mod
   use mpi_f08
+  implicit none
 
   abstract interface
     subroutine matmul_operator(proc_rows, vector, result)
@@ -32,7 +33,7 @@ module matmul_operator_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Sets global variables in matmul_operator module
+! Sets module variables
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine set_matmul_variables(params)
     class(input_params), intent(in) :: params
@@ -45,9 +46,9 @@ contains
       active_matmul_operator => ham_mult_old
     end if
 
-    if (debug_mode == 'old_code_compatibility') then
-      hamz = rovib_ham % proc_chunk
-    end if
+    ! if (debug_mode == 'old_code_compatibility') then
+    !   hamz = rovib_ham % proc_chunk
+    ! end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -137,36 +138,36 @@ contains
     end do
   end subroutine
 
-!-----------------------------------------------------------------------
-! Hamiltonian operator for PARPACK. Complex version. rovib_coupling = 0 version.
-!-----------------------------------------------------------------------
-  subroutine opz(mloc, x, y)
-    integer mloc
-    complex*16 x(mloc)
-    complex*16 y(mloc)
-    complex*16 v(msize)
-    
-    v = 0
-    v(rog+1:rog+mloc) = x
-    ! assembles full vector v by exchanging chunks between processes
-    call zgsum2d(context,'A',' ',msize,1,v,msize,-1,-1)
-    ! matrix-vector product: y = hamz * v
-    call gemv(hamz,v,y)
-  end subroutine
+! !-----------------------------------------------------------------------
+! ! Hamiltonian operator for PARPACK. Complex version. rovib_coupling = 0 version.
+! !-----------------------------------------------------------------------
+!   subroutine opz(mloc, x, y)
+!     integer mloc
+!     complex*16 x(mloc)
+!     complex*16 y(mloc)
+!     complex*16 v(msize)
+!
+!     v = 0
+!     v(rog+1:rog+mloc) = x
+!     ! assembles full vector v by exchanging chunks between processes
+!     call zgsum2d(context,'A',' ',msize,1,v,msize,-1,-1)
+!     ! matrix-vector product: y = hamz * v
+!     call gemv(hamz,v,y)
+!   end subroutine
 
-!-----------------------------------------------------------------------
-! Hamiltonian operator for PARPACK. Real version. rovib = 0 version. Deprecated.
-!-----------------------------------------------------------------------
-  subroutine opd(mloc, x, y)
-    integer mloc
-    real*8 x(mloc)
-    real*8 y(mloc)
-    real*8 v(msize)
-
-    v = 0
-    v(rog+1:rog+mloc) = x
-    call dgsum2d(context,'A',' ',msize,1,v,msize,-1,-1)
-    call gemv(hamd,v,y)
-  end subroutine
+! !-----------------------------------------------------------------------
+! ! Hamiltonian operator for PARPACK. Real version. rovib = 0 version. Deprecated.
+! !-----------------------------------------------------------------------
+!   subroutine opd(mloc, x, y)
+!     integer mloc
+!     real*8 x(mloc)
+!     real*8 y(mloc)
+!     real*8 v(msize)
+!
+!     v = 0
+!     v(rog+1:rog+mloc) = x
+!     call dgsum2d(context,'A',' ',msize,1,v,msize,-1,-1)
+!     call gemv(hamd,v,y)
+!   end subroutine
 
 end module

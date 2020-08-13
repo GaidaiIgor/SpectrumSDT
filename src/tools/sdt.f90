@@ -78,14 +78,13 @@
 !-----------------------------------------------------------------------
 module sdt
   use algorithms
-  use blas95
   use cap_mod
   use constants
   use general_vars
   use index_conversion_mod
   use input_params_mod
   use io_utils
-  use lapack95
+  use lapack_interface_mod
   use matmul_operator_mod
   use mkl
   use parabola
@@ -323,15 +322,10 @@ contains
     call free_1d(nvec,val,vec)
 
     ! Allocate ararys
-    allocate(valraw(n3b),vecraw(n3,n3b), vecrawb(n3b,n3b),basis(n3,n3b),psi(n3), val(n2),vec(n2),nbr(n3b),nvec(n2))
-    write(LG,'(A10,F10.3,A3)')'valraw:', sizeof(valraw) /by2mb,' MB'
-    write(LG,'(A10,F10.3,A3)')'vecraw:', sizeof(vecraw) /by2mb,' MB'
-    write(LG,'(A10,F10.3,A3)')'vecrawb:',sizeof(vecrawb)/by2mb,' MB'
-    write(LG,'(A10,F10.3,A3)')'basis:' , sizeof(basis)  /by2mb,' MB'
-    write(LG,'(A10,F10.3,A3)')'psi:',    sizeof(psi)    /by2mb,' MB'
+    allocate(valraw(n3b), vecrawb(n3b,n3b), basis(n3,n3b), psi(n3), val(n2), vec(n2), nbr(n3b), nvec(n2))
 
     ! Load basis for FBR
-    if (.not.dvr)call init_fbrbasis(basis)
+    if (.not.dvr) call init_fbrbasis(basis)
 
     ! Solve eigenvalue problem for each thread
     nb2 = 0
@@ -348,7 +342,7 @@ contains
         ! Initialize matrix
         call init_matrix3dvr(vecrawb,i1,i2)
         ! Solve matrix
-        call syev(vecrawb,valraw,'V')
+        call lapack_eigensolver(vecrawb, valraw)
         ! Get normalized eigenvectors on the grid
         vecraw = vecrawb / sqrt(alpha3)
       ! FBR case
@@ -369,9 +363,9 @@ contains
         end if
 
         ! Solve matrix
-        call syev(vecrawb,valraw,'V')
+        call lapack_eigensolver(vecrawb, valraw)
         ! Get normalized grid functions
-        call gemm(basis,vecrawb,vecraw)
+        vecraw = matmul(basis, vecrawb)
       ! DVR and FBR
       end if
 
@@ -543,14 +537,14 @@ contains
         if (nvec1r==0)cycle
         
         ! Calculate overlap matrix
-        allocate(ham1(nvec1r,nvec1c))
         if (ic==ir) then
+          allocate(ham1(nvec1r, nvec1c))
           ham1 = 0d0
           do i=1,nvec1c
             ham1(i,i) = 1d0
           end do
         else
-          call gemm(vec1(ir)%a,vec1(ic)%a,ham1,'T')
+          ham1 = matmul(transpose(vec1(ir) % a), vec1(ic) % a)
         end if
 
         ! Calculate block
@@ -579,7 +573,7 @@ contains
     allocate(w(nb2),valraw(nvec2),vecrawe(nb2,nvec2))
     write(LG,'(A10,F10.3,A3)')'valraw:', sizeof(valraw) /by2mb,' MB'
     write(LG,'(A10,F10.3,A3)')'vecrawe:',sizeof(vecrawe)/by2mb,' MB'
-    call syev(ham2,w,'V')
+    call lapack_eigensolver(ham2, w)
     valraw  = w(1:nvec2)
     vecrawe = ham2(:,1:nvec2)
 
@@ -894,7 +888,7 @@ contains
     i = 0
     do is=1,n2
       j = (is-1) * n3b
-      call gemv(vec1(is)%a,vec2e(i+1:i+nvec1(is)),vec2b(j+1:j+n3b))
+      vec2b(j+1 : j+n3b) = matmul(vec1(is) % a, vec2e(i+1 : i+nvec1(is)))
       i = i + nvec1(is)
     end do
   end subroutine
@@ -965,7 +959,7 @@ contains
         call load_vec2(lambdac,ic,ind(ic,ichan),.false.)
         do ir=1,n1
           call load_vec2(lambdar,ir,ind(ir,ichan),.false.)
-          olap(ir,ic) = dot(lambdar,lambdac) * phs(ic,ichan) * phs(ir,ichan)
+          olap(ir,ic) = dot_product(lambdar,lambdac) * phs(ic,ichan) * phs(ir,ichan)
         end do
       end do
 
@@ -1004,7 +998,7 @@ contains
             call load_vec2(lambdac,ic,ind(ic,i),.false.)
             do ir=1,n1
               call load_vec2(lambdar,ir,ind(ir,j),.false.)
-              olap(ir,ic) = dot(lambdar,lambdac) * phs(ic,i) * phs(ir,j)
+              olap(ir,ic) = dot_product(lambdar,lambdac) * phs(ic,i) * phs(ir,j)
             end do
           end do
 
@@ -1069,7 +1063,7 @@ contains
             call trans_eibas_bas(vec1c,nvec1c,vec2c(:,j),lambdac)
             do i=1,nvec2(ir)
               call trans_eibas_bas(vec1r,nvec1r,vec2r(:,i),lambdar)
-              olap(i, j) = dot(lambdar, lambdac)
+              olap(i, j) = dot_product(lambdar, lambdac)
             end do
           end do
 
@@ -1213,272 +1207,272 @@ contains
     end do
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Solution of 3D problem using SDT for a specific value of K (symmetric top approximation)
-  !  Variables are real (d) and/or complex (z).
-  !-----------------------------------------------------------------------
-  subroutine calc_3dsdt_sym_top(params)
-    class(input_params), intent(in) :: params
-    ! Arrays for 2D states
-    real*8,allocatable::val2(:)           ! 2D eivalues
-    ! Arrays for real 3D states
-    real*8,allocatable::val3d(:)          ! 3D eivalues
-    real*8,allocatable::vec3d(:,:)        ! 3D vecs in basis
-    ! Arrays for complex 3D states
-    complex*16,allocatable::val3z(:)      ! 3D eivalues
-    complex*16,allocatable::vec3z(:,:)    ! 3D vecs in basis
-    ! Saved matrix
-    real*8,allocatable::ham(:,:)          ! One full block of overlaps
-    ! Real hamiltonian arrays
-    real*8,allocatable::kin(:,:)          ! KEO matrix
-    real*8,allocatable::ham1d(:,:)        ! One chunk
-    ! Complex hamiltonian arrays
-    complex*16,allocatable::kinz(:,:)     ! KEO matrix
-    complex*16,allocatable::ham1z(:,:)    ! Part of overlap block relevant for this process
-    ! Matrix partitioning
-    integer,allocatable::blsize(:)        ! Block sizes (in rows)
-    integer,allocatable::offset(:)        ! starting row number of each block (block offsets)
-    integer nbl                           ! Number of blocks along rows or columns
-    integer blsizemax                     ! Maximum block size (in rows)
-    integer gblr,gblc                     ! Global block indices
-    ! Variables for Parpack matrix distrubution
-    integer mloc    ! Local number of matrix rows
-    integer mrem    ! Number of remaining rows if not divisible
-    integer rng     ! Global row number
-    integer rns     ! Starting row number in starting block
-    integer rne     ! Ending   row number in ending   block
-    integer bns     ! Block number, starting (for this proc)
-    integer bne     ! Block number, ending (for this proc)
-    integer rn1     ! Starting row number in current block
-    integer rn2     ! Ending   row number in current block
-    integer rc      ! Row count in [rn1,rn2]
-    integer rct     ! Row count, total
-    integer numroc  ! Calculates num of blocks
-    integer nstloc  ! Local num of states
-    ! Miscellaneous
-    integer i,j
-
-    ! Load matrix partitioning
-    call load_partitioning(nbl,blsize,blsizemax,offset,msize)
-    
-    ! Stop if number of states exceeds matrix size
-    if (nstate > msize) then
-      if (myid == 0) then
-        write(*,*)'Requested number of states > matrix size, stop'
-      end if
-      return
-    end if
-
-    ! Find local number of rows and offset
-    mloc = msize / nprocs
-    mrem = mod(msize, nprocs)
-    if (myid < mrem) mloc = mloc + 1 ! distribute remaining rows
-    rog = msize / nprocs * myid + min(myid,mrem) ! starting row for current proc (starting from 0)
-
-    ! Check that ncv <= nloc, as required by pzneupd
-    if (ncv > mloc) then
-      write(*,*)'NCV exceeds MLOC',myid,ncv,mloc
-      stop
-    end if
-
-    ! Allocate KEO matrix
-    if (realver) then
-      allocate(kin(n1,n1))
-      write(LG,'(A10,F10.3,A3)')'kin:', sizeof(kin) /by2mb,' MB'
-    else
-      allocate(kinz(n1,n1))
-      write(LG,'(A10,F10.3,A3)')'kinz:',sizeof(kinz)/by2mb,' MB'
-    end if
-
-    ! Initialize KEO matrix
-    ! In complex version it also includes CAP
-    if (realver) then
-      call init_matrix1d(kin)
-    else
-      call init_matrix1z(kinz)
-    end if
-
-    ! Allocate final matrix
-    if (myid == 0) write(*,*)'Final matrix size: ',msize
-    write(LG,*)'Final matrix size: ',msize
-    write(LG,*)'Local chunk size:',mloc,'x',msize
-    if (realver) then
-      if (allocated(hamd))deallocate(hamd)
-      allocate(hamd(mloc,msize))
-      write(LG,'(A10,F10.3,A3)')'hamd:',sizeof(hamd)/by2mb,' MB'
-    else
-      if (allocated(hamz))deallocate(hamz)
-      allocate(hamz(mloc,msize))
-      write(LG,'(A10,F10.3,A3)')'hamz:',sizeof(hamz)/by2mb,' MB'
-    end if
-
-    ! Find out starting block and starting row in it
-    j = rog + 1
-    bns = 0
-    rns = 0
-    do i=1,nbl
-      if (offset(i)+1 <= j .and. j <= offset(i)+blsize(i)) then
-        bns = i
-        rns = j - offset(i)
-        exit
-      end if
-    end do
-
-    ! Stop if no block/row found
-    if (bns == 0) then
-      write(LG,*)'No starting block/row found'
-      stop
-    else
-      write(LG,*)'Starting block:', bns
-      write(LG,*)'Starting row:',   rns
-    end if
-
-    ! Find out ending block and ending row in it
-    j = rog + mloc
-    bne = 0
-    rne = 0
-    do i=bns,nbl
-      if (offset(i)+1 <= j .and. j <= offset(i)+blsize(i)) then
-        bne = i
-        rne = j - offset(i)
-        exit
-      end if
-    end do
-
-    ! Stop if no block/row found
-    if (bne == 0) then
-      write(LG,*)'No ending block/row found'
-      stop
-    else
-      write(LG,*)'Ending block:', bne
-      write(LG,*)'Ending row:',   rne
-    end if
-
-    ! Setup number of processed rows
-    rct = 0
-    ! Calculate blocks of Hamiltonian matrix
-    ! Loop over needed rows
-    do gblr=bns,bne
-      ! Check if row is not empty
-      if (adiab .and. blsize(gblr) == 0) cycle
-      
-      ! Find out starting row number in current block
-      if (gblr == bns) then
-        rn1 = rns
-      else
-        rn1 = 1
-      end if
-
-      ! Find out ending row number in current block
-      if (gblr == bne) then
-        rn2 = rne
-      else
-        rn2 = blsize(gblr)
-      end if
-
-      ! Get row count in current block
-      rc = rn2 - rn1 + 1
-      ! Loop over all block columns
-      do gblc=1,nbl
-        ! Check if column is not empty
-        if (adiab .and. blsize(gblc) == 0) cycle
-        call load_overlap(gblr,gblc,blsize,ham,adiab)
-
-        ! Finish block construction and save, real version
-        if (realver) then
-          ! Allocate real array
-          allocate(ham1d(rc,blsize(gblc)))
-          ! Multiply by KEO element
-          if (adiab) then
-            ham1d = ham(rn1:rn2,:) * kin(gblr,gblc)
-          else
-            ham1d = ham(rn1:rn2,:) * kin(rn1:rn2,:)
-          end if
-
-          ! Add 2D energies to the diagonal of diagonal block
-          if (gblc == gblr) then
-            if (adiab) then
-              call load_val2(gblc,val2)
-            else
-              call load_val2_grouped(gblc,val2)
-            end if
-            do i=1,rc
-              j = rn1 + i - 1
-              ham1d(i,j) = ham1d(i,j) + val2(j)
-            end do
-          end if
-
-          ! Save block
-          do i=1,blsize(gblc)
-            hamd( rct+1 : rct+rc, offset(gblc)+i ) = ham1d(:,i)
-          end do
-          ! Deallocate temporary array
-          deallocate(ham1d)
-        ! Finish block construction and save, complex version
-        else
-          ! Allocate complex array
-          allocate(ham1z(rc,blsize(gblc)))
-          ! Multiply by KEO element
-          if (adiab) then
-            ham1z = ham(rn1:rn2,:) * kinz(gblr,gblc)
-          else
-            ham1z = ham(rn1:rn2,:) * kinz(rn1:rn2,:)
-          end if
-
-          ! Add 2D energies to the diagonal of diagonal block
-          if (gblc == gblr) then
-            if (adiab) then
-              call load_val2(gblc,val2)
-            else
-              call load_val2_grouped(gblc,val2)
-            end if
-            do i=1,rc
-              j = rn1 + i - 1
-              ham1z(i,j) = ham1z(i,j) + val2(j)
-            end do
-          end if
-
-          ! Save block
-          do i=1,blsize(gblc)
-            hamz( rct+1 : rct+rc, offset(gblc)+i ) = ham1z(:,i)
-          end do
-          ! Deallocate temporary array
-          deallocate(ham1z)
-        end if
-      ! Loop over columns
-      end do
-      ! Update number of processed rows
-      rct = rct + rc
-    ! Loop over rows
-    end do
-
-    ! Allocate memory for values, vectors and symmetries
-    nstloc = numroc(nstate,1,myid,0,nprocs)
-    if (realver) then
-      allocate(val3d(nstate),vec3d(msize,nstloc))
-      write(LG,'(A10,F10.3,A3)')'val3d:', sizeof(val3d) /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'vec3d:', sizeof(vec3d) /by2mb,' MB'
-    else
-      allocate(val3z(nstate),vec3z(msize,nstloc))
-      write(LG,'(A10,F10.3,A3)')'val3z:', sizeof(val3z) /by2mb,' MB'
-      write(LG,'(A10,F10.3,A3)')'vec3z:', sizeof(vec3z) /by2mb,' MB'
-    end if
-
-    if (debug_mode == 'sdt_use_slepc') then
-      call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, val3z, vec3z)
-    else
-      ! Solve matrix
-      if (realver) then
-        call pard(context,val3d,vec3d,msize,mloc,nstate,nstloc,ncv,maxitr,opd)
-      else
-        active_matmul_operator => opz
-        call parz(context,val3z,vec3z,msize,mloc,nstate,nstloc,ncv,maxitr) ! tools/eicalc/parpack.f90
-      end if
-    end if
-    
-    ! Print spectrum
-    call prnt_3dsdt(val3d,vec3d,val3z,vec3z,nstloc,nprocs)
-  end subroutine
+  ! !-----------------------------------------------------------------------
+  ! !  Solution of 3D problem using SDT for a specific value of K (symmetric top approximation)
+  ! !  Variables are real (d) and/or complex (z).
+  ! !-----------------------------------------------------------------------
+  ! subroutine calc_3dsdt_sym_top(params)
+  !   class(input_params), intent(in) :: params
+  !   ! Arrays for 2D states
+  !   real*8,allocatable::val2(:)           ! 2D eivalues
+  !   ! Arrays for real 3D states
+  !   real*8,allocatable::val3d(:)          ! 3D eivalues
+  !   real*8,allocatable::vec3d(:,:)        ! 3D vecs in basis
+  !   ! Arrays for complex 3D states
+  !   complex*16,allocatable::val3z(:)      ! 3D eivalues
+  !   complex*16,allocatable::vec3z(:,:)    ! 3D vecs in basis
+  !   ! Saved matrix
+  !   real*8,allocatable::ham(:,:)          ! One full block of overlaps
+  !   ! Real hamiltonian arrays
+  !   real*8,allocatable::kin(:,:)          ! KEO matrix
+  !   real*8,allocatable::ham1d(:,:)        ! One chunk
+  !   ! Complex hamiltonian arrays
+  !   complex*16,allocatable::kinz(:,:)     ! KEO matrix
+  !   complex*16,allocatable::ham1z(:,:)    ! Part of overlap block relevant for this process
+  !   ! Matrix partitioning
+  !   integer,allocatable::blsize(:)        ! Block sizes (in rows)
+  !   integer,allocatable::offset(:)        ! starting row number of each block (block offsets)
+  !   integer nbl                           ! Number of blocks along rows or columns
+  !   integer blsizemax                     ! Maximum block size (in rows)
+  !   integer gblr,gblc                     ! Global block indices
+  !   ! Variables for Parpack matrix distrubution
+  !   integer mloc    ! Local number of matrix rows
+  !   integer mrem    ! Number of remaining rows if not divisible
+  !   integer rng     ! Global row number
+  !   integer rns     ! Starting row number in starting block
+  !   integer rne     ! Ending   row number in ending   block
+  !   integer bns     ! Block number, starting (for this proc)
+  !   integer bne     ! Block number, ending (for this proc)
+  !   integer rn1     ! Starting row number in current block
+  !   integer rn2     ! Ending   row number in current block
+  !   integer rc      ! Row count in [rn1,rn2]
+  !   integer rct     ! Row count, total
+  !   integer numroc  ! Calculates num of blocks
+  !   integer nstloc  ! Local num of states
+  !   ! Miscellaneous
+  !   integer i,j
+  !
+  !   ! Load matrix partitioning
+  !   call load_partitioning(nbl,blsize,blsizemax,offset,msize)
+  !
+  !   ! Stop if number of states exceeds matrix size
+  !   if (nstate > msize) then
+  !     if (myid == 0) then
+  !       write(*,*)'Requested number of states > matrix size, stop'
+  !     end if
+  !     return
+  !   end if
+  !
+  !   ! Find local number of rows and offset
+  !   mloc = msize / nprocs
+  !   mrem = mod(msize, nprocs)
+  !   if (myid < mrem) mloc = mloc + 1 ! distribute remaining rows
+  !   rog = msize / nprocs * myid + min(myid,mrem) ! starting row for current proc (starting from 0)
+  !
+  !   ! Check that ncv <= nloc, as required by pzneupd
+  !   if (ncv > mloc) then
+  !     write(*,*)'NCV exceeds MLOC',myid,ncv,mloc
+  !     stop
+  !   end if
+  !
+  !   ! Allocate KEO matrix
+  !   if (realver) then
+  !     allocate(kin(n1,n1))
+  !     write(LG,'(A10,F10.3,A3)')'kin:', sizeof(kin) /by2mb,' MB'
+  !   else
+  !     allocate(kinz(n1,n1))
+  !     write(LG,'(A10,F10.3,A3)')'kinz:',sizeof(kinz)/by2mb,' MB'
+  !   end if
+  !
+  !   ! Initialize KEO matrix
+  !   ! In complex version it also includes CAP
+  !   if (realver) then
+  !     call init_matrix1d(kin)
+  !   else
+  !     call init_matrix1z(kinz)
+  !   end if
+  !
+  !   ! Allocate final matrix
+  !   if (myid == 0) write(*,*)'Final matrix size: ',msize
+  !   write(LG,*)'Final matrix size: ',msize
+  !   write(LG,*)'Local chunk size:',mloc,'x',msize
+  !   if (realver) then
+  !     if (allocated(hamd))deallocate(hamd)
+  !     allocate(hamd(mloc,msize))
+  !     write(LG,'(A10,F10.3,A3)')'hamd:',sizeof(hamd)/by2mb,' MB'
+  !   else
+  !     if (allocated(hamz))deallocate(hamz)
+  !     allocate(hamz(mloc,msize))
+  !     write(LG,'(A10,F10.3,A3)')'hamz:',sizeof(hamz)/by2mb,' MB'
+  !   end if
+  !
+  !   ! Find out starting block and starting row in it
+  !   j = rog + 1
+  !   bns = 0
+  !   rns = 0
+  !   do i=1,nbl
+  !     if (offset(i)+1 <= j .and. j <= offset(i)+blsize(i)) then
+  !       bns = i
+  !       rns = j - offset(i)
+  !       exit
+  !     end if
+  !   end do
+  !
+  !   ! Stop if no block/row found
+  !   if (bns == 0) then
+  !     write(LG,*)'No starting block/row found'
+  !     stop
+  !   else
+  !     write(LG,*)'Starting block:', bns
+  !     write(LG,*)'Starting row:',   rns
+  !   end if
+  !
+  !   ! Find out ending block and ending row in it
+  !   j = rog + mloc
+  !   bne = 0
+  !   rne = 0
+  !   do i=bns,nbl
+  !     if (offset(i)+1 <= j .and. j <= offset(i)+blsize(i)) then
+  !       bne = i
+  !       rne = j - offset(i)
+  !       exit
+  !     end if
+  !   end do
+  !
+  !   ! Stop if no block/row found
+  !   if (bne == 0) then
+  !     write(LG,*)'No ending block/row found'
+  !     stop
+  !   else
+  !     write(LG,*)'Ending block:', bne
+  !     write(LG,*)'Ending row:',   rne
+  !   end if
+  !
+  !   ! Setup number of processed rows
+  !   rct = 0
+  !   ! Calculate blocks of Hamiltonian matrix
+  !   ! Loop over needed rows
+  !   do gblr=bns,bne
+  !     ! Check if row is not empty
+  !     if (adiab .and. blsize(gblr) == 0) cycle
+  !
+  !     ! Find out starting row number in current block
+  !     if (gblr == bns) then
+  !       rn1 = rns
+  !     else
+  !       rn1 = 1
+  !     end if
+  !
+  !     ! Find out ending row number in current block
+  !     if (gblr == bne) then
+  !       rn2 = rne
+  !     else
+  !       rn2 = blsize(gblr)
+  !     end if
+  !
+  !     ! Get row count in current block
+  !     rc = rn2 - rn1 + 1
+  !     ! Loop over all block columns
+  !     do gblc=1,nbl
+  !       ! Check if column is not empty
+  !       if (adiab .and. blsize(gblc) == 0) cycle
+  !       call load_overlap(gblr,gblc,blsize,ham,adiab)
+  !
+  !       ! Finish block construction and save, real version
+  !       if (realver) then
+  !         ! Allocate real array
+  !         allocate(ham1d(rc,blsize(gblc)))
+  !         ! Multiply by KEO element
+  !         if (adiab) then
+  !           ham1d = ham(rn1:rn2,:) * kin(gblr,gblc)
+  !         else
+  !           ham1d = ham(rn1:rn2,:) * kin(rn1:rn2,:)
+  !         end if
+  !
+  !         ! Add 2D energies to the diagonal of diagonal block
+  !         if (gblc == gblr) then
+  !           if (adiab) then
+  !             call load_val2(gblc,val2)
+  !           else
+  !             call load_val2_grouped(gblc,val2)
+  !           end if
+  !           do i=1,rc
+  !             j = rn1 + i - 1
+  !             ham1d(i,j) = ham1d(i,j) + val2(j)
+  !           end do
+  !         end if
+  !
+  !         ! Save block
+  !         do i=1,blsize(gblc)
+  !           hamd( rct+1 : rct+rc, offset(gblc)+i ) = ham1d(:,i)
+  !         end do
+  !         ! Deallocate temporary array
+  !         deallocate(ham1d)
+  !       ! Finish block construction and save, complex version
+  !       else
+  !         ! Allocate complex array
+  !         allocate(ham1z(rc,blsize(gblc)))
+  !         ! Multiply by KEO element
+  !         if (adiab) then
+  !           ham1z = ham(rn1:rn2,:) * kinz(gblr,gblc)
+  !         else
+  !           ham1z = ham(rn1:rn2,:) * kinz(rn1:rn2,:)
+  !         end if
+  !
+  !         ! Add 2D energies to the diagonal of diagonal block
+  !         if (gblc == gblr) then
+  !           if (adiab) then
+  !             call load_val2(gblc,val2)
+  !           else
+  !             call load_val2_grouped(gblc,val2)
+  !           end if
+  !           do i=1,rc
+  !             j = rn1 + i - 1
+  !             ham1z(i,j) = ham1z(i,j) + val2(j)
+  !           end do
+  !         end if
+  !
+  !         ! Save block
+  !         do i=1,blsize(gblc)
+  !           hamz( rct+1 : rct+rc, offset(gblc)+i ) = ham1z(:,i)
+  !         end do
+  !         ! Deallocate temporary array
+  !         deallocate(ham1z)
+  !       end if
+  !     ! Loop over columns
+  !     end do
+  !     ! Update number of processed rows
+  !     rct = rct + rc
+  !   ! Loop over rows
+  !   end do
+  !
+  !   ! Allocate memory for values, vectors and symmetries
+  !   nstloc = numroc(nstate,1,myid,0,nprocs)
+  !   if (realver) then
+  !     allocate(val3d(nstate),vec3d(msize,nstloc))
+  !     write(LG,'(A10,F10.3,A3)')'val3d:', sizeof(val3d) /by2mb,' MB'
+  !     write(LG,'(A10,F10.3,A3)')'vec3d:', sizeof(vec3d) /by2mb,' MB'
+  !   else
+  !     allocate(val3z(nstate),vec3z(msize,nstloc))
+  !     write(LG,'(A10,F10.3,A3)')'val3z:', sizeof(val3z) /by2mb,' MB'
+  !     write(LG,'(A10,F10.3,A3)')'vec3z:', sizeof(vec3z) /by2mb,' MB'
+  !   end if
+  !
+  !   if (debug_mode == 'sdt_use_slepc') then
+  !     call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, val3z, vec3z)
+  !   else
+  !     ! Solve matrix
+  !     if (realver) then
+  !       call pard(context,val3d,vec3d,msize,mloc,nstate,nstloc,ncv,maxitr,opd)
+  !     else
+  !       active_matmul_operator => opz
+  !       call parz(context,val3z,vec3z,msize,mloc,nstate,nstloc,ncv,maxitr) ! tools/eicalc/parpack.f90
+  !     end if
+  !   end if
+  !
+  !   ! Print spectrum
+  !   call prnt_3dsdt(val3d,vec3d,val3z,vec3z,nstloc,nprocs)
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates states.
@@ -2137,252 +2131,252 @@ contains
     write(LG,*)'Slice processed: ',isln,istn,phsn,maxolap
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Performs diagonalization of 1D channel Hamiltonians.
-  !-----------------------------------------------------------------------
-  subroutine calc_chdiag(params)
-    class(input_params), intent(in) :: params
-    ! Digonalization
-    real*8, allocatable :: olap(:,:)    ! Overlap matrix
-    integer,allocatable :: ind(:)       ! Channel indices
-    integer,allocatable :: phs(:)       ! Channel phases
-    real*8, allocatable :: val2all(:,:) ! 2D eigenvalues
-    integer ic,ir                       ! Running block numbers
-    ! Real branch arrays
-    real*8, allocatable :: hamd(:,:)    ! Hamiltonian matrix
-    real*8, allocatable :: chvald(:)    ! Channel eigenvalues
-    real*8, allocatable :: chvalalld(:,:)! Cumulative eivals
-    ! Complex branch arrays
-    complex*16, allocatable :: hamz(:,:)! Hamiltonian matrix
-    complex*16, allocatable :: chvalz(:)! Channel eigenvalues
-    complex*16, allocatable :: w(:)     ! Channel eivals, unsorted
-    complex*16, allocatable :: vr(:,:)  ! Channel eivecs, unsorted
-    real*8,     allocatable :: prob(:,:)! Probabilities
-    ! Sorting
-    real*8, allocatable :: sortval(:)   ! Sorted values
-    integer,allocatable :: sortind(:)   ! Sorted indices
-    ! Channel properties
-    integer nchan                       ! Number of channels
-    integer ichan                       ! Channel number
-    real*8  barps                       ! Barrier position
-    real*8  baren                       ! Barirer energy
-    real*8  capebar                     ! Barrier energy for CAP
-    ! Miscellaneous
-    character(:),allocatable::ldir      ! Load directory
-    integer ist                         ! 2D state number
-    integer isl                         ! Slice number
-    real*8  en                          ! Energy
-    character(256) fn
-    integer i,j
-
-    ! Get number of channels
-    nchan = nprocs
-    ! Get my channel number and load recognition
-    ichan = myid + 1
-    if (load_recognition_chan(ind,phs,ichan)) then
-      write(LG,*)'Channel number ',ichan
-    else
-      write(LG,*)'Nothing to do, exiting'
-      return
-    end if
-
-    ! Load 2D eigenvalues
-    call load_val2all(val2all)
-    ! Complex version preparation
-    if (.not.realver) then
-      ! Get channel properties
-      ldir = getrecldpath()
-      open(1,file=ldir//'/channels.dat')
-      do i=1,ichan
-        read(1,'(70X,2F35.17,35X,F35.17)')barps,baren,capebar
-      end do
-      close(1)
-      write(LG,*)'Barrier Position: ',barps
-      write(LG,*)'CAP Ebar: ',capebar
-      ! Initialize CAPs
-      call init_caps(params, capebar / autown)
-    end if
-
-    ! Load overlap matrix
-    allocate(olap(n1,n1))
-    ldir = opath // '/' // getdir(MODE_OVERLAP)
-    write(fn,'(2A,I4.4,A)')ldir,'/overlap.',ichan,'.bin.out'
-    open(1,file=fn,form='unformatted')
-    read(1)olap
-    close(1)
-
-    ! Real branch
-    if (realver) then
-      ! Initialize real KEO matrix
-      allocate(hamd(n1,n1))
-      write(LG,'(A10,F10.3,A3)')'hamd:',  sizeof(hamd)  /by2mb,' MB'
-      call init_matrix1d(hamd)
-
-      ! Multiply KEO by overlap matrix element-wise
-      hamd = olap * hamd
-      ! Add energy to diagonal
-      do isl=1,n1
-        hamd(isl,isl) = hamd(isl,isl) + val2all(ind(isl),isl)
-      end do
-
-      ! Solve matrix
-      allocate(chvald(n1))
-      call syev(hamd,chvald,'V')
-
-      ! Log eigenvalues
-      write(LG,*)'Spectrum:'
-      do isl=1,n1
-        write(LG,'(I5,F25.17)')isl,chvald(isl) * autown
-      end do
-
-      ! Normalize states
-      do ist=1,n1
-        hamd(:,ist) = hamd(:,ist) / sqrt(jac1 * alpha1)
-      end do
-
-      ! Write states in binary form
-      write(fn,'(2A,I4.4,A)')outdir,'/exp.',ichan,'.bin.out'
-      open(1,file=fn,form='unformatted')
-      write(1)hamd
-      close(1)
-
-      ! Write states in text form
-      write(fn,'(2A,I4.4,A)')outdir,'/exp.',ichan,'.out'
-      open(1,file=fn)
-      do i=1,n1
-        do j=1,n1
-          write(1,'(F25.17)',advance='no')hamd(i,j)
-        end do
-        write(1,*)
-      end do
-      close(1)
-
-      ! Allocate collective arrays on root
-      if (myid == 0) then
-        allocate(chvalalld(n1,nchan))
-        chvalalld = 0
-      end if
-
-      ! Colect eigenvalues
-      if (myid == 0) then
-        chvalalld(:,1) = chvald
-        do ichan=2,nchan
-          call dgerv2d(context,n1,1,chvalalld(1,ichan),n1,0,ichan-1)
-        end do
-      else
-        call dgesd2d(context,n1,1,chvald,n1,0,0)
-      end if
-
-      ! Only root continues
-      if (myid /= 0)return
-
-      ! Write channel eigenvalues
-      open(1,file='en.out')
-      write(1,'(10X)',advance='no')
-      do ichan=1,nchan
-        write(1,'(I25)',advance='no')ichan
-      end do
-      write(1,*)
-      do ist=1,n1
-        write(1,'(I10)',advance='no')ist
-        do ichan=1,nchan
-          write(1,'(F25.17)',advance='no')chvalalld(ist,ichan)*autown
-        end do
-        write(1,*)
-      end do
-      close(1)
-    ! Complex branch
-    else
-      ! Initialize complex KEO matrix
-      allocate(hamz(n1,n1))
-      write(LG,'(A10,F10.3,A3)')'hamz:',  sizeof(hamz)  /by2mb,' MB'
-      call init_matrix1z(hamz)
-
-      ! Multiply KEO by overlap matrix element-wise
-      hamz = olap * hamz
-      ! Add energy to diagonal
-      do isl=1,n1
-        hamz(isl,isl) = hamz(isl,isl) + val2all(ind(isl),isl)
-      end do
-
-      ! Solve matrix
-      allocate(chvalz(n1),w(n1),vr(n1,n1),prob(n1,5))
-      call geev(hamz,w,vr,vr)
-
-      ! Sort eigenpairs
-      allocate(sortval(n1),sortind(n1))
-      sortval = real(w)
-      sortval = bubble_sort(sortval, sortind)
-      do i=1,n1
-        chvalz(i) = w (  sortind(i))
-        hamz(:,i) = vr(:,sortind(i))
-      end do
-
-      ! Log eigenvalues
-      write(LG,*)'Spectrum:'
-      do isl=1,n1
-        write(LG,'(I5,2F25.17)')isl,chvalz(isl) * autown
-      end do
-
-      ! Calculate probabilities
-      prob = 0
-      do ist=1,n1
-        do isl=1,n1
-          ! Real part only
-          prob(ist,2) = prob(ist,2) + real(hamz(isl,ist))**2
-          ! Imaginary part only
-          prob(ist,3) = prob(ist,3) + aimag(hamz(isl,ist))**2
-
-          if (g1(isl) < barps) then
-            ! Probability in the well
-            prob(ist,1) = prob(ist,1) + conjg(hamz(isl,ist)) * hamz(isl,ist)
-            ! Real part in the well
-            prob(ist,5) = prob(ist,5) + real(hamz(isl,ist))**2
-          end if
-        end do
-
-        ! Difference between real and imaginary parts
-        prob(ist,4) = prob(ist,2) - prob(ist,3)
-        ! Divide real part in the well by real part
-        prob(ist,5) = prob(ist,5) / prob(ist,2)
-      end do
-
-      ! Save spectrum
-      write(fn,'(2A,I4.4,A)')outdir,'/spec.',ichan,'.out'
-      open(1,file=fn)
-        do ist=1,n1
-          write(1,'(8F30.17)') real(chvalz(ist))  * autown, real(chvalz(ist))  * autown - baren, aimag(chvalz(ist)) * autown * (-2), (prob(ist,i),i=1,5)
-        end do
-      close(1)
-
-      ! Normalize states
-      do ist=1,n1
-        hamz(:,ist) = hamz(:,ist) / sqrt(jac1 * alpha1)
-      end do
-
-      ! Write states in binary form
-      write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.bin.out'
-      open(1,file=fn,form='unformatted')
-      write(1)hamz
-      close(1)
-
-      ! Write states in text form
-      write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.re.out'
-      open(1,file=fn)
-      write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.im.out'
-      open(2,file=fn)
-      do i=1,n1
-        do j=1,n1
-          write(1,'(F25.17)',advance='no')real(hamz(i,j))
-          write(2,'(F25.17)',advance='no')aimag(hamz(i,j))
-        end do
-        write(1,*)
-        write(2,*)
-      end do
-      close(1)
-      close(2)
-    end if
-  end subroutine
+  ! !-----------------------------------------------------------------------
+  ! !  Performs diagonalization of 1D channel Hamiltonians.
+  ! !-----------------------------------------------------------------------
+  ! subroutine calc_chdiag(params)
+  !   class(input_params), intent(in) :: params
+  !   ! Digonalization
+  !   real*8, allocatable :: olap(:,:)    ! Overlap matrix
+  !   integer,allocatable :: ind(:)       ! Channel indices
+  !   integer,allocatable :: phs(:)       ! Channel phases
+  !   real*8, allocatable :: val2all(:,:) ! 2D eigenvalues
+  !   integer ic,ir                       ! Running block numbers
+  !   ! Real branch arrays
+  !   real*8, allocatable :: hamd(:,:)    ! Hamiltonian matrix
+  !   real*8, allocatable :: chvald(:)    ! Channel eigenvalues
+  !   real*8, allocatable :: chvalalld(:,:)! Cumulative eivals
+  !   ! Complex branch arrays
+  !   complex*16, allocatable :: hamz(:,:)! Hamiltonian matrix
+  !   complex*16, allocatable :: chvalz(:)! Channel eigenvalues
+  !   complex*16, allocatable :: w(:)     ! Channel eivals, unsorted
+  !   complex*16, allocatable :: vr(:,:)  ! Channel eivecs, unsorted
+  !   real*8,     allocatable :: prob(:,:)! Probabilities
+  !   ! Sorting
+  !   real*8, allocatable :: sortval(:)   ! Sorted values
+  !   integer,allocatable :: sortind(:)   ! Sorted indices
+  !   ! Channel properties
+  !   integer nchan                       ! Number of channels
+  !   integer ichan                       ! Channel number
+  !   real*8  barps                       ! Barrier position
+  !   real*8  baren                       ! Barirer energy
+  !   real*8  capebar                     ! Barrier energy for CAP
+  !   ! Miscellaneous
+  !   character(:),allocatable::ldir      ! Load directory
+  !   integer ist                         ! 2D state number
+  !   integer isl                         ! Slice number
+  !   real*8  en                          ! Energy
+  !   character(256) fn
+  !   integer i,j
+  !
+  !   ! Get number of channels
+  !   nchan = nprocs
+  !   ! Get my channel number and load recognition
+  !   ichan = myid + 1
+  !   if (load_recognition_chan(ind,phs,ichan)) then
+  !     write(LG,*)'Channel number ',ichan
+  !   else
+  !     write(LG,*)'Nothing to do, exiting'
+  !     return
+  !   end if
+  !
+  !   ! Load 2D eigenvalues
+  !   call load_val2all(val2all)
+  !   ! Complex version preparation
+  !   if (.not.realver) then
+  !     ! Get channel properties
+  !     ldir = getrecldpath()
+  !     open(1,file=ldir//'/channels.dat')
+  !     do i=1,ichan
+  !       read(1,'(70X,2F35.17,35X,F35.17)')barps,baren,capebar
+  !     end do
+  !     close(1)
+  !     write(LG,*)'Barrier Position: ',barps
+  !     write(LG,*)'CAP Ebar: ',capebar
+  !     ! Initialize CAPs
+  !     call init_caps(params, capebar / autown)
+  !   end if
+  !
+  !   ! Load overlap matrix
+  !   allocate(olap(n1,n1))
+  !   ldir = opath // '/' // getdir(MODE_OVERLAP)
+  !   write(fn,'(2A,I4.4,A)')ldir,'/overlap.',ichan,'.bin.out'
+  !   open(1,file=fn,form='unformatted')
+  !   read(1)olap
+  !   close(1)
+  !
+  !   ! Real branch
+  !   if (realver) then
+  !     ! Initialize real KEO matrix
+  !     allocate(hamd(n1,n1))
+  !     write(LG,'(A10,F10.3,A3)')'hamd:',  sizeof(hamd)  /by2mb,' MB'
+  !     call init_matrix1d(hamd)
+  !
+  !     ! Multiply KEO by overlap matrix element-wise
+  !     hamd = olap * hamd
+  !     ! Add energy to diagonal
+  !     do isl=1,n1
+  !       hamd(isl,isl) = hamd(isl,isl) + val2all(ind(isl),isl)
+  !     end do
+  !
+  !     ! Solve matrix
+  !     allocate(chvald(n1))
+  !     call lapack_eigensolver(hamd, chvald)
+  !
+  !     ! Log eigenvalues
+  !     write(LG,*)'Spectrum:'
+  !     do isl=1,n1
+  !       write(LG,'(I5,F25.17)')isl,chvald(isl) * autown
+  !     end do
+  !
+  !     ! Normalize states
+  !     do ist=1,n1
+  !       hamd(:,ist) = hamd(:,ist) / sqrt(jac1 * alpha1)
+  !     end do
+  !
+  !     ! Write states in binary form
+  !     write(fn,'(2A,I4.4,A)')outdir,'/exp.',ichan,'.bin.out'
+  !     open(1,file=fn,form='unformatted')
+  !     write(1)hamd
+  !     close(1)
+  !
+  !     ! Write states in text form
+  !     write(fn,'(2A,I4.4,A)')outdir,'/exp.',ichan,'.out'
+  !     open(1,file=fn)
+  !     do i=1,n1
+  !       do j=1,n1
+  !         write(1,'(F25.17)',advance='no')hamd(i,j)
+  !       end do
+  !       write(1,*)
+  !     end do
+  !     close(1)
+  !
+  !     ! Allocate collective arrays on root
+  !     if (myid == 0) then
+  !       allocate(chvalalld(n1,nchan))
+  !       chvalalld = 0
+  !     end if
+  !
+  !     ! Colect eigenvalues
+  !     if (myid == 0) then
+  !       chvalalld(:,1) = chvald
+  !       do ichan=2,nchan
+  !         call dgerv2d(context,n1,1,chvalalld(1,ichan),n1,0,ichan-1)
+  !       end do
+  !     else
+  !       call dgesd2d(context,n1,1,chvald,n1,0,0)
+  !     end if
+  !
+  !     ! Only root continues
+  !     if (myid /= 0)return
+  !
+  !     ! Write channel eigenvalues
+  !     open(1,file='en.out')
+  !     write(1,'(10X)',advance='no')
+  !     do ichan=1,nchan
+  !       write(1,'(I25)',advance='no')ichan
+  !     end do
+  !     write(1,*)
+  !     do ist=1,n1
+  !       write(1,'(I10)',advance='no')ist
+  !       do ichan=1,nchan
+  !         write(1,'(F25.17)',advance='no')chvalalld(ist,ichan)*autown
+  !       end do
+  !       write(1,*)
+  !     end do
+  !     close(1)
+  !   ! Complex branch
+  !   else
+  !     ! Initialize complex KEO matrix
+  !     allocate(hamz(n1,n1))
+  !     write(LG,'(A10,F10.3,A3)')'hamz:',  sizeof(hamz)  /by2mb,' MB'
+  !     call init_matrix1z(hamz)
+  !
+  !     ! Multiply KEO by overlap matrix element-wise
+  !     hamz = olap * hamz
+  !     ! Add energy to diagonal
+  !     do isl=1,n1
+  !       hamz(isl,isl) = hamz(isl,isl) + val2all(ind(isl),isl)
+  !     end do
+  !
+  !     ! Solve matrix
+  !     allocate(chvalz(n1),w(n1),vr(n1,n1),prob(n1,5))
+  !     call geev(hamz,w,vr,vr)
+  !
+  !     ! Sort eigenpairs
+  !     allocate(sortval(n1),sortind(n1))
+  !     sortval = real(w)
+  !     sortval = bubble_sort(sortval, sortind)
+  !     do i=1,n1
+  !       chvalz(i) = w (  sortind(i))
+  !       hamz(:,i) = vr(:,sortind(i))
+  !     end do
+  !
+  !     ! Log eigenvalues
+  !     write(LG,*)'Spectrum:'
+  !     do isl=1,n1
+  !       write(LG,'(I5,2F25.17)')isl,chvalz(isl) * autown
+  !     end do
+  !
+  !     ! Calculate probabilities
+  !     prob = 0
+  !     do ist=1,n1
+  !       do isl=1,n1
+  !         ! Real part only
+  !         prob(ist,2) = prob(ist,2) + real(hamz(isl,ist))**2
+  !         ! Imaginary part only
+  !         prob(ist,3) = prob(ist,3) + aimag(hamz(isl,ist))**2
+  !
+  !         if (g1(isl) < barps) then
+  !           ! Probability in the well
+  !           prob(ist,1) = prob(ist,1) + conjg(hamz(isl,ist)) * hamz(isl,ist)
+  !           ! Real part in the well
+  !           prob(ist,5) = prob(ist,5) + real(hamz(isl,ist))**2
+  !         end if
+  !       end do
+  !
+  !       ! Difference between real and imaginary parts
+  !       prob(ist,4) = prob(ist,2) - prob(ist,3)
+  !       ! Divide real part in the well by real part
+  !       prob(ist,5) = prob(ist,5) / prob(ist,2)
+  !     end do
+  !
+  !     ! Save spectrum
+  !     write(fn,'(2A,I4.4,A)')outdir,'/spec.',ichan,'.out'
+  !     open(1,file=fn)
+  !       do ist=1,n1
+  !         write(1,'(8F30.17)') real(chvalz(ist))  * autown, real(chvalz(ist))  * autown - baren, aimag(chvalz(ist)) * autown * (-2), (prob(ist,i),i=1,5)
+  !       end do
+  !     close(1)
+  !
+  !     ! Normalize states
+  !     do ist=1,n1
+  !       hamz(:,ist) = hamz(:,ist) / sqrt(jac1 * alpha1)
+  !     end do
+  !
+  !     ! Write states in binary form
+  !     write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.bin.out'
+  !     open(1,file=fn,form='unformatted')
+  !     write(1)hamz
+  !     close(1)
+  !
+  !     ! Write states in text form
+  !     write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.re.out'
+  !     open(1,file=fn)
+  !     write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.im.out'
+  !     open(2,file=fn)
+  !     do i=1,n1
+  !       do j=1,n1
+  !         write(1,'(F25.17)',advance='no')real(hamz(i,j))
+  !         write(2,'(F25.17)',advance='no')aimag(hamz(i,j))
+  !       end do
+  !       write(1,*)
+  !       write(2,*)
+  !     end do
+  !     close(1)
+  !     close(2)
+  !   end if
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Returns a group number 2D state belongs to.
@@ -2434,87 +2428,87 @@ contains
     find_group = irmax
   end function
 
-  !-----------------------------------------------------------------------
-  !  Calculates states after channel diagonalization.
-  !-----------------------------------------------------------------------
-  subroutine calc_chdiag_states
-    ! Real branch arrays
-    real*8,allocatable :: vec3d(:)     ! Vector in grid
-    real*8,allocatable :: vec3ed(:,:)  ! Vector in eibasis
-    real*8,allocatable :: sliced(:)    ! Slice in basis
-    ! Miscellaneous
-    integer,allocatable :: ind(:)      ! Channel indices
-    integer,allocatable :: phs(:)      ! Channel phases
-    integer nchan                      ! Number of channels
-    integer ichan                      ! Channel number
-    integer is                         ! 3D state number
-    integer ist                        ! 2D state number
-    integer isl                        ! Slice number
-    real*8  vol12                      ! Volume element for 1 and 2
-    real*8  a,b                        ! Wave function value
-    real*8  sym                        ! Symmetry
-    character(256)fn                   ! File name
-    integer i,l
-
-    ! Get number of channels
-    nchan = nprocs
-    ! Get my channel number and load recognition
-    ichan = myid + 1
-    if (load_recognition_chan(ind,phs,ichan)) then
-      write(LG,*)'Channel number ',ichan
-    else
-      write(LG,*)'Nothing to do, exiting'
-      return
-    end if
-
-    ! Allocatge arrays
-    allocate(vec3d(nn),vec3ed(n1,n1),sliced(n23b))
-    ! Load expansion
-    write(fn,'(4A,I4.4,A)') getdir(MODE_CHDIAG),'/',expdir,'/exp.',ichan,'.bin.out'
-    open(1,file=fn,form='unformatted')
-    read(1)vec3ed
-    close(1)
-
-    ! Loop over states
-    do is=bst1,bst1+bstn-1
-      ! Loop over slices
-      do isl=1,n1
-        ! Load 2d state
-        call load_vec2(sliced,isl,ind(isl),.true.)
-
-        ! Multiply by expansion coefficient and phase
-        l = (isl-1) * n23
-        vec3d(l+1:l+n23) = sliced * vec3ed(isl,is) * phs(ind(isl))
-      end do
-
-      ! Open files
-      write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.out'
-      open(1,file=fn,buffered='yes')
-      write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.p.out'
-      open(2,file=fn,buffered='yes')
-      write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.n.out'
-      open(3,file=fn,buffered='yes')
-
-      ! Write data
-      do i=1,nn
-        a = abs(vec3d(i)**2)
-        b = vec3d(i)
-        write(1,'(F25.17)')a
-        write(2,'(F25.17)')max(0d0,b)
-        write(3,'(F25.17)')min(0d0,b)
-      end do
-
-      ! Close files
-      close(1)
-      close(2)
-      close(3)
-
-      ! Check symmetry
-      call symmetryd(vec3d,sym)
-      ! Log state written and symmetry
-      write(LG,'(A,I4.4,F25.17)')'Wrote state ',is,sym
-    end do
-  end subroutine
+  ! !-----------------------------------------------------------------------
+  ! !  Calculates states after channel diagonalization.
+  ! !-----------------------------------------------------------------------
+  ! subroutine calc_chdiag_states
+  !   ! Real branch arrays
+  !   real*8,allocatable :: vec3d(:)     ! Vector in grid
+  !   real*8,allocatable :: vec3ed(:,:)  ! Vector in eibasis
+  !   real*8,allocatable :: sliced(:)    ! Slice in basis
+  !   ! Miscellaneous
+  !   integer,allocatable :: ind(:)      ! Channel indices
+  !   integer,allocatable :: phs(:)      ! Channel phases
+  !   integer nchan                      ! Number of channels
+  !   integer ichan                      ! Channel number
+  !   integer is                         ! 3D state number
+  !   integer ist                        ! 2D state number
+  !   integer isl                        ! Slice number
+  !   real*8  vol12                      ! Volume element for 1 and 2
+  !   real*8  a,b                        ! Wave function value
+  !   real*8  sym                        ! Symmetry
+  !   character(256)fn                   ! File name
+  !   integer i,l
+  !
+  !   ! Get number of channels
+  !   nchan = nprocs
+  !   ! Get my channel number and load recognition
+  !   ichan = myid + 1
+  !   if (load_recognition_chan(ind,phs,ichan)) then
+  !     write(LG,*)'Channel number ',ichan
+  !   else
+  !     write(LG,*)'Nothing to do, exiting'
+  !     return
+  !   end if
+  !
+  !   ! Allocatge arrays
+  !   allocate(vec3d(nn),vec3ed(n1,n1),sliced(n23b))
+  !   ! Load expansion
+  !   write(fn,'(4A,I4.4,A)') getdir(MODE_CHDIAG),'/',expdir,'/exp.',ichan,'.bin.out'
+  !   open(1,file=fn,form='unformatted')
+  !   read(1)vec3ed
+  !   close(1)
+  !
+  !   ! Loop over states
+  !   do is=bst1,bst1+bstn-1
+  !     ! Loop over slices
+  !     do isl=1,n1
+  !       ! Load 2d state
+  !       call load_vec2(sliced,isl,ind(isl),.true.)
+  !
+  !       ! Multiply by expansion coefficient and phase
+  !       l = (isl-1) * n23
+  !       vec3d(l+1:l+n23) = sliced * vec3ed(isl,is) * phs(ind(isl))
+  !     end do
+  !
+  !     ! Open files
+  !     write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.out'
+  !     open(1,file=fn,buffered='yes')
+  !     write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.p.out'
+  !     open(2,file=fn,buffered='yes')
+  !     write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.n.out'
+  !     open(3,file=fn,buffered='yes')
+  !
+  !     ! Write data
+  !     do i=1,nn
+  !       a = abs(vec3d(i)**2)
+  !       b = vec3d(i)
+  !       write(1,'(F25.17)')a
+  !       write(2,'(F25.17)')max(0d0,b)
+  !       write(3,'(F25.17)')min(0d0,b)
+  !     end do
+  !
+  !     ! Close files
+  !     close(1)
+  !     close(2)
+  !     close(3)
+  !
+  !     ! Check symmetry
+  !     call symmetryd(vec3d,sym)
+  !     ! Log state written and symmetry
+  !     write(LG,'(A,I4.4,F25.17)')'Wrote state ',is,sym
+  !   end do
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates FBR basis on the grid.
@@ -2581,7 +2575,7 @@ contains
       do is=1,n2
         i = (is-1) * n3b
         j = (is-1) * n3
-        call gemv(basis,vec2bas(i+1:i+n3b),vec2grd(j+1:j+n3))
+        vec2grd(j+1 : j+n3) = matmul(basis, vec2bas(i+1 : i+n3b))
       end do
     end if
   end subroutine
@@ -2600,7 +2594,7 @@ contains
       do is=1,n2
         i = (is-1) * n3b
         j = (is-1) * n3
-        call gemv(basis,vec2bas(i+1:i+n3b),vec2grd(j+1:j+n3))
+        vec2grd(j+1 : j+n3) = matmul(basis, vec2bas(i+1 : i+n3b))
       end do
     end if
   end subroutine
@@ -2659,9 +2653,9 @@ contains
 
     ! Allocate arrays for expansion coefficients of 3D state
     if (realver) then
-      allocate(vec3ed(msize),sliced(n23b))
+      allocate(vec3ed(msize))
     else
-      allocate(vec3ez(msize),slicez(n23b))
+      allocate(vec3ez(msize))
     end if
 
     ! Load 3D expansion. Just reads the file with coefficients, nothing else.
@@ -2718,7 +2712,7 @@ contains
         end do
 
         ! Convert from eibasis to DVR/FBR basis
-        call gemv(vec2b, vd, sliced)
+        sliced = matmul(vec2b, vd)
         ! Get normalized grid function
         sliced = sliced / sqrt(vol12)
         call trans_bas_grd_d(basis,sliced,vec3d(l+1:l+n23))
@@ -2737,7 +2731,7 @@ contains
         end do
 
         ! Convert from eibasis to DVR/FBR basis
-        call gemv(vec2b, vz, slicez)
+        slicez = matmul(vec2b, vz)
 
         ! Get normalized grid function
         slicez = slicez / sqrt(vol12)

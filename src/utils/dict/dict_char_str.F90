@@ -19,10 +19,10 @@ module dict_char_str_mod
 ! Puts a string to dictionary
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine put_string(dic, key, str)
-    type(dict), intent(inout) :: dic
+    type(dictionary_t), intent(inout) :: dic
     character(*), intent(in) :: key, str
     character(:), allocatable :: key_size
-    type(dict) :: pair
+    type(dictionary_t) :: pair
     integer :: str_len
 
     ! Remove an existing value
@@ -39,12 +39,12 @@ module dict_char_str_mod
 ! Extracts a string from dictionary
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function extract_string(dic, key) result(str)
-    type(dict), intent(inout) :: dic
+    type(dictionary_t), intent(inout) :: dic
     character(*), intent(in) :: key
     character(:), allocatable :: str
     integer :: str_len
     character(:), allocatable :: key_size
-    type(dict) :: pair
+    type(dictionary_t) :: pair
     
     call associate(pair, dic, key)
     key_size = get_key_size_name(key)

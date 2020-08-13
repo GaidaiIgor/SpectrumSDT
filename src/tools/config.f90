@@ -23,7 +23,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function read_config_dict(config_path) result(config)
     character(*), intent(in) :: config_path
-    type(dict) :: config
+    type(dictionary_t) :: config
     integer :: file_unit, iostat, line_num
     character(:), allocatable :: line, key, value, error_msg
     type(string), allocatable :: line_tokens(:)
@@ -60,7 +60,7 @@ contains
 ! Checks if all the *keys* are simultaneously present or absent in *config_dict*
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_setting_group(config_dict, keys)
-    class(dict) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict ! intent(in)
     class(string), intent(in) :: keys(:)
     integer :: i
     integer :: status(size(keys))
@@ -84,7 +84,7 @@ contains
 ! Checks that all setting groups are set/unset
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_setting_groups(config_dict)
-    class(dict) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict ! intent(in)
     ! call check_setting_group(config_dict, string(['basis_root_path', 'basis_J', 'basis_K']))
   end subroutine
 
@@ -95,7 +95,7 @@ contains
 ! 3rd digit - fixed basis
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine populate_mode_settings(mandatory_modes, optional_modes)
-    class(dict), intent(out) :: mandatory_modes, optional_modes
+    class(dictionary_t), intent(out) :: mandatory_modes, optional_modes
 
     call put_string(mandatory_modes, 'mode', '.*')
     call put_string(mandatory_modes, 'rovib_coupling', '^[2-4].*')
@@ -135,7 +135,7 @@ contains
 ! 3rd digit: basis_J
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_mode_id(config_dict) result(mode_id)
-    class(dict) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict ! intent(in)
     character(3) :: mode_id
     character(:), allocatable :: mode, rovib, fix_basis_jk
 
@@ -187,7 +187,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_mandatory_keys(mode_id, config_dict, mandatory_modes)
     character(*), intent(in) :: mode_id
-    class(dict) :: config_dict, mandatory_modes ! intent(in)
+    class(dictionary_t) :: config_dict, mandatory_modes ! intent(in)
     integer :: i
     character(:), allocatable :: key, mode_pattern
     type(string), allocatable :: keys(:)
@@ -211,7 +211,7 @@ contains
 ! Checks if some of the specified keys will be unused
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function check_mode_match(modes, key, mode_id) result(is_match)
-    class(dict) :: modes ! intent(in)
+    class(dictionary_t) :: modes ! intent(in)
     character(*), intent(in) :: key, mode_id
     logical :: is_match
     character(:), allocatable :: mode_pattern
@@ -232,7 +232,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_extra_keys(mode_id, config_dict, mandatory_modes, optional_modes)
     character(*), intent(in) :: mode_id
-    class(dict) :: config_dict, mandatory_modes, optional_modes ! intent(in)
+    class(dictionary_t) :: config_dict, mandatory_modes, optional_modes ! intent(in)
     integer :: i
     character(:), allocatable :: key
     type(string), allocatable :: keys(:)
@@ -252,7 +252,7 @@ contains
 ! Extracts info from *config_dict* and fills out *config* structure
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function process_raw_config(config_dict) result(config)
-    class(dict) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict ! intent(in)
     type(input_params) :: config
     character(:), allocatable :: mode, molecule, K_str, basis_root_path, solver, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, &
       debug_param_1
@@ -333,7 +333,7 @@ contains
   subroutine announce_default(mode_id, key, default_str, default_comment, optional_modes, custom_message)
     character(*), intent(in) :: mode_id, key, default_str, default_comment
     character(:), allocatable :: mode_pattern
-    class(dict) :: optional_modes ! intent(in)
+    class(dictionary_t) :: optional_modes ! intent(in)
     character(*), optional, intent(in) :: custom_message
     type(ftlRegex) :: re
     type(ftlRegexMatch), allocatable :: m(:)
@@ -357,7 +357,7 @@ contains
   subroutine set_defaults(mode_id, params, optional_modes)
     character(*), intent(in) :: mode_id
     class(input_params), intent(inout) :: params
-    class(dict) :: optional_modes ! intent(in)
+    class(dictionary_t) :: optional_modes ! intent(in)
 
     if (params % cap_type == '-1') then
       params % cap_type = 'none'
@@ -434,7 +434,7 @@ contains
   function process_user_settings(settings_path) result(params)
     character(*), intent(in) :: settings_path ! path to the file with settings
     character(:), allocatable :: sequential
-    type(dict) :: raw_config, mandatory_modes, optional_modes
+    type(dictionary_t) :: raw_config, mandatory_modes, optional_modes
     type(input_params) :: params
     integer :: my_id, n_procs, ierr
     character(:), allocatable :: mode_id

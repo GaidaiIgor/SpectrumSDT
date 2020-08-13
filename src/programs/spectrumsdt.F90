@@ -273,7 +273,7 @@ contains
     do i = 1, size(eivals)
       energy = real(eivals(i)) * autown
       gamma = aimag(eivals(i)) * autown * -2
-      write(file_unit, '(I5,2G25.16)') i, energy, gamma
+      write(file_unit, '(I5,2G25.15)') i, energy, gamma
     end do
     close(file_unit)
   end subroutine
@@ -412,12 +412,8 @@ contains
           call calculate_states(params, context)
 
         case(MODE_3DSDT_POST)
-          ! if (params % rovib_coupling == 0) then
-          !   call calc_3dsdt_post(params)
-          ! else
-            call init_caps(params, 0d0)
-            call calculate_state_properties(params, g1, size(g2), get_real_cap())
-          ! end if
+          call init_caps(params, 0d0)
+          call calculate_state_properties(params, g1, size(g2), get_real_cap())
 
         case(MODE_3DSDT_STATES)
           call calc_3dsdt_states
@@ -425,11 +421,11 @@ contains
         case(MODE_CHRECOG)
           call calc_chrecog
 
-        case(MODE_CHDIAG)
-          call calc_chdiag(params)
+        ! case(MODE_CHDIAG)
+        !   call calc_chdiag(params)
 
-        case(MODE_CHDIAG_STATES)
-          call calc_chdiag_states
+        ! case(MODE_CHDIAG_STATES)
+        !   call calc_chdiag_states
 
         case(MODE_BASPROBS)
           call calc_basprobs

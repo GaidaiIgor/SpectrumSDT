@@ -8,7 +8,7 @@ contains
 ! Returns item by given key or default value if the key is not present in the dictionary
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(item_or_default_, TEMPLATE_TYPE_NAME)(dic, key, default) result(res)
-    type(dict), intent(inout) :: dic ! inout because assign does not declare it as in
+    type(dictionary_t), intent(inout) :: dic ! inout because assign does not declare it as in
     character(*), intent(in) :: key
     TEMPLATE_TYPE, intent(in) :: default
     TEMPLATE_TYPE_OUT :: res
@@ -28,7 +28,7 @@ contains
 ! Adds an item if it's not already present
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(add_if_absent_, TEMPLATE_TYPE_NAME)(dic, key, value)
-    type(dict), intent(inout) :: dic
+    type(dictionary_t), intent(inout) :: dic
     character(*), intent(in) :: key
     TEMPLATE_TYPE, intent(in) :: value
     TEMPLATE_TYPE_OUT :: res

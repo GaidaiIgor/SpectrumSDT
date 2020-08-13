@@ -20,12 +20,12 @@ contains
 ! Returns all keys in a given dict
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function key_set(dic) result(set)
-    class(dict), intent(in) :: dic
+    class(dictionary_t), intent(in) :: dic
     type(string), allocatable :: set(:)
     integer :: i
     character(:), allocatable :: key
     type(vector_string) :: vec
-    type(dict) :: pair
+    type(dictionary_t) :: pair
     
     vec = vector_string()
     pair = .first. dic

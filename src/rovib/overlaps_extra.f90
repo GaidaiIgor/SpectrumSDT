@@ -2,15 +2,14 @@ module overlaps_extra_mod
   ! Contains procedures related to calculation of extra overlap terms: asymmetric and coriolis
   use array_1d_mod
   use array_2d_mod
-  use blas95 ! for dot product
+  ! use blas95 ! for dot product
   use formulas_mod
   use input_params_mod
   use k_block_info
   use parallel_utils
   use path_utils
   use rovib_io_mod
-
-  use debug_tools
+  implicit none
 
   private
   public :: calculate_overlaps_extra
@@ -35,7 +34,8 @@ contains
     ! Iterate over theta slices
     do is = 1, size(num_solutions_1d)
       j = (is-1) * n_basis
-      call gemv(exp_coeffs_1d(is) % p, exp_coeffs_2d(i+1 : i+num_solutions_1d(is)), exp_coeffs_2d_prim(j+1 : j+n_basis)) ! matrix vector product
+      ! call gemv(exp_coeffs_1d(is) % p, exp_coeffs_2d(i+1 : i+num_solutions_1d(is)), exp_coeffs_2d_prim(j+1 : j+n_basis)) ! matrix vector product
+      exp_coeffs_2d_prim(j+1 : j+n_basis) = matmul(exp_coeffs_1d(is) % p, exp_coeffs_2d(i+1 : i+num_solutions_1d(is)))
       i = i + num_solutions_1d(is)
     end do
   end function
@@ -105,10 +105,10 @@ contains
           exp_coeffs_2d_prim_row = expansion_1D_to_primitive(num_solutions_1d, exp_coeffs_1d, exp_coeffs_2d(:, ir))
           ! Compute partial sums
           do l = 1, size(theta_grid)
-            partial_sum(l) = dot(exp_coeffs_2d_prim_row((l - 1)*n_basis + 1 : l*n_basis), exp_coeffs_2d_prim_col((l - 1)*n_basis + 1 : l*n_basis))
+            partial_sum(l) = dot_product(exp_coeffs_2d_prim_row((l - 1)*n_basis + 1 : l*n_basis), exp_coeffs_2d_prim_col((l - 1)*n_basis + 1 : l*n_basis))
           end do
-          sym_block_J(ir, ic) = dot(sym_factors_J, partial_sum)
-          sym_block_K(ir, ic) = dot(sym_factors_K, partial_sum)
+          sym_block_J(ir, ic) = dot_product(sym_factors_J, partial_sum)
+          sym_block_K(ir, ic) = dot_product(sym_factors_K, partial_sum)
         end do
       end do
 
@@ -215,9 +215,9 @@ contains
             first_m_col = (l - 1)*n_basis + 1 + m_shift_col
             last_m_col = l*n_basis - 1 + m_shift_col
             m_product = exp_coeffs_2d_prim_row(first_m_row : last_m_row) * exp_coeffs_2d_prim_col(first_m_col : last_m_col)
-            partial_sum(l) = dot(cor_factors_m, m_product)
+            partial_sum(l) = dot_product(cor_factors_m, m_product)
           end do
-          cor_block(ir, ic) = dot(cor_factors_b, partial_sum) * 4d0 ! Apply coriolis operator
+          cor_block(ir, ic) = dot_product(cor_factors_b, partial_sum) * 4d0 ! Apply coriolis operator
         end do
       end do
 
@@ -302,9 +302,9 @@ contains
           exp_coeffs_2d_prim_row = expansion_1D_to_primitive(num_solutions_1d_row, exp_coeffs_1d_row, exp_coeffs_2d_row(:, ir))
           ! Compute partial sums
           do l = 1, size(theta_grid)
-            partial_sum(l) = dot(exp_coeffs_2d_prim_row((l - 1)*n_basis + 1 : l*n_basis), exp_coeffs_2d_prim_col((l - 1)*n_basis + 1 : l*n_basis))
+            partial_sum(l) = dot_product(exp_coeffs_2d_prim_row((l - 1)*n_basis + 1 : l*n_basis), exp_coeffs_2d_prim_col((l - 1)*n_basis + 1 : l*n_basis))
           end do
-          asym_block(ir, ic) = dot(asym_factors, partial_sum) / 2d0 ! Apply asym operator
+          asym_block(ir, ic) = dot_product(asym_factors, partial_sum) / 2d0 ! Apply asym operator
         end do
       end do
 

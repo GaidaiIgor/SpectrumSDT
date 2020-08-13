@@ -378,7 +378,7 @@ contains
     ! write(file_unit, '(' // num2str(cols_total) // 'A' // num2str(col_width) // ')', advance = 'no') titles(:)
     write(file_unit, *)
     do k = 1, size(region_probs, 1)
-      write(file_unit, '(' // num2str(cols_total) // 'G' // num2str(col_width) // '.16)', advance = 'no') energies(k), gammas(k, :), region_probs(k, :), K_dists(k, :)
+      write(file_unit, '(' // num2str(cols_total) // 'G' // num2str(col_width) // '.15)', advance = 'no') energies(k), gammas(k, :), region_probs(k, :), K_dists(k, :)
       write(file_unit, *)
     end do
     close(file_unit)

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 enable_language(Fortran)
 
-# Define sets of source files.
+# Source file dependencies (do I need to do it manually like that?)
 set(general_utils src/utils/general/general.F90)
 set(constants src/utils/constants.f90)
 set(formulas ${general_utils} ${constants} src/tools/formulas.f90)
@@ -57,10 +57,10 @@ set(scalapack ${algorithms} ${index_conversion} src/tools/eicalc/scalapack.f90)
 set(pesgeneral ${constants} ${formulas} ${input_params} ${general_utils} ${general_vars} src/tools/pes/pesgeneral.f90)
 set(pesinterface ${constants} ${input_params} ${index_conversion} ${parallel_utils} ${pesgeneral} src/tools/pes/pesinterface.f90)
 
-set(dawes_dynamic_parameters external/pes/dawes/src/dynamic_parameters_3D.f90)
-set(dawes_linkables external/pes/dawes/src/2D-spline.f external/pes/dawes/src/VLGRoo.f external/pes/dawes/src/CJe.f external/pes/dawes/src/C6Js.f external/pes/dawes/src/cleb.f external/pes/dawes/src/Celr.f external/pes/dawes/src/C6r.f external/pes/dawes/src/faclog.f external/pes/dawes/src/index.f90)
-set(dawes_ssplin ${path_utils} external/pes/dawes/src/splin.f90)
-set(dawes ${dawes_linkables} ${path_utils} ${dawes_ssplin} ${dawes_dynamic_parameters} external/pes/dawes/src/PES_3D_subroutine_ozone_L3.f90)
+set(dawes_dynamic_parameters PES/dawes/src/dynamic_parameters_3D.f90)
+set(dawes_linkables PES/dawes/src/2D-spline.f PES/dawes/src/VLGRoo.f PES/dawes/src/CJe.f PES/dawes/src/C6Js.f PES/dawes/src/cleb.f PES/dawes/src/Celr.f PES/dawes/src/C6r.f PES/dawes/src/faclog.f PES/dawes/src/index.f90)
+set(dawes_ssplin ${path_utils} PES/dawes/src/splin.f90)
+set(dawes ${dawes_linkables} ${path_utils} ${dawes_ssplin} ${dawes_dynamic_parameters} PES/dawes/src/PES_3D_subroutine_ozone_L3.f90)
 
 set(block_borders src/rovib/block_borders.f90)
 set(matrix_block_info ${block_borders} ${general_utils} src/rovib/matrix_block_info.f90)
@@ -72,41 +72,21 @@ set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_bl
 set(parpack ${algorithms} ${index_conversion} ${matmul_operator} ${parallel_utils} src/tools/eicalc/parpack.f90)
 set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${rovib_io} ${rovib_utils} ${input_params} ${general_utils} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${debug_tools} src/tools/eicalc/slepc_solver.F90)
-set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${mkl} ${parabola} ${parpack} ${pesgeneral} ${rovib_io} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
+set(lapack_interface ${general_utils} src/interface/lapack.f90)
+set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${lapack_interface} ${matmul_operator} ${mkl} ${parabola} ${parpack} ${pesgeneral} ${rovib_io} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
 set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
 # Specify where to look for external module files (-I option)
-
-# original
-# include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/debug_64/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64/include)
-
-# mkl
-include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc/include external/petsc/debug_64_mkl/include external/slepc-3.13.1/include external/slepc-3.13.1/debug_64_mkl/include)
-
-# opt
-# include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/petsc-3.13.0/include external/petsc-3.13.0/opt_64/include external/slepc-3.13.1/include external/slepc-3.13.1/opt_64/include)
-
-# cray
-# include_directories(external/extras/mklmods external/include external/fdict/include src/include external/ftl_lib/include/ftl external/slepc-3.12.2/include external/slepc-3.12.2/installed-arch-linux-c-opt-complex/include)
+include_directories(include src/include extra/mklmods libs/fdict/build/include libs/ftl/build/include/ftl libs/petsc/include libs/petsc/debug_64_mkl/include libs/slepc/include libs/slepc/debug_64_mkl/include)
 
 # Specify where to look for libraries (-L option)
-# original
-# link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/debug_64/lib external/slepc-3.13.1/debug_64/lib)
-
-# mkl
-link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc/debug_64_mkl/lib external/slepc-3.13.1/debug_64_mkl/lib)
-
-# opt
-# link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/petsc-3.13.0/opt_64/lib external/slepc-3.13.1/opt_64/lib)
-
-# cray
-# link_directories(external/lib external/fdict/lib external/ftl_lib/lib external/slepc-3.12.2/installed-arch-linux-c-opt-complex/lib)
+link_directories(libs/arpack-ng/build libs/fdict/build/lib libs/ftl/build/lib libs/petsc/debug_64_mkl/lib libs/slepc/debug_64_mkl/lib)
 
 # Add common compile flag for all sources. -u forces implicitnone for all functions.
 add_compile_options(-assume bscc -g -traceback -u)
 # Add common linker flags for all targets
-# set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
+set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
 
 add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
 target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
