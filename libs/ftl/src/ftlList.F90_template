@@ -1,0 +1,770 @@
+! Copyright (c) 2016, 2017  Robert Rüger
+!
+! This file is part of of the Fortran Template Library.
+!
+! The Fortran Template Library is free software: you can redistribute it and/or
+! modify it under the terms of the GNU Lesser General Public License as
+! published by the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+!
+! The Fortran Template Library is distributed in the hope that it will be
+! useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+! General Public License for more details.
+!
+! You should have received a copy of the GNU Lesser General Public License along
+! with the Fortran Template Library.  If not, see <http://www.gnu.org/licenses/>.
+
+
+#define FTL_CONTAINER ftlList
+#define FTL_CONTAINER_PROVIDES_BIDIRECTIONAL_ITERATOR
+
+#ifdef FTL_INSTANTIATE_TEMPLATE
+
+#if !defined(FTL_TEMPLATE_TYPE)
+#error FTL_TEMPLATE_TYPE must be defined when instantiating ftlList
+#endif
+#if !defined(FTL_TEMPLATE_TYPE_NAME)
+#error FTL_TEMPLATE_TYPE_NAME must be defined when instantiating ftlList
+#endif
+
+#include "ftlMacros.inc"
+
+#ifdef FTL_TEMPLATE_TYPE_IS_DERIVED
+#define FTL_TEMPLATE_TYPE_WRAP type(FTL_TEMPLATE_TYPE)
+#else
+#define FTL_TEMPLATE_TYPE_WRAP FTL_TEMPLATE_TYPE
+#endif
+
+
+module CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Module)
+
+#ifdef FTL_TEMPLATE_TYPE_MODULE
+   use FTL_TEMPLATE_TYPE_MODULE
+#endif
+
+   implicit none
+   private
+
+
+! ====== Type of the ftlList container itself ====================================================================================
+
+   type :: ListNode
+      class(ListNode), pointer :: prev => null()
+      class(ListNode), pointer :: next => null()
+   end type
+
+   type, extends(ListNode) :: DataNode
+      FTL_TEMPLATE_TYPE_WRAP :: data
+   end type
+
+
+   type, public :: CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)
+      private
+
+      integer                                 :: psize = 0
+      type(ListNode)                          :: sentinel
+      FTL_TEMPLATE_TYPE_WRAP, pointer, public :: front => null()
+      FTL_TEMPLATE_TYPE_WRAP, pointer, public :: back => null()
+
+   contains
+      private
+
+      procedure         :: NewDefault
+      procedure         :: NewCopyOther
+      procedure         :: NewFill
+      procedure         :: NewFromArray
+      procedure         :: NewFromIteratorPair
+      generic  , public :: New => NewDefault, NewCopyOther, NewFill, NewFromArray, NewFromIteratorPair
+
+      procedure, public :: Delete
+      final             :: Finalizer
+
+      procedure, public :: Begin => BeginList
+      procedure, public :: End => EndList
+
+      procedure         :: SizeList
+      generic  , public :: Size => SizeList
+
+      procedure, public :: Empty
+
+      procedure         :: AssignOther
+      procedure         :: AssignArray
+      generic  , public :: assignment(=) => AssignOther, AssignArray
+
+      procedure         :: InsertSingle
+      procedure         :: InsertFill
+      procedure         :: InsertArray
+      procedure         :: InsertIteratorPair
+      generic  , public :: Insert => InsertSingle, InsertFill, InsertArray, InsertIteratorPair
+
+      procedure         :: EraseSingle
+      procedure         :: EraseIteratorPair
+      generic  , public :: Erase => EraseSingle, EraseIteratorPair
+
+      procedure, public :: PushFront
+      procedure, public :: PopFront
+      procedure, public :: PushBack
+      procedure, public :: PopBack
+
+      procedure, public :: Resize
+
+      procedure, public :: Clear
+
+      procedure         :: FixValuePtrs
+
+   end type
+
+   public :: Begin
+   interface Begin
+      module procedure BeginList
+   end interface
+
+   public :: End
+   interface End
+      module procedure EndList
+   end interface
+
+   public :: Size
+   interface Size
+      module procedure SizeList
+   end interface
+
+   public :: ftlSwap
+   interface ftlSwap
+      module procedure SwapList
+   end interface
+
+   public :: ftlMove
+   interface ftlMove
+      module procedure ftlMoveList
+   end interface
+
+
+! ====== Type of an iterator over a ftlList container ============================================================================
+
+   type, public :: CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)
+      private
+
+      class(ListNode)       , pointer         :: node => null()
+      FTL_TEMPLATE_TYPE_WRAP, pointer, public :: value => null()
+
+   contains
+      private
+
+      procedure         :: NewItDefault
+      procedure         :: NewItCopyOther
+      generic  , public :: New => NewItDefault, NewItCopyOther
+
+      procedure, public :: Inc
+      procedure, public :: Dec
+
+   end type
+
+   public :: operator(==)
+   interface operator(==)
+      module procedure EqualOther
+   end interface
+
+   public :: operator(/=)
+   interface operator(/=)
+      module procedure UnequalOther
+   end interface
+
+
+contains
+
+
+
+! ====== Implementation of ftlList methods =======================================================================================
+
+
+   subroutine NewDefault(self)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout), target :: self
+
+      call self%Delete()
+
+      self%sentinel%next => self%sentinel
+      self%sentinel%prev => self%sentinel
+
+   end subroutine
+   !
+   impure elemental subroutine NewCopyOther(self, other)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+       type(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(in)    :: other
+
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)) :: it
+
+      call self%New()
+
+      it = other%Begin()
+      do while (it /= other%End())
+         call self%PushBack(it%value)
+         call it%Inc()
+      enddo
+
+   end subroutine
+   !
+   subroutine NewFill(self, n, val)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout)        :: self
+      integer                                   , intent(in)           :: n
+      FTL_TEMPLATE_TYPE_WRAP                    , intent(in), optional :: val
+
+      integer :: i
+
+      call self%New()
+
+      if (present(val)) then
+         do i = 1, n
+            call self%PushBack(val)
+         enddo
+      else
+         stop 'TODO: Implement ftlList%NewFill without val'
+      endif
+
+   end subroutine
+   !
+   subroutine NewFromArray(self, array)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+      FTL_TEMPLATE_TYPE_WRAP                    , intent(in)    :: array(:)
+
+      integer :: i
+
+      call self%New()
+
+      do i = 1, size(array)
+         call self%PushBack(array(i))
+      enddo
+
+   end subroutine
+   !
+   subroutine NewFromIteratorPair(self, first, last)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME))         , intent(inout) :: self
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in)    :: first
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in)    :: last
+
+      call self%New()
+      call self%Insert(self%Begin(), first, last)
+
+   end subroutine
+
+
+
+   impure elemental subroutine Delete(self)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout), target :: self
+
+      class(ListNode), pointer :: walker, deletor
+
+      walker => self%sentinel%next
+      do while (associated(walker) .and. .not.associated(walker,self%sentinel))
+         deletor => walker
+         walker => walker%next
+         deallocate(deletor)
+      enddo
+
+      self%psize = 0
+      nullify(self%sentinel%prev)
+      nullify(self%sentinel%next)
+      nullify(self%front)
+      nullify(self%back)
+
+   end subroutine
+   !
+   impure elemental subroutine Finalizer(self)
+      type(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+      call self%Delete()
+   end subroutine
+
+
+
+   ! =============> Iterators:
+
+
+
+   type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)) function BeginList(self) result(Begin)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(in), target :: self
+
+      Begin%node => self%sentinel%next
+      select type (node => Begin%node)
+      type is (DataNode)
+         Begin%value => node%data
+      end select
+
+   end function
+
+
+
+   type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)) function EndList(self) result(End)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(in), target :: self
+
+      End%node => self%sentinel
+
+   end function
+
+
+
+   ! =============> Capacity:
+
+
+
+   pure integer function SizeList(self) result(Size)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(in) :: self
+
+      Size = self%psize
+
+   end function
+
+
+   pure logical function Empty(self)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(in) :: self
+
+      Empty = (self%psize == 0)
+
+   end function
+
+
+
+   ! =============> Modifiers:
+
+
+
+   ! TODO: implement using existing list nodes instead of copy construction
+   !
+   impure elemental subroutine AssignOther(self, other)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+       type(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(in)    :: other
+
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)) :: it
+      integer :: i
+
+      call self%New()
+      i = 1
+      it = other%Begin()
+      do while (i <= other%Size())
+         call self%PushBack(it%value)
+         i = i + 1
+         call it%Inc()
+      enddo
+
+   end subroutine
+   !
+   subroutine AssignArray(self, array)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+      FTL_TEMPLATE_TYPE_WRAP                    , intent(in)    :: array(:)
+
+      call self%New(array)
+
+   end subroutine
+
+
+
+   subroutine InsertSingle(self, position, val)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME))         , intent(inout) :: self
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator))                :: position
+      FTL_TEMPLATE_TYPE_WRAP                             , intent(in)    :: val
+
+      call self%InsertFill(position, 1, val)
+
+   end subroutine
+   !
+   subroutine InsertFill(self, position, n, val)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME))         , intent(inout) :: self
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator))                :: position
+      integer                                            , intent(in)    :: n
+      FTL_TEMPLATE_TYPE_WRAP                             , intent(in)    :: val
+
+      integer :: i
+
+      do i = 1, n
+         call InsertNodeBefore(position%node, val)
+      enddo
+      self%psize = self%psize + n
+      call self%FixValuePtrs()
+
+   end subroutine
+   !
+   subroutine InsertArray(self, position, array)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME))         , intent(inout) :: self
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator))                :: position
+      FTL_TEMPLATE_TYPE_WRAP                             , intent(in)    :: array(:)
+
+      integer :: i
+
+      do i = 1, size(array)
+         call InsertNodeBefore(position%node, array(i))
+      enddo
+      self%psize = self%psize + size(array)
+      call self%FixValuePtrs()
+
+   end subroutine
+   !
+   subroutine InsertIteratorPair(self, position, first, last)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME))         , intent(inout) :: self
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator))                :: position
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in)    :: first
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in)    :: last
+
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)) :: it
+
+      it = first
+      do while (it /= last)
+         call InsertNodeBefore(position%node, it%value)
+         self%psize = self%psize + 1
+         call it%Inc()
+      enddo
+      call self%FixValuePtrs()
+
+   end subroutine
+
+
+
+   subroutine PushFront(self, val)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout), target :: self
+      FTL_TEMPLATE_TYPE_WRAP                    , intent(in)            :: val
+
+      call InsertNodeBefore(self%sentinel%next, val)
+      self%psize = self%psize + 1
+      call self%FixValuePtrs()
+
+   end subroutine
+
+
+
+   FTL_TEMPLATE_TYPE_WRAP function PopFront(self)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout), target :: self
+
+      class(ListNode), pointer :: oldfirst
+      oldfirst => self%sentinel%next
+
+#ifdef FTL_TEMPLATE_TYPE_PROVIDES_FTLMOVE
+      call ftlMove(self%front, PopFront)
+#else
+      PopFront = self%front
+#endif
+      self%psize = self%psize - 1
+      call UnlinkNode(oldfirst)
+      deallocate(oldfirst)
+      call self%FixValuePtrs()
+
+   end function
+
+
+
+   subroutine PushBack(self, val)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+      FTL_TEMPLATE_TYPE_WRAP                    , intent(in)    :: val
+
+      call InsertNodeAfter(self%sentinel%prev, val)
+      self%psize = self%psize + 1
+      call self%FixValuePtrs()
+
+   end subroutine
+
+
+
+   FTL_TEMPLATE_TYPE_WRAP function PopBack(self)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout), target :: self
+
+      class(ListNode), pointer :: oldlast
+      oldlast => self%sentinel%prev
+
+#ifdef FTL_TEMPLATE_TYPE_PROVIDES_FTLMOVE
+      call ftlMove(self%back, PopBack)
+#else
+      PopBack = self%back
+#endif
+      self%psize = self%psize - 1
+      call UnlinkNode(oldlast)
+      deallocate(oldlast)
+      call self%FixValuePtrs()
+
+   end function
+
+
+
+   subroutine EraseSingle(self, position)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME))         , intent(inout) :: self
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator))                :: position
+
+      call UnlinkNode(position%node)
+      deallocate(position%node)
+      self%psize = self%psize - 1
+      call self%FixValuePtrs()
+
+   end subroutine
+   !
+   subroutine EraseIteratorPair(self, first, last)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME))         , intent(inout) :: self
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator))                :: first
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in)    :: last
+
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)) :: deletor
+      associate(walker => first)
+
+      do while (walker /= last)
+         deletor = walker
+         call walker%Inc()
+         call self%EraseSingle(deletor)
+      enddo
+
+      end associate
+   end subroutine
+
+
+
+   subroutine SwapList(self, other)
+      type(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout), target :: self
+      type(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout), target :: other
+
+      integer :: tmpSize
+      type(ListNode) :: tmpNode
+
+      ! fix pointers from data nodes to the sentinels
+
+      self%sentinel%prev%next => other%sentinel
+      self%sentinel%next%prev => other%sentinel
+
+      other%sentinel%prev%next => self%sentinel
+      other%sentinel%next%prev => self%sentinel
+
+      ! exchange sentinels themselves
+
+      tmpNode = self%sentinel
+      tmpSize = self%psize
+
+      self%sentinel = other%sentinel
+      self%psize    = other%psize
+
+      other%sentinel = tmpNode
+      other%psize    = tmpSize
+
+      ! fix front/back pointers for both lists
+
+      call self%FixValuePtrs()
+      call other%FixValuePtrs()
+
+   end subroutine
+
+
+
+   subroutine Resize(self, n, val)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout)           :: self
+      integer                                   , intent(in)              :: n
+      FTL_TEMPLATE_TYPE_WRAP                    , intent(in)   , optional :: val
+
+      type(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)) :: it
+      integer :: i
+
+      if (n == self%psize) then
+         return
+      else if (n < self%psize) then
+         it = self%Begin()
+         do i = 2, n
+            call it%Inc()
+         enddo
+         call it%Inc()
+         call self%Erase(it,self%End())
+      else ! n > self%psize
+         do i = 1, n - self%psize
+            call InsertNodeAfter(self%sentinel%prev, val)
+         enddo
+      endif
+
+      self%psize = n
+      call self%FixValuePtrs()
+
+   end subroutine
+
+
+
+   subroutine Clear(self)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+
+      call self%New()
+
+   end subroutine
+
+
+
+   ! =============> FTL methods:
+
+
+
+   subroutine ftlMoveList(src, dest)
+      type(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout)         :: src
+      type(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(out)  , target :: dest
+
+      dest%psize = src%psize
+      dest%sentinel = src%sentinel
+      if (associated(dest%sentinel%next)) dest%sentinel%next%prev => dest%sentinel
+      if (associated(dest%sentinel%prev)) dest%sentinel%prev%next => dest%sentinel
+      call dest%FixValuePtrs()
+
+      nullify(src%sentinel%prev)
+      nullify(src%sentinel%next)
+      nullify(src%front)
+      nullify(src%back)
+      src%psize = 0
+
+   end subroutine
+
+
+
+   ! =============> Internal methods:
+
+
+
+   subroutine InsertNodeBefore(beforenode, val)
+      class(ListNode), pointer, intent(inout)           :: beforenode
+      FTL_TEMPLATE_TYPE_WRAP  , intent(in)   , optional :: val
+
+      class(ListNode), pointer :: oldprev, newprev
+
+      oldprev => beforenode%prev
+      allocate(DataNode::beforenode%prev)
+      newprev => beforenode%prev
+      newprev%next => beforenode
+      newprev%prev => oldprev
+      oldprev%next => newprev
+      if (present(val)) then
+         select type (newprev)
+         type is (DataNode) ! always true
+            newprev%data = val
+         end select
+      endif
+
+   end subroutine
+
+
+
+   subroutine InsertNodeAfter(afternode, val)
+      class(ListNode), pointer, intent(inout)           :: afternode
+      FTL_TEMPLATE_TYPE_WRAP  , intent(in)   , optional :: val
+
+      class(ListNode), pointer :: oldnext, newnext
+
+      oldnext => afternode%next
+      allocate(DataNode::afternode%next)
+      newnext => afternode%next
+      newnext%prev => afternode
+      newnext%next => oldnext
+      oldnext%prev => newnext
+      if (present(val)) then
+         select type (newnext)
+         type is (DataNode) ! always true
+            newnext%data = val
+         end select
+      endif
+
+   end subroutine
+
+
+
+   subroutine UnlinkNode(node)
+      class(ListNode), intent(inout) :: node
+
+      node%next%prev => node%prev
+      node%prev%next => node%next
+
+   end subroutine
+
+
+
+   subroutine FixValuePtrs(self)
+      class(CAT(ftlList,FTL_TEMPLATE_TYPE_NAME)), intent(inout) :: self
+
+      if (self%psize == 0) then
+         nullify(self%front,self%back)
+      else
+         select type (first => self%sentinel%next)
+         type is (DataNode)
+            self%front => first%data
+         end select
+         select type (last => self%sentinel%prev)
+         type is (DataNode)
+            self%back => last%data
+         end select
+      endif
+
+   end subroutine
+
+
+
+
+! ====== Implementation of ftlListIterator methods ===============================================================================
+
+
+
+   subroutine NewItDefault(self)
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(inout) :: self
+
+      nullify(self%node)
+      nullify(self%value)
+
+   end subroutine
+   !
+   subroutine NewItCopyOther(self, other)
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(out) :: self
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in)  :: other
+
+      self%node => other%node
+      select type (node => self%node)
+      type is (DataNode)
+         self%value => node%data
+      end select
+
+   end subroutine
+
+
+
+   ! =============> Arithmetic operations:
+
+
+
+   subroutine Inc(self)
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(inout) :: self
+
+      self%node => self%node%next
+      select type (node => self%node)
+      type is (DataNode)
+         self%value => node%data
+      end select
+
+   end subroutine
+   !
+   subroutine Dec(self)
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(inout) :: self
+
+      self%node => self%node%prev
+      select type (node => self%node)
+      type is (DataNode)
+         self%value => node%data
+      end select
+
+   end subroutine
+
+
+
+   ! =============> Logical operations:
+
+
+
+   pure logical function EqualOther(self, other)
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in) :: self
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in) :: other
+
+      EqualOther = associated(self%node,other%node)
+
+   end function
+   !
+   pure logical function UnequalOther(self, other)
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in) :: self
+      class(CAT3(ftlList,FTL_TEMPLATE_TYPE_NAME,Iterator)), intent(in) :: other
+
+      UnequalOther = .not.associated(self%node,other%node)
+
+   end function
+
+
+end module
+#endif
