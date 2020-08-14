@@ -1,6 +1,6 @@
 module general_utils
   use iso_fortran_env
-  use ifcore
+  ! use ifcore
 
   implicit none
 
