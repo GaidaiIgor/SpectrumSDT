@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
+project(SpectrumSDT)
 enable_language(Fortran)
 
 # Source file dependencies (do I need to do it manually like that?)
