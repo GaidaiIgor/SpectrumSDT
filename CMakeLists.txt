@@ -78,10 +78,10 @@ set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
 # Specify where to look for external module files (-I option)
-include_directories(include src/include extra/mklmods libs/fdict/build/include libs/ftl/build/include/ftl libs/petsc/include libs/petsc/debug_64_mkl/include libs/slepc/include libs/slepc/debug_64_mkl/include)
+include_directories(include src/include extra/mklmods libs/fdict/build/include libs/ftl/build/include/ftl libs/petsc/include libs/petsc/debug_64/include libs/slepc/include libs/slepc/debug_64/include)
 
 # Specify where to look for libraries (-L option)
-link_directories(libs/arpack-ng/build libs/fdict/build/lib libs/ftl/build/lib libs/petsc/debug_64_mkl/lib libs/slepc/debug_64_mkl/lib)
+link_directories(libs/arpack-ng/build libs/fdict/build/lib libs/ftl/build/lib libs/petsc/debug_64/lib libs/slepc/debug_64/lib)
 
 # Add common compile flag for all sources. -u forces implicitnone for all functions.
 add_compile_options(-assume bscc -g -traceback -u)
