@@ -7,11 +7,11 @@ module general_utils
   interface arg_or_default
     module procedure :: arg_or_default_integer, arg_or_default_real, arg_or_default_real_array, arg_or_default_char_str
   end interface
-  
+
   interface swap
     module procedure :: swap_integer, swap_real, swap_char_str
   end interface
-  
+
   interface num2str
     module procedure :: num2str_integer, num2str_real
   end interface
@@ -73,12 +73,12 @@ module general_utils
     if (compare_reals(npointsf - npoints, 1.d0) == 0) then
       npoints = npoints + 1
     end if
-    
+
     ! +1 because of an extra point at the beginning of interval
     allocate(grid(npoints + 1))
     grid = [(start + i * step, i = 0,npoints)]
   end function
-  
+
 !-----------------------------------------------------------------------
 ! Generates equally spaced grid of points in the interval [start, end]
 !-----------------------------------------------------------------------
@@ -134,7 +134,7 @@ module general_utils
       stop
     end if
   end subroutine
-  
+
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts integer to string
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -144,12 +144,12 @@ module general_utils
     character(:), allocatable :: str
     character(256) :: buffer
     character(:), allocatable :: format_act
-    
+
     format_act = arg_or_default(format, '(I0)')
     write(buffer, format_act) num
     str = trim(buffer)
   end function
-  
+
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts real*8 to string
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -159,12 +159,12 @@ module general_utils
     character(:), allocatable :: str
     character(256) :: buffer
     character(:), allocatable :: format_act
-    
+
     format_act = arg_or_default(format, '(G10.2)')
     write(buffer, format_act) num
     str = trim(adjustl(buffer))
   end function
-  
+
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts string to integer
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -173,7 +173,7 @@ module general_utils
     integer :: int
     read(str, *) int
   end function
-  
+
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts string to real*8
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -258,7 +258,7 @@ module general_utils
     logical :: res
     res = .not. (a .and. .not. b)
   end function
-  
+
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Evaluates delta Kronecker function
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -276,7 +276,7 @@ module general_utils
     integer, intent(out) :: row, col
     integer, allocatable :: max_loc_col(:) ! row of maximum in each column
     real*8, allocatable :: max_val_col(:) ! value of maximum in each column
-    
+
     max_loc_col = maxloc(matrix, 2)
     max_val_col = maxval(matrix, 2)
     col = maxloc(max_val_col, 1)
