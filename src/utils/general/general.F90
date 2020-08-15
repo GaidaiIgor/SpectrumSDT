@@ -130,7 +130,8 @@ module general_utils
     character(*) :: error_message
 
     if (.not. logical_statemenet) then
-      call TRACEBACKQQ(error_message)
+      print *, error_message
+      call abort()
       stop
     end if
   end subroutine
