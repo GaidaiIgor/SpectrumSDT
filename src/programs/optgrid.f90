@@ -382,7 +382,7 @@ contains
     use general
     implicit none
     real*8 rho,tet
-    gridextra = - 2/(mu*rho**2)*(sin(2*tet)**-2+0.0625d0)
+    gridextra = - 2/(mu*rho**2)*(sin(2*tet)**(-2)+0.0625d0)
   end function
 
   !-----------------------------------------------------------------------

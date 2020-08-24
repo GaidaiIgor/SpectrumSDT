@@ -73,7 +73,7 @@ contains
       ! Maximum number of functions and maximum number of values to be stored.
       REAL*8 x1,x2,vstart(nvar),xx(NSTPMX),y(NMAX,NSTPMX),result(nvar)
       EXTERNAL derivs
-      COMMON /path/ xx,y ! Storage of results.
+      ! COMMON /path/ xx,y ! Storage of results.
       INTEGER i,k
       REAL*8 h,x,dv(NMAX),v(NMAX)
       do i=1,nvar ! Load starting values.
@@ -86,7 +86,7 @@ contains
       do k=1,nstep ! Take nstep steps.
         call derivs(x,v,dv)
         call rk4(v,dv,nvar,x,h,v,derivs)
-        if (x+h.eq.x) pause 'stepsize not significant in rkdumb'
+        if (x+h.eq.x) stop 'stepsize not significant in rkdumb'
         x=x+h
         xx(k+1)=x ! Store intermediate steps.
         do i=1,nvar
@@ -161,7 +161,7 @@ contains
          htemp=SAFETY*h*(errmax**PSHRNK)
          h=sign(max(abs(htemp),0.1d0*abs(h)),h)
          xnew=x+h
-         if(xnew.eq.x)pause 'stepsize underflow in rkqs'  
+         if(xnew.eq.x) stop 'stepsize underflow in rkqs'  
          goto 1
        else
          if(errmax.gt.ERRCON)then
@@ -251,7 +251,7 @@ contains
 ! about how often an intermediate value is to be stored.
        INTEGER i,kmax,kount,nstp
        REAL*8 dxsav,h,hdid,hnext,x,xsav,dydx(NMAX),xp(KMAXX),y(NMAX),yp(NMAX,KMAXX),yscal(NMAX)
-       COMMON /path/ kmax,kount,dxsav,xp,yp 
+       ! COMMON /path/ kmax,kount,dxsav,xp,yp
        ! User storage for intermediate results. Preset dxsav and kmax.
        kmax=0
        dxsav=1.d99
@@ -303,10 +303,10 @@ contains
            endif
            return ! Normal exit.
          endif
-         if(abs(hnext).lt.hmin) pause 'stepsize smaller than minimum in odeint'  
+         if(abs(hnext).lt.hmin) stop 'stepsize smaller than minimum in odeint'  
          h=hnext
  16    continue
-       pause 'too many steps in odeint'  
+       stop 'too many steps in odeint'  
        return
        END
 end module
