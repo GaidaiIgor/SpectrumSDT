@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.5)
+
+set(CMAKE_Fortran_COMPILER mpifort)
 project(SpectrumSDT)
 enable_language(Fortran)
+
+# Specify where to look for external module files (-I option)
+include_directories(include src/include extra/mklmods libs/fdict/build/include libs/ftl/build/include/ftl libs/petsc/include libs/petsc/debug_64/include libs/slepc/include libs/slepc/debug_64/include)
+# Specify where to look for libraries (-L option)
+link_directories(libs/arpack-ng/build libs/fdict/build/lib libs/ftl/build/lib libs/petsc/debug_64/lib libs/slepc/debug_64/lib)
+# Add common compile flag for all sources. -u forces implicitnone for all functions.
+add_compile_options(-g -fbacktrace -fimplicit-none -ffree-line-length-0 -fbackslash)
 
 # Source file dependencies (do I need to do it manually like that?)
 set(general_utils src/utils/general/general.F90)
@@ -78,17 +87,6 @@ set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${
 set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
-# Specify where to look for external module files (-I option)
-include_directories(include src/include extra/mklmods libs/fdict/build/include libs/ftl/build/include/ftl libs/petsc/include libs/petsc/debug_64/include libs/slepc/include libs/slepc/debug_64/include)
-
-# Specify where to look for libraries (-L option)
-link_directories(libs/arpack-ng/build libs/fdict/build/lib libs/ftl/build/lib libs/petsc/debug_64/lib libs/slepc/debug_64/lib)
-
-# Add common compile flag for all sources. -u forces implicitnone for all functions.
-add_compile_options(-assume bscc -g -traceback -u)
-# Add common linker flags for all targets
-set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
-
 add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
 target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
@@ -97,12 +95,3 @@ target_link_libraries(pesprint fdict ftl pcreposix parpack arpack mkl_blas95_lp6
 
 add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${parpack} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)
 target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
-
-add_executable(kinetics ${pesgeneral} src/programs/kinetics.f90)
-# target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
-
-# add_executable(dawes_de ${utils} ${tools} ${dawes} src/programs/misc/dawes_de.f90)
-# target_link_libraries(dawes_de parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
-
-add_executable(zpeO2 ${config} ${constants} ${general_vars} ${input_params} ${mkl} ${pesinterface} ${dawes} src/programs/zpeO2.f)
-target_link_libraries(zpeO2 parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix)
