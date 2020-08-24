@@ -1,28 +1,28 @@
 #include "funcs.macro"
 use general_utils
 
-interface CONCAT2(vector_, TEMPLATE_TYPE_NAME)
-  module procedure :: CONCAT2(new_vector_, TEMPLATE_TYPE_NAME)
+interface CONCAT2(vector_,TEMPLATE_TYPE_NAME)
+  module procedure :: CONCAT2(new_vector_,TEMPLATE_TYPE_NAME)
 end interface
 
-type CONCAT2(vector_, TEMPLATE_TYPE_NAME)
+type CONCAT2(vector_,TEMPLATE_TYPE_NAME)
   integer :: size
   integer :: resize_factor
-  TEMPLATE_TYPE, allocatable :: storage(:)
+  TEMPLATE_TYPE_OUT, allocatable :: storage(:)
 
 contains
-  procedure, pass :: push => CONCAT2(push_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: push_all => CONCAT2(push_all_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: append_vector => CONCAT2(append_vector_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: clear => CONCAT2(clear_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: get => CONCAT2(get_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: set => CONCAT2(set_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: get_size => CONCAT2(get_size_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: reverse => CONCAT2(reverse_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: to_array => CONCAT2(to_array_, TEMPLATE_TYPE_NAME)
-  procedure, pass :: to_existing_array => CONCAT2(to_existing_array_, TEMPLATE_TYPE_NAME)
+  procedure, pass :: push => CONCAT2(push_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: push_all => CONCAT2(push_all_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: append_vector => CONCAT2(append_vector_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: clear => CONCAT2(clear_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: get => CONCAT2(get_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: set => CONCAT2(set_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: get_size => CONCAT2(get_size_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: reverse => CONCAT2(reverse_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: to_array => CONCAT2(to_array_,TEMPLATE_TYPE_NAME)
+  procedure, pass :: to_existing_array => CONCAT2(to_existing_array_,TEMPLATE_TYPE_NAME)
   
-  procedure, pass :: write => CONCAT2(write_vector_, TEMPLATE_TYPE_NAME)
+  procedure, pass :: write => CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)
   generic :: write(formatted) => write
 end type
 
@@ -31,136 +31,136 @@ contains
 !-----------------------------------------------------------------------
 ! Init
 !-----------------------------------------------------------------------
-elemental function CONCAT2(new_vector_, TEMPLATE_TYPE_NAME)(initial_capacity, resize_factor) result(new_instance)
+elemental function CONCAT2(new_vector_,TEMPLATE_TYPE_NAME)(initial_capacity, resize_factor) result(new_instance)
   integer, optional, intent(in) :: initial_capacity, resize_factor
   integer :: initial_capacity_act, resize_factor_act
-  type(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: new_instance
+  type(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: new_instance
   
   initial_capacity_act = arg_or_default(initial_capacity, 256)
   resize_factor_act = arg_or_default(resize_factor, 2)
-  new_instance%size = 0
-  new_instance%resize_factor = resize_factor_act
-  allocate(new_instance%storage(initial_capacity_act))
+  new_instance % size = 0
+  new_instance % resize_factor = resize_factor_act
+  allocate(new_instance % storage(initial_capacity_act))
 end function
 
 !-----------------------------------------------------------------------
 ! Push a value
 !-----------------------------------------------------------------------
-subroutine CONCAT2(push_, TEMPLATE_TYPE_NAME)(this, value)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
+subroutine CONCAT2(push_,TEMPLATE_TYPE_NAME)(this, value)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE, intent(in) :: value
-  TEMPLATE_TYPE, allocatable :: temp(:)
+  TEMPLATE_TYPE_OUT, allocatable :: temp(:)
   integer :: i
 
-  if (this%size == size(this%storage)) then
-    allocate(temp(this%size * this%resize_factor)) ! make a new allocation
-    temp(1:this%size) = this%storage ! move items to new allocation
-    call move_alloc(temp, this%storage) ! swap pointers, deallocate old pointer
+  if (this%size == size(this % storage)) then
+    allocate(temp(this % size * this % resize_factor)) ! make a new allocation
+    temp(1:this % size) = this % storage ! move items to new allocation
+    call move_alloc(temp, this % storage) ! swap pointers, deallocate old pointer
   end if
   
-  this%size = this%size + 1
-  this%storage(this%size) = value
+  this % size = this % size + 1
+  this % storage(this % size) = value
 end subroutine
 
 !-----------------------------------------------------------------------
 ! Pushes all elements
 !-----------------------------------------------------------------------
-subroutine CONCAT2(push_all_, TEMPLATE_TYPE_NAME)(this, array)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
+subroutine CONCAT2(push_all_,TEMPLATE_TYPE_NAME)(this, array)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE, intent(in) :: array(:)
   integer :: i
 
   do i = 1,size(array)
-    call this%push(array(i))
+    call this % push(array(i))
   end do
 end subroutine
 
 !-----------------------------------------------------------------------
 ! Appends another vector
 !-----------------------------------------------------------------------
-subroutine CONCAT2(append_vector_, TEMPLATE_TYPE_NAME)(this, other)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this, other
+subroutine CONCAT2(append_vector_,TEMPLATE_TYPE_NAME)(this, other)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this, other
   integer :: i
 
-  do i = 1,other%get_size()
-    call this%push(other%get(i))
+  do i = 1,other % get_size()
+    call this % push(other % get(i))
   end do
 end subroutine
 
 !-----------------------------------------------------------------------
 ! Clears
 !-----------------------------------------------------------------------
-subroutine CONCAT2(clear_, TEMPLATE_TYPE_NAME)(this)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)), intent(inout) :: this
-  this%size = 0
+subroutine CONCAT2(clear_,TEMPLATE_TYPE_NAME)(this)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)), intent(inout) :: this
+  this % size = 0
 end subroutine
 
 !-----------------------------------------------------------------------
 ! Get a value
 !-----------------------------------------------------------------------
-function CONCAT2(get_, TEMPLATE_TYPE_NAME)(this, index) result(res)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
+function CONCAT2(get_,TEMPLATE_TYPE_NAME)(this, index) result(res)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   integer, intent(in) :: index
   TEMPLATE_TYPE_OUT :: res
-  res = this%storage(index)
+  res = this % storage(index)
 end function
 
 !-----------------------------------------------------------------------
 ! Set an element equal to a value
 !-----------------------------------------------------------------------
-subroutine CONCAT2(set_, TEMPLATE_TYPE_NAME)(this, index, value)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
+subroutine CONCAT2(set_,TEMPLATE_TYPE_NAME)(this, index, value)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   integer, intent(in) :: index
   TEMPLATE_TYPE, intent(in) :: value
-  this%storage(index) = value
+  this % storage(index) = value
 end subroutine
 
 !-----------------------------------------------------------------------
 ! Returns size
 !-----------------------------------------------------------------------
-function CONCAT2(get_size_, TEMPLATE_TYPE_NAME)(this) result(res)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
+function CONCAT2(get_size_,TEMPLATE_TYPE_NAME)(this) result(res)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   integer :: res
-  res = this%size
+  res = this % size
 end function
 
 !-----------------------------------------------------------------------
 ! Reverses the content of this vector
 !-----------------------------------------------------------------------
-subroutine CONCAT2(reverse_, TEMPLATE_TYPE_NAME)(this)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
-  this%storage(1:this%size) = this%storage(this%size:1:-1)
+subroutine CONCAT2(reverse_,TEMPLATE_TYPE_NAME)(this)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
+  this % storage(1:this % size) = this % storage(this % size:1:-1)
 end subroutine
 
 !-----------------------------------------------------------------------
 ! Converts vector into plain array
 !-----------------------------------------------------------------------
-function CONCAT2(to_array_, TEMPLATE_TYPE_NAME)(this) result(array)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
+function CONCAT2(to_array_,TEMPLATE_TYPE_NAME)(this) result(array)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE_OUT, allocatable :: array(:)
 
-  allocate(array(this%get_size()))
-  array = this%storage(1:this%get_size())
+  allocate(array(this % get_size()))
+  array = this % storage(1:this % get_size())
 end function
 
 !-----------------------------------------------------------------------
 ! Moves vector content into an existing array
 !-----------------------------------------------------------------------
-subroutine CONCAT2(to_existing_array_, TEMPLATE_TYPE_NAME)(this, array)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)) :: this
+subroutine CONCAT2(to_existing_array_,TEMPLATE_TYPE_NAME)(this, array)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE_OUT, allocatable, intent(inout) :: array(:)
 
-  if (size(array) < this%get_size()) then
+  if (size(array) < this % get_size()) then
     stop 'Target array is too small'
   end if
-  array = this%storage(1:this%get_size())
+  array = this % storage(1:this % get_size())
 end subroutine
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Writes
 !---------------------------------------------------------------------------------------------------------------------------------------------
-subroutine CONCAT2(write_vector_, TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list, iostat, iomsg)
-  class(CONCAT2(vector_, TEMPLATE_TYPE_NAME)), intent(in) :: this
+subroutine CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list, iostat, iomsg)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)), intent(in) :: this
   integer, intent(in) :: unit
   character(*), intent(in) :: iotype
   integer, intent(in) :: v_list(:)
@@ -168,8 +168,8 @@ subroutine CONCAT2(write_vector_, TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list
   character(*), intent(inout) :: iomsg
   integer :: i
   
-  do i = 1,this%get_size() - 1
-    write(unit, *, iostat = iostat) this%get(i), ','
+  do i = 1,this % get_size() - 1
+    write(unit, *, iostat = iostat) this % get(i), ','
   end do
-  write(unit, *, iostat = iostat) this%get(this%get_size())
+  write(unit, *, iostat = iostat) this % get(this % get_size())
 end
