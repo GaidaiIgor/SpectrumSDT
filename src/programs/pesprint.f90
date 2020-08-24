@@ -24,12 +24,7 @@ program pesprint
     call load_equgrids
   endif
 
-  if (params % debug_mode == 'use_calc_pots_mpi') then
-    print *, 'Using MPI version'
-    call calc_pots_mpi(g1, g2, g3)
-  else
-    call calc_pots(n1,n2,n3,g1,g2,g3,3)
-  end if
+  call calc_pots(g1, g2, g3)
 
   if (get_proc_id() == 0) then
     if (sdtcalc .and. params % print_potential == 0) then

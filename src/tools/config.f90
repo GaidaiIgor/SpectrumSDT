@@ -440,11 +440,7 @@ contains
     ! Pull out sequential ahead of time as we need to decide if parallel mode should be initialized first
     sequential = item_or_default(raw_config, 'sequential', '0') ! Sequential execution is disabled by default
     if (sequential == '0') then
-      if (test_mode == 'blacs_instead_MPI') then
-        call blacs_setup(my_id, n_procs) ! Init blacs if the sequential mode is not requested to enable parallel mode
-      else
-        call MPI_Init(ierr)
-      end if
+      call MPI_Init(ierr)
     end if
 
     call check_setting_groups(raw_config)
