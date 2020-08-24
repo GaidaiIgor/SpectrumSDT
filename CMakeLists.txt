@@ -9,7 +9,7 @@ include_directories(include src/include extra/mklmods libs/fdict/build/include l
 # Specify where to look for libraries (-L option)
 link_directories(libs/arpack-ng/build libs/fdict/build/lib libs/ftl/build/lib libs/petsc/debug_64/lib libs/slepc/debug_64/lib)
 # Add common compile flag for all sources. -u forces implicitnone for all functions.
-add_compile_options(-g -fbacktrace -fimplicit-none -ffree-line-length-0 -fbackslash)
+add_compile_options(-g -fbacktrace -ffree-line-length-0 -fbackslash)
 
 # Source file dependencies (do I need to do it manually like that?)
 set(general_utils src/utils/general/general.F90)
@@ -79,19 +79,18 @@ set(rovib_io ${array_1d} ${array_2d} ${constants} ${io_utils} ${input_params} ${
 set(overlaps_extra ${array_1d} ${array_2d} ${formulas} ${input_params} ${k_block_info} ${path_utils} ${parallel_utils} ${rovib_io} ${debug_tools} src/rovib/overlaps_extra.f90)
 set(distributed_rovib_hamiltonian ${block_borders} ${rovib_utils} ${formulas} ${general_utils} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/distributed_rovib_hamiltonian.f90)
 set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_block_info} src/tools/eicalc/matmul_operator.F90)
-set(parpack ${algorithms} ${index_conversion} ${matmul_operator} ${parallel_utils} src/tools/eicalc/parpack.f90)
 set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${rovib_io} ${rovib_utils} ${input_params} ${general_utils} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${debug_tools} src/tools/eicalc/slepc_solver.F90)
 set(lapack_interface ${general_utils} src/interface/lapack.f90)
-set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${lapack_interface} ${matmul_operator} ${mkl} ${parabola} ${parpack} ${pesgeneral} ${rovib_io} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
+set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${lapack_interface} ${matmul_operator} ${mkl} ${parabola} ${pesgeneral} ${rovib_io} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
 set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
 add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
-target_link_libraries(optgrid parpack arpack blas lapack)
+target_link_libraries(optgrid blas lapack)
 
 add_executable(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${dawes} src/programs/pesprint.f90)
-target_link_libraries(pesprint fdict ftl pcreposix parpack arpack blas lapack)
+target_link_libraries(pesprint fdict ftl pcreposix blas lapack)
 
-add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${parpack} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)
-target_link_libraries(spectrumsdt parpack arpack fdict ftl blas lapack pcreposix petsc slepc)
+add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)
+target_link_libraries(spectrumsdt fdict ftl blas lapack pcreposix petsc slepc)

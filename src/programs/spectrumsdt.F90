@@ -16,7 +16,6 @@ program spectrumsdt
   use matmul_operator_mod
   use overlaps_extra_mod
   use parallel_utils
-  use parpack
   use path_utils
   use pesgeneral
   use sdt
@@ -320,9 +319,6 @@ contains
     if (params % solver == 'slepc') then
       call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
       call print_spectrum(params, eivals, eivecs, 1)
-    else
-      call find_eigenpairs_parpack(context, params % num_states, params % ncv, params % max_iterations, eivals, eivecs)
-      call print_spectrum(params, eivals, eivecs)
     end if
   end subroutine
 

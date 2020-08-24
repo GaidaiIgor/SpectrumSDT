@@ -33,26 +33,6 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns current process id and total number of processes
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine get_grid_info(comm, n_rows, n_cols, proc_row, proc_col)
-    integer, intent(in) :: comm
-    integer, intent(out) :: n_rows, n_cols, proc_row, proc_col
-    integer :: ierr
-    logical :: mpi_enabled
-
-    call MPI_Initialized(mpi_enabled, ierr)
-    if (mpi_enabled) then
-      call blacs_gridinfo(comm, n_rows, n_cols, proc_row, proc_col)
-    else
-      n_rows = 1
-      n_cols = 1
-      proc_row = 0
-      proc_col = 0
-    end if
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Computes range of elements to process by this processor
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine get_proc_elem_range(n_elems, first_elem, proc_elems, all_counts, all_shifts)

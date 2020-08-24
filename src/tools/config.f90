@@ -366,10 +366,6 @@ contains
 
     params % solver = iff('slepc', params % solver, params % solver == '-1')
 
-    if (params % ncv == -1 .and. params % num_states /= -1 .and. params % solver == 'parpack') then
-      params % ncv = params % num_states * 2
-      call announce_default(mode_id, 'ncv', num2str(params % ncv), '(2 * num_states)', optional_modes)
-    end if
     if (params % ncv == -1 .and. params % solver == 'slepc') then
       call announce_default(mode_id, 'ncv', '', '', optional_modes, 'ncv is not specified; its value will be determined by SLEPc. This might affect the number of converged ' // &
          'eigenvalues')
@@ -414,7 +410,7 @@ contains
     call assert(params % basis_K >= -1, 'Error: basis_K should be >= 0')
     ! call assert(params % basis_K <= params % basis_J, 'Error: basis_K should be <= basis_J')
 
-    call assert(any(params % solver == [character(len = 100) :: 'slepc', 'parpack']), 'Error: solver can be "slepc" or "parpack"')
+    call assert(any(params % solver == [character(len = 100) :: 'slepc']), 'Error: solver can be "slepc"')
     call assert(params % num_states == -1 .or. params % num_states > 0, 'Error: num_states should be > 0')
     call assert(params % ncv == -1 .or. params % ncv > 0, 'Error: ncv should be > 0')
     call assert(params % mpd == -1 .or. params % mpd > 0, 'Error: mpd should be > 0')
