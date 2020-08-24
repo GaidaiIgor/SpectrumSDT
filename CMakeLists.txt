@@ -88,10 +88,10 @@ set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
 add_executable(optgrid ${constants} ${optgrid_tools} src/programs/optgrid.f90)
-target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
+target_link_libraries(optgrid parpack arpack blas lapack)
 
 add_executable(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${dawes} src/programs/pesprint.f90)
-target_link_libraries(pesprint fdict ftl pcreposix parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
+target_link_libraries(pesprint fdict ftl pcreposix parpack arpack blas lapack)
 
 add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${parpack} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)
-target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
+target_link_libraries(spectrumsdt parpack arpack fdict ftl blas lapack pcreposix petsc slepc)
