@@ -153,7 +153,6 @@ contains
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states)
     allocate(p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), 3)) ! S x K x N x 3
     p_dist = 0
-
     do proc_state_ind = 1, size(p_dist, 1)
       do K_val = params % K(1), params % K(2)
         call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
@@ -305,7 +304,7 @@ contains
 
     do K_val = params % K(1), params % K(2)
       call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
-      K_dist(params % K(1) + 1) = sum(p_dist_k(K_ind, :, :))
+      K_dist(K_val + 1) = sum(p_dist_k(K_ind, :, :))
     end do
     K_dist = K_dist * 2 ! due to phi-symmetry
   end function
@@ -319,6 +318,7 @@ contains
     real*8, allocatable :: K_dists(:, :)
     integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
     integer, allocatable :: recv_counts(:), recv_shifts(:)
+    real*8 :: K_dist_error
     real*8, allocatable :: K_dists_chunk(:, :)
 
     call get_proc_info(proc_id, n_procs)
@@ -328,6 +328,8 @@ contains
     allocate(K_dists_chunk(proc_states, params % J + 1))
     do proc_k = 1, proc_states
       K_dists_chunk(proc_k, :) = calculate_K_dist(params, p_dist(proc_k, :, :, :))
+      K_dist_error = 1 - sum(K_dists_chunk(proc_k, :))
+      if (abs(K_dist_error > 1d-10)) print *, 'Warning: K_dist_error is ' // num2str(K_dist_error) // ' on state ' // num2str(proc_first_state + proc_k - 1)
     end do
 
     ! Gather results
