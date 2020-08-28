@@ -351,7 +351,7 @@ contains
         call init_matrix3fbr(vecrawb,i1,i2)
         ! Print matrix
         if (output1d) then
-          write(fn,'(2A,I4.4,A,I4.4,A)')outdir, '/mat1.',i1,'.',i2,'.out'
+          write(fn,'(2A,I0,A,I0,A)')outdir, '/mat1.',i1,'.',i2,'.out'
           open(1,file=fn)
           do i3=1,n3b
             do j=1,n3b
@@ -372,7 +372,7 @@ contains
       ! Print solution
       if (output1d) then
         ! Print eigenvalues
-        write(fn,'(2A,I4.4,A,I4.4,A)')outdir, '/val1.',i1,'.',i2,'.out'
+        write(fn,'(2A,I0,A,I0,A)')outdir, '/val1.',i1,'.',i2,'.out'
         open(1,file=fn)
         do i3=1,n3b
           call symmetry_1d(vecraw(1,i3),s3)
@@ -381,7 +381,7 @@ contains
         close(1)
 
         ! Print eigenvectors
-        write(fn,'(2A,I4.4,A,I4.4,A)')outdir, '/vec1.',i1,'.',i2,'.out'
+        write(fn,'(2A,I0,A,I0,A)')outdir, '/vec1.',i1,'.',i2,'.out'
         open(1,file=fn)
         do i3=1,n3
           do j=1,n3b
@@ -392,7 +392,7 @@ contains
         close(1)
 
         ! Print expansion
-        write(fn,'(2A,I4.4,A,I4.4,A)')outdir, '/exp1.',i1,'.',i2,'.out'
+        write(fn,'(2A,I0,A,I0,A)')outdir, '/exp1.',i1,'.',i2,'.out'
         open(1,file=fn)
         do i3=1,n3b
           do j=1,n3b
@@ -443,7 +443,7 @@ contains
     end do
 
     ! Save results in binary file
-    write(fn,'(2A,I4.4,A)')outdir,'/bas1.',i1,'.bin.out'
+    write(fn,'(2A,I0,A)')outdir,'/bas1.',i1,'.bin.out'
     open(1,file=fn,form='unformatted')
     write(1)nvec
     do i2=1,n2
@@ -657,7 +657,7 @@ contains
     end if
 
     ! Save results in binary file for 3D solution
-    write(fn,'(2A,I4.4,A)')outdir,'/bas2.',i1,'.bin.out'
+    write(fn,'(2A,I0,A)')outdir,'/bas2.',i1,'.bin.out'
     open(1,file=fn,form='unformatted')
     write(1)ivec,nb2
     if (ivec /=0 ) then
@@ -847,7 +847,7 @@ contains
     ! Get load directory
     ldir = bpath // '/' // getdir(MODE_BASIS)
     ! Get file name
-    write(fn,'(2A,I4.4,A)')ldir,'/bas2.',isl,'.bin.out'
+    write(fn,'(2A,I0,A)')ldir,'/bas2.',isl,'.bin.out'
     ! Load 2D solution
     open(1,file=fn,form='unformatted')
     read(1)nvec2,nb2
@@ -858,7 +858,7 @@ contains
     close(1)
 
     ! Get file name
-    write(fn,'(2A,I4.4,A)')ldir,'/bas1.',isl,'.bin.out'
+    write(fn,'(2A,I0,A)')ldir,'/bas1.',isl,'.bin.out'
     ! Load 1D solution
     allocate(nvec1(n2),val1(n2),vec1(n2))
     open(1,file=fn,form='unformatted')
@@ -964,7 +964,7 @@ contains
       end do
 
       ! Save block
-      write(fn,'(2A,I4.4,A)')outdir,'/overlap.',ichan,'.bin.out'
+      write(fn,'(2A,I0,A)')outdir,'/overlap.',ichan,'.bin.out'
       open(1,file=fn,form='unformatted')
       write(1)olap
       close(1)
@@ -1003,7 +1003,7 @@ contains
           end do
 
           ! Save block
-          write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/overlap.',ichr,'.',ichc,'.bin.out'
+          write(fn,'(2A,I0,A,I0,A)') outdir,'/overlap.',ichr,'.',ichc,'.bin.out'
           open(1,file=fn,form='unformatted')
           write(1)olap
           close(1)
@@ -1068,7 +1068,7 @@ contains
           end do
 
           ! Save block
-          write(fn,'(2A,I4.4,A,I4.4,A)')outdir,'/overlap.', ir,'.',ic,'.bin.out'
+          write(fn,'(2A,I0,A,I0,A)')outdir,'/overlap.', ir,'.',ic,'.bin.out'
           open(1,file=fn,form='unformatted')
           write(1)olap
           close(1)
@@ -1122,7 +1122,7 @@ contains
       end if
 
       ! Get filename
-      write(fn,'(2A,I4.4,A,I4.4,A)')ldir, '/overlap.',gblrt,'.',gblct,'.bin.out'
+      write(fn,'(2A,I0,A,I0,A)')ldir, '/overlap.',gblrt,'.',gblct,'.bin.out'
       ! Check if file exists
       inquire(file=fn,exist=ex)
       if (.not.ex) then
@@ -1162,7 +1162,7 @@ contains
     ! Get load directory
     ldir = bpath // '/' // getdir(MODE_BASIS)
     ! Get filename
-    write(fn,'(2A,I4.4,A)')ldir,'/bas2.',isl,'.bin.out'
+    write(fn,'(2A,I0,A)')ldir,'/bas2.',isl,'.bin.out'
     ! Read data
     open(1,file=fn,form='unformatted')
     read(1)nvec2
@@ -1517,9 +1517,9 @@ contains
       call build_state(is,stated,statez)
       
       ! Build file names
-      write(fn1,'(2A,I4.4,A)')outdir,'/state.',is,'.out'
-      write(fn2,'(2A,I4.4,A)')outdir,'/state.',is,'.p.out'
-      write(fn3,'(2A,I4.4,A)')outdir,'/state.',is,'.n.out'
+      write(fn1,'(2A,I0,A)')outdir,'/state.',is,'.out'
+      write(fn2,'(2A,I0,A)')outdir,'/state.',is,'.p.out'
+      write(fn3,'(2A,I0,A)')outdir,'/state.',is,'.n.out'
 
       ! Open files
       open(1,file=fn1,buffered='yes')
@@ -1894,7 +1894,7 @@ contains
     end if
 
     ! Write similarities
-    write(fn,'(2A,I4.4,A)')outdir,'/sim.',irec,'.out'
+    write(fn,'(2A,I0,A)')outdir,'/sim.',irec,'.out'
     open(1,file=fn)
     do ist=nvec2sch,1,-1
       do isl=1,n1
@@ -2200,7 +2200,7 @@ contains
   !   ! Load overlap matrix
   !   allocate(olap(n1,n1))
   !   ldir = opath // '/' // getdir(MODE_OVERLAP)
-  !   write(fn,'(2A,I4.4,A)')ldir,'/overlap.',ichan,'.bin.out'
+  !   write(fn,'(2A,I0,A)')ldir,'/overlap.',ichan,'.bin.out'
   !   open(1,file=fn,form='unformatted')
   !   read(1)olap
   !   close(1)
@@ -2235,13 +2235,13 @@ contains
   !     end do
   !
   !     ! Write states in binary form
-  !     write(fn,'(2A,I4.4,A)')outdir,'/exp.',ichan,'.bin.out'
+  !     write(fn,'(2A,I0,A)')outdir,'/exp.',ichan,'.bin.out'
   !     open(1,file=fn,form='unformatted')
   !     write(1)hamd
   !     close(1)
   !
   !     ! Write states in text form
-  !     write(fn,'(2A,I4.4,A)')outdir,'/exp.',ichan,'.out'
+  !     write(fn,'(2A,I0,A)')outdir,'/exp.',ichan,'.out'
   !     open(1,file=fn)
   !     do i=1,n1
   !       do j=1,n1
@@ -2342,7 +2342,7 @@ contains
   !     end do
   !
   !     ! Save spectrum
-  !     write(fn,'(2A,I4.4,A)')outdir,'/spec.',ichan,'.out'
+  !     write(fn,'(2A,I0,A)')outdir,'/spec.',ichan,'.out'
   !     open(1,file=fn)
   !       do ist=1,n1
   !         write(1,'(8F30.17)') real(chvalz(ist))  * autown, real(chvalz(ist))  * autown - baren, aimag(chvalz(ist)) * autown * (-2), (prob(ist,i),i=1,5)
@@ -2355,15 +2355,15 @@ contains
   !     end do
   !
   !     ! Write states in binary form
-  !     write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.bin.out'
+  !     write(fn,'(4A,I0,A)') outdir,'/',expdir,'/exp.',ichan,'.bin.out'
   !     open(1,file=fn,form='unformatted')
   !     write(1)hamz
   !     close(1)
   !
   !     ! Write states in text form
-  !     write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.re.out'
+  !     write(fn,'(4A,I0,A)') outdir,'/',expdir,'/exp.',ichan,'.re.out'
   !     open(1,file=fn)
-  !     write(fn,'(4A,I4.4,A)') outdir,'/',expdir,'/exp.',ichan,'.im.out'
+  !     write(fn,'(4A,I0,A)') outdir,'/',expdir,'/exp.',ichan,'.im.out'
   !     open(2,file=fn)
   !     do i=1,n1
   !       do j=1,n1
@@ -2464,7 +2464,7 @@ contains
   !   ! Allocatge arrays
   !   allocate(vec3d(nn),vec3ed(n1,n1),sliced(n23b))
   !   ! Load expansion
-  !   write(fn,'(4A,I4.4,A)') getdir(MODE_CHDIAG),'/',expdir,'/exp.',ichan,'.bin.out'
+  !   write(fn,'(4A,I0,A)') getdir(MODE_CHDIAG),'/',expdir,'/exp.',ichan,'.bin.out'
   !   open(1,file=fn,form='unformatted')
   !   read(1)vec3ed
   !   close(1)
@@ -2482,11 +2482,11 @@ contains
   !     end do
   !
   !     ! Open files
-  !     write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.out'
+  !     write(fn,'(2A,I0,A,I0,A)') outdir,'/state',ichan,'.',is,'.out'
   !     open(1,file=fn,buffered='yes')
-  !     write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.p.out'
+  !     write(fn,'(2A,I0,A,I0,A)') outdir,'/state',ichan,'.',is,'.p.out'
   !     open(2,file=fn,buffered='yes')
-  !     write(fn,'(2A,I4.4,A,I4.4,A)') outdir,'/state',ichan,'.',is,'.n.out'
+  !     write(fn,'(2A,I0,A,I0,A)') outdir,'/state',ichan,'.',is,'.n.out'
   !     open(3,file=fn,buffered='yes')
   !
   !     ! Write data
@@ -2506,7 +2506,7 @@ contains
   !     ! Check symmetry
   !     call symmetryd(vec3d,sym)
   !     ! Log state written and symmetry
-  !     write(LG,'(A,I4.4,F25.17)')'Wrote state ',is,sym
+  !     write(LG,'(A,I0,F25.17)')'Wrote state ',is,sym
   !   end do
   ! end subroutine
 
@@ -2957,7 +2957,7 @@ contains
     end do
     close(1)
     do istate=1,nstate
-      write(fn,'(A5,I4.4,A4)')'state',istate,'.out'
+      write(fn,'(A5,I0,A4)')'state',istate,'.out'
       open(1,file=fn)
       do i1=1,n1
       do i2=1,n2
@@ -3089,7 +3089,7 @@ contains
       ! Get global state number
       call l2g(myist,myid,nstate,np,1,ist)
       ! Build file name
-      write(fn,'(4A,I4.4,A)')outdir,'/',expdir,'/exp.',ist,'.bin.out'
+      write(fn,'(4A,I0,A)')outdir,'/',expdir,'/exp.',ist,'.bin.out'
 
       ! Write data
       open(1,file=fn,form='unformatted')
@@ -3156,7 +3156,7 @@ contains
     character(256) fn
 
     ! Build file name
-    write(fn,'(6A,I4.4,A)') dpath, '/', getdir(MODE_3DSDT),'/',expdir,'/exp.',is,'.bin.out'
+    write(fn,'(6A,I0,A)') dpath, '/', getdir(MODE_3DSDT),'/',expdir,'/exp.',is,'.bin.out'
     ! Read data
     open(1,file=fn,form='unformatted')
     if (realver) then
@@ -3345,7 +3345,7 @@ contains
     real*8, allocatable::vec(:)
     integer i1,is,sgn,i,j,l
     character(256) fn
-    write(fn,'(2A,I4.4,A,I4.4,A)')outdir,'/vec2.',i1,'.',is,'.out'
+    write(fn,'(2A,I0,A,I0,A)')outdir,'/vec2.',i1,'.',is,'.out'
     open(1,file=fn)
     do i=1,n2
       do j=1,n3
