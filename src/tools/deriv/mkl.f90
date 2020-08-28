@@ -1,4 +1,6 @@
 module mkl
+  implicit none
+
 contains
   !-----------------------------------------------------------------------
   !  Derivatives calculation using MKL library (mkl.f).
@@ -19,7 +21,7 @@ contains
     real*8 f,l
     f=2*pi/l
     freq = 0
-    do k=2,nk/2
+    do k=2,nk/2+1
       freq(k)=(k-1)*f
     end do
     if(t.eq.2)freq = -freq**2
@@ -45,6 +47,7 @@ contains
 
     do i=1,nf
       psi(1, i) = 0
+      psi(nk, i) = psi(nk, i) * freq(nk/2 + 1)
       do k=2,nk/2
         a = psi(2*(k-1),i)
         b = psi(2*(k-1)+1,i)
