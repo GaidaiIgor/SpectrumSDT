@@ -359,8 +359,8 @@ contains
     cols_total = cols_bar_K + params % J + 1
 
     allocate(titles(cols_total))
-    titles(1:cols_bar_K) = to_string_char_str_arr_trim(['Energy (cm-1)', 'Gamma A (cm-1)', 'Gamma B (cm-1)', 'Covalent Sym', 'Covalent Asym', 'VdW A Sym', 'VdW A Asym', 'VdW B', &
-      'Infinity'])
+    titles(1:cols_bar_K) = to_string_char_str_arr_trim([character(len = 100) :: 'Energy (cm-1)', 'Gamma A (cm-1)', 'Gamma B (cm-1)', 'Covalent Sym', 'Covalent Asym', 'VdW A Sym', 'VdW A Asym', &
+        'VdW B', 'Infinity'])
     do K_val = 0, params % J
       titles(cols_bar_K + K_val + 1) = string('K' // num2str(K_val))
     end do

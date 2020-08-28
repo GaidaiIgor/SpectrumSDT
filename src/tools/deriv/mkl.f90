@@ -1,4 +1,6 @@
 module mkl
+  implicit none
+
 contains
   !-----------------------------------------------------------------------
   !  Derivatives calculation using MKL library (mkl.f).
@@ -12,7 +14,6 @@ contains
   !-----------------------------------------------------------------------
   subroutine init_derivd(t,nk,l,freq)
     use constants
-    implicit none
     integer nk,k,t
     
     real*8 freq(nk)
@@ -30,7 +31,6 @@ contains
   !-----------------------------------------------------------------------
   subroutine calc_derivd(t,nf,nk,freq,psi)
     use MKL_DFTI
-    implicit none
     integer nk,nf,st,i,k,t
     real*8 psi(nk,nf),freq(nk),a,b
     type(DFTI_DESCRIPTOR),POINTER :: My_Desc1_Handle, My_Desc2_Handle
@@ -73,7 +73,6 @@ contains
   !-----------------------------------------------------------------------
   subroutine init_derivz(nk,l,freq)
     use constants
-    implicit none
     integer nk,k
     complex*16 f, freq(nk)
     real*8 l
@@ -93,7 +92,6 @@ contains
   !-----------------------------------------------------------------------
   subroutine calc_derivz(nf,nk,freq,psi)
     use MKL_DFTI
-    implicit none
     integer nk,nf,st,i,k
     complex*16 psi(nk,nf),freq(nk)
     type(DFTI_DESCRIPTOR),POINTER :: My_Desc1_Handle, My_Desc2_Handle

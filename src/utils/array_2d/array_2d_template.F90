@@ -1,11 +1,11 @@
 #include "funcs.macro"  
 
-  interface CONCAT2(array_2d_, TEMPLATE_TYPE_NAME)
-    module procedure :: CONCAT2(new_array_2d_, TEMPLATE_TYPE_NAME)
+  interface CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)
+    module procedure :: CONCAT2(new_array_2d_,TEMPLATE_TYPE_NAME)
   end interface
 
-  type CONCAT2(array_2d_, TEMPLATE_TYPE_NAME)
-    TEMPLATE_TYPE, allocatable :: p(:, :)
+  type CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)
+    TEMPLATE_TYPE_OUT, allocatable :: p(:, :)
   end type
 
 contains
@@ -14,9 +14,9 @@ contains
 ! Appends all 2D slices to form a single 2D array. Assumes the number of rows is the same in each 2D slice.
 ! blocks is an additional optional output argument, which saves initial slice number of each column in the resulting array
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(new_array_2d_, TEMPLATE_TYPE_NAME)(p) result(new_instance)
+  function CONCAT2(new_array_2d_,TEMPLATE_TYPE_NAME)(p) result(new_instance)
     TEMPLATE_TYPE, intent(in) :: p(:, :)
-    type(CONCAT2(array_2d_, TEMPLATE_TYPE_NAME)) :: new_instance
+    type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)) :: new_instance
     new_instance % p = p
   end function
 
@@ -24,14 +24,14 @@ contains
 ! Appends all 2D slices to form a single 2D array. Assumes the number of rows is the same in each 2D slice.
 ! blocks is an additional optional output argument, which saves initial slice number of each column in the resulting array
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(flatten_array_2d_, TEMPLATE_TYPE_NAME)(array_2d, blocks) result(res)
-    class(CONCAT2(array_2d_, TEMPLATE_TYPE_NAME)), intent(in) :: array_2d(:)
+  function CONCAT2(flatten_array_2d_,TEMPLATE_TYPE_NAME)(array_2d, blocks) result(res)
+    class(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), intent(in) :: array_2d(:)
     TEMPLATE_TYPE_OUT, allocatable :: res(:, :)
     integer, allocatable, intent(out), optional :: blocks(:)
     integer :: i, j, k, cols_total
     integer, allocatable :: blocks_temp(:)
 
-    cols_total = CONCAT2(columns_number_, TEMPLATE_TYPE_NAME)(array_2d)
+    cols_total = CONCAT2(columns_number_,TEMPLATE_TYPE_NAME)(array_2d)
     allocate(res(size(array_2d(1) % p, 1), cols_total))
     allocate(blocks_temp(cols_total))
 
@@ -52,8 +52,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Computes total number of columns in all slices of ragged array
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(columns_number_, TEMPLATE_TYPE_NAME)(array_2d) result(res)
-    class(CONCAT2(array_2d_, TEMPLATE_TYPE_NAME)), intent(in) :: array_2d(:)
+  function CONCAT2(columns_number_,TEMPLATE_TYPE_NAME)(array_2d) result(res)
+    class(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), intent(in) :: array_2d(:)
     integer :: res
     integer :: i
 
