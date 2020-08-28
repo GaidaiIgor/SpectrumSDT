@@ -4,6 +4,7 @@ enable_language(Fortran)
 # Source file dependencies (do I need to do it manually like that?)
 set(general_utils src/utils/general/general.F90)
 set(constants src/utils/constants.f90)
+set(fourier_transform ${constants} ${general_utils} src/utils/fourier_transform.f90)
 set(formulas ${general_utils} ${constants} src/tools/formulas.f90)
 set(general_vars src/tools/general_vars.f90)
 set(debug_tools src/tools/debug_tools.f90)
@@ -100,7 +101,7 @@ target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_l
 add_executable(kinetics ${pesgeneral} src/programs/kinetics.f90)
 # target_link_libraries(pesprint fdict parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(test_prg ${io_utils} ${string} src/test/test_prg.F90)
+add_executable(test_prg ${mkl} ${fourier_transform} src/test/test_prg.F90)
 target_link_libraries(test_prg parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
 
 # add_executable(dawes_de ${utils} ${tools} ${dawes} src/programs/misc/dawes_de.f90)
