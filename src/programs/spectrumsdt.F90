@@ -22,6 +22,7 @@ program spectrumsdt
   use sdt
   use slepc_solver_mod
   use state_properties_mod
+  implicit none
 
   type(input_params) :: params
   params = process_user_settings('spectrumsdt.config')
@@ -72,7 +73,7 @@ contains
 
     realver  = .false.
     onewell  = .false.
-    dvr      = .false.
+    ! dvr      = .false.
     if (params % symmetry == 0) then
       sy = 5
     else if (params % symmetry == 1) then
@@ -83,8 +84,8 @@ contains
     oltype   = 0
     recstart = 0
     recld    = 0
-    ham1type = 3 ! complex fft
-    ham2type = 1 ! analytical
+    ! ham1type = 3 ! complex fft
+    ! ham2type = 1 ! analytical
 
     ! Set adiabatic control variable
     adiab = oltype == OVERLAP_ALL ! OVERLAP_ALL=0
@@ -106,7 +107,7 @@ contains
     call load_grids
 
     ! Set DVR basis size equal to number of points
-    if (dvr) n3b = n3
+    ! if (dvr) n3b = n3
 
     ! Setup shortcuts for products
     nn   = n1 * n2 * n3
@@ -141,7 +142,6 @@ contains
 !  Init total potential.
 !-----------------------------------------------------------------------
   subroutine init_pottot(params)
-    implicit none
     class(input_params), intent(in) :: params
     integer i1, i2, i3
 
@@ -167,36 +167,35 @@ contains
 !  Calculates N second derivatives for N "delta" functions.
 !  The function #i is equal 1 in point #i and 0 in all other points.
 !-----------------------------------------------------------------------
-  subroutine calc_der(der,n,freq,jac,gt)
-    implicit none
-    real*8 der(n,n),freq(n),jac(n)
-    integer i,n,gt
-
-    der = 0d0
-    do i=1,n
-      der(i,i) = 1d0
-    end do
-    if(gt==1)then
-      call calc_derivd_jac_2nd(n,n,der,freq,jac)
-    else
-      call calc_derivd(2,n,n,freq,der)
-    end if
-  end subroutine
+  ! subroutine calc_der(der,n,freq,jac,gt)
+  !   real*8 der(n,n),freq(n),jac(n)
+  !   integer i,n,gt
+  !
+  !   der = 0d0
+  !   do i=1,n
+  !     der(i,i) = 1d0
+  !   end do
+  !   if(gt==1)then
+  !     call calc_derivd_jac_2nd(n,n,der,freq,jac)
+  !   else
+  !     call calc_derivd(2,n,n,freq,der)
+  !   end if
+  ! end subroutine
 
 !-----------------------------------------------------------------------
 !  Calculates kinetic energy matrices
 !-----------------------------------------------------------------------
   subroutine calc_kin
-    implicit none
     integer i1,i2
 
-    allocate(freq1(n1),freq2(n2),freq3(n3), der1(n1,n1),der2(n2,n2),der3(n3,n3), sintet2(n2),grho2(n1))
-    call init_derivd(1,n1,n1*alpha1,freq1) ! alpha1 is not multiplied by jac, but alpha2(3) were previously multiplied
-    call init_derivd(2,n2,n2*alpha2,freq2)
-    call init_derivd(2,n3,n3*alpha3,freq3)
-    call calc_der(der1,n1,freq1,jac1,1) ! calculates 2nd derivative, last argument specifies method, 1 is for optimal grid, 2 for equidistant
-    call calc_der(der2,n2,freq2,jac2,2)
-    call calc_der(der3,n3,freq3,jac3,2)
+    allocate(sintet2(n2), grho2(n1))
+    ! allocate(freq1(n1),freq2(n2),freq3(n3), der1(n1,n1),der2(n2,n2),der3(n3,n3), sintet2(n2),grho2(n1))
+    ! call init_derivd(1,n1,n1*alpha1,freq1) ! alpha1 is not multiplied by jac, but alpha2(3) were previously multiplied
+    ! call init_derivd(2,n2,n2*alpha2,freq2)
+    ! call init_derivd(2,n3,n3*alpha3,freq3)
+    ! call calc_der(der1,n1,freq1,jac1,1) ! calculates 2nd derivative, last argument specifies method, 1 is for optimal grid, 2 for equidistant
+    ! call calc_der(der2,n2,freq2,jac2,2)
+    ! call calc_der(der3,n3,freq3,jac3,2)
     do i1=1,n1
       grho2(i1) = g1(i1)**2
     end do
@@ -397,8 +396,8 @@ contains
     if (ready .and. myrow /= -1) then
       ! Call appropriate subroutine
       select case(mode)
-        case(MODE_DPROD)
-          call calc_dprod
+        ! case(MODE_DPROD)
+        !   call calc_dprod
 
         case(MODE_BASIS)
           call calc_basis

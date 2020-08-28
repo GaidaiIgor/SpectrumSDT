@@ -167,14 +167,14 @@ module sdt
   integer,parameter::RECLD_DENSE    = 1
 
   ! Hamiltonian type for coordinate #1
-  integer,parameter::HAM1_FFT       = 0
-  integer,parameter::HAM1_ANALYTIC6 = 1
-  integer,parameter::HAM1_ANALYTIC8 = 2
-  integer,parameter::HAM1_FFT_CMPL  = 3
+  ! integer,parameter::HAM1_FFT       = 0
+  ! integer,parameter::HAM1_ANALYTIC6 = 1
+  ! integer,parameter::HAM1_ANALYTIC8 = 2
+  ! integer,parameter::HAM1_FFT_CMPL  = 3
 
   ! Hamiltonian type for coordinate #2
-  integer,parameter::HAM2_FFT       = 0
-  integer,parameter::HAM2_ANALYTIC  = 1
+  ! integer,parameter::HAM2_FFT       = 0
+  ! integer,parameter::HAM2_ANALYTIC  = 1
 
   ! Directories
   character(:),allocatable::gpath ! Grid
@@ -195,7 +195,7 @@ module sdt
   integer solver   ! Solver
   logical realver  ! Real or complex version
   logical onewell  ! One well or three wells
-  logical dvr      ! DVR or FBR
+  ! logical dvr      ! DVR or FBR
   integer sy       ! Symmetry/basis
   integer basout   ! Output control for mode 1
   integer trmeth   ! Truncation method
@@ -203,8 +203,8 @@ module sdt
   logical adiab    ! Adiabatic calculation or pathway S
   integer recstart ! Recognition start
   integer recld    ! Recognition load directory
-  integer ham1type ! Type of Hamiltonian for coordinate #1
-  integer ham2type ! Type of Hamiltonian for coordinate #2
+  ! integer ham1type ! Type of Hamiltonian for coordinate #1
+  ! integer ham2type ! Type of Hamiltonian for coordinate #2
 
   ! Sizes
   integer nstate   ! Number of states to calculate
@@ -325,7 +325,8 @@ contains
     allocate(valraw(n3b), vecrawb(n3b,n3b), basis(n3,n3b), psi(n3), val(n2), vec(n2), nbr(n3b), nvec(n2))
 
     ! Load basis for FBR
-    if (.not.dvr) call init_fbrbasis(basis)
+    ! if (.not.dvr)
+    call init_fbrbasis(basis)
 
     ! Solve eigenvalue problem for each thread
     nb2 = 0
@@ -338,15 +339,15 @@ contains
       end if
 
       ! DVR case
-      if (dvr) then
-        ! Initialize matrix
-        call init_matrix3dvr(vecrawb,i1,i2)
-        ! Solve matrix
-        call lapack_eigensolver(vecrawb, valraw)
-        ! Get normalized eigenvectors on the grid
-        vecraw = vecrawb / sqrt(alpha3)
-      ! FBR case
-      else
+      ! if (dvr) then
+      !   ! Initialize matrix
+      !   call init_matrix3dvr(vecrawb,i1,i2)
+      !   ! Solve matrix
+      !   call lapack_eigensolver(vecrawb, valraw)
+      !   ! Get normalized eigenvectors on the grid
+      !   vecraw = vecrawb / sqrt(alpha3)
+      ! ! FBR case
+      ! else
         ! Initialize matrix
         call init_matrix3fbr(vecrawb,i1,i2)
         ! Print matrix
@@ -367,7 +368,7 @@ contains
         ! Get normalized grid functions
         vecraw = matmul(basis, vecrawb)
       ! DVR and FBR
-      end if
+      ! end if
 
       ! Print solution
       if (output1d) then
@@ -580,10 +581,10 @@ contains
     ! No need in Hamiltonian matrix, so deallocate
     deallocate(ham2)
     ! Load basis for FBR
-    if (.not.dvr) then
+    ! if (.not.dvr) then
       allocate(basis(n3,n3b))
       call init_fbrbasis(basis)
-    end if
+    ! end if
 
     ! Process calculated 2D vectors
     allocate(vecrawb(n23b),vecraw(n23),nbr(nvec2),symraw(nvec2))
@@ -637,8 +638,8 @@ contains
       symraw(is) = s3
 
       ! Filter by symmetry in DVR case
-      if (dvr.and.sy==SY_A1.and.s3<0)cycle
-      if (dvr.and.sy==SY_A2.and.s3>0)cycle
+      ! if (dvr.and.sy==SY_A1.and.s3<0)cycle
+      ! if (dvr.and.sy==SY_A2.and.s3>0)cycle
 
       ! Remember eigenvector number
       ivec = ivec + 1
@@ -2569,15 +2570,15 @@ contains
     real*8 vec2bas(:)    ! 2D vector in basis
     real*8 vec2grd(:)    ! 2D vector on grid
     integer is,i,j
-    if (dvr) then
-      vec2grd = vec2bas / sqrt(alpha3)
-    else
+    ! if (dvr) then
+    !   vec2grd = vec2bas / sqrt(alpha3)
+    ! else
       do is=1,n2
         i = (is-1) * n3b
         j = (is-1) * n3
         vec2grd(j+1 : j+n3) = matmul(basis, vec2bas(i+1 : i+n3b))
       end do
-    end if
+    ! end if
   end subroutine
 
   !-----------------------------------------------------------------------
@@ -2588,15 +2589,15 @@ contains
     complex*16 vec2bas(:)    ! 2D vector in basis
     complex*16 vec2grd(:)    ! 2D vector on grid
     integer is,i,j
-    if (dvr) then
-      vec2grd = vec2bas / sqrt(alpha3)
-    else
+    ! if (dvr) then
+    !   vec2grd = vec2bas / sqrt(alpha3)
+    ! else
       do is=1,n2
         i = (is-1) * n3b
         j = (is-1) * n3
         vec2grd(j+1 : j+n3) = matmul(basis, vec2bas(i+1 : i+n3b))
       end do
-    end if
+    ! end if
   end subroutine
 
   !-----------------------------------------------------------------------
@@ -2661,10 +2662,10 @@ contains
     ! Load 3D expansion. Just reads the file with coefficients, nothing else.
     call load_expansion(vec3ed,vec3ez,ist)
     ! Load basis for FBR. DVR means DVR along phi, which is always false now.
-    if (.not.dvr) then
+    ! if (.not.dvr) then
       allocate(basis(n3,n3b))
       call init_fbrbasis(basis) ! Evaluates FBR (normalized) on phi grid
-    end if
+    ! end if
 
     ! Loop over slice (n-block)
     do isl=1,n1
@@ -2788,10 +2789,10 @@ contains
     nvec2 = size(vec2e,2)
 
     ! Load basis for FBR
-    if (.not.dvr) then
+    ! if (.not.dvr) then
       allocate(basis(n3,n3b))
       call init_fbrbasis(basis)
-    end if
+    ! end if
 
     ! Allocate arrays
     allocate(myp(nvec2max,ngr), vec2b(n23b), vec2(n23))
@@ -2891,85 +2892,85 @@ contains
   !  Since exact direct-product is very expensive, the configuration space
   !  is reduced by excluding points with a large potential energy.
   !-----------------------------------------------------------------------
-  subroutine calc_dprod
-    real*8,allocatable::a(:,:)      ! Chunk of reduced matrix
-    real*8,allocatable::psi(:)      ! Initial basis function
-    real*8,allocatable::hpsi(:)     ! Hamilt * psi
-    real*8,allocatable::val(:)      ! Resulted eigenvalues
-    real*8,allocatable::vec(:,:)    ! Resulted eigenvectors
-    real*8,allocatable::vecred(:,:) ! Eigenvectors in reduced form
-    real*8,allocatable::idx(:,:)    ! Indices of included points
-    integer np,ip                   ! Number of included points
-    integer i1,i2,i3,k,istate
-    character(256) fn
-    real*8 stsy,s(n1)
-    integer nploc,numroc,j,id,myj
-
-    ! Calculate indices of included points
-    call calc_reduction(np,idx)
-    ! Calculate reduced matrix
-    nploc = numroc( np, 1, myid, 0, nprocs)
-    allocate(a(np,nploc),psi(nn),hpsi(nn), val(nstate),vecred(np,nstate),vec(nn,nstate))
-
-    ! Calculate matrix blocks
-    do j=1,np
-      call g2l(j,np,nprocs,1,id,myj)
-      if (myid==id) then
-       psi = 0d0
-       k = (idx(j,1)-1)*n23 + (idx(j,2)-1)*n3 + idx(j,3)
-       psi(k) = 1d0
-       call hamilt3D(psi,hpsi)
-       do ip=1,np
-         k = (idx(ip,1)-1)*n23 + (idx(ip,2)-1)*n3 + idx(ip,3)
-         a(ip,myj) = hpsi(k)
-       end do
-      end if
-    end do
-    if (myid==0)write(*,*)'Reduced matrix size: ',np
-
-    ! Calculate matrix eigen decomposition
-    call scald_cd(context,np,nstate,vecred,val,a,nploc)
-    vec = 0
-    do istate=1,nstate
-      do ip=1,np
-        k = (idx(ip,1)-1)*n23 + (idx(ip,2)-1)*n3 + idx(ip,3)
-        vec(k,istate) = vecred(ip,istate)
-      end do
-    end do
-
-    ! Only root continues with printing
-    if (myid /= 0)return
-
-    ! Convert states
-    s = sqrt(jac1 * alpha1)
-    do istate=1,nstate
-      do k=1,nn
-        i1 = (k-1) / n23 + 1
-        vec(k,istate) = vec(k,istate) / s(i1)
-      end do
-    end do
-
-    ! Print results
-    open(1,file='eigenvalues.out')
-    do k=1,nstate
-      call symmetryd(vec(:,k),stsy)
-      write(1,'(I4,2F25.17)')k,val(k)*autown,stsy
-    end do
-    close(1)
-    do istate=1,nstate
-      write(fn,'(A5,I0,A4)')'state',istate,'.out'
-      open(1,file=fn)
-      do i1=1,n1
-      do i2=1,n2
-      do i3=1,n3
-        k = i3 + (i2-1)*n3 + (i1-1)*n2*n3
-        write(1,*)vec(k,istate)**2
-      end do
-      end do
-      end do
-      close(1)
-    end do
-  end subroutine
+  ! subroutine calc_dprod
+  !   real*8,allocatable::a(:,:)      ! Chunk of reduced matrix
+  !   real*8,allocatable::psi(:)      ! Initial basis function
+  !   real*8,allocatable::hpsi(:)     ! Hamilt * psi
+  !   real*8,allocatable::val(:)      ! Resulted eigenvalues
+  !   real*8,allocatable::vec(:,:)    ! Resulted eigenvectors
+  !   real*8,allocatable::vecred(:,:) ! Eigenvectors in reduced form
+  !   real*8,allocatable::idx(:,:)    ! Indices of included points
+  !   integer np,ip                   ! Number of included points
+  !   integer i1,i2,i3,k,istate
+  !   character(256) fn
+  !   real*8 stsy,s(n1)
+  !   integer nploc,numroc,j,id,myj
+  !
+  !   ! Calculate indices of included points
+  !   call calc_reduction(np,idx)
+  !   ! Calculate reduced matrix
+  !   nploc = numroc( np, 1, myid, 0, nprocs)
+  !   allocate(a(np,nploc),psi(nn),hpsi(nn), val(nstate),vecred(np,nstate),vec(nn,nstate))
+  !
+  !   ! Calculate matrix blocks
+  !   do j=1,np
+  !     call g2l(j,np,nprocs,1,id,myj)
+  !     if (myid==id) then
+  !      psi = 0d0
+  !      k = (idx(j,1)-1)*n23 + (idx(j,2)-1)*n3 + idx(j,3)
+  !      psi(k) = 1d0
+  !      call hamilt3D(psi,hpsi)
+  !      do ip=1,np
+  !        k = (idx(ip,1)-1)*n23 + (idx(ip,2)-1)*n3 + idx(ip,3)
+  !        a(ip,myj) = hpsi(k)
+  !      end do
+  !     end if
+  !   end do
+  !   if (myid==0)write(*,*)'Reduced matrix size: ',np
+  !
+  !   ! Calculate matrix eigen decomposition
+  !   call scald_cd(context,np,nstate,vecred,val,a,nploc)
+  !   vec = 0
+  !   do istate=1,nstate
+  !     do ip=1,np
+  !       k = (idx(ip,1)-1)*n23 + (idx(ip,2)-1)*n3 + idx(ip,3)
+  !       vec(k,istate) = vecred(ip,istate)
+  !     end do
+  !   end do
+  !
+  !   ! Only root continues with printing
+  !   if (myid /= 0)return
+  !
+  !   ! Convert states
+  !   s = sqrt(jac1 * alpha1)
+  !   do istate=1,nstate
+  !     do k=1,nn
+  !       i1 = (k-1) / n23 + 1
+  !       vec(k,istate) = vec(k,istate) / s(i1)
+  !     end do
+  !   end do
+  !
+  !   ! Print results
+  !   open(1,file='eigenvalues.out')
+  !   do k=1,nstate
+  !     call symmetryd(vec(:,k),stsy)
+  !     write(1,'(I4,2F25.17)')k,val(k)*autown,stsy
+  !   end do
+  !   close(1)
+  !   do istate=1,nstate
+  !     write(fn,'(A5,I0,A4)')'state',istate,'.out'
+  !     open(1,file=fn)
+  !     do i1=1,n1
+  !     do i2=1,n2
+  !     do i3=1,n3
+  !       k = i3 + (i2-1)*n3 + (i1-1)*n2*n3
+  !       write(1,*)vec(k,istate)**2
+  !     end do
+  !     end do
+  !     end do
+  !     close(1)
+  !   end do
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates symmetry of 3D state. Real version.
@@ -3386,10 +3387,10 @@ contains
     ! Transform to grid if requested
     if (ongrid) then
       ! Load basis for FBR
-      if (.not.dvr) then
+      ! if (.not.dvr) then
         allocate(basis(n3,n3b))
         call init_fbrbasis(basis)
-      end if
+      ! end if
 
       ! Get normalized grid function
       allocate(vec2(n23))
@@ -3405,29 +3406,29 @@ contains
   !-----------------------------------------------------------------------
   !  Calculates 1D Hamiltonian for coordinate #1. Real version.
   !-----------------------------------------------------------------------
-  subroutine init_matrix1d(ham)
-    implicit none
-    real*8 ham(n1,n1)
-    real*8 L
-    integer i,j
-
-    ! FFT
-    if (ham1type == HAM1_FFT) then
-      ham = - der1 / (2d0 * mu) ! /tools/pesgeneral.f90
-    ! Finite differences
-    else
-      L = n1 * alpha1
-      do i=1,n1
-        do j=1,n1
-          if (i == j) then 
-            ham(i,j) = pi**2 / (mu * L**2) * (n1**2 + 2) / 6 / jac1(i)**2
-          else
-            ham(i,j) = pi**2 / (mu * L**2 * 2) * (-1)**(i-j) / (sin((i-j)*pi/n1))**2 * (1/jac1(i)**2 + 1/jac1(j)**2)
-          endif
-        enddo
-      enddo
-    endif
-  end subroutine
+  ! subroutine init_matrix1d(ham)
+  !   implicit none
+  !   real*8 ham(n1,n1)
+  !   real*8 L
+  !   integer i,j
+  !
+  !   ! FFT
+  !   if (ham1type == HAM1_FFT) then
+  !     ham = - der1 / (2d0 * mu) ! /tools/pesgeneral.f90
+  !   ! Finite differences
+  !   else
+  !     L = n1 * alpha1
+  !     do i=1,n1
+  !       do j=1,n1
+  !         if (i == j) then
+  !           ham(i,j) = pi**2 / (mu * L**2) * (n1**2 + 2) / 6 / jac1(i)**2
+  !         else
+  !           ham(i,j) = pi**2 / (mu * L**2 * 2) * (-1)**(i-j) / (sin((i-j)*pi/n1))**2 * (1/jac1(i)**2 + 1/jac1(j)**2)
+  !         endif
+  !       enddo
+  !     enddo
+  !   endif
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates 1D Hamiltonian for coordinate #1. Complex version.
@@ -3444,12 +3445,12 @@ contains
     real*8 t
 
     ! Complex fft
-    if (ham1type == HAM1_FFT_CMPL) then
+    ! if (ham1type == HAM1_FFT_CMPL) then
       ham = - der1z / (2d0 * mu)
-    else
-      call init_matrix1d(tmp)
-      ham = tmp
-    endif
+    ! else
+    !   call init_matrix1d(tmp)
+    !   ham = tmp
+    ! endif
 
     ! Add complex potential
     if (capid /= 0) then
@@ -3459,46 +3460,46 @@ contains
     endif
 
     ! Exit if FFT
-    if (ham1type == HAM1_FFT .or. ham1type == HAM1_FFT_CMPL) then
+    ! if (ham1type == HAM1_FFT .or. ham1type == HAM1_FFT_CMPL) then
       return
-    end if
+    ! end if
 
     ! If not FFT, then add potential term due to grid jacobian
-    do i=1,n1
-      ! Calculate 1st derivative
-      if (i == 1) then
-        fd = jac1(i)   * (-1     ) + jac1(i+1) * ( 1     )
-      elseif (i == n1) then
-        fd = jac1(i-1) * (-1     ) + jac1(i)   * ( 1     )
-      elseif (i == 2 .or. i == n1-1) then
-        fd = jac1(i-1) * (-1d0/2 ) + jac1(i)   * (     0 ) + jac1(i+1) * ( 1d0/2 )
-      elseif (i == 3 .or. i == n1-2) then
-        fd = jac1(i-2) * ( 1d0/12) + jac1(i-1) * (-2d0/3 ) + jac1(i)   * (     0 ) + jac1(i+1) * ( 2d0/3 ) + jac1(i+2) * (-1d0/12)
-      elseif (ham1type == HAM1_ANALYTIC6 .or. (ham1type == HAM1_ANALYTIC8 .and. (i == 4 .or. i == n1-3))) then
-        fd = jac1(i-3) * (-1d0/60) + jac1(i-2) * ( 3d0/20) + jac1(i-1) * (-3d0/4 ) + jac1(i)   * (     0 ) + jac1(i+1) * ( 3d0/4 ) + jac1(i+2) * (-3d0/20) + jac1(i+3) * ( 1d0/60)
-      elseif (ham1type == HAM1_ANALYTIC8) then
-        fd = jac1(i-4) * ( 1d0/280) + jac1(i-3) * (-4d0/105) + jac1(i-2) * (1d0/5) + jac1(i-1) * (-4d0/5) + jac1(i) * (0) + jac1(i+1) * (4d0/5) + jac1(i+2) * (-1d0/5) + jac1(i+3) * (4d0/105) + jac1(i+4) * (-1d0/280)
-      endif
-      fd = fd / alpha1
-
-      ! Calculate 2nd derivative
-      if (i == 1) then
-        sd = jac1(i)   * ( 1     ) + jac1(i+1) * (-2     ) + jac1(i+2) * ( 1     )
-      elseif (i == n1) then
-        sd = jac1(i-2) * ( 1     ) + jac1(i-1) * (-2     ) + jac1(i)   * ( 1     )
-      elseif (i == 2 .or. i == n1-1) then
-        sd = jac1(i-1) * ( 1     ) + jac1(i)   * (-2     ) + jac1(i+1) * ( 1     )
-      elseif (i == 3 .or. i == n1-2) then
-        sd = jac1(i-2) * (-1d0/12) + jac1(i-1) * ( 4d0/3 ) + jac1(i)   * (-5d0/2 ) + jac1(i+1) * ( 4d0/3 ) + jac1(i+2) * (-1d0/12)
-      elseif (ham1type == HAM1_ANALYTIC6 .or. (ham1type == HAM1_ANALYTIC8 .and. (i == 4 .or. i == n1-3))) then
-        sd = jac1(i-3) * ( 1d0/90) + jac1(i-2) * (-3d0/20) + jac1(i-1) * ( 3d0/2 ) + jac1(i)   * (-49d0/18 ) + jac1(i+1) * ( 3d0/2 ) + jac1(i+2) * (-3d0/20) + jac1(i+3) * ( 1d0/90)
-      elseif (ham1type == HAM1_ANALYTIC8) then
-        sd = jac1(i-4) * (-1d0/560) + jac1(i-3) * (8d0/315) + jac1(i-2) * (-1d0/5) + jac1(i-1) * (8d0/5) + jac1(i) * (-205d0/72) + jac1(i+1) * (8d0/5) + jac1(i+2) * (-1d0/5) + jac1(i+3) * (8d0/315) + jac1(i+4) * (-1d0/560)
-      endif
-      sd = sd / alpha1**2
-      t = 7d0/4 * fd**2 / jac1(i)**4 - sd / jac1(i)**3 / 2
-      ham(i,i) = ham(i,i) + t / (2d0 * mu)
-    end do
+    ! do i=1,n1
+    !   Calculate 1st derivative
+    !   if (i == 1) then
+    !     fd = jac1(i)   * (-1     ) + jac1(i+1) * ( 1     )
+    !   elseif (i == n1) then
+    !     fd = jac1(i-1) * (-1     ) + jac1(i)   * ( 1     )
+    !   elseif (i == 2 .or. i == n1-1) then
+    !     fd = jac1(i-1) * (-1d0/2 ) + jac1(i)   * (     0 ) + jac1(i+1) * ( 1d0/2 )
+    !   elseif (i == 3 .or. i == n1-2) then
+    !     fd = jac1(i-2) * ( 1d0/12) + jac1(i-1) * (-2d0/3 ) + jac1(i)   * (     0 ) + jac1(i+1) * ( 2d0/3 ) + jac1(i+2) * (-1d0/12)
+    !   elseif (ham1type == HAM1_ANALYTIC6 .or. (ham1type == HAM1_ANALYTIC8 .and. (i == 4 .or. i == n1-3))) then
+    !     fd = jac1(i-3) * (-1d0/60) + jac1(i-2) * ( 3d0/20) + jac1(i-1) * (-3d0/4 ) + jac1(i)   * (     0 ) + jac1(i+1) * ( 3d0/4 ) + jac1(i+2) * (-3d0/20) + jac1(i+3) * ( 1d0/60)
+    !   elseif (ham1type == HAM1_ANALYTIC8) then
+    !     fd = jac1(i-4) * ( 1d0/280) + jac1(i-3) * (-4d0/105) + jac1(i-2) * (1d0/5) + jac1(i-1) * (-4d0/5) + jac1(i) * (0) + jac1(i+1) * (4d0/5) + jac1(i+2) * (-1d0/5) + jac1(i+3) * (4d0/105) + jac1(i+4) * (-1d0/280)
+    !   endif
+    !   fd = fd / alpha1
+    !
+    !   Calculate 2nd derivative
+    !   if (i == 1) then
+    !     sd = jac1(i)   * ( 1     ) + jac1(i+1) * (-2     ) + jac1(i+2) * ( 1     )
+    !   elseif (i == n1) then
+    !     sd = jac1(i-2) * ( 1     ) + jac1(i-1) * (-2     ) + jac1(i)   * ( 1     )
+    !   elseif (i == 2 .or. i == n1-1) then
+    !     sd = jac1(i-1) * ( 1     ) + jac1(i)   * (-2     ) + jac1(i+1) * ( 1     )
+    !   elseif (i == 3 .or. i == n1-2) then
+    !     sd = jac1(i-2) * (-1d0/12) + jac1(i-1) * ( 4d0/3 ) + jac1(i)   * (-5d0/2 ) + jac1(i+1) * ( 4d0/3 ) + jac1(i+2) * (-1d0/12)
+    !   elseif (ham1type == HAM1_ANALYTIC6 .or. (ham1type == HAM1_ANALYTIC8 .and. (i == 4 .or. i == n1-3))) then
+    !     sd = jac1(i-3) * ( 1d0/90) + jac1(i-2) * (-3d0/20) + jac1(i-1) * ( 3d0/2 ) + jac1(i)   * (-49d0/18 ) + jac1(i+1) * ( 3d0/2 ) + jac1(i+2) * (-3d0/20) + jac1(i+3) * ( 1d0/90)
+    !   elseif (ham1type == HAM1_ANALYTIC8) then
+    !     sd = jac1(i-4) * (-1d0/560) + jac1(i-3) * (8d0/315) + jac1(i-2) * (-1d0/5) + jac1(i-1) * (8d0/5) + jac1(i) * (-205d0/72) + jac1(i+1) * (8d0/5) + jac1(i+2) * (-1d0/5) + jac1(i+3) * (8d0/315) + jac1(i+4) * (-1d0/560)
+    !   endif
+    !   sd = sd / alpha1**2
+    !   t = 7d0/4 * fd**2 / jac1(i)**4 - sd / jac1(i)**3 / 2
+    !   ham(i,i) = ham(i,i) + t / (2d0 * mu)
+    ! end do
   end subroutine
 
   !-----------------------------------------------------------------------
@@ -3513,11 +3514,11 @@ contains
     integer i,j
 
     ! FFT
-    if (ham2type == HAM2_FFT) then
-      coeff = - 1 / (2d0 * mu) * 4 / grho2(ic1)
-      ham = der2 * coeff
-    ! Analytic
-    else
+    ! if (ham2type == HAM2_FFT) then
+    !   coeff = - 1 / (2d0 * mu) * 4 / grho2(ic1)
+    !   ham = der2 * coeff
+    ! ! Analytic
+    ! else
       L = n2 * alpha2
       coeff = pi**2 / (mu * L**2) * 4 / grho2(ic1)
       do i=1,n2
@@ -3527,23 +3528,23 @@ contains
           ham(j,i) = ham(i,j)
         end do
       end do
-    endif
+    ! endif
   end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates 1D Hamiltonian for coordinate #3 using DVR.
   !-----------------------------------------------------------------------
-  subroutine init_matrix3dvr(ham,ic1,ic2)
-    implicit none
-    real*8 ham(n3,n3)
-    integer ic1,ic2,ic3
-    real*8 coeff
-    coeff = - 1 / (2d0 * mu) * 4 / grho2(ic1) / sintet2(ic2)
-    ham = der3 * coeff
-    do ic3=1,n3
-      ham(ic3,ic3) = ham(ic3,ic3) + pottot(ic3,ic2,ic1)
-    enddo
-  end subroutine
+  ! subroutine init_matrix3dvr(ham,ic1,ic2)
+  !   implicit none
+  !   real*8 ham(n3,n3)
+  !   integer ic1,ic2,ic3
+  !   real*8 coeff
+  !   coeff = - 1 / (2d0 * mu) * 4 / grho2(ic1) / sintet2(ic2)
+  !   ham = der3 * coeff
+  !   do ic3=1,n3
+  !     ham(ic3,ic3) = ham(ic3,ic3) + pottot(ic3,ic2,ic1)
+  !   enddo
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates 1D Hamiltonian for coordinate #3 using FBR.
@@ -3598,62 +3599,62 @@ contains
   !-----------------------------------------------------------------------
   !  Applies 3D hamiltonian operator to 3D wave function.
   !-----------------------------------------------------------------------
-  subroutine hamilt3D(psi,hpsi)
-    implicit none
-    real*8 psi(nn),hpsi(nn)
-    real*8 hpsi1(n1,n3,n2)
-    real*8 hpsi2(n2,n3,n1)
-    real*8 hpsi3(n3,n2,n1)
-    integer i1,i2,i3,k
-    hpsi1 = 0
-    hpsi2 = 0
-    hpsi3 = 0
-    do i1=1,n1
-      do i2=1,n2
-        do i3=1,n3
-          k = i3 + (i2-1)*n3 + (i1-1)*n2*n3
-          hpsi1(i1,i3,i2) = psi(k)
-          hpsi2(i2,i3,i1) = psi(k)
-          hpsi3(i3,i2,i1) = psi(k)
-        enddo
-      enddo
-    enddo
-    call calc_derivd_jac_2nd(n1,n2*n3,hpsi1,freq1,jac1) ! general_vars
-    call calc_derivd(2,n1*n3,n2,freq2,hpsi2)
-    call calc_derivd(2,n1*n2,n3,freq3,hpsi3)
-    do i1=1,n1
-      do i2=1,n2
-        do i3=1,n3
-          k = i3 + (i2-1)*n3 + (i1-1)*n2*n3
-          hpsi(k) =  hpsi1(i1,i3,i2) + 4/grho2(i1) * ( hpsi2(i2,i3,i1) + hpsi3(i3,i2,i1) / sintet2(i2) )
-          hpsi(k) = -hpsi(k)/(2.0d0*mu) + psi(k)*pottot(i3,i2,i1)
-          if (capid /= 0)hpsi(k)= hpsi(k) + psi(k)*(0,-1)*all_caps(i1,capid)
-        enddo
-      enddo
-    enddo
-  end subroutine
+  ! subroutine hamilt3D(psi,hpsi)
+  !   implicit none
+  !   real*8 psi(nn),hpsi(nn)
+  !   real*8 hpsi1(n1,n3,n2)
+  !   real*8 hpsi2(n2,n3,n1)
+  !   real*8 hpsi3(n3,n2,n1)
+  !   integer i1,i2,i3,k
+  !   hpsi1 = 0
+  !   hpsi2 = 0
+  !   hpsi3 = 0
+  !   do i1=1,n1
+  !     do i2=1,n2
+  !       do i3=1,n3
+  !         k = i3 + (i2-1)*n3 + (i1-1)*n2*n3
+  !         hpsi1(i1,i3,i2) = psi(k)
+  !         hpsi2(i2,i3,i1) = psi(k)
+  !         hpsi3(i3,i2,i1) = psi(k)
+  !       enddo
+  !     enddo
+  !   enddo
+  !   call calc_derivd_jac_2nd(n1,n2*n3,hpsi1,freq1,jac1) ! general_vars
+  !   call calc_derivd(2,n1*n3,n2,freq2,hpsi2)
+  !   call calc_derivd(2,n1*n2,n3,freq3,hpsi3)
+  !   do i1=1,n1
+  !     do i2=1,n2
+  !       do i3=1,n3
+  !         k = i3 + (i2-1)*n3 + (i1-1)*n2*n3
+  !         hpsi(k) =  hpsi1(i1,i3,i2) + 4/grho2(i1) * ( hpsi2(i2,i3,i1) + hpsi3(i3,i2,i1) / sintet2(i2) )
+  !         hpsi(k) = -hpsi(k)/(2.0d0*mu) + psi(k)*pottot(i3,i2,i1)
+  !         if (capid /= 0)hpsi(k)= hpsi(k) + psi(k)*(0,-1)*all_caps(i1,capid)
+  !       enddo
+  !     enddo
+  !   enddo
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates second derivative on optimal grid. Real
   !-----------------------------------------------------------------------
-  subroutine calc_derivd_jac_2nd(ni,nj,psi,freq,jac)
-    implicit none
-    integer ni,nj,i,j
-    real*8 psi(ni,nj),freq(ni),jac(ni),sqrtjac(ni)
-    
-    sqrtjac = sqrt(jac)
-    do j=1,nj
-      psi(:,j) = psi(:,j) / sqrtjac
-    enddo
-    call calc_derivd(1,nj,ni,freq,psi)
-    do j=1,nj
-      psi(:,j) = psi(:,j) / jac
-    enddo
-    call calc_derivd(1,nj,ni,freq,psi)
-    do j=1,nj
-      psi(:,j) = psi(:,j) / sqrtjac
-    enddo
-  end subroutine
+  ! subroutine calc_derivd_jac_2nd(ni,nj,psi,freq,jac)
+  !   implicit none
+  !   integer ni,nj,i,j
+  !   real*8 psi(ni,nj),freq(ni),jac(ni),sqrtjac(ni)
+  !
+  !   sqrtjac = sqrt(jac)
+  !   do j=1,nj
+  !     psi(:,j) = psi(:,j) / sqrtjac
+  !   enddo
+  !   call calc_derivd(1,nj,ni,freq,psi)
+  !   do j=1,nj
+  !     psi(:,j) = psi(:,j) / jac
+  !   enddo
+  !   call calc_derivd(1,nj,ni,freq,psi)
+  !   do j=1,nj
+  !     psi(:,j) = psi(:,j) / sqrtjac
+  !   enddo
+  ! end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates second derivative on optimal grid. Complex
