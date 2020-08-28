@@ -10,7 +10,6 @@ set(general_vars src/tools/general_vars.f90)
 set(debug_tools src/tools/debug_tools.f90)
 set(input_params src/tools/input_params.f90)
 set(rovib_utils ${input_params} src/utils/rovib_utils.f90)
-set(mkl src/tools/deriv/mkl.f90)
 set(index_conversion src/tools/index_conversion.f90)
 set(parabola src/tools/parabola.f90)
 
@@ -74,12 +73,12 @@ set(parpack ${algorithms} ${index_conversion} ${matmul_operator} ${parallel_util
 set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${rovib_io} ${rovib_utils} ${input_params} ${general_utils} ${parallel_utils} ${path_utils} ${debug_tools} src/rovib/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${debug_tools} src/tools/eicalc/slepc_solver.F90)
 set(lapack_interface ${general_utils} src/interface/lapack.f90)
-set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${lapack_interface} ${matmul_operator} ${mkl} ${parabola} ${parpack} ${pesgeneral} ${rovib_io} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
+set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${lapack_interface} ${matmul_operator} ${parabola} ${parpack} ${pesgeneral} ${rovib_io} ${scalapack} ${slepc_solver} ${debug_tools} src/tools/sdt.f90)
 set(numerical_recipies src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} src/tools/optgrid_tools.f90)
 
 # Specify where to look for external module files (-I option)
-include_directories(include src/include extra/mklmods libs/fdict/build/include libs/ftl/build/include/ftl libs/petsc/include libs/petsc/debug_64/include libs/slepc/include libs/slepc/debug_64/include)
+include_directories(include src/include libs/fdict/build/include libs/ftl/build/include/ftl libs/petsc/include libs/petsc/debug_64/include libs/slepc/include libs/slepc/debug_64/include)
 
 # Specify where to look for libraries (-L option)
 link_directories(libs/arpack-ng/build libs/fdict/build/lib libs/ftl/build/lib libs/petsc/debug_64/lib libs/slepc/debug_64/lib)
@@ -95,7 +94,7 @@ target_link_libraries(optgrid parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 add_executable(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${dawes} src/programs/pesprint.f90)
 target_link_libraries(pesprint fdict ftl pcreposix parpack arpack mkl_blas95_lp64 mkl_lapack95_lp64)
 
-add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${parpack} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)
+add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${fourier_transform} ${general_vars} ${index_conversion} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${parpack} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} src/programs/spectrumsdt.F90)
 target_link_libraries(spectrumsdt parpack arpack fdict ftl mkl_blas95_lp64 mkl_lapack95_lp64 pcreposix petsc slepc)
 
 add_executable(kinetics ${pesgeneral} src/programs/kinetics.f90)

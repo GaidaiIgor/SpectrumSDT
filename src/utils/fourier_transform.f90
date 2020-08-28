@@ -104,17 +104,23 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Applies dft_derivative to all columns of a given matrix
+! Calculates the 2nd derivative of an optimized DVR basis, taking into account its Jacobian
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function dft_derivative_all(time_samples, period, order) result(deriv_time_samples)
-    complex(real64), intent(in) :: time_samples(:, :)
+  function dft_derivative2_jac(basis, jac, period) result(basis_deriv2)
+    complex(real64), intent(in) :: basis(:, :)
+    real(real64), intent(in) :: jac(:)
     real(real64), intent(in) :: period
-    integer, intent(in) :: order
-    complex(real64) :: deriv_time_samples(size(time_samples, 1), size(time_samples, 2))
+    complex(real64) :: basis_deriv2(size(basis, 1), size(basis, 2))
     integer :: n
-
-    do n = 1, size(time_samples, 2)
-      deriv_time_samples(:, n) = dft_derivative(time_samples(:, n), period, order)
+    
+    basis_deriv2 = basis
+    do n = 1, size(basis_deriv2, 2)
+      basis_deriv2(:, n) = basis_deriv2(:, n) / sqrt(jac)
+      basis_deriv2(:, n) = dft_derivative(basis_deriv2(:, n), period, 1)
+      basis_deriv2(:, n) = basis_deriv2(:, n) / jac
+      basis_deriv2(:, n) = dft_derivative(basis_deriv2(:, n), period, 1)
+      basis_deriv2(:, n) = basis_deriv2(:, n) / sqrt(jac)
     end do
   end function
+
 end module
