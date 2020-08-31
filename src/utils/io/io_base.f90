@@ -140,7 +140,7 @@ contains
       do j = 1,size(matrix, 2)
         call write_element(matrix(i, j), file_unit)
       end do
-      call write_element('\n', file_unit)
+      write(file_unit, '(/)')
     end do
   end subroutine
 
@@ -157,11 +157,11 @@ contains
     file_unit = get_file_unit(file_name, append)
     do i = 1,size(array)
       call write_element(array(i), file_unit)
-      if (vertical_act == 1) then
-        call write_element('\n', file_unit)
+      if (vertical_act) then
+        write(file_unit, '(/)')
       end if
     end do
-    call write_element('\n', file_unit)
+    write(file_unit, '(/)')
     close(file_unit)
   end subroutine
 
@@ -178,8 +178,8 @@ contains
     new_line_act = arg_or_default(new_line, 1)
     file_unit = get_file_unit(file_name, append)
     call write_element(smth, file_unit)
-    if (new_line_act == 1) then
-      call write_element('\n', file_unit)
+    if (new_line_act) then
+      write(file_unit, '(/)')
     end if
     close(file_unit)
   end subroutine
