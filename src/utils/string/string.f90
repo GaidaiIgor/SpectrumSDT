@@ -115,7 +115,7 @@ contains
   elemental function length(this) result(res)
     class(string), intent(in) :: this
     integer :: res
-    res = len(this%s)
+    res = len(this % s)
   end function
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
@@ -128,8 +128,8 @@ contains
     integer :: start_act, end_act
     
     start_act = arg_or_default(start, 1)
-    end_act = arg_or_default(end, this%length())
-    res = this%s(start_act:end_act)
+    end_act = arg_or_default(end, this % length())
+    res = this % s(start_act:end_act)
   end function
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
@@ -141,7 +141,7 @@ contains
   elemental function to_string_char_str(char_str) result(str)
     character(*), intent(in) :: char_str
     type(string) :: str
-    str%s = char_str
+    str % s = char_str
   end function
   
 !---------------------------------------------------------------------------------------------------------------------------------------------

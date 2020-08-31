@@ -1,80 +1,7 @@
-!  Sequential Diagonalization Truncation, 3D (sdt.f)
-!  Uses optimal grid for first coordinate and equidistant for other two.
-!  Calculation is controlled by "sdtcode" variable.
-!
-!  1st digit: mode
-!    0. Calculates 3D eigenpairs of direct product matrix
-!    1. Calculates 1D and 2D basis using SDT
-!    2. Calculates overlap matrix between 2D vectors
-!    3. Calculates 3D eigenpairs using SDT
-!    4. Post-processing
-!    5. Build states, computed in 3
-!    6. Channel recognition
-!    7. Channel diagonalization
-!    8. Build states, computed in 7
-!    9. Compute pathway probs for basis functions
-!
-!  2nd digit: solver
-!    0. ScaLapack
-!    1. Parpack
-!    2. Lapack
-!
-!  3rd digit: real or complex
-!    0. Real
-!    1. Complex
-!
-!  4th digit: number of wells
-!    1. One well
-!    3. Three wells
-!
-!  5th digit: representation
-!    0. DVR
-!    1. FBR
-!
-!  6th digit: symmetry/basis
-!    0. No symmetry restriction
-!    1. A1       Cos  3x
-!    2. A2       Sin  3x
-!    3. E1       Cos  No 3x
-!    4. E2       Sin  No 3x
-!    5. Sym.     Cos  All
-!    6. Antisym. Sin  All
-!
-!  7th digit: output control for mode 1
-!    0. Save basis in binary form
-!    1. Print 1D solutions
-!    2. Print 2D solutions
-!    3. Print both 1D and 2D solutions
-!
-!  8th digit: Truncation method
-!    0. By Ecut value
-!    1. Fixed number of channels
-!
-!  9th digit: overlaps between
-!    0. Adiabatic states in all slices
-!    1. Adiabatic states in adjacent slices
-!    2. States of one  diabatic channel  in all slices
-!    3. States of many diabatic channels in all slices in pathway S
-!
-! 10th digit: recognition start
-!    0. The last slice
-!    1. The bottom of the well
-!
-! 11th digit: recognition load directory
-!    0. Default
-!    1. Dense grid
-!
-! 12th digit: hamiltonian type for coordinate #1
-!    0. Computed using FFT
-!    1. Computed using finite differences, accuracy order 6
-!    2. Computed using finite differences, accuracy order 8
-!    3. Computed using FFT, complex
-!
-! 13th digit: hamiltonian type for coordinate #2
-!    0. Computed using FFT
-!    1. Computed analytically
-!
-!  Author: Alexander Teplukhin
+!----------------------------------------------------------------------
+! Calculates basis for sdt and some of the overlaps
+! + a lot of legacy code that does not do anything
+! Author: Alexander Teplukhin
 !-----------------------------------------------------------------------
 module sdt
   use algorithms
@@ -87,7 +14,6 @@ module sdt
   use lapack_interface_mod
   use matmul_operator_mod
   use parabola
-  use parpack
   use pesgeneral
   use rovib_io_mod
   use scalapack

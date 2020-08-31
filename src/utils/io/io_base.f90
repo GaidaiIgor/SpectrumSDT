@@ -1,5 +1,6 @@
 module io_base_mod
   use general_utils
+  use iso_fortran_env, only : real64
   
   interface myprint
     module procedure :: print_element, print_array, print_matrix
@@ -40,7 +41,7 @@ contains
     transpose_act = merge(transpose, 0, present(transpose))
     print_size_act = merge(print_size, 0, present(print_size))
     if (present(fileName)) then
-      if (append_act) then
+      if (append_act == 1) then
         open(newunit = fileUnit, file = fileName, position = 'append')
       else
         open(newunit = fileUnit, file = fileName)
@@ -52,7 +53,7 @@ contains
     if (print_size_act == 1) then
       write(fileUnit, '(I0,x,I0)') size(matrix, 1), size(matrix, 2)
     end if
-    if (transpose_act) then
+    if (transpose_act == 1) then
       do j = 1,size(matrix, 2)
         write(fileUnit, '(*(E26.17))') (matrix(i, j), i = 1,size(matrix, 1))
       end do
@@ -115,9 +116,9 @@ contains
     select type(smth)
     type is (integer)
       write(file_unit, '(3x,I0$)') smth
-    type is (real*8)
+    type is (real(real64))
       write(file_unit, '(3x,G24.16$)') smth
-    type is (complex*16)
+    type is (complex(real64))
       ! write(file_unit, '(3x,ES23.16,SP,ES23.16,A$)') real(smth), aimag(smth), 'i'
       write(file_unit, '(3x,A,G0.16,A,G0.16,A$)') '(', real(smth), ',', aimag(smth), ')'
     type is (character(*))
@@ -174,12 +175,7 @@ contains
     integer :: new_line_act
     integer :: file_unit
 
-    if (present(new_line)) then
-      new_line_act = new_line
-    else
-      new_line_act = 1
-    end if
-
+    new_line_act = arg_or_default(new_line, 1)
     file_unit = get_file_unit(file_name, append)
     call write_element(smth, file_unit)
     if (new_line_act) then

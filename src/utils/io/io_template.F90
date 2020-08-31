@@ -9,16 +9,16 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Reads matrix from file
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(read_matrix_, TEMPLATE_TYPE_NAME)(file_path) result(matrix)
+  function CONCAT2(read_matrix_,TEMPLATE_TYPE_NAME)(file_path) result(matrix)
     character(*), intent(in) :: file_path
-    TEMPLATE_TYPE, allocatable :: matrix(:, :)
-    type(CONCAT2(vector_array_1d_, TEMPLATE_TYPE_NAME)) :: matrix_vector
+    TEMPLATE_TYPE_OUT, allocatable :: matrix(:, :)
+    type(CONCAT2(vector_array_1d_,TEMPLATE_TYPE_NAME)) :: matrix_vector
     integer :: file_unit
     character(:), allocatable :: next_line
     type(string), allocatable :: line_tokens(:)
-    TEMPLATE_TYPE, allocatable :: next_row(:)
+    TEMPLATE_TYPE_OUT, allocatable :: next_row(:)
 
-    matrix_vector = CONCAT2(vector_array_1d_, TEMPLATE_TYPE_NAME)()
+    matrix_vector = CONCAT2(vector_array_1d_,TEMPLATE_TYPE_NAME)()
     open(newunit = file_unit, file = file_path)
     do
       next_line = read_line(file_unit)
@@ -28,17 +28,17 @@ contains
       line_tokens = strsplit(next_line) ! split by spaces
       line_tokens = pack(line_tokens, line_tokens % length() > 0) ! filter out empty tokens
 
-      next_row = line_tokens % CONCAT2(to_, TEMPLATE_TYPE_NAME)() ! convert strings to target type
-      call matrix_vector % push(CONCAT2(array_1d_, TEMPLATE_TYPE_NAME)(next_row)) ! wrap into the type and store in matrix
+      next_row = line_tokens % CONCAT2(to_,TEMPLATE_TYPE_NAME)() ! convert strings to target type
+      call matrix_vector % push(CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)(next_row)) ! wrap into the type and store in matrix
     end do
     close(file_unit)
-    matrix = CONCAT3(vector_array_1d_, TEMPLATE_TYPE_NAME, _to_2D_array)(matrix_vector)
+    matrix = CONCAT3(vector_array_1d_,TEMPLATE_TYPE_NAME,_to_2D_array)(matrix_vector)
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Writes a matrix in binary form to the specified file
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine CONCAT2(write_binary_matrix_, TEMPLATE_TYPE_NAME)(matrix, file_path)
+  subroutine CONCAT2(write_binary_matrix_,TEMPLATE_TYPE_NAME)(matrix, file_path)
     TEMPLATE_TYPE, intent(in) :: matrix(:, :)
     character(*), intent(in) :: file_path
     integer :: file_unit
@@ -52,9 +52,9 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Writes a matrix in binary form to the specified file
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(read_binary_matrix_, TEMPLATE_TYPE_NAME)(file_path) result(matrix)
+  function CONCAT2(read_binary_matrix_,TEMPLATE_TYPE_NAME)(file_path) result(matrix)
     character(*), intent(in) :: file_path
-    TEMPLATE_TYPE, allocatable :: matrix(:, :)
+    TEMPLATE_TYPE_OUT, allocatable :: matrix(:, :)
     integer :: file_unit, rows, cols
 
     open(newunit = file_unit, file = file_path, form = 'unformatted')
@@ -67,7 +67,7 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Writes a matrix in binary form to the specified file
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine CONCAT2(write_binary_vector_, TEMPLATE_TYPE_NAME)(matrix, file_path)
+  subroutine CONCAT2(write_binary_vector_,TEMPLATE_TYPE_NAME)(matrix, file_path)
     TEMPLATE_TYPE, intent(in) :: matrix(:)
     character(*), intent(in) :: file_path
     integer :: file_unit
@@ -81,9 +81,9 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Writes a matrix in binary form to the specified file
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(read_binary_vector_, TEMPLATE_TYPE_NAME)(file_path) result(matrix)
+  function CONCAT2(read_binary_vector_,TEMPLATE_TYPE_NAME)(file_path) result(matrix)
     character(*), intent(in) :: file_path
-    TEMPLATE_TYPE, allocatable :: matrix(:)
+    TEMPLATE_TYPE_OUT, allocatable :: matrix(:)
     integer :: file_unit, rows
 
     open(newunit = file_unit, file = file_path, form = 'unformatted')

@@ -366,10 +366,6 @@ contains
 
     params % solver = iff('slepc', params % solver, params % solver == '-1')
 
-    if (params % ncv == -1 .and. params % num_states /= -1 .and. params % solver == 'parpack') then
-      params % ncv = params % num_states * 2
-      call announce_default(mode_id, 'ncv', num2str(params % ncv), '(2 * num_states)', optional_modes)
-    end if
     if (params % ncv == -1 .and. params % solver == 'slepc') then
       call announce_default(mode_id, 'ncv', '', '', optional_modes, 'ncv is not specified; its value will be determined by SLEPc. This might affect the number of converged ' // &
          'eigenvalues')
@@ -397,10 +393,10 @@ contains
     class(input_params), intent(in) :: params
     integer :: K_min
 
-    call assert(any(string(params % molecule) == string(['-1', '686', '868'])), 'Error: molecule can be "686" or "868"')
+    call assert(any(params % molecule == [character(len = 100) :: '-1', '686', '868']), 'Error: molecule can be "686" or "868"')
     call assert(params % J >= -1, 'Error: J should be >= 0')
     call assert(any(params % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
-    if (any(string(params % mode) == string(['diagonalization', 'properties'])) .and. params % rovib_coupling == 1) then
+    if (any(params % mode == [character(len = 100) :: 'diagonalization', 'properties']) .and. params % rovib_coupling == 1) then
       K_min = get_k_start(params % J, params % parity)
       call assert(all(params % K == -1) .or. all(params % K >= K_min), 'Error: K(1:2) should be >= mod(J+p, 2)')
     else
@@ -414,13 +410,13 @@ contains
     call assert(params % basis_K >= -1, 'Error: basis_K should be >= 0')
     ! call assert(params % basis_K <= params % basis_J, 'Error: basis_K should be <= basis_J')
 
-    call assert(any(string(params % solver) == string(['slepc', 'parpack'])), 'Error: solver can be "slepc" or "parpack"')
+    call assert(any(params % solver == [character(len = 100) :: 'slepc']), 'Error: solver can be "slepc"')
     call assert(params % num_states == -1 .or. params % num_states > 0, 'Error: num_states should be > 0')
     call assert(params % ncv == -1 .or. params % ncv > 0, 'Error: ncv should be > 0')
     call assert(params % mpd == -1 .or. params % mpd > 0, 'Error: mpd should be > 0')
     call assert(params % max_iterations == -1 .or. params % max_iterations > 0, 'Error: max_iterations should be > 0')
 
-    call assert(any(string(params % cap_type) == string(['none', 'Manolopoulos'])), 'Error: cap_type can be "none" or "Manolopoulos"')
+    call assert(any(params % cap_type == [character(len = 100) :: 'none', 'Manolopoulos']), 'Error: cap_type can be "none" or "Manolopoulos"')
     call assert(any(params % print_potential == [-1, 0, 1]), 'Error: print_potential can be 0 or 1')
     call assert(any(params % sequential == [-1, 0, 1]), 'Error: sequential can be 0 or 1')
     call assert(any(params % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
@@ -444,11 +440,7 @@ contains
     ! Pull out sequential ahead of time as we need to decide if parallel mode should be initialized first
     sequential = item_or_default(raw_config, 'sequential', '0') ! Sequential execution is disabled by default
     if (sequential == '0') then
-      if (test_mode == 'blacs_instead_MPI') then
-        call blacs_setup(my_id, n_procs) ! Init blacs if the sequential mode is not requested to enable parallel mode
-      else
-        call MPI_Init(ierr)
-      end if
+      call MPI_Init(ierr)
     end if
 
     call check_setting_groups(raw_config)

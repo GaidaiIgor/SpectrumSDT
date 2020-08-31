@@ -16,7 +16,7 @@
 
    private
    public :: pes_mass
-   public :: init_pots, calc_potvib, calc_pots, calc_pots_mpi
+   public :: init_pots, calc_potvib, calc_pots
 
  contains
 
@@ -57,101 +57,6 @@
     calc_potvib = vpot + shift
   end function
 
-!-----------------------------------------------------------------------
-!  Calculates vibrational and total potentials on 3D grid in parallel.
-!  BLACS init/finish mode:
-!    1. Both are called
-!    2. Neither is called
-!    3. Init is called, Finish is not
-!-----------------------------------------------------------------------
-  subroutine calc_pots(n1,n2,n3,g1,g2,g3,blacsmode)
-    implicit none
-    integer i1,i2,i3,n1,n2,n3,k,myk,nn
-    integer context,iam,nprocs,pcol
-    real*8 g1(n1),g2(n2),g3(n3)
-    integer blacsmode
-    integer numroc
-    integer nprow,npcol ! Process grid
-    integer myrow,mycol ! Current process coordinates
-    integer nnloc       ! Local number of elements
-    integer nnlocm      ! Maximum number of local elements
-    integer nnloct      ! Number of broadcasted elements
-
-    ! Local and temporary vibrational and total potentials
-    real*8,allocatable::potvloc(:),potvtmp(:)
-    real*8,allocatable::pottloc(:),potttmp(:)
-
-    ! Setup a 1D process grid
-    if(blacsmode/=2)then
-      call blacs_pinfo(iam,nprocs)
-      call blacs_setup(iam,nprocs)
-      call blacs_get(0,0,context)
-      nprow = 1
-      npcol = nprocs
-      call blacs_gridinit(context,'R',nprow,npcol)
-      call blacs_gridinfo(context,nprow,npcol,myrow,mycol)
-    endif
-
-    ! Allocate potential arrays, global and local
-    allocate(potvib(n3,n2,n1),pottot(n3,n2,n1))
-    nn = n1 * n2 * n3
-    nnloc = numroc(nn,1,iam,0,nprocs)
-    allocate(potvloc(nnloc),pottloc(nnloc))
-
-    ! Calculate a chunk
-    do myk=1,nnloc
-      call l2g(myk,mycol,nn,nprocs,1,k)
-      i1 = (k - 1) / (n2 * n3)
-      i2 = (k - 1 - i1 * n2 * n3) / n3
-      i3 = (k - 1 - i1 * n2 * n3 - i2 * n3)
-      i1 = i1 + 1
-      i2 = i2 + 1
-      i3 = i3 + 1
-      potvloc(myk) = calc_potvib(g1(i1),g2(i2),g3(i3))
-      pottloc(myk) = potvloc(myk) + calc_potrot(g1(i1),g2(i2)) + calc_potxtr(g1(i1),g2(i2))
-    enddo
-
-    ! Allocate a buffer of maximum size for a chunks broadcasting
-    nnlocm = nnloc
-    call igamx2d(context,'A',' ',1,1,nnlocm,1,k,k,-1,-1,-1)
-    allocate(potvtmp(nnlocm),potttmp(nnlocm))
-
-    ! Redistribute elements
-    do pcol=0,nprocs-1
-
-      ! Broadcast chunk
-      if(pcol==mycol)then
-        nnloct = nnloc
-        potvtmp(1:nnloct) = potvloc(1:nnloct)
-        potttmp(1:nnloct) = pottloc(1:nnloct)
-        call dgebs2d(context,'A',' ',nnlocm,1,potvtmp,nnlocm)
-        call dgebs2d(context,'A',' ',nnlocm,1,potttmp,nnlocm)
-        call igebs2d(context,'A',' ',1,1,nnloct,1)
-      else
-        call dgebr2d(context,'A',' ',nnlocm,1,potvtmp,nnlocm,0,pcol)
-        call dgebr2d(context,'A',' ',nnlocm,1,potttmp,nnlocm,0,pcol)
-        call igebr2d(context,'A',' ',1,1,nnloct,1,0,pcol)
-      endif
-
-      ! Store elements in global arrays
-      do myk=1,nnloct
-        call l2g(myk,pcol,nn,nprocs,1,k)
-        i1 = (k - 1) / (n2 * n3)
-        i2 = (k - 1 - i1 * n2 * n3) / n3
-        i3 = (k - 1 - i1 * n2 * n3 - i2 * n3)
-        i1 = i1 + 1
-        i2 = i2 + 1
-        i3 = i3 + 1
-        potvib(i3,i2,i1) = potvtmp(myk)
-        pottot(i3,i2,i1) = potttmp(myk)
-      enddo
-    enddo
-
-    ! Finish
-    call blacs_gridexit(context)
-    if(blacsmode==1)call blacs_exit(1)
-  end subroutine
-
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts a 1D index of 1D-representation into 3 indexes corresponding to it in 3D representation
 ! Assumes the 3D array was flattened using the following order of dimenisions: 3, 2, 1 (3rd coordinate is changing most frequently)
@@ -175,9 +80,9 @@
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Finds eigenpairs of a matrix currently set in matmul_operator_mod using SLEPc eigensolver
+! Calculates potentials
 !-------------------------------------------------------------------------------------------------------------------------------------------
-   subroutine calc_pots_mpi(grid1, grid2, grid3)
+   subroutine calc_pots(grid1, grid2, grid3)
      real*8 :: grid1(:), grid2(:), grid3(:)
      integer :: i1, i2, i3, n1, n2, n3, proc_k, first_k, k, proc_points, total_points, proc_id
      integer, allocatable :: proc_counts(:), proc_shifts(:)
