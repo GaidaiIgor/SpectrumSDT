@@ -86,7 +86,6 @@ module sdt
   use io_utils
   use lapack_interface_mod
   use matmul_operator_mod
-  use mkl
   use parabola
   use parpack
   use pesgeneral
