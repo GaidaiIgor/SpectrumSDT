@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
+
+include(compiler_options.cmake)
 project(SpectrumSDT)
 enable_language(Fortran)
 
@@ -9,14 +11,8 @@ endif(NOT DEFINED prefix)
 
 # Specify where to look for external module files (-I option)
 include_directories(include ${prefix}/src/include ${prefix}/libs/fdict/build/include ${prefix}/libs/ftl/build/include/ftl ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
-
 # Specify where to look for libraries (-L option)
 link_directories(${prefix}/libs/arpack-ng/build ${prefix}/libs/fdict/build/lib ${prefix}/libs/ftl/build/lib ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
-
-# Add common compile flag for all sources
-add_compile_options(-g -traceback)
-# Add common linker flags for all targets
-set(CMAKE_EXE_LINKER_FLAGS "-dynamic -mkl=cluster")
 
 # Source file dependencies
 set(general_utils ${prefix}/src/utils/general/general.F90)
