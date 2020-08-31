@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 
-include(compiler_options.cmake)
+if (EXISTS compiler_options.cmake)
+  include(compiler_options.cmake)
+else
+  include(compiler_options_default.cmake)
+endif()
+
 project(SpectrumSDT)
 enable_language(Fortran)
 
