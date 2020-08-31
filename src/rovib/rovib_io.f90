@@ -366,11 +366,6 @@ contains
     end do
     col_width = 25
 
-    if (debug_mode == 'print') then
-      print *, cols_bar_K, cols_total
-      print *, titles
-    end if
-
     open(newunit = file_unit, file = properties_result_path)
     do i = 1, size(titles)
       write(file_unit, '(A)', advance = 'no') align_center(titles(i) % to_char_str(), col_width)

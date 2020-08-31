@@ -122,6 +122,13 @@ module general_utils
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Prints stack trace and aborts the program
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine exit_abnormally()
+    print *, 1/0
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! A one-liner to check various constraints
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assert(logical_statemenet, error_message)
@@ -130,8 +137,7 @@ module general_utils
 
     if (.not. logical_statemenet) then
       print *, error_message
-      call abort()
-      stop
+      call exit_abnormally()
     end if
   end subroutine
 

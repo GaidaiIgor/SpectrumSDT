@@ -239,7 +239,7 @@ contains
     character(:), allocatable :: basis_results_path, file_name
 
     basis_results_path = get_basis_results_path(sym_path)
-    file_name = 'bas1.' // num2str(slice_ind, '(I4.4)') // '.bin.out'
+    file_name = 'bas1.' // num2str(slice_ind, '(I0)') // '.bin.out'
     res = append_path_tokens(basis_results_path, file_name)
   end function
 
@@ -253,7 +253,7 @@ contains
     character(:), allocatable :: basis_results_path, file_name
 
     basis_results_path = get_basis_results_path(sym_path)
-    file_name = 'bas2.' // num2str(slice_ind, '(I4.4)') // '.bin.out'
+    file_name = 'bas2.' // num2str(slice_ind, '(I0)') // '.bin.out'
     res = append_path_tokens(basis_results_path, file_name)
   end function
 
@@ -288,7 +288,7 @@ contains
     character(:), allocatable :: overlaps_results_path, file_name
 
     overlaps_results_path = get_overlaps_results_path(sym_path)
-    file_name = 'overlap.' // num2str(slice_ind_1, '(I4.4)') // '.' // num2str(slice_ind_2, '(I4.4)') // '.bin.out'
+    file_name = 'overlap.' // num2str(slice_ind_1, '(I0)') // '.' // num2str(slice_ind_2, '(I0)') // '.bin.out'
     res = append_path_tokens(overlaps_results_path, file_name)
   end function
 
@@ -405,7 +405,7 @@ contains
     character(:), allocatable :: exp_coeffs_folder, file_name
 
     exp_coeffs_folder = get_expansion_coefficients_3d_path(sym_path)
-    file_name = 'exp.' // num2str(k, '(I4.4)') // '.bin.out'
+    file_name = 'exp.' // num2str(k, '(I0)') // '.bin.out'
     res = append_path_tokens(exp_coeffs_folder, file_name)
   end function
 
