@@ -16,7 +16,6 @@ contains
     if (mpi_enabled) then
       call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
       call MPI_Comm_Size(MPI_COMM_WORLD, n_procs, ierr)
-      ! call blacs_pinfo(proc_id, n_procs)
     else
       proc_id = 0
       n_procs = 1

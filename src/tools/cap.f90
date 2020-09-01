@@ -6,6 +6,7 @@ module cap_mod
   use general_vars
   use input_params_mod
   use parallel_utils
+  implicit none
 
   integer, parameter :: ncap = 3 ! Number of CAPs
   character(*), parameter :: capdir = 'caps'
@@ -26,8 +27,7 @@ contains
   !               2. Balint-Kurti
   !               3. Manolopoulos
   !-----------------------------------------------------------------------
-  subroutine calc_cap(nr,g,u)
-    implicit none
+  subroutine calc_cap(nr,g)
     ! CAP #1
     real*8 ac,wc,rc
     real*8 d0
@@ -47,7 +47,7 @@ contains
     real*8 dbl       ! De Broglie wavelength
     real*8 dampstr   ! Damping strength
     real*8 damplen   ! Damping length
-    integer ir,nr,u
+    integer ir,nr
 
     ! Allocate array
     allocate(all_caps(nr,ncap))
@@ -148,7 +148,7 @@ contains
     emin = 7 / autown
     capebar = capebarin
 
-    call calc_cap(n1,g1,LG)
+    call calc_cap(n1,g1)
     write(fn,'(4A,I5.5,A)')outdir,'/',capdir,'/cap',myid+1,'.out'
 
     if (get_proc_id() == 0 .and. params % mode == 'diagonalization') then

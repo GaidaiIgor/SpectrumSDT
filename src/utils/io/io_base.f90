@@ -157,7 +157,7 @@ contains
     file_unit = get_file_unit(file_name, append)
     do i = 1,size(array)
       call write_element(array(i), file_unit)
-      if (vertical_act) then
+      if (vertical_act == 1) then
         write(file_unit, '(/)')
       end if
     end do
@@ -178,7 +178,7 @@ contains
     new_line_act = arg_or_default(new_line, 1)
     file_unit = get_file_unit(file_name, append)
     call write_element(smth, file_unit)
-    if (new_line_act) then
+    if (new_line_act == 1) then
       write(file_unit, '(/)')
     end if
     close(file_unit)

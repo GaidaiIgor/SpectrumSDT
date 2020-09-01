@@ -44,14 +44,6 @@ contains
     nstate = params % num_states
     n3b = params % basis_size_phi
     trecut = params % cutoff_energy
-    trnchan = 160
-    nvec2prt = 160
-    nvec2sch = 160
-    nch = 10
-    ncv = params % ncv
-    maxitr = params % max_iterations
-    bst1 = 1
-    bstn = 5
 
     ! Old params are stored in plain variables defined in sdt.f90
     if (params % mode == 'basis') then
@@ -64,29 +56,11 @@ contains
       mode = 4
     end if
 
-    if (params % solver == 'parpack') then
-      solver = 1
-    else if (params % solver == 'slepc') then
-      solver = 3
-    else
-      stop 'Error: unknown solver. Config check has failed.'
-    end if
-
-    realver  = .false.
-    onewell  = .false.
     if (params % symmetry == 0) then
       sy = 5
     else if (params % symmetry == 1) then
       sy = 6
     end if
-    basout   = 0
-    trmeth   = 0
-    oltype   = 0
-    recstart = 0
-    recld    = 0
-
-    ! Set adiabatic control variable
-    adiab = oltype == OVERLAP_ALL ! OVERLAP_ALL=0
 
     ! Paths
     gpath = params % grid_path
@@ -94,7 +68,6 @@ contains
     bpath = get_basis_path(sym_path)
     opath = get_overlaps_path(sym_path)
     dpath = get_diagonalization_path(sym_path)
-    rpath = get_channels_folder_parent_path(params % channels_root, params % J, params % K(1), params % symmetry)
 
     ! Set output directory
     if (.not. (mode == 0)) then
@@ -112,7 +85,6 @@ contains
 
     ! Set ranges of basis sizes
     nvec1min = 3
-    if (sy == SY_NONE) nvec1min = nvec1min * 2
     nvec1max = n3
     nvec2max = 400
 
@@ -140,7 +112,7 @@ contains
     class(input_params), intent(in) :: params
     integer i1, i2, i3
 
-    if(mode /= MODE_DPROD .and. mode /= MODE_BASIS) return
+    if(mode /= MODE_BASIS) return
 
     ! Load vibrational potential
     allocate(pottot(n3, n2, n1))
@@ -192,24 +164,18 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints spectrum
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine print_spectrum(params, eivals, eivecs, global_mapping)
+  subroutine print_spectrum(params, eivals, eivecs)
     class(input_params), intent(in) :: params
     complex*16, allocatable, intent(in) :: eivals(:)
     complex*16, allocatable, intent(in) :: eivecs(:, :)
-    integer, optional, intent(in) :: global_mapping ! regulates local-global index mapping behavior
-    integer :: proc_id, n_procs, proc_first_state, proc_states, file_unit, i, global_state_ind, global_mapping_act
+    integer :: proc_id, n_procs, proc_first_state, proc_states, file_unit, i, global_state_ind
     real*8 :: energy, gamma
     character(:), allocatable :: sym_path, file_folder, file_path
     external :: numroc
     integer :: numroc
 
-    global_mapping_act = arg_or_default(global_mapping, 0)
     call get_proc_info(proc_id, n_procs)
-    if (global_mapping_act == 0) then
-      proc_states = numroc(size(eivals), 1, proc_id, 0, n_procs)
-    else if (global_mapping_act == 1) then
-      call get_proc_elem_range(size(eivals), proc_first_state, proc_states)
-    end if
+    call get_proc_elem_range(size(eivals), proc_first_state, proc_states)
 
     sym_path = get_sym_path_params(params)
     file_folder = get_expansion_coefficients_3d_path(sym_path)
@@ -218,11 +184,7 @@ contains
     ! Write each eigenvector in a separate binary file
     do i = 1, proc_states
       ! Get global state number
-      if (global_mapping_act == 0) then
-        call l2g(i, proc_id, size(eivals), n_procs, 1, global_state_ind)
-      else if (global_mapping_act == 1) then
-        global_state_ind = proc_first_state + i - 1
-      end if
+      global_state_ind = proc_first_state + i - 1
       file_path = get_solution_3d_path(sym_path, global_state_ind)
 
       open(newunit = file_unit, file = file_path, form = 'unformatted')
@@ -238,7 +200,7 @@ contains
     open(newunit = file_unit, file = file_path)
     do i = 1, size(eivals)
       energy = real(eivals(i)) * autown
-      gamma = aimag(eivals(i)) * autown * -2
+      gamma = aimag(eivals(i)) * autown * (-2)
       write(file_unit, '(I5,2G25.15)') i, energy, gamma
     end do
     close(file_unit)
@@ -247,9 +209,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Sets up rovib_ham and computes (rotational-)vibrational states
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_states(params, context)
+  subroutine calculate_states(params)
     type(input_params), intent(in) :: params
-    integer, intent(in) :: context
     complex*16, allocatable :: eivals(:), cap(:)
     complex*16, allocatable :: eivecs(:, :), kinetic(:, :)
 
@@ -268,24 +229,11 @@ contains
     end if
     call print_parallel('Hamiltonian matrix is built. Size: ' // num2str(rovib_ham % global_chunk_info % columns) // ' x ' // num2str(size(rovib_ham % proc_chunk, 2)))
 
-    if (debug_mode == 'build_only') then
-      stop 'Done build_only'
-    end if
-
-    if (debug_mode == 'print_ham') then
-      call print_complex_matrix(rovib_ham % proc_chunk, 'ham', print_size = 1)
-      stop 'Done print_ham'
-    end if
-    if (debug_mode == 'print_ham_binary') then
-      call write_binary_matrix_complex(rovib_ham % proc_chunk, 'ham_bin')
-      stop 'Done print_ham_binary'
-    end if
-
     call set_matmul_variables(params) ! rovib_ham is already set
     call print_parallel('Eigenvalue solver has started')
     if (params % solver == 'slepc') then
       call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
-      call print_spectrum(params, eivals, eivecs, 1)
+      call print_spectrum(params, eivals, eivecs)
     end if
   end subroutine
 
@@ -294,113 +242,48 @@ contains
 !-----------------------------------------------------------------------
   subroutine calc_sdt(params)
     type(input_params), intent(in) :: params
-    character(256) fn
-    integer ready
+    integer :: ready, ierr
 
-    ! Get BLACS info
     call get_proc_info(myid, nprocs)
-    ! By default process grid is a row
-    nprow = 1
-    npcol = nprocs
-
-    ! For ScaLapack the grid must be rectangular
-    if (mode == MODE_3DSDT .and. solver == SOLVER_SCAL) then
-      nprow = int(sqrt(real(nprocs)))
-      npcol = nprocs / nprow
-    end if
-    nprocs_rect = nprow * npcol
-
-    ! For basis the grid size must be equal to the number of slices
-    if (mode == MODE_BASIS) then
-      npcol = n1
-    end if
-
-    ! Call BLACS to setup process grid
-    if (params % sequential == 1) then
-      context = -1
-      myrow = 1
-      mycol = 1
-    else
-      call blacs_get(0,0,context)
-      call blacs_gridinit(context,'R',nprow,npcol)
-      call blacs_gridinfo(context,nprow,npcol,myrow,mycol)
-    end if
-
     ! Write information
-    if (myid == 0) then
-      write(*,*)'Mode: ', params % mode
-      write(*,*)'Processes:',nprocs
-    end if
+    call print_parallel('Mode: ' // params % mode)
+    call print_parallel('Processes: ' // num2str(nprocs))
 
     ! Setup directories
     if (params % mode == 'properties') then
       ready = 1
     else
-      if (params % sequential == 1) then
+      if (myid == 0) then
         ready = maindir()
-      else
-        if (myid == 0) then
-          ready = maindir()
-          call igebs2d(context,'A',' ',1,1,ready,1)
-        else
-          call igebr2d(context,'A',' ',1,1,ready,1,0,0)
+        if (params % sequential == 0) then
+          call MPI_Barrier(MPI_COMM_WORLD, ierr)
         end if
       end if
-
-      ! Open log file and log process coordinates
-      if (ready .and. myrow /= -1) then
-        write(fn,'(4A,I5.5,A)')outdir,'/',logdir,'/log',myid,'.out'
-        open(LG,file=fn)
-        write(LG,*)'Process: ',myid,myrow,mycol
-      end if
     end if
+    call assert(ready == 1, 'Error: cannot create directory structure')
 
-    ! If ready to start and process is in the grid, then solve
-    if (ready .and. myrow /= -1) then
-      ! Call appropriate subroutine
-      select case(mode)
-        case(MODE_BASIS)
-          call calc_basis
+    ! Call appropriate subroutine
+    select case(mode)
+      case(MODE_BASIS)
+        call calc_basis
 
-        case(MODE_OVERLAP)
-          call calc_overlap
-          call calculate_overlaps_extra(params, mu, g1, g2)
+      case(MODE_OVERLAP)
+        call calc_overlap
+        call calculate_overlaps_extra(params, mu, g1, g2)
 
-        case(MODE_3DSDT)
-          call init_caps(params, 0d0)
-          call calculate_states(params, context)
+      case(MODE_3DSDT)
+        call init_caps(params, 0d0)
+        call calculate_states(params)
 
-        case(MODE_3DSDT_POST)
-          call init_caps(params, 0d0)
-          call calculate_state_properties(params, g1, size(g2), get_real_cap())
+      case(MODE_3DSDT_POST)
+        call init_caps(params, 0d0)
+        call calculate_state_properties(params, g1, size(g2), get_real_cap())
 
-        case(MODE_3DSDT_STATES)
-          call calc_3dsdt_states
+      case default
+        call print_parallel('Config check has failed. Mode does not exist.')
+    end select
 
-        case(MODE_CHRECOG)
-          call calc_chrecog
-
-        case(MODE_BASPROBS)
-          call calc_basprobs
-
-        case default
-          if (myid == 0) write(*,*)'Mode does not exist'
-      end select
-
-      ! Finish
-      if (params % sequential == 0) then
-        call blacs_gridexit(context)
-      end if
-      close(LG)
-    end if
-
-    ! Log work done
-    if (params % sequential == 0) then
-      call blacs_get(0,0,context)
-      call blacs_gridinit(context,'R',1,nprocs)
-      call blacs_barrier(context,'A')
-      call blacs_exit(0)
-    end if
-    if (myid == 0) write(*,*)'Done: ',outdir
+    call MPI_Finalize(ierr)
+    print *, 'Done'
   end subroutine
 end program

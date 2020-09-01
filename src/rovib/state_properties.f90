@@ -329,7 +329,7 @@ contains
     do proc_k = 1, proc_states
       K_dists_chunk(proc_k, :) = calculate_K_dist(params, p_dist(proc_k, :, :, :))
       K_dist_error = 1 - sum(K_dists_chunk(proc_k, :))
-      if (abs(K_dist_error > 1d-10)) print *, 'Warning: K_dist_error is ' // num2str(K_dist_error) // ' on state ' // num2str(proc_first_state + proc_k - 1)
+      if (abs(K_dist_error) > 1d-10) print *, 'Warning: K_dist_error is ' // num2str(K_dist_error) // ' on state ' // num2str(proc_first_state + proc_k - 1)
     end do
 
     ! Gather results
@@ -341,115 +341,6 @@ contains
     allocate(K_dists(params % num_states, params % J + 1))
     do ind = 1, size(K_dists, 2)
       call MPI_Gatherv(K_dists_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, K_dists(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-    end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks orthonormality of 1D solutions
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function check_orthonormality_1D(As) result(max_deviation)
-    type(array_2d_real), intent(in) :: As(:, :, :)
-    real*8 :: max_deviation ! from orthonormality
-    integer :: K_ind, n, l, i1, i2
-    real*8 :: overlap
-    real*8, allocatable :: solution_set(:, :)
-
-    max_deviation = 0
-    do K_ind = 1, size(As, 1)
-      do n = 1, size(As, 2)
-        do l = 1, size(As, 3)
-          solution_set = As(K_ind, n, l) % p
-          do i1 = 1, size(solution_set, 2)
-            do i2 = i1, size(solution_set, 2)           
-              overlap = sum(solution_set(:, i1) * solution_set(:, i2))
-              max_deviation = max(max_deviation, abs(0 ** (i2 - i1) - overlap))
-            end do
-          end do
-        end do
-      end do
-    end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks orthonormality of 2D solutions
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function check_orthonormality_2D(As, Bs) result(max_deviation)
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
-    real*8 :: max_deviation ! from orthonormality
-    integer :: K_ind, n, l, m_ind, j1, j2
-    real*8 :: i1_sum, i2_sum, overlap
-
-    max_deviation = 0
-    do K_ind = 1, size(As, 1)
-      do n = 1, size(As, 2)
-        print *, 'Doing n: ', n
-        do j1 = 1, size(Bs(K_ind, n, 1) % p, 2)
-          do j2 = j1, size(Bs(K_ind, n, 1) % p, 2)
-
-            overlap = 0
-            do l = 1, size(As, 3)
-              do m_ind = 1, size(As(K_ind, n, l) % p, 1)
-                i1_sum = sum(Bs(K_ind, n, l) % p(:, j1) * As(K_ind, n, l) % p(m_ind, :))
-                i2_sum = sum(Bs(K_ind, n, l) % p(:, j2) * As(K_ind, n, l) % p(m_ind, :))
-                overlap = overlap + i1_sum * i2_sum
-              end do
-            end do
-            max_deviation = max(max_deviation, abs(0 ** (j2 - j1) - overlap))
-          end do
-        end do
-      end do
-    end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks orthonormality of 3D solutions. Returns deviation from expected value (0 for different ks, 1 for same ks).
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function check_orthonormality_3D(As, Bs, Cs, params, k1_first, k2_first, k1_last, k2_last) result(max_deviation)
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B.
-    type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
-    type(array_2d_complex), intent(in) :: Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S.
-    class(input_params), intent(in) :: params
-    integer, intent(in) :: k1_first, k2_first
-    integer, optional, intent(in) :: k1_last, k2_last
-    real*8 :: max_deviation
-    integer :: K_val, K_sym, K_ind, K_ind_comp, n, l, m_ind, j, k1, k2, k1_last_act, k2_last_act
-    real*8 :: i_sum
-    complex*16 :: j1_sum, j2_sum
-    complex*16 :: overlap
-
-    k1_last_act = arg_or_default(k1_last, k1_first)
-    k2_last_act = arg_or_default(k2_last, k2_first)
-    max_deviation = 0
-    do k1 = k1_first, k1_last_act ! size(Cs(1, 1) % p, 2)
-      do k2 = k2_first, k2_last_act ! k1, size(Cs(1, 1) % p, 2)
-        if (k2 < k1) then
-          print *, 'Skipping ovelap between', k1, k2, 'since k1 has to be >= than k2'
-          cycle
-        end if
-
-        print *, 'Calculating overlap between', k1, k2
-        overlap = 0
-        do K_val = params % K(1), params % K(2)
-          call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
-          do n = 1, size(As, 2)
-            ! call track_progress(n * 1d0 / size(As, 2))
-            do l = 1, size(As, 3)
-              do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
-                j1_sum = 0
-                j2_sum = 0
-                do j = 1, size(Bs(K_ind_comp, n, l) % p, 2)
-                  i_sum = sum(Bs(K_ind_comp, n, l) % p(:, j) * As(K_ind_comp, n, l) % p(m_ind, :))
-                  j1_sum = j1_sum + conjg(Cs(K_ind, n) % p(j, k1)) * i_sum
-                  j2_sum = j2_sum + Cs(K_ind, n) % p(j, k2) * i_sum
-                end do
-                overlap = overlap + j1_sum * j2_sum
-              end do
-            end do
-          end do
-        end do
-
-        max_deviation = max(max_deviation, abs(0 ** (k2 - k1) - overlap))
-      end do
     end do
   end function
 
@@ -466,7 +357,7 @@ contains
     integer, allocatable :: num_solutions_2d(:, :) ! K x n
     integer, allocatable :: num_solutions_1d(:, :, :)
     real*8 :: vdw_max
-    real*8, allocatable :: energies_3d(:), sym_probs(:)
+    real*8, allocatable :: energies_3d(:)
     real*8, allocatable :: region_probs(:, :) ! nstate x 5
     real*8, allocatable :: K_dists(:, :) ! n_state x (J + 1)
     real*8, allocatable :: gammas(:, :) ! n_state x 2
@@ -513,53 +404,117 @@ contains
     call write_state_properties(params, energies_3d, gammas * autown, region_probs, K_dists)
   end subroutine
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! The three functions below can be used for debug purposes to check orthnormality of 1D, 2D and 3D solutions
+!-------------------------------------------------------------------------------------------------------------------------------------------
+
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
-! ! Calculates total probability of k-th state in symmetric molecule part of the PES (2*pi/3 <= phi <= 4*pi/3, regardless of rho)
-! ! Asymmetric can be obtained as 1 - symmetric
+! ! Checks orthonormality of 1D solutions
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
-!   function calculate_symmetric_molecule_probability(params, As, Bs, proc_Cs, proc_k) result(sym_prob)
-!     class(input_params), intent(in) :: params
-!     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
-!     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
-!     type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-!     integer, intent(in) :: proc_k ! local 3D state index
-!     real*8 :: sym_prob
-!     sym_prob = 2 * calculate_wf_integral_region(params, As, Bs, proc_Cs, proc_k, phi_range = [2*pi/3, pi])
+!   function check_orthonormality_1D(As) result(max_deviation)
+!     type(array_2d_real), intent(in) :: As(:, :, :)
+!     real*8 :: max_deviation ! from orthonormality
+!     integer :: K_ind, n, l, i1, i2
+!     real*8 :: overlap
+!     real*8, allocatable :: solution_set(:, :)
+!
+!     max_deviation = 0
+!     do K_ind = 1, size(As, 1)
+!       do n = 1, size(As, 2)
+!         do l = 1, size(As, 3)
+!           solution_set = As(K_ind, n, l) % p
+!           do i1 = 1, size(solution_set, 2)
+!             do i2 = i1, size(solution_set, 2)
+!               overlap = sum(solution_set(:, i1) * solution_set(:, i2))
+!               max_deviation = max(max_deviation, abs(0 ** (i2 - i1) - overlap))
+!             end do
+!           end do
+!         end do
+!       end do
+!     end do
 !   end function
 !
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
-! ! Calculates total probability of each state in symmetric molecule part of the PES (2*pi/3 <= phi <= 4*pi/3, regardless of rho)
-! ! Asymmetric can be obtained as 1 - symmetric
+! ! Checks orthonormality of 2D solutions
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
-!   function calculate_symmetric_molecule_probability_all(params, As, Bs, proc_Cs) result(sym_probs)
-!     class(input_params), intent(in) :: params
-!     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
+!   function check_orthonormality_2D(As, Bs) result(max_deviation)
 !     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
-!     type(array_2d_complex), intent(in) :: proc_Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-!     real*8, allocatable :: sym_probs(:)
-!     integer :: proc_k
-!     ! Parallel
-!     integer :: proc_id, n_procs, proc_first_state, proc_states, ierr
-!     integer, allocatable :: recv_counts(:), recv_shifts(:)
-!     real*8, allocatable :: sym_probs_chunk(:)
+!     real*8 :: max_deviation ! from orthonormality
+!     integer :: K_ind, n, l, m_ind, j1, j2
+!     real*8 :: i1_sum, i2_sum, overlap
 !
-!     call get_proc_info(proc_id, n_procs)
-!     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
+!     max_deviation = 0
+!     do K_ind = 1, size(As, 1)
+!       do n = 1, size(As, 2)
+!         print *, 'Doing n: ', n
+!         do j1 = 1, size(Bs(K_ind, n, 1) % p, 2)
+!           do j2 = j1, size(Bs(K_ind, n, 1) % p, 2)
 !
-!     ! Calculate chunks
-!     allocate(sym_probs_chunk(proc_states))
-!     do proc_k = 1, proc_states
-!       sym_probs_chunk(proc_k) = calculate_symmetric_molecule_probability(params, As, Bs, proc_Cs, proc_k)
+!             overlap = 0
+!             do l = 1, size(As, 3)
+!               do m_ind = 1, size(As(K_ind, n, l) % p, 1)
+!                 i1_sum = sum(Bs(K_ind, n, l) % p(:, j1) * As(K_ind, n, l) % p(m_ind, :))
+!                 i2_sum = sum(Bs(K_ind, n, l) % p(:, j2) * As(K_ind, n, l) % p(m_ind, :))
+!                 overlap = overlap + i1_sum * i2_sum
+!               end do
+!             end do
+!             max_deviation = max(max_deviation, abs(0 ** (j2 - j1) - overlap))
+!           end do
+!         end do
+!       end do
 !     end do
+!   end function
 !
-!     ! Gather results
-!     if (n_procs == 1) then
-!       sym_probs = sym_probs_chunk
-!       return
-!     end if
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+! ! Checks orthonormality of 3D solutions. Returns deviation from expected value (0 for different ks, 1 for same ks).
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+!   function check_orthonormality_3D(As, Bs, Cs, params, k1_first, k2_first, k1_last, k2_last) result(max_deviation)
+!     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B.
+!     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
+!     type(array_2d_complex), intent(in) :: Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S.
+!     class(input_params), intent(in) :: params
+!     integer, intent(in) :: k1_first, k2_first
+!     integer, optional, intent(in) :: k1_last, k2_last
+!     real*8 :: max_deviation
+!     integer :: K_val, K_sym, K_ind, K_ind_comp, n, l, m_ind, j, k1, k2, k1_last_act, k2_last_act
+!     real*8 :: i_sum
+!     complex*16 :: j1_sum, j2_sum
+!     complex*16 :: overlap
 !
-!     allocate(sym_probs(params % num_states))
-!     call MPI_Gatherv(sym_probs_chunk, proc_states, MPI_DOUBLE_PRECISION, sym_probs, recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+!     k1_last_act = arg_or_default(k1_last, k1_first)
+!     k2_last_act = arg_or_default(k2_last, k2_first)
+!     max_deviation = 0
+!     do k1 = k1_first, k1_last_act ! size(Cs(1, 1) % p, 2)
+!       do k2 = k2_first, k2_last_act ! k1, size(Cs(1, 1) % p, 2)
+!         if (k2 < k1) then
+!           print *, 'Skipping ovelap between', k1, k2, 'since k1 has to be >= than k2'
+!           cycle
+!         end if
+!
+!         print *, 'Calculating overlap between', k1, k2
+!         overlap = 0
+!         do K_val = params % K(1), params % K(2)
+!           call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
+!           do n = 1, size(As, 2)
+!             ! call track_progress(n * 1d0 / size(As, 2))
+!             do l = 1, size(As, 3)
+!               do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
+!                 j1_sum = 0
+!                 j2_sum = 0
+!                 do j = 1, size(Bs(K_ind_comp, n, l) % p, 2)
+!                   i_sum = sum(Bs(K_ind_comp, n, l) % p(:, j) * As(K_ind_comp, n, l) % p(m_ind, :))
+!                   j1_sum = j1_sum + conjg(Cs(K_ind, n) % p(j, k1)) * i_sum
+!                   j2_sum = j2_sum + Cs(K_ind, n) % p(j, k2) * i_sum
+!                 end do
+!                 overlap = overlap + j1_sum * j2_sum
+!               end do
+!             end do
+!           end do
+!         end do
+!
+!         max_deviation = max(max_deviation, abs(0 ** (k2 - k1) - overlap))
+!       end do
+!     end do
 !   end function
 
 end module

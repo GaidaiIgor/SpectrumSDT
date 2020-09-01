@@ -48,7 +48,7 @@ contains
     real*8, intent(in) :: mu ! reduced mass
     real*8, intent(in) :: rho_grid(:), theta_grid(:)
     integer :: my_id, n_procs
-    integer :: n, l, ir, ic, n_basis, slice_code, file_unit
+    integer :: n, l, ir, ic, n_basis, file_unit
     ! Arrays for data arrays length
     integer, allocatable :: num_solutions_1d(:) ! number of 1D solutions in each theta slice (for fixed rho)
     integer, allocatable :: num_solutions_2d(:) ! number of 2D solutions in each rho slice
@@ -329,7 +329,6 @@ contains
     type(input_params), intent(in) :: params
     real*8, intent(in) :: mu
     real*8, intent(in) :: rho_grid(:), theta_grid(:)
-    integer :: K
 
     if (params % fix_basis_jk == 1) then
       call calculate_sym_term(params, mu, rho_grid, theta_grid)

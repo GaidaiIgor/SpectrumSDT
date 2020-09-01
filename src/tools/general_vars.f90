@@ -26,14 +26,8 @@ module general_vars
   ! Directories
   character(:), allocatable :: outdir
 
-  ! Log file unit
-  integer, parameter :: LG = 9
-
   ! Network
   integer :: myid        ! Process id
   integer :: nprocs      ! Number of processes
-  integer :: nprocs_rect ! Number of processes forming rectangle
-  integer :: myrow, mycol ! Process coordinates
-  integer :: nprow, npcol ! Process grid sizes
 
 end module

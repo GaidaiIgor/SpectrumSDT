@@ -31,7 +31,6 @@ contains
     type(dictionary_t), intent(inout) :: dic
     character(*), intent(in) :: key
     TEMPLATE_TYPE, intent(in) :: value
-    TEMPLATE_TYPE_OUT :: res
     
     if (key .in. dic) then
       return

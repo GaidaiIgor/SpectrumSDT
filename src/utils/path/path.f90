@@ -275,7 +275,7 @@ contains
     character(:), allocatable :: overlaps_path
 
     overlaps_path = get_overlaps_path(sym_path)
-    res = append_path_tokens(overlaps_path, 'overlap0')
+    res = append_path_tokens(overlaps_path, 'overlap')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

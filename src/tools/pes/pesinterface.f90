@@ -5,7 +5,6 @@
 !-----------------------------------------------------------------------
  module pesinterface_mod
    use constants
-   use index_conversion_mod
    use input_params_mod
    use mpi_f08
    use parallel_utils

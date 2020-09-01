@@ -25,7 +25,7 @@ contains
     character(*), intent(in) :: config_path
     type(dictionary_t) :: config
     integer :: file_unit, iostat, line_num
-    character(:), allocatable :: line, key, value, error_msg
+    character(:), allocatable :: line, key, value
     type(string), allocatable :: line_tokens(:)
     
     open(newunit = file_unit, file = config_path)
@@ -56,29 +56,31 @@ contains
     close(file_unit)
   end function
   
+! This function can be uncommented if there is ever a need to introduce parameter groups, i.e. a set of settings such that the settings 
+! within the group are either all set or all unset
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks if all the *keys* are simultaneously present or absent in *config_dict*
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_setting_group(config_dict, keys)
-    class(dictionary_t) :: config_dict ! intent(in)
-    class(string), intent(in) :: keys(:)
-    integer :: i
-    integer :: status(size(keys))
-    character(:), allocatable :: key
-
-    status = 0
-    do i = 1, size(keys)
-      key = keys(i) % to_char_str()
-      if (key .in. config_dict) then
-        status(i) = 1
-      end if
-    end do
-
-    if (any(status == 1) .and. .not. all(status == 1)) then
-      call print_parallel('Error: the following keys must all be set if any of them is set: ' // string_arr_to_char_str(keys))
-      stop
-    end if
-  end subroutine
+  ! subroutine check_setting_group(config_dict, keys)
+  !   class(dictionary_t) :: config_dict ! intent(in)
+  !   class(string), intent(in) :: keys(:)
+  !   integer :: i
+  !   integer :: status(size(keys))
+  !   character(:), allocatable :: key
+  !
+  !   status = 0
+  !   do i = 1, size(keys)
+  !     key = keys(i) % to_char_str()
+  !     if (key .in. config_dict) then
+  !       status(i) = 1
+  !     end if
+  !   end do
+  !
+  !   if (any(status == 1) .and. .not. all(status == 1)) then
+  !     call print_parallel('Error: the following keys must all be set if any of them is set: ' // string_arr_to_char_str(keys))
+  !     stop
+  !   end if
+  ! end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks that all setting groups are set/unset
@@ -432,7 +434,7 @@ contains
     character(:), allocatable :: sequential
     type(dictionary_t) :: raw_config, mandatory_modes, optional_modes
     type(input_params) :: params
-    integer :: my_id, n_procs, ierr
+    integer :: ierr
     character(:), allocatable :: mode_id
     
     ! Parse the raw file and structure its content into a dictionary

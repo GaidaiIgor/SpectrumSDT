@@ -18,7 +18,7 @@ contains
   subroutine generate_gridr(grid,jac,n,alpha,minr,eps,der)
     implicit none
     real*8 grid(n),jac(n),x(0:n)
-    real*8 r0,alpha,minr,eps,nextr,pot
+    real*8 alpha,minr,eps,nextr
     real*8 :: nextr_ode(1)
     integer i,n,nok,nbad
     external der
@@ -116,9 +116,9 @@ contains
     integer,parameter:: n0 = 1024
     real*8,allocatable::grid(:),jac(:)
     real*8 gridl(n0),gridr(n0),x(0:n0)
-    real*8 r0,alpha,minr,maxr,nextr,eps,pot
+    real*8 r0,alpha,minr,maxr,nextr,eps
     real*8 :: nextr_rkdumb(1)
-    integer i,n,nl,nr,nok,nbad
+    integer i,n,nl,nr
     external der
 
     x(0) = 0

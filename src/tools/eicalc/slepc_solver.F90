@@ -23,6 +23,7 @@ contains
     integer :: n_conv, proc_first_eivec, proc_eivecs, proc_first_row, proc_rows, root
     integer, allocatable :: eivec_counts(:), eivec_shifts(:), row_counts(:), row_shifts(:)
     complex*16 :: next_eivec_local(msize)
+    PetscInt, parameter :: max_iterations = 1000000
     PetscInt :: ncv_petsc, mpd_petsc, n_eigs_petsc, n_conv_petsc, i_petsc, msize_petsc
     PetscErrorCode :: ierr
     PetscScalar, pointer :: next_eivec_ptr(:)
@@ -43,7 +44,7 @@ contains
     call EPSSetOperators(eps, A, PETSC_NULL_MAT, ierr)
     call EPSSetProblemType(eps, EPS_NHEP, ierr)
     call EPSSetWhichEigenpairs(eps, EPS_SMALLEST_REAL, ierr)
-    call EPSSetTolerances(eps, PETSC_DEFAULT_REAL, 1000000, ierr) ! unlimited iterations
+    call EPSSetTolerances(eps, PETSC_DEFAULT_REAL, max_iterations, ierr) ! unlimited iterations
 
     ncv_petsc = ncv
     mpd_petsc = mpd

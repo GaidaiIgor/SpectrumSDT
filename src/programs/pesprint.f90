@@ -12,7 +12,6 @@ program pesprint
 
   implicit none
   real*8 min1,max1,min2,max2,min3,max3
-  integer iam
   logical optgrid
   logical sdtcalc
   type(input_params) :: params

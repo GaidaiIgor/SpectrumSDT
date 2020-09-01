@@ -6,7 +6,6 @@
 function CONCAT3(vector_,TEMPLATE_TYPE_NAME,_to_2D_array)(vector) result(matrix)
   type(CONCAT2(vector_,TEMPLATE_TYPE_NAME)), intent(in) :: vector
   TEMPLATE_INNER_TYPE, allocatable :: matrix(:, :)
-  TEMPLATE_INNER_TYPE, allocatable :: row(:)
   TEMPLATE_TYPE_OUT :: vector_elem
   integer :: n_rows, n_cols, i
   

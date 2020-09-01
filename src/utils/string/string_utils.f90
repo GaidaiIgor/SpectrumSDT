@@ -27,7 +27,7 @@ contains
     ! local
     type(vector_string) :: tokens
     character(:), allocatable :: delim_act
-    integer :: i, delim_pos, search_start
+    integer :: delim_pos, search_start
     type(string) :: substring
     
     delim_act = arg_or_default(delim, ' ')

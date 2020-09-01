@@ -109,7 +109,7 @@ contains
   function compress_chunk_info(global_chunk_info) result(compressed_info)
     type(matrix_block_info), intent(in) :: global_chunk_info
     type(matrix_block_info) :: compressed_info
-    integer :: K_row_ind, K_col_ind, global_K_row_ind, global_K_col_ind_left, global_K_col_ind_right, n_empty_blocks, first_row, first_col, rows, cols
+    integer :: K_row_ind, K_col_ind, global_K_row_ind, global_K_col_ind_left, global_K_col_ind_right, first_row, first_col, rows, cols
 
     compressed_info = copy_without_subblocks(global_chunk_info)
     allocate(compressed_info % subblocks(size(global_chunk_info % subblocks, 1), 5))
@@ -151,9 +151,7 @@ contains
   subroutine load_chunk_info(this, ham_info)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     type(matrix_block_info), intent(in) :: ham_info
-    type(matrix_block_info) :: ham_info_copy
     integer :: first_row, proc_rows
-    integer :: myid, nprocs
 
     call get_proc_elem_range(ham_info % rows, first_row, proc_rows, this % all_counts, this % all_shifts) ! determines first_row and proc_rows values
     this % global_chunk_info = ham_info ! copy on assignment
@@ -178,7 +176,7 @@ contains
   function load_overlap_block(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns) result(block)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns
-    logical :: swap_condition, symmetric, coriolis, asymmetric
+    logical :: swap_condition
     integer :: file_unit, K_row_act, K_col_act, K_row_sym_act, slice_ind_row_act, slice_ind_col_act, rows_act, columns_act
     real*8, allocatable :: block(:, :)
     character(:), allocatable :: sym_path, file_path
@@ -564,7 +562,7 @@ contains
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     class(input_params), intent(in) :: params
     type(matrix_block_info), intent(in) :: ham_info
-    integer :: ir, ic, K_row_ind, K_col_ind, K, K_sym
+    integer :: ir, ic, K_row_ind, K_col_ind
 
     do ir = 1, size(this % global_chunk_info % subblocks, 1)
       do ic = 1, size(this % global_chunk_info % subblocks, 2)

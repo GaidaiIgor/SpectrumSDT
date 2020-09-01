@@ -50,7 +50,6 @@ subroutine CONCAT2(push_,TEMPLATE_TYPE_NAME)(this, value)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE, intent(in) :: value
   TEMPLATE_TYPE_OUT, allocatable :: temp(:)
-  integer :: i
 
   if (this%size == size(this % storage)) then
     allocate(temp(this % size * this % resize_factor)) ! make a new allocation

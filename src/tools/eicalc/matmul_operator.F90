@@ -22,7 +22,6 @@ module matmul_operator_mod
     end subroutine
   end interface
 
-  integer :: context ! BLACS context
   integer :: msize ! Hamiltonain size
   integer :: rog ! Row offset of the first row of this process
   real*8, allocatable :: hamd(:, :) ! Hamiltonian matrices
@@ -137,37 +136,5 @@ contains
       end do
     end do
   end subroutine
-
-! !-----------------------------------------------------------------------
-! ! Hamiltonian operator for PARPACK. Complex version. rovib_coupling = 0 version.
-! !-----------------------------------------------------------------------
-!   subroutine opz(mloc, x, y)
-!     integer mloc
-!     complex*16 x(mloc)
-!     complex*16 y(mloc)
-!     complex*16 v(msize)
-!
-!     v = 0
-!     v(rog+1:rog+mloc) = x
-!     ! assembles full vector v by exchanging chunks between processes
-!     call zgsum2d(context,'A',' ',msize,1,v,msize,-1,-1)
-!     ! matrix-vector product: y = hamz * v
-!     call gemv(hamz,v,y)
-!   end subroutine
-
-! !-----------------------------------------------------------------------
-! ! Hamiltonian operator for PARPACK. Real version. rovib = 0 version. Deprecated.
-! !-----------------------------------------------------------------------
-!   subroutine opd(mloc, x, y)
-!     integer mloc
-!     real*8 x(mloc)
-!     real*8 y(mloc)
-!     real*8 v(msize)
-!
-!     v = 0
-!     v(rog+1:rog+mloc) = x
-!     call dgsum2d(context,'A',' ',msize,1,v,msize,-1,-1)
-!     call gemv(hamd,v,y)
-!   end subroutine
 
 end module

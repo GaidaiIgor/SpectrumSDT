@@ -194,7 +194,7 @@ contains
     real*8 env(nenv),pot(nenv),enva,envE,envm
     integer nenv,i,im,il,ir
     real*8 mat(3,3),d(3)
-    real*8 det0,det1,c,x
+    real*8 det0,det1,c
     im = 1
     do i=1,nenv
       if(pot(i).lt.pot(im))im = i
