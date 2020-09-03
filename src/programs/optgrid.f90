@@ -34,7 +34,6 @@ module general
   integer envtype1,envtype2,envtype3
   integer cs,rgrid,symmphi
   !--- Envelopes ---
-  character(1000) :: project_path
   character(:), allocatable :: envpath
   real*8 env1_d1,env1_dn
   real*8 env2_d1,env2_dn
@@ -113,7 +112,6 @@ contains
   subroutine input_parameters
     integer :: m0_code, m1_code, m2_code, total_code
     open(1,file='optgrid.config')
-    read(1,'(A)') project_path
     read(1,*) n1,n2,n3
     read(1,*) nenv1,nenv2,nenv3
     read(1,*) a1,a2,a3
@@ -121,7 +119,7 @@ contains
     read(1, *) min1, max1, Emax1
     read(1, *) min2, max2, Emax2
     
-    envpath = append_path_token(trim(project_path), 'extra/spectrum/optgrid/dawes/J00K000')
+    envpath = resolve_relative_exe_path('../extra/spectrum/optgrid/dawes/J00K000')
     if (envtype3 == 1) then
       read(1, *) min3, max3, Emax3, symmphi
     elseif (envtype3 == 2) then
