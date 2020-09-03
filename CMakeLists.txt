@@ -11,7 +11,7 @@ project(SpectrumSDT)
 enable_language(Fortran)
 
 # Specify where to look for external module files (-I option)
-include_directories(include ${prefix}/src/include ${prefix}/libs/fdict/build/include ${prefix}/libs/ftl/build/include/ftl ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
+include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict/build/include ${prefix}/libs/ftl/build/include/ftl ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
 # Specify where to look for libraries (-L option)
 link_directories(${prefix}/libs/fdict/build/lib ${prefix}/libs/ftl/build/lib ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
 
@@ -88,7 +88,7 @@ set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${input_params} ${io_u
 set(numerical_recipies ${prefix}/src/tools/numerical_recipies.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} ${prefix}/src/tools/optgrid_tools.f90)
 
-add_executable(optgrid ${constants} ${optgrid_tools} ${prefix}/src/programs/optgrid.f90)
+add_executable(optgrid ${constants} ${optgrid_tools} ${path_utils} ${prefix}/src/programs/optgrid.f90)
 target_link_libraries(optgrid blas lapack)
 
 add_executable(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${dawes} ${prefix}/src/programs/pesprint.f90)

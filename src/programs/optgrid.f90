@@ -34,7 +34,8 @@ module general
   integer envtype1,envtype2,envtype3
   integer cs,rgrid,symmphi
   !--- Envelopes ---
-  character*256 envpath
+  character(1000) :: project_path
+  character(:), allocatable :: envpath
   real*8 env1_d1,env1_dn
   real*8 env2_d1,env2_dn
   real*8 env3_d1,env3_dn
@@ -51,6 +52,7 @@ program optgrid
   use general
   use constants
   use optgrid_tools
+  use path_utils
   implicit none
 
   call input_parameters
@@ -101,6 +103,7 @@ program optgrid
   call print_grid(g1,jac1,n1,'grid1.dat',a1,potv1)
   call print_grid(g2,jac2,n2,'grid2.dat',a2,potv2)
   call print_grid(g3,jac3,n3,'grid3.dat',a3,potv3)
+  print *, 'Done'
 contains
 
   !-----------------------------------------------------------------------
@@ -108,17 +111,17 @@ contains
   !  J vector, number of point along each coordinate, initial alpha
   !-----------------------------------------------------------------------
   subroutine input_parameters
-    implicit none
     integer :: m0_code, m1_code, m2_code, total_code
     open(1,file='optgrid.config')
-    read(1,'(A)')envpath
-    read(1,*)n1,n2,n3
-    read(1,*)nenv1,nenv2,nenv3
-    read(1,*)a1,a2,a3
+    read(1,'(A)') project_path
+    read(1,*) n1,n2,n3
+    read(1,*) nenv1,nenv2,nenv3
+    read(1,*) a1,a2,a3
     read(1, *) envtype1, envtype2, envtype3
     read(1, *) min1, max1, Emax1
     read(1, *) min2, max2, Emax2
     
+    envpath = append_path_token(trim(project_path), 'extra/spectrum/optgrid/dawes/J00K000')
     if (envtype3 == 1) then
       read(1, *) min3, max3, Emax3, symmphi
     elseif (envtype3 == 2) then
@@ -153,21 +156,20 @@ contains
   !  Loads potential along MEP for each coordinate
   !-----------------------------------------------------------------------
   subroutine input_envelopes
-    implicit none
     integer i
-    open(1,file=trim(envpath)//'/MEP1.dat',status='old')
+    open(1, file = append_path_token(envpath, 'MEP1.dat'), status='old')
     do i=1,nenv1
       read(1,*) env1(i), pot1(i)
     enddo
     close(1)
     pot1 = pot1 / autown + zpe
-    open(1,file=trim(envpath)//'/MEP2.dat',status='old')
+    open(1, file = append_path_token(envpath, 'MEP2.dat'), status='old')
     do i=1,nenv2
       read(1,*) env2(i), pot2(i)
     enddo
     close(1)
     pot2 = pot2/autown + zpe
-    open(1,file=trim(envpath)//'/MEP3.dat',status='old')
+    open(1, file = append_path_token(envpath, 'MEP3.dat'), status='old')
     do i=1,nenv3
       read(1,*) env3(i), pot3(i)
     enddo
@@ -190,7 +192,6 @@ contains
   !  Find parabola
   !-----------------------------------------------------------------------
   subroutine find_parabola(env,pot,nenv,enva,envE,envm)
-    implicit none
     real*8 env(nenv),pot(nenv),enva,envE,envm
     integer nenv,i,im,il,ir
     real*8 mat(3,3),d(3)
@@ -228,6 +229,9 @@ contains
     envm = env(im)
   end subroutine
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! 
+!-------------------------------------------------------------------------------------------------------------------------------------------
   real*8 function det(a)
     real*8 a(3,3)
     det = a(1,1)*(a(2,2)*a(3,3) - a(3,2)*a(2,3)) + a(1,2)*(a(3,1)*a(2,3) - a(2,1)*a(3,3)) + a(1,3)*(a(2,1)*a(3,2) - a(3,1)*a(2,2))
@@ -239,8 +243,6 @@ contains
   !  Adds approximate ZPE value along two other coordinates
   !-----------------------------------------------------------------------
   real*8 function potv1(r)
-    use general
-    implicit none
     real*8 r
     if(r>env1(nenv1))then
       potv1 = pot1(nenv1)
@@ -249,9 +251,10 @@ contains
     endif
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! 
+!-------------------------------------------------------------------------------------------------------------------------------------------
   real*8 function potv2(r)
-    use general
-    implicit none
     real*8 r
     if(r>env2(nenv2))then
       potv2 = pot2(nenv2)
@@ -260,9 +263,10 @@ contains
     endif
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! 
+!-------------------------------------------------------------------------------------------------------------------------------------------
   real*8 function potv3(r)
-    use general
-    implicit none
     real*8 r
     if(symmphi==2.and.r<pi)then
       call splint(env3,pot3,env3_d1,env3_2d,nenv3,2*pi-r,potv3)
@@ -276,8 +280,6 @@ contains
   !  Smooth envelopes by Eckart function
   !-----------------------------------------------------------------------
   real*8 function potenv1(r)
-    use general
-    implicit none
     real*8 r,x
     if(envtype1.eq.1)then
       x = r - envm1
@@ -295,9 +297,10 @@ contains
     endif
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! 
+!-------------------------------------------------------------------------------------------------------------------------------------------
   real*8 function potenv2(r)
-    use general
-    implicit none
     real*8 r,x
     if(envtype2.eq.1)then
       x = r - envm2
@@ -315,9 +318,10 @@ contains
     endif
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! 
+!-------------------------------------------------------------------------------------------------------------------------------------------
   real*8 function potenv3(r)
-    use general
-    implicit none
     real*8 r,x
     if(envtype3.eq.1)then
       x = r - envm3
@@ -331,8 +335,6 @@ contains
   !  Grid derivative for rho
   !-----------------------------------------------------------------------
   subroutine der_rho(x,y,dydx)
-    use general
-    implicit none
     real*8 x,y,dydx
     real*8 argument
     argument = 2*mu*(Emax1-potenv1(y)-gridextra(envm1,envm2))
@@ -347,8 +349,6 @@ contains
   !  Grid derivative for tet
   !-----------------------------------------------------------------------
   subroutine der_tet(x,y,dydx)
-    use general
-    implicit none
     real*8 x,y,dydx
     real*8 argument
     argument = mu/2*(Emax2-potenv2(y)-gridextra(envm1,envm2))
@@ -363,8 +363,6 @@ contains
   !  Grid derivative for phi
   !-----------------------------------------------------------------------
   subroutine der_phi(x,y,dydx)
-    use general
-    implicit none
     real*8 x,y,dydx
     real*8 argument
     argument = mu/2*(Emax3-potenv3(y)-gridextra(envm1,envm2))
@@ -379,8 +377,6 @@ contains
   !  Extra potential caused by conversion from Jacoby coordinates
   !-----------------------------------------------------------------------
   real*8 function gridextra(rho,tet)
-    use general
-    implicit none
     real*8 rho,tet
     gridextra = - 2/(mu*rho**2)*(sin(2*tet)**(-2)+0.0625d0)
   end function
@@ -389,8 +385,6 @@ contains
   !  Grid derivative for R1
   !-----------------------------------------------------------------------
   subroutine der_r1(x,y,dydx)
-    use general
-    implicit none
     real*8 x,y,dydx
     real*8 argument
     argument = 2*mu1*(Emax1-potenv1(y))
@@ -405,8 +399,6 @@ contains
   !  Grid derivative for R2
   !-----------------------------------------------------------------------
   subroutine der_r2(x,y,dydx)
-    use general
-    implicit none
     real*8 x,y,dydx
     real*8 argument
     argument = 2*mu2*(Emax2-potenv2(y))
@@ -421,8 +413,6 @@ contains
   !  Grid derivative for Te
   !-----------------------------------------------------------------------
   subroutine der_te(x,y,dydx)
-    use general
-    implicit none
     real*8 x,y,dydx
     real*8 argument
     argument = 2/(1/(mu1*envm1**2) + 1/(mu2*envm2**2) - 2*cos(envm3)/(m0*envm1*envm2)) * (Emax3-potenv3(y))
