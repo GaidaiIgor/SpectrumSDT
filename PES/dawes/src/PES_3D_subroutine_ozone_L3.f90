@@ -63,7 +63,7 @@ subroutine IMLS(jac3,V,SO_flag)
     dist_tol=0.7d0
     allocate(jac(3),jac2(3))
 
-    path = resolve_relative_exe_path('../external/pes/dawes/data/PES_2663_QZ_F12_20.dat')
+    path = resolve_relative_exe_path('../PES/dawes/data/PES_2663_QZ_F12_20.dat')
     OPEN(UNIT = 652, FILE = path, FORM = 'UNFORMATTED', ACCESS = 'SEQUENTIAL')
     read(652) count3
     write(*,*) 'data points',count3/2
