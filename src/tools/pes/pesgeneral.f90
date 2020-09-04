@@ -31,7 +31,6 @@ contains
 !  Each particular PES must call this subroutine from init_pots.
 !-----------------------------------------------------------------------
   subroutine init_pots_general(params)
-    implicit none
     class(input_params), intent(in) :: params
     integer :: a1, a2, a3, total_code
     real*8 maxmu
@@ -76,7 +75,6 @@ contains
   !  Calculates rotational potential in symmetric top approximation.
   !-----------------------------------------------------------------------
   function calc_potrot(rho, theta, J, K) result(res)
-    implicit none
     real*8 :: rho, theta
     integer, optional, intent(in) :: J, K
     real*8 :: res
@@ -87,7 +85,6 @@ contains
   !  Calculates J**2 component of rotational potential.
   !-----------------------------------------------------------------------
   function calc_potrotj2(rho, theta, J) result(res)
-    implicit none
     real*8 :: rho, theta
     integer, optional, intent(in) :: J
     real*8 :: res
@@ -104,7 +101,6 @@ contains
   !  Calculates K**2 component of rotational potential.
   !-----------------------------------------------------------------------
   function calc_potrotk2(rho, theta, K) result(res)
-    implicit none
     real*8 :: rho, theta
     integer, optional, intent(in) :: K
     real*8 :: res
@@ -122,7 +118,6 @@ contains
   !  Calculates asymmetric component of rotational potential.
   !-----------------------------------------------------------------------
   real*8 function calc_potrotasym(rho,tet)
-    implicit none
     real*8 rho, tet
     real*8 :: a, b
     a = get_rotational_a(mu, rho, tet)
@@ -134,7 +129,6 @@ contains
   !  Calculates rotational potential at a given point.
   !-----------------------------------------------------------------------
   real*8 function calc_potrotfull(rho,tet)
-    implicit none
     real*8 rho,tet
     calc_potrotfull = ( jx**2/(1-sin(tet)) + jy**2/(1+sin(tet)) + jz**2/(2*sin(tet)**2) ) / (mu*rho**2)
   end function
@@ -143,7 +137,6 @@ contains
   !  Calculates extra potential term at a given point.
   !-----------------------------------------------------------------------
   real*8 function calc_potxtr(rho,tet)
-    implicit none
     real*8 rho,tet
     calc_potxtr = -(0.25d0+4/(sin(2*tet)**2))/(2d0*mu*rho**2)
   end function
@@ -151,40 +144,17 @@ contains
   !-----------------------------------------------------------------------
   !  Prints vibrational potential on 3D grid.
   !-----------------------------------------------------------------------
-  subroutine prnt_potvib
-    implicit none
-    integer i1,i2,i3
-    open(1,file='potvib.dat',form='unformatted')
-    write(1)potvib
-    close(1)
-    open(1,file='potvib.out')
-    do i1=1,size(potvib,3)
-      do i2=1,size(potvib,2)
-        do i3=1,size(potvib,1)
-          write(1,*)potvib(i3,i2,i1)*autown
+  subroutine print_potvib()
+    integer :: i1, i2, i3, file_unit
+    open(file_unit, file = 'potvib.out')
+    do i1 = 1, size(potvib, 3)
+      do i2 = 1, size(potvib, 2)
+        do i3 = 1, size(potvib, 1)
+          write(file_unit, *) potvib(i3, i2, i1) * autown
         end do
       end do
     end do
-    close(1)
+    close(file_unit)
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Prints total potential on 3D grid.
-  !-----------------------------------------------------------------------
-  subroutine prnt_pottot
-    implicit none
-    integer i1,i2,i3
-    open(1,file='pottot.dat',form='unformatted')
-    write(1)pottot
-    close(1)
-    open(1,file='pottot.out')
-    do i1=1,size(pottot,3)
-      do i2=1,size(pottot,2)
-        do i3=1,size(pottot,1)
-          write(1,*)pottot(i3,i2,i1)*autown
-        end do
-      end do
-    end do
-    close(1)
-  end subroutine
 end module

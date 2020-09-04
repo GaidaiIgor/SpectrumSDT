@@ -95,14 +95,16 @@ module general_utils
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints progress %
 ! progress: current progress of some process (a number from 0 to 1)
-! last_progress: the value of progress for the previous call. If it exceeds the value of progress by more than progress_step, progress is reported.
+! last_progress: the value of progress for the previous call. If it exceeds the value of progress by more than progress_step, progress is 
+! reported.
 ! progress_step: controls how often progress should be reported (default is every 0.1)
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine track_progress(progress, progress_step, reset)
-    real*8, value :: progress
-    real*8, optional :: progress_step
+    real*8, intent(in) :: progress
+    real*8, optional, intent(in) :: progress_step
     integer, optional, intent(in) :: reset
-    real*8, save :: last_progress
+    character, parameter :: carriage_return = achar(13)
+    real*8, save :: last_progress = 0
     real*8 :: progress_step_act
 
     if (present(reset)) then
@@ -112,10 +114,10 @@ module general_utils
     end if
 
     progress_step_act = merge(progress_step, 0.1d0, present(progress_step))
-    if (progress > last_progress + progress_step_act) then
+    if (progress - (last_progress + progress_step_act) > -1d-10) then
       last_progress = last_progress + progress_step_act
-      print '(A,x,F6.2,A$)', '\r', last_progress * 100, '% done'
-      if (compare_reals(last_progress, 1d0) == 0) then
+      print '(A,x,F6.2,A$)', carriage_return, last_progress * 100, '% done'
+      if (abs(last_progress - 1) < 1d-10) then
         print *
       end if
     end if
@@ -126,7 +128,7 @@ module general_utils
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine exit_abnormally()
     integer :: zero = 0
-    print *, 1 / zero
+    print *, 1 / zero ! This is the only portable way to print stack trace that I'm aware of...
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

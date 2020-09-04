@@ -79,38 +79,41 @@
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates potentials
+! Calculates potential energy surface
 !-------------------------------------------------------------------------------------------------------------------------------------------
    subroutine calc_pots(grid1, grid2, grid3)
      real*8 :: grid1(:), grid2(:), grid3(:)
      integer :: i1, i2, i3, n1, n2, n3, proc_k, first_k, k, proc_points, total_points, proc_id
      integer, allocatable :: proc_counts(:), proc_shifts(:)
-     real*8, allocatable :: proc_pot_vib_1d(:), proc_pot_total_1d(:), global_pot_vib_1d(:), global_pot_total_1d(:)
+     real*8, allocatable :: proc_pot_vib_1d(:), global_pot_vib_1d(:)
 
      n1 = size(grid1)
      n2 = size(grid2)
      n3 = size(grid3)
      total_points = n1 * n2 * n3
      call get_proc_elem_range(total_points, first_k, proc_points, proc_counts, proc_shifts)
-     allocate(proc_pot_vib_1d(proc_points), proc_pot_total_1d(proc_points))
+     allocate(proc_pot_vib_1d(proc_points))
 
      ! Calculate a chunk
      do proc_k = 1, proc_points
+       if (get_proc_id() == 0) then
+         call track_progress(proc_k * 1d0 / proc_points, 0.01d0)
+       end if
+
        k = first_k + proc_k - 1
        call convert_1d_ind_to_3d(k, n1, n2, n3, i1, i2, i3)
        proc_pot_vib_1d(proc_k) = calc_potvib(grid1(i1), grid2(i2), grid3(i3))
-       proc_pot_total_1d(proc_k) = proc_pot_vib_1d(proc_k) + calc_potrot(grid1(i1), grid2(i2)) + calc_potxtr(grid1(i1), grid2(i2))
      end do
 
      ! Allocate global storage on 0th proc
      proc_id = get_proc_id()
      if (proc_id == 0) then
-       allocate(global_pot_vib_1d(total_points), global_pot_total_1d(total_points))
-       allocate(potvib(n3, n2, n1), pottot(n3, n2, n1))
+       allocate(global_pot_vib_1d(total_points))
+       allocate(potvib(n3, n2, n1))
      end if
 
+     call print_parallel('Exchanging data...')
      call MPI_Gatherv(proc_pot_vib_1d, size(proc_pot_vib_1d), MPI_DOUBLE_PRECISION, global_pot_vib_1d, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD)
-     call MPI_Gatherv(proc_pot_total_1d, size(proc_pot_total_1d), MPI_DOUBLE_PRECISION, global_pot_total_1d, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD)
 
      if (proc_id == 0) then
        k = 1
@@ -118,7 +121,6 @@
          do i2 = 1, n2
            do i3 = 1, n3
              potvib(i3, i2, i1) = global_pot_vib_1d(k)
-             pottot(i3, i2, i1) = global_pot_total_1d(k)
              k = k + 1
            end do
          end do
