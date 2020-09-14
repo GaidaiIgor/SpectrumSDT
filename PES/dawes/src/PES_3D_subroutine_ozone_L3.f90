@@ -2,7 +2,6 @@ subroutine IMLS(jac3,V,SO_flag)
   use dynamic_parameters
   use ssplin
   use path_utils
-  ! use constants
   implicit none
   integer :: i,initflag,SO_flag
   real*8 :: xi(3),temp3,jac3(3),h2wn,v,cartt(9),dist(3),dist_temp(3),vec1(2),vec2(2),bohr,pii
