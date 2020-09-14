@@ -1,7 +1,6 @@
 !-----------------------------------------------------------------------
-!  PESprint (pesprint.f)
-!  Prints PES in APH and valence coordinates.
-!  Author: Alexander Teplukhin
+!  Prints PES in APH coordinates.
+!  Author: Alexander Teplukhin, Igor Gayday
 !-----------------------------------------------------------------------
 program pesprint
   use config
@@ -16,16 +15,15 @@ program pesprint
 
   call init_parameters_pesprint(params)
   call load_optgrids()
-
   call calc_pots(g1, g2, g3)
+
   open(newunit = file_unit, file = 'potvib.dat', form = 'unformatted')
   write(file_unit) potvib
   close(file_unit)
-
+  
   if (params % print_potential == 1 .and. get_proc_id() == 0) then
     call print_potvib()
   end if
-
   call MPI_Finalize(ierr)
 
 contains
