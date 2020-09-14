@@ -366,7 +366,7 @@ contains
       call announce_default(mode_id, 'cap_type', params % cap_type, '', optional_modes)
     end if
 
-    params % solver = iff('slepc', params % solver, params % solver == '-1')
+    params % solver = iff(params % solver == '-1', 'slepc', params % solver)
 
     if (params % ncv == -1 .and. params % solver == 'slepc') then
       call announce_default(mode_id, 'ncv', '', '', optional_modes, 'ncv is not specified; its value will be determined by SLEPc. This might affect the number of converged ' // &

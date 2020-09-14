@@ -60,7 +60,7 @@ contains
     K_ind = 1
     do K = params % K(1), params % K(2)
       K_load = merge(params % basis_K, K, params % fix_basis_jk == 1)
-      root_path = iff(params % basis_root_path, params % root_path, params % fix_basis_jk == 1)
+      root_path = iff(params % fix_basis_jk == 1, params % basis_root_path, params % root_path)
       sym_folder = get_sym_path_root(root_path, K_load, next_sym)
       block_info_path = get_block_info_path(sym_folder)
       k_blocks_info(K_ind, K_ind) = load_k_subblock_sizes_diag(block_info_path)
@@ -260,7 +260,7 @@ contains
         rows = full_ham_overlap_info % rows
         columns = full_ham_overlap_info % columns
         K_load = merge(params % basis_K, K, params % fix_basis_jk == 1)
-        root_path = iff(params % basis_root_path, params % root_path, params % fix_basis_jk == 1)
+        root_path = iff(params % fix_basis_jk == 1, params % basis_root_path, params % root_path)
         overlap_block = load_overlap_block(root_path, K_load, K_load, 0, K_sym, slice_ind_row, slice_ind_col, rows, columns)
 
         ! Determine which part of overlaps block should be stored in the current chunk
@@ -400,7 +400,7 @@ contains
         col_shift = global_overlap_block_info % borders % top - full_ham_overlap_block_info % borders % top
 
         K_load = merge(params % basis_K, K, params % fix_basis_jk == 1)
-        root_path = iff(params % basis_root_path, params % root_path, params % fix_basis_jk == 1)
+        root_path = iff(params % fix_basis_jk == 1, params % basis_root_path, params % root_path)
         eivals = load_eivals_2d(root_path, K_load, K_sym, slice_ind_row)
         overlap_block = local_overlap_block_info % extract_from_matrix(this % proc_chunk)
         do row = 1, size(overlap_block, 1)
@@ -532,7 +532,7 @@ contains
         rows = full_ham_overlap_info % rows
 
         K_load = merge(params % basis_K, K, params % fix_basis_jk == 1)
-        root_path = iff(params % basis_root_path, params % root_path, params % fix_basis_jk == 1)
+        root_path = iff(params % fix_basis_jk == 1, params % basis_root_path, params % root_path)
         overlap_block_J = load_overlap_block(root_path, K_load, K_load, 10, K_sym, slice_row_ind, slice_col_ind, rows, rows)
         overlap_block_K = load_overlap_block(root_path, K_load, K_load, 11, K_sym, slice_row_ind, slice_col_ind, rows, rows)
 

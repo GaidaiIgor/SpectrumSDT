@@ -120,7 +120,7 @@ contains
     character(:), allocatable :: res
     character(:), allocatable :: k_folder_name
     
-    k_folder_name = iff('K_all', 'K_' // num2str(K), K == -1)
+    k_folder_name = iff(K == -1, 'K_all', 'K_' // num2str(K))
     res = append_path_tokens(root_path, k_folder_name)
   end function
 
@@ -147,7 +147,7 @@ contains
     character(:), allocatable :: res
     character(:), allocatable :: sym_name
 
-    sym_name = iff('even', 'odd', sym_code == 0)
+    sym_name = iff(sym_code == 0, 'even', 'odd')
     res = get_sym_path_str(k_path, sym_name, parity)
   end function
 
