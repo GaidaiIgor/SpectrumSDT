@@ -11,6 +11,7 @@ module sdt
   use io_utils
   use lapack_interface_mod
   use matmul_operator_mod
+  use mpi
   use parabola
   use pesgeneral
   use rovib_io_mod
@@ -121,7 +122,7 @@ contains
   !  Creates main directory.
   !-----------------------------------------------------------------------
   integer function maindir()
-    call subdir(logdir)
+    call subdir('')
     if (mode == MODE_3DSDT) then
       call subdir(capdir)
       call subdir(expdir)
@@ -253,6 +254,7 @@ contains
 
       ! Solve matrix
       call lapack_eigensolver(vecrawb, valraw)
+
       ! Get normalized grid functions
       vecraw = matmul(basis, vecrawb)
 
@@ -425,21 +427,22 @@ contains
     ! Calculate offsets in final matrix
     offset(1) = 0
     do i=1,n2
-      if (i/=1)offset(i) = offset(i-1) + nvec1(i-1)
+      if (i/=1) offset(i) = offset(i-1) + nvec1(i-1)
     end do
 
     ! Initialize kinetic matrix
     call init_matrix2(kin,i1)
+
     ! Prepare hamiltonian in basis
     ! Loop over columns
     do ic=1,n2
       nvec1c = nvec1(ic)
-      if (nvec1c==0)cycle
+      if (nvec1c==0) cycle
 
       ! Loop over rows
       do ir=1,n2
         nvec1r = nvec1(ir)
-        if (nvec1r==0)cycle
+        if (nvec1r==0) cycle
         
         ! Calculate overlap matrix
         if (ic==ir) then
@@ -456,7 +459,7 @@ contains
         ham1 = ham1 * kin(ir,ic)
         if (ic==ir) then
           do i=1,nvec1c
-            ham1(i,i) = ham1(i,i) + val1(ic)%a(i)
+            ham1(i,i) = ham1(i,i) + val1(ic) % a(i)
           end do
         end if
 
@@ -474,8 +477,9 @@ contains
 
     ! Solve eigenvalue problem
     nvec2 = nvec2max
-    if (nvec2>nb2)nvec2 = nb2
+    if (nvec2>nb2) nvec2 = nb2
     allocate(w(nb2),valraw(nvec2),vecrawe(nb2,nvec2))
+
     call lapack_eigensolver(ham2, w)
     valraw  = w(1:nvec2)
     vecrawe = ham2(:,1:nvec2)
@@ -488,6 +492,7 @@ contains
     ! Process calculated 2D vectors
     allocate(vecrawb(n23b),vecraw(n23),nbr(nvec2),symraw(nvec2))
     ivec = 0
+
     do is=1,nvec2
       ! Transform from eigenvector basis
       call trans_eibas_bas(vec1,nvec1,vecrawe(:,is),vecrawb)
@@ -522,13 +527,14 @@ contains
       nbr(ivec) = is
     ! Loop over states
     end do
+    nvec2 = ivec
 
     ! Save good states
     if (ivec/=0) then
       allocate(val2(ivec),sym2(ivec),vec2(nb2,ivec))
       do i=1,ivec
-        val2(i)   = valraw(  nbr(i))
-        sym2(i)   = symraw(  nbr(i))
+        val2(i)   = valraw(nbr(i))
+        sym2(i)   = symraw(nbr(i))
         vec2(:,i) = vecrawe(:,nbr(i))
       end do
     end if
@@ -537,7 +543,7 @@ contains
     write(fn,'(2A,I0,A)')outdir,'/bas2.',i1,'.bin.out'
     open(1,file=fn,form='unformatted')
     write(1)ivec,nb2
-    if (ivec /=0 ) then
+    if (ivec /= 0) then
       write(1) val2
       write(1) vec2
     end if
@@ -559,7 +565,7 @@ contains
     integer nvec2                      ! Number of 2D vectors
     integer nb2                        ! Basis size
     integer mysl                       ! SLice number
-    integer i,j
+    integer :: i, j, ierr
 
     ! Collective variables
     real*8,allocatable::val2all(:,:)   ! 2D values
@@ -589,13 +595,13 @@ contains
     allocate(buf(nvec2max))
     buf = 0
 
-    call MPI_Gather(nvec2, 1, MPI_INTEGER, nvec2all, 1, MPI_INTEGER, 0, MPI_COMM_WORLD)
-    call MPI_Gather(nvec1, n2, MPI_INTEGER, nvec1all, n2, MPI_INTEGER, 0, MPI_COMM_WORLD)
+    call MPI_Gather(nvec2, 1, MPI_INTEGER, nvec2all, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+    call MPI_Gather(nvec1, n2, MPI_INTEGER, nvec1all, n2, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
     buf(1:nvec2) = val2
-    call MPI_Gather(buf, nvec2max, MPI_DOUBLE_PRECISION, val2all, nvec2max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD)
+    call MPI_Gather(buf, nvec2max, MPI_DOUBLE_PRECISION, val2all, nvec2max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
     buf(1:nvec2) = sym2
-    call MPI_Gather(buf, nvec2max, MPI_DOUBLE_PRECISION, sym2all, nvec2max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD)
+    call MPI_Gather(buf, nvec2max, MPI_DOUBLE_PRECISION, sym2all, nvec2max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
     ! Only root continues with printing
     if (myid == 0) then
