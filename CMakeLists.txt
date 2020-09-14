@@ -16,7 +16,12 @@ include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict
 link_directories(${prefix}/libs/fdict/build/lib ${prefix}/libs/ftl/build/lib ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
 
 # Source file dependencies
-set(general_utils ${prefix}/src/utils/general/general.F90)
+set(general_char_str ${prefix}/src/utils/general/general_char_str.F90)
+set(general_integer ${general_char_str} ${prefix}/src/utils/general/general_integer.F90)
+set(general_real ${general_char_str} ${prefix}/src/utils/general/general_real.F90)
+set(general_real_array ${prefix}/src/utils/general/general_real_array.F90)
+set(general_utils ${general_integer} ${general_real} ${general_real_array} ${general_char_str} ${prefix}/src/utils/general/general.F90)
+
 set(constants ${prefix}/src/utils/constants.f90)
 set(fourier_transform ${constants} ${general_utils} ${prefix}/src/utils/fourier_transform.f90)
 set(formulas ${general_utils} ${constants} ${prefix}/src/tools/formulas.f90)
@@ -67,12 +72,12 @@ set(system ${general_utils} ${io_utils} ${prefix}/src/utils/system.f90)
 set(path_utils ${general_utils} ${input_params} ${parallel_utils} ${system} ${prefix}/src/utils/path/path.f90)
 set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${string_utils} ${debug_tools} ${prefix}/src/tools/config.f90)
 set(pesgeneral ${constants} ${formulas} ${input_params} ${general_utils} ${general_vars} ${prefix}/src/tools/pes/pesgeneral.f90)
-set(pesinterface ${constants} ${input_params} ${parallel_utils} ${pesgeneral} ${prefix}/src/tools/pes/pesinterface.f90)
 
 set(dawes_dynamic_parameters ${prefix}/PES/dawes/src/dynamic_parameters_3D.f90)
 set(dawes_linkables ${prefix}/PES/dawes/src/2D-spline.f ${prefix}/PES/dawes/src/VLGRoo.f ${prefix}/PES/dawes/src/CJe.f ${prefix}/PES/dawes/src/C6Js.f ${prefix}/PES/dawes/src/cleb.f ${prefix}/PES/dawes/src/Celr.f ${prefix}/PES/dawes/src/C6r.f ${prefix}/PES/dawes/src/faclog.f ${prefix}/PES/dawes/src/index.f90)
 set(dawes_ssplin ${path_utils} ${prefix}/PES/dawes/src/splin.f90)
 set(dawes ${dawes_linkables} ${path_utils} ${dawes_ssplin} ${dawes_dynamic_parameters} ${prefix}/PES/dawes/src/PES_3D_subroutine_ozone_L3.f90)
+set(pesinterface ${constants} ${dawes} ${input_params} ${parallel_utils} ${pesgeneral} ${prefix}/src/tools/pes/pesinterface.f90)
 
 set(block_borders ${prefix}/src/rovib/block_borders.f90)
 set(matrix_block_info ${block_borders} ${general_utils} ${prefix}/src/rovib/matrix_block_info.f90)
@@ -91,7 +96,7 @@ set(optgrid_tools ${general_utils} ${numerical_recipies} ${prefix}/src/tools/opt
 add_executable(optgrid ${constants} ${optgrid_tools} ${path_utils} ${prefix}/src/programs/optgrid.f90)
 target_link_libraries(optgrid blas lapack)
 
-add_executable(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${dawes} ${prefix}/src/programs/pesprint.f90)
+add_executable(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${prefix}/src/programs/pesprint.f90)
 target_link_libraries(pesprint fdict ftl pcreposix blas lapack)
 
 add_executable(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${fourier_transform} ${general_vars} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} ${prefix}/src/programs/spectrumsdt.F90)
