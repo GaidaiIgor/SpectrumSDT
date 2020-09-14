@@ -6,7 +6,7 @@ module state_properties_mod
   use general_utils
   use input_params_mod
   use io_utils
-  use mpi_f08
+  use mpi
   use parallel_utils
   use path_utils
   use rovib_io_mod

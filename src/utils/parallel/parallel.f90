@@ -1,9 +1,10 @@
 module parallel_utils
   use algorithms
   use general_utils
-  use mpi_f08
+  use mpi
 
 contains
+
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns current process id and total number of processes
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -65,14 +66,14 @@ contains
       all_shifts = prefix_sum_exclusive(all_counts_act)
     end if
   end subroutine
-  
+
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints using only 0th process
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine print_parallel(printable)
     class(*), intent(in) :: printable
     integer :: proc_id, n_procs
-    
+
     call get_proc_info(proc_id, n_procs)
     if (proc_id == 0) then
       select type (printable)

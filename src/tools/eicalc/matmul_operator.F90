@@ -7,7 +7,7 @@ module matmul_operator_mod
   use distributed_rovib_hamiltonian_mod
   use input_params_mod
   use matrix_block_info_mod
-  use mpi_f08
+  use mpi
   implicit none
 
   abstract interface
