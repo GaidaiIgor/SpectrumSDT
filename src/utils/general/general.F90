@@ -1,10 +1,16 @@
 module general_utils
-  use iso_fortran_env
-
+  use general_integer_mod
+  use general_real_mod
+  use general_real_array_mod
+  use general_char_str_mod
   implicit none
 
   interface arg_or_default
     module procedure :: arg_or_default_integer, arg_or_default_real, arg_or_default_real_array, arg_or_default_char_str
+  end interface
+
+  interface iff
+    module procedure :: iff_integer, iff_real, iff_real_array, iff_char_str
   end interface
 
   interface swap
@@ -21,22 +27,6 @@ module general_utils
 
   contains
   
-#include "general_integer.F90"
-#include "general_real.F90"
-#include "general_real_array.F90"
-#include "general_char_str.F90"
-
-!-----------------------------------------------------------------------
-! Allocates array and compies the value of initialization array
-!-----------------------------------------------------------------------
-  subroutine initAllocatable(array, initializer)
-    real*8, allocatable :: array(:)
-    real*8 :: initializer(:)
-
-    allocate(array(size(initializer)))
-    array = initializer
-  end subroutine
-
 !-----------------------------------------------------------------------
 ! Compares given reals with specified precision
 !-----------------------------------------------------------------------
@@ -60,7 +50,7 @@ module general_utils
 !-----------------------------------------------------------------------
 ! generates real grid using specified step
 !-----------------------------------------------------------------------
-  function generateRealRange(start, end, step) result(grid)
+  function generate_real_range(start, end, step) result(grid)
     real*8, intent(in) :: start, end, step
     real*8, allocatable :: grid(:)
     real*8 :: npointsf
@@ -75,7 +65,7 @@ module general_utils
 
     ! +1 because of an extra point at the beginning of interval
     allocate(grid(npoints + 1))
-    grid = [(start + i * step, i = 0,npoints)]
+    grid = [(start + i * step, i = 0, npoints)]
   end function
 
 !-----------------------------------------------------------------------
@@ -89,7 +79,7 @@ module general_utils
     real*8 :: step
 
     step = (end - start) / (npoints - 1)
-    grid = [(start + i * step, i = 0,npoints - 1)]
+    grid = [(start + i * step, i = 0, npoints - 1)]
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
@@ -114,10 +104,10 @@ module general_utils
     end if
 
     progress_step_act = merge(progress_step, 0.1d0, present(progress_step))
-    if (progress - (last_progress + progress_step_act) > -1d-10) then
-      last_progress = last_progress + progress_step_act
+    if (compare_reals(progress, last_progress + progress_step_act) == 1) then
+      last_progress = int(progress / progress_step_act) * progress_step_act
       print '(A,x,F6.2,A$)', carriage_return, last_progress * 100, '% done'
-      if (abs(last_progress - 1) < 1d-10) then
+      if (compare_reals(last_progress, 1d0) == 0) then
         print *
       end if
     end if
@@ -135,7 +125,7 @@ module general_utils
 ! A one-liner to check various constraints
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assert(logical_statemenet, error_message)
-    logical, value :: logical_statemenet
+    logical :: logical_statemenet
     character(*) :: error_message
 
     if (.not. logical_statemenet) then
@@ -143,54 +133,6 @@ module general_utils
       call exit_abnormally()
     end if
   end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts integer to string
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function num2str_integer(num, format) result(str)
-    integer, intent(in) :: num
-    character(*), intent(in), optional :: format
-    character(:), allocatable :: str
-    character(256) :: buffer
-    character(:), allocatable :: format_act
-
-    format_act = arg_or_default(format, '(I0)')
-    write(buffer, format_act) num
-    str = trim(buffer)
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts real*8 to string
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function num2str_real(num, format) result(str)
-    real*8, intent(in) :: num
-    character(*), intent(in), optional :: format
-    character(:), allocatable :: str
-    character(256) :: buffer
-    character(:), allocatable :: format_act
-
-    format_act = arg_or_default(format, '(G10.2)')
-    write(buffer, format_act) num
-    str = trim(adjustl(buffer))
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string to integer
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  elemental function str2int(str) result(int)
-    character(*), intent(in) :: str
-    integer :: int
-    read(str, *) int
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string to real*8
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  elemental function str2real(str) result(real_num)
-    character(*), intent(in) :: str
-    real*8 :: real_num
-    read(str, *) real_num
-  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks if a given strings starts with a given pattern
@@ -229,21 +171,6 @@ module general_utils
     do i = 1, size
       matrix(i, i) = 1
     end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Tertiary if operator
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function iff(true_res, false_res, cond) result(res)
-    character(*), intent(in) :: true_res, false_res
-    logical, intent(in) :: cond
-    character(:), allocatable :: res
-
-    if (cond) then
-      res = true_res
-    else
-      res = false_res
-    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

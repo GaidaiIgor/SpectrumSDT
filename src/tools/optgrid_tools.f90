@@ -195,7 +195,7 @@ contains
     real*8, allocatable, intent(out) :: grid(:), jac(:)
     integer, intent(out) :: n
     
-    grid = generateRealRange(minr + step / 2d0, maxr - step / 2d0, step)
+    grid = generate_real_range(minr + step / 2d0, maxr - step / 2d0, step)
     n = size(grid)
     allocate(jac(n))
     jac = 1d0
