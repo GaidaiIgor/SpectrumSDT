@@ -16,6 +16,7 @@ program spectrumsdt
   use io_utils
   use iso_fortran_env, only : real64
   use matmul_operator_mod
+  use mpi
   use overlaps_extra_mod
   use parallel_utils
   use path_utils
@@ -255,12 +256,12 @@ contains
     else
       if (myid == 0) then
         ready = maindir()
-        if (params % sequential == 0) then
-          call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        end if
+        call assert(ready == 1, 'Error: cannot create directory structure')
       end if
     end if
-    call assert(ready == 1, 'Error: cannot create directory structure')
+    if (params % sequential == 0) then
+      call MPI_Barrier(MPI_COMM_WORLD, ierr)
+    end if
 
     ! Call appropriate subroutine
     select case(mode)
@@ -283,7 +284,7 @@ contains
         call print_parallel('Config check has failed. Mode does not exist.')
     end select
 
+    call print_parallel('Done')
     call MPI_Finalize(ierr)
-    print *, 'Done'
   end subroutine
 end program
