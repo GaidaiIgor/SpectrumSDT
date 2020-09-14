@@ -6,7 +6,7 @@
  module pesinterface_mod
    use constants
    use input_params_mod
-   use mpi_f08
+   use mpi
    use parallel_utils
    use pesgeneral
 
@@ -23,7 +23,6 @@
 !  Initialization.
 !-----------------------------------------------------------------------
   subroutine init_pots(params)
-    implicit none
     class(input_params), intent(in) :: params
     
     call init_pots_general(params)
@@ -37,16 +36,16 @@
 ! init_pots has to be called first to set pes_mass
 !-----------------------------------------------------------------------
   real*8 function calc_potvib(rho,tet,phi)
-    implicit none
     real*8 rho,tet,phi
     real*8 vpot,r(3),r2(3),cart(9)
+
     r2(1) = rho
     r2(2) = tet
     r2(3) = phi
 
     call INT_Cart(r2,cart,pes_mass,4)
-    call cart_int(r2,cart,pes_mass,2)
-    
+    call Cart_INT(r2,cart,pes_mass,2)
+
     r(1)=min(r2(1),r2(2))
     r(2)=max(r2(1),r2(2))
     r(3)=180d0*acos(r2(3))/pi
@@ -83,7 +82,7 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
    subroutine calc_pots(grid1, grid2, grid3)
      real*8 :: grid1(:), grid2(:), grid3(:)
-     integer :: i1, i2, i3, n1, n2, n3, proc_k, first_k, k, proc_points, total_points, proc_id
+     integer :: i1, i2, i3, n1, n2, n3, proc_k, first_k, k, proc_points, total_points, proc_id, ierr
      integer, allocatable :: proc_counts(:), proc_shifts(:)
      real*8, allocatable :: proc_pot_vib_1d(:), global_pot_vib_1d(:)
 
@@ -109,13 +108,13 @@
      proc_id = get_proc_id()
      if (proc_id == 0) then
        allocate(global_pot_vib_1d(total_points))
-       allocate(potvib(n3, n2, n1))
      end if
 
      call print_parallel('Exchanging data...')
-     call MPI_Gatherv(proc_pot_vib_1d, size(proc_pot_vib_1d), MPI_DOUBLE_PRECISION, global_pot_vib_1d, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD)
+     call MPI_Gatherv(proc_pot_vib_1d, size(proc_pot_vib_1d), MPI_DOUBLE_PRECISION, global_pot_vib_1d, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
      if (proc_id == 0) then
+       allocate(potvib(n3, n2, n1))
        k = 1
        do i1 = 1, n1
          do i2 = 1, n2
