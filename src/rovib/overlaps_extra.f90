@@ -323,6 +323,26 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks that all required files exist
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_prerequisites(params)
+    type(input_params), intent(in) :: params
+    logical :: file_exists
+    character(:), allocatable :: block_info_path
+
+    block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), params % symmetry))
+    inquire(file = block_info_path, exist = file_exists)
+    call assert(file_exists, 'Error: basis is not computed')
+
+    ! the other symmetry is also required in this mode
+    if (params % fix_basis_jk == 1) then
+      block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), 1 - params % symmetry))
+      inquire(file = block_info_path, exist = file_exists)
+      call assert(file_exists, 'Error: basis of both symmetries has to be computed in fixed_basis_jk mode')
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! The main subroutine that initiates calculation of both types of extra overlaps
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_overlaps_extra(params, mu, rho_grid, theta_grid)
@@ -330,6 +350,7 @@ contains
     real*8, intent(in) :: mu
     real*8, intent(in) :: rho_grid(:), theta_grid(:)
 
+    call check_prerequisites(params)
     if (params % fix_basis_jk == 1) then
       call calculate_sym_term(params, mu, rho_grid, theta_grid)
     end if
