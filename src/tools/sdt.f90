@@ -912,7 +912,7 @@ contains
         end do
 
         ! Save block
-        write(fn,'(2A,I0,A,I0,A)')outdir,'/overlap.', ir,'.',ic,'.bin.out'
+        write(fn,'(2A,I0,A,I0,A)') outdir, '/overlap.', ir, '.', ic, '.bin.out'
         open(1,file=fn,form='unformatted')
         write(1)olap
         close(1)

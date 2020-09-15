@@ -91,10 +91,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Fills out mode settings of all parameters
-! 1st digit - mode id
-! 2nd digit - rovib coupling
-! 3rd digit - fixed basis
+! Fills out 2 dictionaries. A key is a name of a config parameter. The corresponding value is a regexp of all mode ids where this parameter
+! is mandatory (1st dict) or optional (2nd dict). See get_mode_id for description of id string
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine populate_mode_settings(mandatory_modes, optional_modes)
     class(dictionary_t), intent(out) :: mandatory_modes, optional_modes
@@ -132,9 +130,9 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Builds a string that incorporates settings relevant for mode determination
-! 1st digit: mode
-! 2nd digit: rovib_coupling
-! 3rd digit: basis_J
+! 1st digit - mode (basis, overlaps, diagonalization, etc.)
+! 2nd digit - whether rovib coupling is enabled
+! 3rd digit - whether fixed basis is enabled
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_mode_id(config_dict) result(mode_id)
     class(dictionary_t) :: config_dict ! intent(in)
@@ -185,7 +183,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks if all mandatory keys of this mode are specified
+! Checks whether all mandatory keys of this mode are specified in config
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_mandatory_keys(mode_id, config_dict, mandatory_modes)
     character(*), intent(in) :: mode_id
@@ -230,7 +228,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks if some of the specified keys will be unused
+! Checks whether some of the specified keys will be unused
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_extra_keys(mode_id, config_dict, mandatory_modes, optional_modes)
     character(*), intent(in) :: mode_id
@@ -243,7 +241,8 @@ contains
     do i = 1, size(keys)
       key = keys(i) % to_char_str()
       if (.not. (key .in. mandatory_modes) .and. .not. (key .in. optional_modes)) then
-        call print_parallel('Warning: "' // key // '" keyword is not recognized; ignoring it')
+        call print_parallel('Error: "' // key // '" keyword is not recognized')
+        stop
       else if (.not. check_mode_match(mandatory_modes, key, mode_id) .and. .not. check_mode_match(optional_modes, key, mode_id)) then
         call print_parallel('Warning: ' // key // ' value is not used in this mode')
       end if
@@ -378,12 +377,12 @@ contains
     end if
 
     ! Silent defaults. These parameters should not normally be changed.
-    params % max_iterations = merge(10000, params % max_iterations, params % max_iterations == -1)
-    params % print_potential = merge(0, params % print_potential, params % print_potential == -1)
-    params % print_potential = merge(0, params % print_potential, params % print_potential == -1)
-    params % enable_terms(1) = merge(1, params % enable_terms(1), params % enable_terms(1) == -1)
-    params % enable_terms(2) = merge(1, params % enable_terms(2), params % enable_terms(2) == -1)
-    params % optimized_mult = merge(1, params % optimized_mult, params % optimized_mult == -1)
+    params % max_iterations = iff(params % max_iterations == -1, 10000, params % max_iterations)
+    params % print_potential = iff(params % print_potential == -1, 0, params % print_potential)
+    params % sequential = iff(params % sequential == -1, 0, 1)
+    params % enable_terms(1) = iff(params % enable_terms(1) == -1, 1, params % enable_terms(1))
+    params % enable_terms(2) = iff(params % enable_terms(2) == -1, 1, params % enable_terms(2))
+    params % optimized_mult = iff(params % optimized_mult == -1, 1, params % optimized_mult)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
