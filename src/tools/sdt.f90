@@ -879,7 +879,6 @@ contains
     do ir=1,irmax
       ! Skip if no basis
       if (nvec2(ir) == 0) then
-        if (myid == 0) write(*,*)'Skipped row:',ir
         cycle
       end if
 
@@ -888,7 +887,6 @@ contains
       do ic = ir+1, icmax
         ! Skip if no basis
         if (nvec2(ic) == 0) then
-          if (myid == 0) write(*,*)'Skipped col:',ic
           cycle
         end if
 
