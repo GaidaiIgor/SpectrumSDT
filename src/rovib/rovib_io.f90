@@ -228,7 +228,7 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads and rearranges 2D expansion coefficients when fix_basis_jk = 1
-! Bs - Inner dimensions: S_Knl x S_Kn. All coeffs of a single 2D solution should be collected over different Ls
+! Bs: Outer dimensions: 2 x N x L. Inner dimensions: S_Knl x S_Kn. All coeffs of a single 2D solution should be collected over different Ls.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
     class(input_params), intent(in) :: params

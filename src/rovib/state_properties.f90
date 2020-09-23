@@ -133,7 +133,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_wf_integral_all_regions(params, As, Bs, proc_Cs) result(p_dist)
     class(input_params), intent(in) :: params
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
+    ! Arrays of size 2 x N x L (or K x N x L if compression is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
     class(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
     class(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
     real*8, allocatable :: p_dist(:, :, :, :) ! S x K x N x 3
@@ -157,6 +157,11 @@ contains
       do K_val = params % K(1), params % K(2)
         call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
         do n = 1, size(p_dist, 3)
+          ! Skip empty n-slices
+          if (.not. allocated(Bs(K_ind_comp, n, 1) % p)) then
+            cycle
+          end if
+
           do phi_group_ind = 1, size(p_dist, 4)
             phi_range = phi_borders(phi_group_ind : phi_group_ind+1)
             do l = 1, size(As, 3)
@@ -363,7 +368,7 @@ contains
     real*8, allocatable :: gammas(:, :) ! n_state x 2
     real*8, allocatable :: p_dist(:, :, :, :) ! n_state x K x n x 3
     character(:), allocatable :: sym_path, spectrum_path
-    ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
+    ! Arrays of size 2 x N x L (or K x N x L if compressing is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
     type(array_2d_complex), allocatable :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
 
