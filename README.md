@@ -3,65 +3,65 @@ A parallel Fortran program for calculation of ro-vibrational energy levels and l
 # Building
 
 0. Prerequisites
-  0.1 Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake`, `gfortran`, `mpich`, `libblas-dev`, `liblapack-dev`, `libpcre3-dev`
+    1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake`, `gfortran`, `mpich`, `libblas-dev`, `liblapack-dev`, `libpcre3-dev`
 Tested with gfortran 9.3.0 and mpich 3.3.2
-  0.2 Make sure you machine has at least 2GB of RAM (for compilation)
+    2. Make sure you machine has at least 2GB of RAM (for compilation)
 
 1. Clone the repo
 `git clone https://github.com/IgorGayday/SpectrumSDT`
-This example assumes the repo is cloned into ~/SpectrumSDT
+This example assumes the repo is cloned into `~/SpectrumSDT`
 
 2. Build the libraries
 
-2.1 fdict
-```
-cd ~/SpectrumSDT/libs/fdict
-printf 'FC=gfortran\nFFLAGS = -g\n' > setup.make
-make
-PREFIX=build make install
-```
+    1. fdict
+    ```
+    cd ~/SpectrumSDT/libs/fdict
+    printf 'FC=gfortran\nFFLAGS = -g\n' > setup.make
+    make
+    PREFIX=build make install
+    ```
 
-2.2 ftl
-```
-cd ~/SpectrumSDT/libs/ftl
-make
-PREFIX=build make install
-```
+    2. FTL
+    ```
+    cd ~/SpectrumSDT/libs/ftl
+    make
+    PREFIX=build make install
+    ```
 
-2.3 petsc
-```
-cd ~/SpectrumSDT/libs/petsc
-export PETSC_DIR=$PWD
-export PETSC_ARCH=debug_64
-./configure --with-scalar-type=complex --with-64-bit-indices
-make all
-```
+    3. PETSc
+    ```
+    cd ~/SpectrumSDT/libs/petsc
+    export PETSC_DIR=$PWD
+    export PETSC_ARCH=debug_64
+    ./configure --with-scalar-type=complex --with-64-bit-indices
+    make all
+    ```
 
-2.4 slepc
-```
-cd ~/SpectrumSDT/libs/slepc
-export SLEPC_DIR=$PWD
-./configure
-make all
-```
+    4. SLEPc
+    ```
+    cd ~/SpectrumSDT/libs/slepc
+    export SLEPC_DIR=$PWD
+    ./configure
+    make all
+    ```
 
 3. Build the main programs
 `cd ~/SpectrumSDT`
 
-3.1 Specify custom compiler options (optional)
-Default compiler options are specified in `compiler_options_default.cmake`.
-You can create a file named `compiler_options.cmake` to specify your custom compile options instead of the default ones.
-A few presets for different compilers can be found in the `compiler_options_alternative` folder.
+    1. Specify custom compiler options (optional)
+    Default compiler options are specified in `compiler_options_default.cmake`.
+    You can create a file named `compiler_options.cmake` to specify your custom compile options instead of the default ones.
+    A few presets for different compilers can be found in the `compiler_options_alternative` folder.
 
-3.2 Build the executables
-Note: do not move the executables to another folder since some paths are resolved relative to their location.
-```
-mkdir build && cd build
-cmake ..
-make optgrid
-make pesprint
-make spectrumsdt
-```
+    2. Build the executables
+    Note: do not move the executables to another folder since some paths are resolved relative to their location.
+    ```
+    mkdir build && cd build
+    cmake ..
+    make optgrid
+    make pesprint
+    make spectrumsdt
+    ```
 
 # A basic example of running
 
