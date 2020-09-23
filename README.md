@@ -45,7 +45,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     make all
     ```
 
-3. Build the main programs
+3. Build the main programs  
 `cd ~/SpectrumSDT`
 
     1. Specify custom compiler options (optional)  
@@ -78,7 +78,7 @@ If executed successfully, three grid files should appear in the current folder.
 cp ~/SpectrumSDT/config_examples/pesprint.config spectrumsdt.config
 mpiexec -n <n_procs> ~/SpectrumSDT/build/pesprint
 ```
-Replace <n_procs> with however many MPI tasks you want to use.  
+Replace `<n_procs>` with however many MPI tasks you want to use.  
 If executed successfully, potvib.dat file should appear in the current folder.
 
 3. Setup SpectrumSDT directory structure
@@ -94,7 +94,7 @@ Edit spectrumsdt.config and replace username in the paths.
 cd K_0/even/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
-Here <n_procs> has to be equal to the number of points in `~/SpectrumSDT_runs/grid1.dat` (16 in this example).  
+Here `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/grid1.dat` (16 in this example).  
 In `fix_basis_jk` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
 ```
 cd ../../odd/basis
@@ -112,3 +112,4 @@ mpiexec -n <n_procs> spectrumsdt
 cd ../diagonalization
 mpiexec -n <n_procs> spectrumsdt
 ```
+Solutions will be printed into `3dsdt/spec.out` file.
