@@ -3,12 +3,12 @@ A parallel Fortran program for calculation of ro-vibrational energy levels and l
 # Building
 
 0. Prerequisites
-    1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake`, `gfortran`, `mpich`, `libblas-dev`, `liblapack-dev`, `libpcre3-dev`
-Tested with gfortran 9.3.0 and mpich 3.3.2
+    1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake`, `gfortran`, `mpich`, `libblas-dev`, `liblapack-dev`, `libpcre3-dev`.  
+    Tested with gfortran 9.3.0 and mpich 3.3.2.
     2. Make sure you machine has at least 2GB of RAM (for compilation)
 
 1. Clone the repo
-`git clone https://github.com/IgorGayday/SpectrumSDT`
+`git clone https://github.com/IgorGayday/SpectrumSDT`  
 This example assumes the repo is cloned into `~/SpectrumSDT`
 
 2. Build the libraries
@@ -48,13 +48,13 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
 3. Build the main programs
 `cd ~/SpectrumSDT`
 
-    1. Specify custom compiler options (optional)
-    Default compiler options are specified in `compiler_options_default.cmake`.
-    You can create a file named `compiler_options.cmake` to specify your custom compile options instead of the default ones.
+    1. Specify custom compiler options (optional)  
+    Default compiler options are specified in `compiler_options_default.cmake`.  
+    You can create a file named `compiler_options.cmake` to specify your custom compile options instead of the default ones.  
     A few presets for different compilers can be found in the `compiler_options_alternative` folder.
 
-    2. Build the executables
-    Note: do not move the executables to another folder since some paths are resolved relative to their location.
+    2. Build the executables  
+    Note: do not move the executables to another folder since some paths are resolved relative to their location.  
     ```
     mkdir build && cd build
     cmake ..
@@ -78,7 +78,7 @@ If executed successfully, three grid files should appear in the current folder.
 cp ~/SpectrumSDT/config_examples/pesprint.config spectrumsdt.config
 mpiexec -n <n_procs> ~/SpectrumSDT/build/pesprint
 ```
-Replace <n_procs> with however many MPI tasks you want to use.
+Replace <n_procs> with however many MPI tasks you want to use.  
 If executed successfully, potvib.dat file should appear in the current folder.
 
 3. Setup SpectrumSDT directory structure
@@ -86,7 +86,7 @@ If executed successfully, potvib.dat file should appear in the current folder.
 mkdir J_0 && cd J_0
 cp ~/SpectrumSDT/config_examples/spectrumsdt_smaller.config spectrumsdt.config
 ```
-edit spectrumsdt.config and replace username in the paths
+Edit spectrumsdt.config and replace username in the paths.  
 `~/SpectrumSDT/scripts/init_spectrum_folders.py -K 0`
 
 4. Calculate basis
@@ -94,8 +94,8 @@ edit spectrumsdt.config and replace username in the paths
 cd K_0/even/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
-Here <n_procs> has to be equal to the number of points in `~/SpectrumSDT_runs/grid1.dat` (16 in this example)
-In `fix_basis_jk` mode (enabled in this example), basis of the other symmetry has to be computed as well
+Here <n_procs> has to be equal to the number of points in `~/SpectrumSDT_runs/grid1.dat` (16 in this example).  
+In `fix_basis_jk` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
 ```
 cd ../../odd/basis
 mpiexec -n 16 spectrumsdt
@@ -112,4 +112,3 @@ mpiexec -n <n_procs> spectrumsdt
 cd ../diagonalization
 mpiexec -n <n_procs> spectrumsdt
 ```
-
