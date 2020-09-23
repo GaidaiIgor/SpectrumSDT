@@ -9,9 +9,9 @@ contains
 !  Initializes sizes of diagonal n blocks
 !  Only block sizes are computed, not positions
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function init_n_block_sizes_diag(block_sizes) result(n_blocks)
+  subroutine init_n_block_sizes_diag(block_sizes, n_blocks)
     integer, intent(in) :: block_sizes(:)
-    type(matrix_block_info), allocatable :: n_blocks(:, :)
+    type(matrix_block_info), pointer, intent(out) :: n_blocks(:, :)
     integer :: i, rows
 
     allocate(n_blocks(size(block_sizes), size(block_sizes)))
@@ -19,22 +19,22 @@ contains
       rows = block_sizes(i)
       n_blocks(i, i) = matrix_block_info(1, 1, rows, rows) ! diagonal blocks are square
     end do
-  end function
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 !  Loads sizes of all overlap blocks for a given k-block
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_k_subblock_sizes_diag(block_info_path) result(k_block_info)
+  subroutine load_k_subblock_sizes_diag(block_info_path, k_block_info)
     character(*), intent(in) :: block_info_path
-    type(matrix_block_info) :: k_block_info
+    type(matrix_block_info), intent(out) :: k_block_info
     integer :: rows_total
     integer, allocatable :: block_sizes(:) ! overlap subblocks of a given block
 
     block_sizes = load_basis_size_2d(block_info_path) ! loads num of solutions kept in each slice
     rows_total = sum(block_sizes)
     k_block_info = matrix_block_info(1, 1, rows_total, rows_total)
-    k_block_info % subblocks = init_n_block_sizes_diag(block_sizes)
-  end function
+    call init_n_block_sizes_diag(block_sizes, k_block_info % subblocks)
+  end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
 !  Loads number of 2D states kept in each slice

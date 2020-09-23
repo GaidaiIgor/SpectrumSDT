@@ -232,6 +232,7 @@ contains
 
     call set_matmul_variables(params) ! rovib_ham is already set
     call print_parallel('Eigenvalue solver has started')
+
     if (params % solver == 'slepc') then
       call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
       call print_spectrum(params, eivals, eivecs)

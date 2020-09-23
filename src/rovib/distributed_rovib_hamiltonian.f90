@@ -14,16 +14,18 @@ module distributed_rovib_hamiltonian_mod
   use io_utils
 
   private
-  public :: load_overlap_block
+  public :: distributed_rovib_hamiltonian, load_overlap_block
 
-  type, public :: distributed_rovib_hamiltonian
-    type(matrix_block_info) :: local_chunk_info ! contains structure info on this chunk without regard for other chunks
-    type(matrix_block_info) :: global_chunk_info ! contains structure info on thus chunk with regard for other chunks (location, borders, etc.)
+  type :: distributed_rovib_hamiltonian
+    type(matrix_block_info), pointer :: local_chunk_info => null() ! contains structure info on this chunk without regard for other chunks
+    type(matrix_block_info), pointer :: global_chunk_info => null() ! contains structure info on thus chunk with regard for other chunks (location, borders, etc.)
     complex*16, allocatable :: proc_chunk(:, :)
     integer, allocatable :: all_counts(:) ! how many rows each processor has
     integer, allocatable :: all_shifts(:) ! prefix sum of all_counts
     integer :: compression
   contains
+    private
+    final :: finalize_distributed_rovib_hamiltonian
     procedure :: load_chunk_info
     procedure :: load_k_block_overlaps
     procedure :: load_chunk_overlaps
@@ -43,75 +45,86 @@ module distributed_rovib_hamiltonian_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Destructor
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine finalize_distributed_rovib_hamiltonian(this)
+    type(distributed_rovib_hamiltonian), intent(inout) :: this
+    call this % local_chunk_info % deallocate_recursive()
+    call this % global_chunk_info % deallocate_recursive()
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads K block sizes on the main diagonal of hamiltonian (based on number of solutions)
 ! Offdiagonal blocks are ignored. Blocks' positions and borders are ignored, only sizes are initialized here.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_block_sizes_diag(params) result(ham_info)
+  subroutine load_block_sizes_diag(params, ham_info)
     class(input_params), intent(in) :: params
-    type(matrix_block_info) :: ham_info
+    type(matrix_block_info), intent(out) :: ham_info
     integer :: K, K_load, K_ind, next_sym, total_rows, n_k_blocks
     character(:), allocatable :: root_path, sym_folder, block_info_path
-    type(matrix_block_info), allocatable :: k_blocks_info(:, :)
+    type(matrix_block_info), pointer :: k_blocks_info(:, :)
 
     n_k_blocks = params % K(2) - params % K(1) + 1
     allocate(k_blocks_info(n_k_blocks, n_k_blocks))
     next_sym = get_k_symmetry(params % K(1), params % symmetry)
     total_rows = 0
     K_ind = 1
+
     do K = params % K(1), params % K(2)
       K_load = merge(params % basis_K, K, params % fix_basis_jk == 1)
       root_path = iff(params % fix_basis_jk == 1, params % basis_root_path, params % root_path)
       sym_folder = get_sym_path_root(root_path, K_load, next_sym)
       block_info_path = get_block_info_path(sym_folder)
-      k_blocks_info(K_ind, K_ind) = load_k_subblock_sizes_diag(block_info_path)
+      call load_k_subblock_sizes_diag(block_info_path, k_blocks_info(K_ind, K_ind))
       total_rows = total_rows + k_blocks_info(K_ind, K_ind) % rows
       next_sym = 1 - next_sym
       K_ind = K_ind + 1
     end do
 
     ham_info = matrix_block_info(1, 1, total_rows, total_rows)
-    ham_info % subblocks = k_blocks_info
-  end function
+    ham_info % subblocks => k_blocks_info
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads blocks information for the whole rovib-enabled hamiltonian matrix
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_rovib_hamiltonian_info(params) result(ham_info)
+  subroutine load_rovib_hamiltonian_info(params, ham_info)
     class(input_params), intent(in) :: params
-    type(matrix_block_info) :: ham_info ! enveloping block for all Ks
+    type(matrix_block_info), intent(out) :: ham_info ! enveloping block for all Ks
 
-    ham_info = load_block_sizes_diag(params) ! Loads sizes of diagonal blocks (down to n-blocks)
+    call load_block_sizes_diag(params, ham_info) ! Loads sizes of diagonal blocks (down to n-blocks)
     call ham_info % compute_offdiag_subblock_sizes_diag() ! Calculates sizes of offdiagonal blocks. All block sizes are known after this.
     call ham_info % shift_to(1, 1) ! Recursively establishes blocks' borders
     call ham_info % update_block_indexes() ! Recursively establishes blocks' indexes (all blocks know their indexes within the parental block)
-  end function
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Transforms K-block info to correspond to compressed offdiagonal K-block representation
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function compress_offdiag_K_block(global_K_block_info) result(compressed_info)
+  subroutine compress_offdiag_K_block(global_K_block_info, compressed_info)
     type(matrix_block_info), intent(in) :: global_K_block_info
-    type(matrix_block_info) :: compressed_info
+    type(matrix_block_info), intent(out) :: compressed_info
     integer :: n_row_ind, global_n_row_ind
 
-    compressed_info = copy_without_subblocks(global_K_block_info)
+    call compressed_info % copy_without_subblocks(global_K_block_info)
     allocate(compressed_info % subblocks(size(global_K_block_info % subblocks, 1), 1))
 
     do n_row_ind = 1, size(global_K_block_info % subblocks, 1)
       global_n_row_ind = global_K_block_info % subblocks(n_row_ind, 1) % block_row_ind
-      compressed_info % subblocks(n_row_ind, 1) = global_K_block_info % subblocks(n_row_ind, global_n_row_ind)
+      call compressed_info % subblocks(n_row_ind, 1) % copy(global_K_block_info % subblocks(n_row_ind, global_n_row_ind))
     end do
-  end function
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Transforms chunk info to correspond to compressed matrix representation
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function compress_chunk_info(global_chunk_info) result(compressed_info)
-    type(matrix_block_info), intent(in) :: global_chunk_info
-    type(matrix_block_info) :: compressed_info
+  subroutine compress_chunk_info(global_chunk_info)
+    type(matrix_block_info), pointer, intent(inout) :: global_chunk_info
+    type(matrix_block_info), pointer :: compressed_info
     integer :: K_row_ind, K_col_ind, global_K_row_ind, global_K_col_ind_left, global_K_col_ind_right, first_row, first_col, rows, cols
 
-    compressed_info = copy_without_subblocks(global_chunk_info)
+    allocate(compressed_info)
+    call compressed_info % copy_without_subblocks(global_chunk_info)
     allocate(compressed_info % subblocks(size(global_chunk_info % subblocks, 1), 5))
     ! Copy necessary blocks
     do K_row_ind = 1, size(global_chunk_info % subblocks, 1)
@@ -121,15 +134,15 @@ contains
 
       ! Copy non-empty blocks
       do K_col_ind = 1, global_K_col_ind_right - global_K_col_ind_left + 1
-        ! Compress offdiagonal blocks if requested
+        ! Compress offdiagonal blocks
         if (global_K_col_ind_left + K_col_ind - 1 /= global_K_row_ind) then
-          compressed_info % subblocks(K_row_ind, K_col_ind) = compress_offdiag_K_block(global_chunk_info % subblocks(K_row_ind, global_K_col_ind_left + K_col_ind - 1))
+          call compress_offdiag_K_block(global_chunk_info % subblocks(K_row_ind, global_K_col_ind_left + K_col_ind - 1), compressed_info % subblocks(K_row_ind, K_col_ind))
         else
-          compressed_info % subblocks(K_row_ind, K_col_ind) = global_chunk_info % subblocks(K_row_ind, global_K_col_ind_left + K_col_ind - 1)
+          call compressed_info % subblocks(K_row_ind, K_col_ind) % copy(global_chunk_info % subblocks(K_row_ind, global_K_col_ind_left + K_col_ind - 1))
         end if
       end do
 
-      ! Add empty blocks for first and last two block rows
+      ! Add empty blocks for rows where number of blocks is < 5
       do K_col_ind = K_col_ind, 5
         first_row = compressed_info % subblocks(K_row_ind, K_col_ind - 1) % borders % top
         first_col = compressed_info % subblocks(K_row_ind, K_col_ind - 1) % borders % right + 1
@@ -141,7 +154,11 @@ contains
         compressed_info % subblocks(K_row_ind, K_col_ind) % block_col_ind = -1
       end do
     end do
-  end function
+
+    ! Point to the compressed object
+    call global_chunk_info % deallocate_recursive()
+    global_chunk_info => compressed_info
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Determines part of the overall hamiltonian available to the current process (chunk).
@@ -154,14 +171,16 @@ contains
     integer :: first_row, proc_rows
 
     call get_proc_elem_range(ham_info % rows, first_row, proc_rows, this % all_counts, this % all_shifts) ! determines first_row and proc_rows values
-    this % global_chunk_info = ham_info ! copy on assignment
+    allocate(this % global_chunk_info)
+    call this % global_chunk_info % copy(ham_info)
     call this % global_chunk_info % cut_rows_between(first_row, first_row + proc_rows - 1)
 
     if (this % compression == 1) then
-      this % global_chunk_info = compress_chunk_info(this % global_chunk_info)
+      call compress_chunk_info(this % global_chunk_info)
     end if
 
-    this % local_chunk_info = this % global_chunk_info
+    allocate(this % local_chunk_info)
+    call this % local_chunk_info % copy(this % global_chunk_info)
     if (this % compression == 1) then
       call this % local_chunk_info % calculate_compressed_columns()
     end if
@@ -236,9 +255,9 @@ contains
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: ir, ic, K, K_load, K_ind, K_sym, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
     real*8, allocatable :: overlap_block(:, :)
-    complex*16, allocatable :: overlap_block_slice(:, :)
+    complex*16, pointer :: local_overlap_info_data(:, :)
     character(:), allocatable :: root_path
-    type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
+    type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
 
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
@@ -246,9 +265,7 @@ contains
 
     do ir = 1, size(local_k_block_info % subblocks, 1)
       do ic = 1, size(local_k_block_info % subblocks, 2)
-        local_overlap_info => local_k_block_info % subblocks(ir, ic)
         global_overlap_info => global_k_block_info % subblocks(ir, ic)
-
         slice_ind_row = global_overlap_info % block_row_ind
         slice_ind_col = global_overlap_info % block_col_ind
         full_ham_overlap_info => full_ham_k_block_info % subblocks(slice_ind_row, slice_ind_col)
@@ -262,14 +279,12 @@ contains
         K_load = merge(params % basis_K, K, params % fix_basis_jk == 1)
         root_path = iff(params % fix_basis_jk == 1, params % basis_root_path, params % root_path)
         overlap_block = load_overlap_block(root_path, K_load, K_load, 0, K_sym, slice_ind_row, slice_ind_col, rows, columns)
-
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
         last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
-        overlap_block_slice = overlap_block(first_row : last_row, :)
 
-        ! Use overlap block info to find correct placement of the overlap in the chunk
-        call local_overlap_info % update_matrix(this % proc_chunk, overlap_block_slice)
+        local_overlap_info_data => local_k_block_info % subblocks(ir, ic) % extract_from_matrix(this % proc_chunk)
+        local_overlap_info_data = overlap_block(first_row : last_row, :)
       end do
     end do
   end subroutine
@@ -289,7 +304,7 @@ contains
         K2_ind = this % global_chunk_info % subblocks(ir, ic) % block_col_ind
 
         ! Only diagonal K blocks have pure overlaps
-        if (K1_ind /= K2_ind) then
+        if (K1_ind /= K2_ind .or. K1_ind == -1) then
           cycle
         end if
 
@@ -304,7 +319,7 @@ contains
   subroutine include_kinetic_energy(this, kinetic)
     class(distributed_rovib_hamiltonian), target, intent(inout) :: this
     complex*16, intent(in) :: kinetic(:, :) ! Kinetic energy matrix for rho grid
-    complex*16, allocatable :: overlap_block(:, :)
+    complex*16, pointer :: overlap_block(:, :)
     integer :: i, j, n, m, K1_ind, K2_ind, slice_ind_row, slice_ind_col
     type(matrix_block_info), pointer :: local_k_block_info, global_k_block_info, local_overlap_block_info, global_overlap_block_info
 
@@ -317,7 +332,7 @@ contains
         K2_ind = global_k_block_info % block_col_ind
 
         ! only diagonal K blocks need to include kinetic energy
-        if (K1_ind /= K2_ind) then
+        if (K1_ind /= K2_ind .or. K1_ind == -1) then
           cycle
         end if
         
@@ -332,9 +347,8 @@ contains
 
             slice_ind_row = global_overlap_block_info % block_row_ind
             slice_ind_col = global_overlap_block_info % block_col_ind
-            overlap_block = local_overlap_block_info % extract_from_matrix(this % proc_chunk)
+            overlap_block => local_overlap_block_info % extract_from_matrix(this % proc_chunk)
             overlap_block = overlap_block * kinetic(slice_ind_row, slice_ind_col)
-            call local_overlap_block_info % update_matrix(this % proc_chunk, overlap_block)
           end do
         end do
       end do
@@ -370,7 +384,7 @@ contains
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: K_ind, K, K_sym, n, m, K_load, slice_ind_row, slice_ind_col, col_shift, row, col
     real*8, allocatable :: eivals(:)
-    complex*16, allocatable :: overlap_block(:, :)
+    complex*16, pointer :: overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_block_info, global_overlap_block_info, full_ham_overlap_block_info
 
@@ -402,12 +416,11 @@ contains
         K_load = merge(params % basis_K, K, params % fix_basis_jk == 1)
         root_path = iff(params % fix_basis_jk == 1, params % basis_root_path, params % root_path)
         eivals = load_eivals_2d(root_path, K_load, K_sym, slice_ind_row)
-        overlap_block = local_overlap_block_info % extract_from_matrix(this % proc_chunk)
+        overlap_block => local_overlap_block_info % extract_from_matrix(this % proc_chunk)
         do row = 1, size(overlap_block, 1)
           col = row + col_shift
           overlap_block(row, col) = overlap_block(row, col) + eivals(col)
         end do
-        call local_overlap_block_info % update_matrix(this % proc_chunk, overlap_block)
       end do
     end do
   end subroutine
@@ -431,7 +444,7 @@ contains
         K_col_ind = global_k_block_info % block_col_ind
 
         ! Only diagonal K blocks need to include 2D eigenvalues
-        if (K_row_ind /= K_col_ind) then
+        if (K_row_ind /= K_col_ind .or. K_row_ind == -1) then
           cycle
         end if
 
@@ -448,7 +461,7 @@ contains
     complex*16, intent(in) :: cap(:)
     class(matrix_block_info), target, intent(in) :: ham_info
     integer :: ir, ic, n, m, K1_ind, K2_ind, slice_ind_row, slice_ind_col, col_shift, row, col
-    complex*16, allocatable :: overlap_block(:, :)
+    complex*16, pointer :: overlap_block(:, :)
     type(matrix_block_info), pointer :: local_k_block_info, global_k_block_info, local_overlap_block_info, global_overlap_block_info, full_ham_overlap_block_info
 
     ! Iterate through all K-blocks because we don't know where the diagonal blocks are in an arbitrary chunk
@@ -460,7 +473,7 @@ contains
         K2_ind = global_k_block_info % block_col_ind
 
         ! Only diagonal K blocks need to include 2D eigenvalues
-        if (K1_ind /= K2_ind) then
+        if (K1_ind /= K2_ind .or. K1_ind == -1) then
           cycle
         end if
         
@@ -480,7 +493,7 @@ contains
             if (slice_ind_row /= slice_ind_col) then
               cycle
             end if
-            overlap_block = local_overlap_block_info % extract_from_matrix(this % proc_chunk)
+            overlap_block => local_overlap_block_info % extract_from_matrix(this % proc_chunk)
 
             ! First column of the main diagonal may not be first in this process chunk, so we need to make corresponding adjustments
             full_ham_overlap_block_info => ham_info % subblocks(K1_ind, K2_ind) % subblocks(slice_ind_row, slice_ind_col)
@@ -489,7 +502,6 @@ contains
               col = row + col_shift
               overlap_block(row, col) = overlap_block(row, col) + cap(slice_ind_row)
             end do
-            call local_overlap_block_info % update_matrix(this % proc_chunk, overlap_block)
           end do
         end do
       end do
@@ -505,7 +517,8 @@ contains
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: K_ind, K, K_sym, ir, ic, K_load, slice_row_ind, slice_col_ind, rows, first_row, last_row, J_shift, K_shift, J_factor, K_factor
     real*8, allocatable :: overlap_block_J(:, :), overlap_block_K(:, :)
-    complex*16, allocatable :: overlap_block_slice(:, :), existing_overlap_block(:, :)
+    complex*16, allocatable :: overlap_block_slice(:, :)
+    complex*16, pointer :: existing_overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
 
@@ -547,10 +560,8 @@ contains
         overlap_block_slice = J_factor * overlap_block_J(first_row : last_row, :) + K_factor * overlap_block_K(first_row : last_row, :)
 
         ! Add to existing regular overlaps
-        existing_overlap_block = local_overlap_info % extract_from_matrix(this % proc_chunk)
-        overlap_block_slice = overlap_block_slice + existing_overlap_block
-        ! Use overlap block info to find correct placement of the overlap in the chunk
-        call local_overlap_info % update_matrix(this % proc_chunk, overlap_block_slice)
+        existing_overlap_block => local_overlap_info % extract_from_matrix(this % proc_chunk)
+        existing_overlap_block = existing_overlap_block + overlap_block_slice
       end do
     end do
   end subroutine
@@ -569,7 +580,7 @@ contains
         K_row_ind = this % global_chunk_info % subblocks(ir, ic) % block_row_ind
         K_col_ind = this % global_chunk_info % subblocks(ir, ic) % block_col_ind
 
-        if (K_row_ind /= K_col_ind) then
+        if (K_row_ind /= K_col_ind .or. K_row_ind == -1) then
           cycle
         end if
 
@@ -589,9 +600,9 @@ contains
     integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, ir, ic, K_row_load, K_col_load, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
     real*8 :: W
     real*8, allocatable :: overlap_block(:, :)
-    complex*16, allocatable :: overlap_block_slice(:, :)
+    complex*16, pointer :: local_overlap_info_data(:, :)
     character(:), allocatable :: root_path
-    type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
+    type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
 
     K_row_ind = global_k_block_info % block_row_ind
     K_col_ind = global_k_block_info % block_col_ind
@@ -613,9 +624,7 @@ contains
 
     do ir = 1, size(local_k_block_info % subblocks, 1)
       do ic = 1, size(local_k_block_info % subblocks, 2)
-        local_overlap_info => local_k_block_info % subblocks(ir, ic)
         global_overlap_info => global_k_block_info % subblocks(ir, ic)
-
         slice_ind_row = global_overlap_info % block_row_ind
         slice_ind_col = global_overlap_info % block_col_ind
         full_ham_overlap_info => full_ham_k_block_info % subblocks(slice_ind_row, slice_ind_col)
@@ -625,16 +634,6 @@ contains
           cycle
         end if
 
-        ! Load block
-        rows = full_ham_overlap_info % rows
-        columns = full_ham_overlap_info % columns
-        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 2, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
-
-        ! Determine which part of overlaps block should be stored in the current chunk
-        first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
-        last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
-        overlap_block_slice = overlap_block(first_row : last_row, :)
-
         ! Since matrix is symmetric, lower-diagonal blocks are not actually stored on disk and upper diagonal blocks are read and transposed instead
         ! To correct the sign of the block, W-factor should also be taken from the upper-diagonal block even if the current block is lower-diagonal
         if (K_row < K_col) then
@@ -642,10 +641,18 @@ contains
         else
           W = calculate_W(params % J, K_col, K_row, params % parity)
         end if
-        overlap_block_slice = W * overlap_block_slice
 
-        ! Use overlap block info to find correct placement of the overlap in the chunk
-        call local_overlap_info % update_matrix(this % proc_chunk, overlap_block_slice)
+        ! Load block
+        rows = full_ham_overlap_info % rows
+        columns = full_ham_overlap_info % columns
+        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 2, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
+        ! Determine which part of overlaps block should be stored in the current chunk
+        first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
+        last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
+
+        ! Update Hamiltonian
+        local_overlap_info_data => local_k_block_info % subblocks(ir, ic) % extract_from_matrix(this % proc_chunk)
+        local_overlap_info_data = W * overlap_block(first_row : last_row, :)
       end do
     end do
   end subroutine
@@ -683,7 +690,8 @@ contains
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, K_row_load, K_col_load, ir, ic, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
     real*8, allocatable :: overlap_block(:, :)
-    complex*16, allocatable :: overlap_block_slice(:, :), existing_overlap_block(:, :)
+    complex*16, allocatable :: overlap_block_slice(:, :)
+    complex*16, pointer :: existing_overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
 
@@ -728,14 +736,13 @@ contains
         overlap_block_slice = overlap_block(first_row : last_row, :)
         overlap_block_slice = calculate_U(params % J, K_row, K_col, params % parity) * overlap_block_slice
 
+        existing_overlap_block => local_overlap_info % extract_from_matrix(this % proc_chunk)
         ! add existing regular overlaps for K = 1
         if (K_row == 1 .and. K_col == 1) then
-          existing_overlap_block = local_overlap_info % extract_from_matrix(this % proc_chunk)
-          overlap_block_slice = overlap_block_slice + existing_overlap_block
+          existing_overlap_block = existing_overlap_block + overlap_block_slice
+        else
+          existing_overlap_block = overlap_block_slice
         end if
-
-        ! Use overlap block info to find correct placement of the overlap in the chunk
-        call local_overlap_info % update_matrix(this % proc_chunk, overlap_block_slice)
       end do
     end do
   end subroutine
@@ -776,7 +783,7 @@ contains
     complex*16, intent(in), optional :: cap(:) ! Complex absorbing potential for rho
     type(matrix_block_info) :: ham_info
 
-    ham_info = load_rovib_hamiltonian_info(params) ! loads blocks info for the whole hamiltonian (sizes, positions, borders)
+    call load_rovib_hamiltonian_info(params, ham_info) ! loads blocks info for the whole hamiltonian (sizes, positions, borders)
     call this % load_chunk_info(ham_info) ! loads blocks info for the local chunk of the hamiltonian available to this process
     allocate(this % proc_chunk(this % local_chunk_info % rows, this % local_chunk_info % columns)) ! allocate proc chunk
     this % proc_chunk = 0

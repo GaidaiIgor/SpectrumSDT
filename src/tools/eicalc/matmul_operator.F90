@@ -44,10 +44,6 @@ contains
     else
       active_matmul_operator => ham_mult_old
     end if
-
-    ! if (debug_mode == 'old_code_compatibility') then
-    !   hamz = rovib_ham % proc_chunk
-    ! end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -93,12 +89,18 @@ contains
       do K_row_ind = 1, size(rovib_ham % local_chunk_info % subblocks, 1)
         local_K_block_info => rovib_ham % local_chunk_info % subblocks(K_row_ind, K_col_ind)
         global_K_block_info => rovib_ham % global_chunk_info % subblocks(K_row_ind, K_col_ind)
+        
+        ! Skip filler blocks
+        if (global_k_block_info % block_row_ind == -1 .or. global_k_block_info % block_col_ind == -1) then
+          cycle
+        end if
 
-        ! -1 corresponds to empty K-blocks in the first and last 2 rows
-        if (global_K_block_info % block_row_ind == global_K_block_info % block_col_ind .and. global_K_block_info % block_row_ind /= -1) then
+        if (global_K_block_info % block_row_ind == global_K_block_info % block_col_ind) then
+          ! Diagonal K-blocks are not compressed, so multiply by the whole K-block
           v_start = global_K_block_info % borders % left
           call ham_mult_block_compressed(rovib_ham % proc_chunk, v, local_K_block_info, v_start, v_proc_out)
         else
+          ! Offdiagonal K-blocks are compressed, so multiply each n-block individually
           do n_col_ind = 1, size(local_K_block_info % subblocks, 2)
             do n_row_ind = 1, size(local_K_block_info % subblocks, 1)
               local_n_block_info => local_K_block_info % subblocks(n_row_ind, n_col_ind)
