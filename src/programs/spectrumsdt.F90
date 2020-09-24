@@ -278,8 +278,12 @@ contains
         call calculate_states(params)
 
       case(MODE_3DSDT_POST)
-        call init_caps(params, 0d0)
-        call calculate_state_properties(params, g1, size(g2), get_real_cap())
+        if (params % cap_type /= 'none') then
+          call init_caps(params, 0d0)
+          call calculate_state_properties(params, g1, size(g2), get_real_cap())
+        else
+          call calculate_state_properties(params, g1, size(g2))
+        end if
 
       case default
         call print_parallel('Config check has failed. Mode does not exist.')

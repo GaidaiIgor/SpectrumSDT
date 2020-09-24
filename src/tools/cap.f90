@@ -111,7 +111,6 @@ contains
   !  Prints CAP.
   !-----------------------------------------------------------------------
   subroutine prnt_cap(fn)
-    implicit none
     integer i1,id
     character(*)::fn
     open(1,file=fn)
@@ -129,7 +128,6 @@ contains
   ! Initializes CAPs (complex absorbing potential)
   !-----------------------------------------------------------------------
   subroutine init_caps(params, capebarin)
-    implicit none
     class(input_params), intent(in) :: params
     real*8 :: capebarin
     character(256) :: fn
@@ -160,8 +158,8 @@ contains
 ! Writes active (as specified by global capid) CAP/-i into *p*
 !-----------------------------------------------------------------------
   subroutine get_cap(p)
-    implicit none
     real*8 :: p(n1)
+    call assert(capid /= 0, 'Error: cap type is not specified')
     p = all_caps(:, capid)
   end subroutine
 

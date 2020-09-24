@@ -221,13 +221,17 @@ contains
       gammas_chunk(proc_k, :) = calculate_gamma_channels(p_dist(proc_k, :, :, :), cap)
     end do
 
-    ! Gather results
     if (n_procs == 1) then
       gammas = gammas_chunk
       return
     end if
     
-    allocate(gammas(params % num_states, 2))
+    if (proc_id == 0) then
+      allocate(gammas(params % num_states, 2))
+    else
+      allocate(gammas(1, 1)) ! allocate dummy return value for other processors
+    end if
+    ! Gather results
     do ind = 1, size(gammas, 2)
       call MPI_Gatherv(gammas_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, gammas(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
     end do
@@ -356,17 +360,17 @@ contains
     class(input_params), intent(in) :: params
     real*8, intent(in) :: rho_grid(:)
     integer, intent(in) :: L ! Num of points along theta
-    real*8, intent(in) :: cap(:)
+    real*8, optional, intent(in) :: cap(:)
     integer :: N, vdw_n_ind
     integer :: cov_n_inds(3)
     integer, allocatable :: num_solutions_2d(:, :) ! K x n
     integer, allocatable :: num_solutions_1d(:, :, :)
     real*8 :: vdw_max
     real*8, allocatable :: energies_3d(:)
-    real*8, allocatable :: region_probs(:, :) ! nstate x 5
-    real*8, allocatable :: K_dists(:, :) ! n_state x (J + 1)
-    real*8, allocatable :: gammas(:, :) ! n_state x 2
-    real*8, allocatable :: p_dist(:, :, :, :) ! n_state x K x n x 3
+    real*8, allocatable :: region_probs(:, :) ! num_states x 5
+    real*8, allocatable :: K_dists(:, :) ! num_states x (J + 1)
+    real*8, allocatable :: gammas(:, :) ! num_states x 2
+    real*8, allocatable :: p_dist(:, :, :, :) ! num_states x K x n x 3
     character(:), allocatable :: sym_path, spectrum_path
     ! Arrays of size 2 x N x L (or K x N x L if compressing is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
@@ -394,8 +398,12 @@ contains
     p_dist = calculate_wf_integral_all_regions(params, As, Bs, proc_Cs)
     call print_parallel('Done calculating probability distributions')
 
-    ! Calculate properties
-    gammas = calculate_gamma_channels_all(params, p_dist, cap)
+    if (present(cap)) then
+      gammas = calculate_gamma_channels_all(params, p_dist, cap)
+    else
+      allocate(gammas(params % num_states, 2))
+      gammas = 0d0
+    end if
     call print_parallel('Done calculating channel-specific gammas')
 
     call find_barriers_n_indices(params, rho_grid, vdw_max, cov_n_inds, vdw_n_ind)

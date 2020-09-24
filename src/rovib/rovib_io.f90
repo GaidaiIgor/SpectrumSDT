@@ -343,11 +343,9 @@ contains
     integer :: file_unit, i, k, K_val, col_width, cols_bar_K, cols_total
     character(:), allocatable :: sym_path, properties_result_path
     type(string), allocatable :: titles(:)
-    ! Parallel
-    integer :: proc_id, n_procs
 
-    call get_proc_info(proc_id, n_procs)
-    if (proc_id /= 0) then
+    ! Sequential print
+    if (get_proc_id() /= 0) then
       return
     end if
 
