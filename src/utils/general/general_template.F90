@@ -1,4 +1,6 @@
 #include "funcs.macro"
+implicit none
+contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! returns arg if it's present, otherwise default

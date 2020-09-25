@@ -10,8 +10,7 @@ module config
   use rovib_utils_mod
   use string_mod
   use string_utils
-
-  use debug_tools
+  implicit none
 
   private
   public :: process_user_settings

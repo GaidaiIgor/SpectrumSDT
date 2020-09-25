@@ -1,6 +1,5 @@
 module array_1d_integer_mod
 #include "type_list.macro"
-#include "reset_definitions.macro"
 #define TYPE_ID INTEGER_ID
 #include "type_attributes.macro"
 #include "array_1d_template.F90"

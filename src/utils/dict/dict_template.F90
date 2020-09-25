@@ -1,6 +1,7 @@
 #include "funcs.macro" 
 
 use dictionary
+implicit none
 
 contains
 

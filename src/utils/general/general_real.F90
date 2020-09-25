@@ -2,12 +2,7 @@ module general_real_mod
 #include "type_list.macro"
 #define TYPE_ID REAL_ID
 #include "type_attributes.macro"
-
 use general_char_str_mod
-implicit none
-
-contains
-
 #include "general_template.F90"
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

@@ -57,7 +57,7 @@ module general_utils
     integer :: npoints, i
 
     npointsf = (end - start) / step
-    npoints = npointsf
+    npoints = int(npointsf)
     ! If the last step is complete up to comparison accuracy
     if (compare_reals(npointsf - npoints, 1.d0) == 0) then
       npoints = npoints + 1

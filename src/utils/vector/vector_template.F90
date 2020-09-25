@@ -1,5 +1,6 @@
 #include "funcs.macro"
 use general_utils
+implicit none
 
 interface CONCAT2(vector_,TEMPLATE_TYPE_NAME)
   module procedure :: CONCAT2(new_vector_,TEMPLATE_TYPE_NAME)

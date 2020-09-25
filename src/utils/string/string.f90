@@ -1,5 +1,6 @@
 module string_mod
   use general_utils
+  implicit none
   
   interface string
     module procedure :: to_string_char_str

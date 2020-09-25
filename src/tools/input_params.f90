@@ -1,4 +1,6 @@
 module input_params_mod
+  implicit none
+
   type :: input_params
     ! Mode
     character(:), allocatable :: mode ! basis, overlaps, diagonalization or properties

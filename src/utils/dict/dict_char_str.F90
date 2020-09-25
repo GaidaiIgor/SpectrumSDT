@@ -1,7 +1,6 @@
 module dict_char_str_mod
 
 #include "type_list.macro"
-#include "reset_definitions.macro"
 #define TYPE_ID CHAR_STR_ID
 #include "type_attributes.macro"
 #include "dict_template.F90"

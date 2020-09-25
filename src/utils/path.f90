@@ -6,6 +6,7 @@ module path_utils
   use input_params_mod
   use parallel_utils
   use system_mod
+  implicit none
 
 contains
 

@@ -27,13 +27,13 @@ program main
   De = diss_min_point(2) - min_point(3)
   print *, 'De:'
   print *, De
+
 contains
 
   !-------------------------------------
   ! optimizes value of coord(2) (O2 bond length) on Dawes surface
   !-------------------------------------
   function find_surface_diss_energy(search_limits, coords, npoints, eps) result(min_point)
-    implicit none
     real*8, value :: search_limits(2), coords(3)
     integer, intent(in) :: npoints
     real*8, intent(in) :: eps
@@ -73,7 +73,6 @@ contains
   ! finds miniumum on Dawes surface
   !-------------------------------------
   function find_surface_min_energy(search_limits, npoints, eps) result(min_point)
-    implicit none
     real*8, value :: search_limits(2, 2)
     integer, intent(in) :: npoints
     real*8, intent(in) :: eps
@@ -136,7 +135,6 @@ contains
   ! finds miniumum on 3d surface
   !-------------------------------------
   function find_surface_min_3d(search_limits, npoints, eps) result(min_point)
-    implicit none
     real*8, value :: search_limits(3, 2)
     integer, intent(in) :: npoints
     real*8, intent(in) :: eps
@@ -183,25 +181,3 @@ contains
   end function
   
 end program
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

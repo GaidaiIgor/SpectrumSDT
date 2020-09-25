@@ -12,6 +12,7 @@ module distributed_rovib_hamiltonian_mod
   ! Debug
   use debug_tools
   use io_utils
+  implicit none
 
   private
   public :: distributed_rovib_hamiltonian, load_overlap_block

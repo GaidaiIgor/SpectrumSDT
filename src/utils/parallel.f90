@@ -2,26 +2,9 @@ module parallel_utils
   use algorithms
   use general_utils
   use mpi
+  implicit none
 
 contains
-
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-! ! Returns current process id and total number of processes
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-!   subroutine get_proc_info(proc_id, n_procs)
-!     integer, intent(out) :: proc_id, n_procs
-!     logical :: mpi_enabled
-!     integer :: ierr
-!
-!     call MPI_Initialized(mpi_enabled, ierr)
-!     if (mpi_enabled) then
-!       call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
-!       call MPI_Comm_Size(MPI_COMM_WORLD, n_procs, ierr)
-!     else
-!       proc_id = 0
-!       n_procs = 1
-!     end if
-!   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Wraps MPI_Initialized into a function
@@ -118,6 +101,7 @@ contains
     real*8, intent(in) :: chunk(:, :)
     integer, intent(in) :: counts(:), shifts(:)
     real*8, allocatable, intent(out) :: global(:, :)
+    integer :: ind, ierr
 
     ! Avoid calling MPI functions if MPI is not initialized
     if (.not. is_mpi_enabled()) then

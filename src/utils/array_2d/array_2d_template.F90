@@ -1,4 +1,5 @@
 #include "funcs.macro"  
+implicit none
 
   interface CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)
     module procedure :: CONCAT2(new_array_2d_,TEMPLATE_TYPE_NAME)

@@ -5,6 +5,7 @@ module dict_utils
   use dict_char_str_mod
   use string_mod
   use vector_string_mod
+  implicit none
   
   interface item_or_default
     module procedure :: item_or_default_integer, item_or_default_integer_array, item_or_default_char_str

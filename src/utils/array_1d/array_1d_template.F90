@@ -1,5 +1,6 @@
 #include "funcs.macro"
 use vector_integer_mod
+implicit none
 
 interface CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)
   module procedure :: CONCAT2(new_array_1d_,TEMPLATE_TYPE_NAME)

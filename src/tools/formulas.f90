@@ -2,6 +2,8 @@ module formulas_mod
   ! Contains functions that evaluate simple physical formulas
   use constants
   use general_utils
+  implicit none
+
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

@@ -1,7 +1,11 @@
 module optgrid_tools
+  use constants
   use general_utils
   use numerical_recipies
+  implicit none
+
 contains
+
   !-----------------------------------------------------------------------
   !  OptGrid (optgrid.f)
   !  Optimal grid generator, subroutines:
@@ -16,7 +20,6 @@ contains
   !  Alpha is fixed.
   !-----------------------------------------------------------------------
   subroutine generate_gridr(grid,jac,n,alpha,minr,eps,der)
-    implicit none
     real*8 grid(n),jac(n),x(0:n)
     real*8 alpha,minr,eps,nextr
     real*8 :: nextr_ode(1)
@@ -44,7 +47,6 @@ contains
   !  Alpha is adjusted.
   !-----------------------------------------------------------------------
   subroutine generate_grida(grid,jac,n,alpha,minr,maxr,eps,der)
-    implicit none
     real*8 grid(n),jac(n),x(0:n+1)
     real*8 alpha,alpha1,alpha2,minr,maxr,nextr,eps
     real*8 :: nextr_ode(1)
@@ -112,7 +114,6 @@ contains
   !  Makes symmetric distribution of points for symmetric derivative.
   !-----------------------------------------------------------------------
   subroutine generate_gridn(grid,jac,n,alpha,minr,maxr,r0,eps,der)
-    implicit none
     integer,parameter:: n0 = 1024
     real*8,allocatable::grid(:),jac(:)
     real*8 gridl(n0),gridr(n0),x(0:n0)
@@ -171,7 +172,6 @@ contains
   ! Generates grid with required number of points and boundaries. Step size is adjusted
   !-----------------------------------------------------------------------
   subroutine generate_equidistant_grid_points(minr, maxr, n, grid, jac, step)
-    implicit none
     real*8, intent(in) :: minr, maxr
     integer, intent(in) :: n
     real*8, allocatable, intent(out) :: grid(:), jac(:)
@@ -190,7 +190,6 @@ contains
   ! Generates grid with required step size and boundaries. Number of points is adjusted
   !-----------------------------------------------------------------------
   subroutine generate_equidistant_grid_step(minr, maxr, step, grid, jac, n)
-    implicit none
     real*8, intent(in) :: minr, maxr, step
     real*8, allocatable, intent(out) :: grid(:), jac(:)
     integer, intent(out) :: n
@@ -207,8 +206,6 @@ contains
   !  Corresponding alpha is saved too
   !-----------------------------------------------------------------------
   subroutine print_grid(grid, jac, n, name, alpha, potvib)
-    use constants
-    implicit none
     real*8, intent(in) :: grid(n), jac(n)
     integer, intent(in) :: n
     character(*), intent(in) :: name

@@ -1,5 +1,6 @@
 module string_utils
-use vector_string_mod
+  use vector_string_mod
+  implicit none
 
   interface strsplit
     module procedure :: strsplit_char_str, strsplit_string

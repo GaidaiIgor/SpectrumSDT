@@ -1,5 +1,6 @@
 module algorithms
   use general_utils
+  implicit none
 
   interface prefix_sum
     module procedure :: prefix_sum_integer

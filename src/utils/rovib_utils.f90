@@ -1,5 +1,6 @@
 module rovib_utils_mod
   use input_params_mod
+  implicit none
 
 contains
 

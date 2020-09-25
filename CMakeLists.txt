@@ -31,8 +31,8 @@ set(input_params ${prefix}/src/tools/input_params.f90)
 set(rovib_utils ${input_params} ${prefix}/src/utils/rovib_utils.f90)
 set(parabola ${prefix}/src/tools/parabola.f90)
 
-set(algorithms ${general_utils} ${prefix}/src/utils/algorithms/algorithms.f90)
-set(parallel_utils ${algorithms} ${general_utils} ${prefix}/src/utils/parallel/parallel.f90)
+set(algorithms ${general_utils} ${prefix}/src/utils/algorithms.f90)
+set(parallel_utils ${algorithms} ${general_utils} ${prefix}/src/utils/parallel.f90)
 set(cap ${constants} ${general_vars} ${input_params} ${parallel_utils} ${prefix}/src/tools/cap.f90)
 set(string ${general_utils} ${prefix}/src/utils/string/string.f90)
 
@@ -69,7 +69,7 @@ set(io_complex ${io_base} ${string} ${string_utils} ${vector} ${prefix}/src/util
 set(io_utils ${io_base} ${io_integer} ${io_real} ${io_complex} ${prefix}/src/utils/io/io.f90)
 
 set(system ${general_utils} ${io_utils} ${prefix}/src/utils/system.f90)
-set(path_utils ${general_utils} ${input_params} ${parallel_utils} ${system} ${prefix}/src/utils/path/path.f90)
+set(path_utils ${general_utils} ${input_params} ${parallel_utils} ${system} ${prefix}/src/utils/path.f90)
 set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${string_utils} ${debug_tools} ${prefix}/src/tools/config.f90)
 set(pesgeneral ${constants} ${formulas} ${input_params} ${general_utils} ${general_vars} ${prefix}/src/tools/pes/pesgeneral.f90)
 

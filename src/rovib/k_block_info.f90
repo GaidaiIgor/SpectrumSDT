@@ -2,6 +2,7 @@ module k_block_info
   use algorithms
   use io_utils
   use matrix_block_info_mod
+  implicit none
 
 contains
 

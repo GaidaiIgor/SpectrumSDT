@@ -1,4 +1,5 @@
 module debug_tools
+  implicit none
   character(:), allocatable :: debug_mode
   character(:), allocatable :: test_mode
   integer :: debug_int_1
