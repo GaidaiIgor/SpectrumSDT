@@ -426,8 +426,8 @@ contains
 
     ! Calculate offsets in final matrix
     offset(1) = 0
-    do i=1,n2
-      if (i/=1) offset(i) = offset(i-1) + nvec1(i-1)
+    do i = 2, n2
+      offset(i) = offset(i-1) + nvec1(i-1)
     end do
 
     ! Initialize kinetic matrix
