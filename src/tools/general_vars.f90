@@ -29,5 +29,4 @@ module general_vars
   ! Network
   integer :: myid        ! Process id
   integer :: nprocs      ! Number of processes
-
 end module

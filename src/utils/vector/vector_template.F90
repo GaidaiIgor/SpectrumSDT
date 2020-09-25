@@ -169,7 +169,7 @@ subroutine CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list,
   integer :: i
   
   do i = 1,this % get_size() - 1
-    write(unit, *, iostat = iostat) this % get(i), ','
+    write(unit, *) this % get(i), ','
   end do
-  write(unit, *, iostat = iostat) this % get(this % get_size())
+  write(unit, *) this % get(this % get_size())
 end

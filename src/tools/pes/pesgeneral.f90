@@ -146,7 +146,7 @@ contains
   !-----------------------------------------------------------------------
   subroutine print_potvib()
     integer :: i1, i2, i3, file_unit
-    open(file_unit, file = 'potvib.out')
+    open(newunit = file_unit, file = 'potvib.out')
     do i1 = 1, size(potvib, 3)
       do i2 = 1, size(potvib, 2)
         do i3 = 1, size(potvib, 1)

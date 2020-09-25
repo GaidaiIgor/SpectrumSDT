@@ -40,7 +40,7 @@ contains
     integer, intent(in) :: v_list(:)
     integer, intent(out) :: iostat
     character(*), intent(inout) :: iomsg
-    write(unit, *, iostat = iostat) this % s
+    write(unit, *) this % s
   end subroutine
   
 !---------------------------------------------------------------------------------------------------------------------------------------------

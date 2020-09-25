@@ -56,7 +56,7 @@ contains
     call EPSSolve(eps, ierr)
 
     call EPSGetConverged(eps, n_conv_petsc, ierr)
-    n_conv = n_conv_petsc
+    n_conv = int(n_conv_petsc, kind = kind(n_conv))
     call print_parallel('Eigenpairs converged: ' // num2str(n_conv))
 
     ! Ham is no longer needed (does not work)
@@ -106,7 +106,7 @@ contains
     call VecGetArrayReadF90(x, x_ptr, ierr)
     call VecGetArrayF90(y, y_ptr, ierr)
 
-    size_proc = size_proc_petsc
+    size_proc = int(size_proc_petsc, kind = kind(size_proc))
     call active_matmul_operator(size_proc, x_ptr, y_ptr)
 
     call VecRestoreArrayReadF90(x, x_ptr, ierr)

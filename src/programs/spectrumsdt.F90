@@ -30,7 +30,7 @@ program spectrumsdt
   params = process_user_settings('spectrumsdt.config')
   call init_parameters(params)
   call init_pottot(params)
-  call calc_kin
+  call calc_kin()
   call calc_sdt(params)
 
 contains
@@ -134,7 +134,7 @@ contains
 !-----------------------------------------------------------------------
 !  Calculates kinetic energy matrices
 !-----------------------------------------------------------------------
-  subroutine calc_kin
+  subroutine calc_kin()
     integer :: i
     complex(real64) :: dvr_basis(n1, n1)
 
@@ -154,10 +154,9 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes kinetic energy matrix of given size (number of points in the grid)
+! Computes kinetic energy matrix. *calc_kin* has to be called first to initialize *der1z*
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function compute_kinetic_energy_matrix(matrix_size) result(matrix)
-    integer, intent(in) :: matrix_size
+  function compute_kinetic_energy_matrix() result(matrix)
     complex*16, allocatable :: matrix(:, :)
     matrix = -der1z / (2d0 * mu)
   end function
@@ -214,7 +213,7 @@ contains
     complex*16, allocatable :: eivecs(:, :), kinetic(:, :)
 
     call print_parallel('Using rovib coupling')
-    kinetic = compute_kinetic_energy_matrix(n1)
+    kinetic = compute_kinetic_energy_matrix()
     rovib_ham % compression = merge(1, 0, params % optimized_mult == 1) ! Global in matmul_operator_mod
     if (rovib_ham % compression == 0) then
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')

@@ -84,8 +84,6 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine print_parallel(printable)
     class(*), intent(in) :: printable
-    integer :: proc_id, n_procs
-
     if (get_proc_id() == 0) then
       select type (printable)
       type is (character(*))
