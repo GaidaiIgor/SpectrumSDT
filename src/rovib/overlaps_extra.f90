@@ -66,7 +66,8 @@ contains
     character(:), allocatable :: solutions_1d_path, solutions_2d_path
 
     call print_parallel('Calculating sym term')
-    call get_proc_info(my_id, n_procs)
+    my_id = get_proc_id()
+    n_procs = get_num_procs()
     n_basis = params % basis_size_phi
     allocate(sym_factors_J(size(theta_grid)), sym_factors_K(size(theta_grid)), partial_sum(size(theta_grid)))
 
@@ -154,7 +155,8 @@ contains
     character(:), allocatable :: solutions_1d_path_row, solutions_1d_path_col, solutions_2d_path_row, solutions_2d_path_col
 
     call print_parallel('Calculating Coriolis term')
-    call get_proc_info(my_id, n_procs)
+    my_id = get_proc_id()
+    n_procs = get_num_procs()
     n_basis = params % basis_size_phi
     allocate(cor_factors_m(n_basis - 1), cor_factors_b(size(theta_grid)), partial_sum(size(theta_grid)))
 
@@ -258,7 +260,8 @@ contains
 
     call print_parallel('Calculating asym term')
     call assert(K_row + 2 == K_col .or. K_row == 1 .and. K_col == 1 .or. params % fix_basis_jk == 1 .and. K_row == K_col, 'Wrong combination of Ks for asym term')
-    call get_proc_info(my_id, n_procs)
+    my_id = get_proc_id()
+    n_procs = get_num_procs()
     n_basis = params % basis_size_phi
     allocate(asym_factors(size(theta_grid)), partial_sum(size(theta_grid)))
 

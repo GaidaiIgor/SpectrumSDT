@@ -5,31 +5,59 @@ module parallel_utils
 
 contains
 
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns current process id and total number of processes
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine get_proc_info(proc_id, n_procs)
-    integer, intent(out) :: proc_id, n_procs
-    integer :: ierr
-    logical :: mpi_enabled
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+! ! Returns current process id and total number of processes
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+!   subroutine get_proc_info(proc_id, n_procs)
+!     integer, intent(out) :: proc_id, n_procs
+!     logical :: mpi_enabled
+!     integer :: ierr
+!
+!     call MPI_Initialized(mpi_enabled, ierr)
+!     if (mpi_enabled) then
+!       call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
+!       call MPI_Comm_Size(MPI_COMM_WORLD, n_procs, ierr)
+!     else
+!       proc_id = 0
+!       n_procs = 1
+!     end if
+!   end subroutine
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Wraps MPI_Initialized into a function
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function is_mpi_enabled() result(mpi_enabled)
+    logical :: mpi_enabled
+    integer :: ierr
     call MPI_Initialized(mpi_enabled, ierr)
-    if (mpi_enabled) then
-      call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
-      call MPI_Comm_Size(MPI_COMM_WORLD, n_procs, ierr)
-    else
-      proc_id = 0
-      n_procs = 1
-    end if
-  end subroutine
+  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns current process id
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_proc_id() result(proc_id)
     integer :: proc_id
-    integer :: n_procs
-    call get_proc_info(proc_id, n_procs)
+    integer :: ierr
+
+    if (is_mpi_enabled()) then
+      call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
+    else
+      proc_id = 0
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns number of processors
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_num_procs() result(num_procs)
+    integer :: num_procs
+    integer :: ierr
+
+    if (is_mpi_enabled()) then
+      call MPI_Comm_Size(MPI_COMM_WORLD, num_procs, ierr)
+    else
+      num_procs = 1
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -44,7 +72,8 @@ contains
     integer, allocatable :: all_counts_act(:)
     integer :: proc_id, n_procs, remaining_elems
 
-    call get_proc_info(proc_id, n_procs)
+    proc_id = get_proc_id()
+    n_procs = get_num_procs()
     proc_elems = n_elems / n_procs
     remaining_elems = mod(n_elems, n_procs)
     if (proc_id < remaining_elems) then
@@ -74,12 +103,37 @@ contains
     class(*), intent(in) :: printable
     integer :: proc_id, n_procs
 
-    call get_proc_info(proc_id, n_procs)
-    if (proc_id == 0) then
+    if (get_proc_id() == 0) then
       select type (printable)
       type is (character(*))
         print '(A)', printable
       end select
     end if
   end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Gathers local chunks on 0th processor
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine gather_chunks(chunk, counts, shifts, global)
+    real*8, intent(in) :: chunk(:, :)
+    integer, intent(in) :: counts(:), shifts(:)
+    real*8, allocatable, intent(out) :: global(:, :)
+
+    ! Avoid calling MPI functions if MPI is not initialized
+    if (.not. is_mpi_enabled()) then
+      global = chunk
+      return
+    end if
+    
+    ! The result is collected and allocated on 0th proc only
+    if (get_proc_id() == 0) then
+      allocate(global(sum(counts), size(chunk, 2)))
+    end if
+
+    ! Gather results
+    do ind = 1, size(chunk, 2)
+      call MPI_Gatherv(chunk(1, ind), size(chunk, 1), MPI_DOUBLE_PRECISION, global(1, ind), counts, shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+    end do
+  end subroutine
+
 end module

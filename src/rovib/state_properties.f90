@@ -203,39 +203,23 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates channel-specific gammas for all states
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_gamma_channels_all(params, p_dist, cap) result(gammas)
+  subroutine calculate_gamma_channels_all(params, p_dist, cap, gammas)
     class(input_params), intent(in) :: params
     real*8, intent(in) :: p_dist(:, :, :, :)
     real*8, intent(in) :: cap(:)
-    real*8, allocatable :: gammas(:, :)
-    integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
+    real*8, allocatable, intent(out) :: gammas(:, :)
+    integer :: proc_first_state, proc_states, proc_k
     integer, allocatable :: recv_counts(:), recv_shifts(:)
     real*8, allocatable :: gammas_chunk(:, :)
 
-    call get_proc_info(proc_id, n_procs)
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
-
-    ! Calculate chunks
+    ! Calculate proc chunks
     allocate(gammas_chunk(proc_states, 2))
     do proc_k = 1, proc_states
       gammas_chunk(proc_k, :) = calculate_gamma_channels(p_dist(proc_k, :, :, :), cap)
     end do
-
-    if (n_procs == 1) then
-      gammas = gammas_chunk
-      return
-    end if
-    
-    if (proc_id == 0) then
-      allocate(gammas(params % num_states, 2))
-    else
-      allocate(gammas(1, 1)) ! allocate dummy return value for other processors
-    end if
-    ! Gather results
-    do ind = 1, size(gammas, 2)
-      call MPI_Gatherv(gammas_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, gammas(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-    end do
-  end function
+    call gather_chunks(gammas_chunk, recv_counts, recv_shifts, gammas)
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates total probability of k-th state in different parts of the PES.
@@ -265,36 +249,24 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calls calculate_pes_region_probabilities for all states and gathers results
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind) result(region_probs)
+  subroutine calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind, region_probs)
     class(input_params), intent(in) :: params
     real*8, intent(in) :: p_dist(:, :, :, :) ! state x K x n x 3
     integer, intent(in) :: cov_n_inds(3)
     integer, intent(in) :: vdw_n_ind
-    real*8, allocatable :: region_probs(:, :)
-    integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
+    real*8, allocatable, intent(out) :: region_probs(:, :)
+    integer :: proc_first_state, proc_states, proc_k
     integer, allocatable :: recv_counts(:), recv_shifts(:)
     real*8, allocatable :: region_probs_chunk(:, :)
 
-    call get_proc_info(proc_id, n_procs)
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
-
-    ! Calculate chunks
+    ! Calculate local chunks
     allocate(region_probs_chunk(proc_states, 6))
     do proc_k = 1, proc_states
       region_probs_chunk(proc_k, :) = calculate_pes_region_probabilities(p_dist(proc_k, :, :, :), cov_n_inds, vdw_n_ind)
     end do
-
-    ! Gather results
-    if (n_procs == 1) then
-      region_probs = region_probs_chunk
-      return
-    end if
-    
-    allocate(region_probs(params % num_states, size(region_probs_chunk, 2)))
-    do ind = 1, size(region_probs, 2)
-      call MPI_Gatherv(region_probs_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, region_probs(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-    end do
-  end function
+    call gather_chunks(region_probs_chunk, recv_counts, recv_shifts, region_probs)
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates K probability distribution for a given state
@@ -321,37 +293,25 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates K probability distribution for all states
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_K_dist_all(params, p_dist) result(K_dists)
+  subroutine calculate_K_dist_all(params, p_dist, K_dists)
     class(input_params), intent(in) :: params
     real*8, intent(in) :: p_dist(:, :, :, :) ! states x K x n x 3
-    real*8, allocatable :: K_dists(:, :)
-    integer :: proc_id, n_procs, proc_first_state, proc_states, proc_k, ind, ierr
+    real*8, allocatable, intent(out) :: K_dists(:, :)
+    integer :: proc_first_state, proc_states, proc_k
     integer, allocatable :: recv_counts(:), recv_shifts(:)
     real*8 :: K_dist_error
     real*8, allocatable :: K_dists_chunk(:, :)
 
-    call get_proc_info(proc_id, n_procs)
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
-
-    ! Calculate chunks
+    ! Calculate local chunks
     allocate(K_dists_chunk(proc_states, params % J + 1))
     do proc_k = 1, proc_states
       K_dists_chunk(proc_k, :) = calculate_K_dist(params, p_dist(proc_k, :, :, :))
       K_dist_error = 1 - sum(K_dists_chunk(proc_k, :))
       if (abs(K_dist_error) > 1d-10) print *, 'Warning: K_dist_error is ' // num2str(K_dist_error) // ' on state ' // num2str(proc_first_state + proc_k - 1)
     end do
-
-    ! Gather results
-    if (n_procs == 1) then
-      K_dists = K_dists_chunk
-      return
-    end if
-    
-    allocate(K_dists(params % num_states, params % J + 1))
-    do ind = 1, size(K_dists, 2)
-      call MPI_Gatherv(K_dists_chunk(1, ind), proc_states, MPI_DOUBLE_PRECISION, K_dists(1, ind), recv_counts, recv_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-    end do
-  end function
+    call gather_chunks(K_dists_chunk, recv_counts, recv_shifts, K_dists)
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! The main procedure for calculation of states properties
@@ -399,7 +359,7 @@ contains
     call print_parallel('Done calculating probability distributions')
 
     if (present(cap)) then
-      gammas = calculate_gamma_channels_all(params, p_dist, cap)
+      call calculate_gamma_channels_all(params, p_dist, cap, gammas)
     else
       allocate(gammas(params % num_states, 2))
       gammas = 0d0
@@ -407,10 +367,10 @@ contains
     call print_parallel('Done calculating channel-specific gammas')
 
     call find_barriers_n_indices(params, rho_grid, vdw_max, cov_n_inds, vdw_n_ind)
-    region_probs = calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind)
+    call calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind, region_probs)
     call print_parallel('Done calculating PES region probabilities')
 
-    K_dists = calculate_K_dist_all(params, p_dist)
+    call calculate_K_dist_all(params, p_dist, K_dists)
     call print_parallel('Done calculating K-distributions')
 
     call print_parallel('Writing results...')

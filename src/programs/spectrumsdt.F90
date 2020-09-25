@@ -169,15 +169,13 @@ contains
     class(input_params), intent(in) :: params
     complex*16, allocatable, intent(in) :: eivals(:)
     complex*16, allocatable, intent(in) :: eivecs(:, :)
-    integer :: proc_id, n_procs, proc_first_state, proc_states, file_unit, i, global_state_ind
+    integer :: proc_first_state, proc_states, file_unit, i, global_state_ind
     real*8 :: energy, gamma
     character(:), allocatable :: sym_path, file_folder, file_path
     external :: numroc
     integer :: numroc
 
-    call get_proc_info(proc_id, n_procs)
     call get_proc_elem_range(size(eivals), proc_first_state, proc_states)
-
     sym_path = get_sym_path_params(params)
     file_folder = get_expansion_coefficients_3d_path(sym_path)
     call create_path(file_folder)
@@ -194,7 +192,7 @@ contains
     end do
 
     ! Final file is written by the 0th proc
-    if (proc_id /= 0) return
+    if (get_proc_id() /= 0) return
     ! Write spectrum
     file_path = get_spectrum_path(sym_path)
 
@@ -246,16 +244,15 @@ contains
     type(input_params), intent(in) :: params
     integer :: ready, ierr
 
-    call get_proc_info(myid, nprocs)
     ! Write information
     call print_parallel('Mode: ' // params % mode)
-    call print_parallel('Processes: ' // num2str(nprocs))
+    call print_parallel('Processes: ' // num2str(get_num_procs()))
 
     ! Setup directories
     if (params % mode == 'properties') then
       ready = 1
     else
-      if (myid == 0) then
+      if (get_proc_id() == 0) then
         ready = maindir()
         call assert(ready == 1, 'Error: cannot create directory structure')
       end if
