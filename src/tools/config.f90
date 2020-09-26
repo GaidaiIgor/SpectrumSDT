@@ -6,6 +6,7 @@ module config
   use general_utils
   use input_params_mod
   use io_utils
+  use iso_fortran_env, only: real64
   use parallel_utils
   use rovib_utils_mod
   use string_mod
@@ -260,7 +261,7 @@ contains
       optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
-    real*8 :: cutoff_energy
+    real(real64) :: cutoff_energy
     type(string), allocatable :: tokens(:)
 
     ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults

@@ -11,7 +11,6 @@ program spectrumsdt
   use distributed_rovib_hamiltonian_mod
   use fourier_transform_mod
   use general_vars
-  use index_conversion_mod
   use input_params_mod
   use io_utils
   use iso_fortran_env, only : real64
@@ -157,7 +156,7 @@ contains
 ! Computes kinetic energy matrix. *calc_kin* has to be called first to initialize *der1z*
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function compute_kinetic_energy_matrix() result(matrix)
-    complex*16, allocatable :: matrix(:, :)
+    complex(real64), allocatable :: matrix(:, :)
     matrix = -der1z / (2d0 * mu)
   end function
 
@@ -166,10 +165,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine print_spectrum(params, eivals, eivecs)
     class(input_params), intent(in) :: params
-    complex*16, allocatable, intent(in) :: eivals(:)
-    complex*16, allocatable, intent(in) :: eivecs(:, :)
+    complex(real64), allocatable, intent(in) :: eivals(:)
+    complex(real64), allocatable, intent(in) :: eivecs(:, :)
     integer :: proc_first_state, proc_states, file_unit, i, global_state_ind
-    real*8 :: energy, gamma
+    real(real64) :: energy, gamma
     character(:), allocatable :: sym_path, file_folder, file_path
     external :: numroc
     integer :: numroc
@@ -209,8 +208,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_states(params)
     type(input_params), intent(in) :: params
-    complex*16, allocatable :: eivals(:), cap(:)
-    complex*16, allocatable :: eivecs(:, :), kinetic(:, :)
+    complex(real64), allocatable :: eivals(:), cap(:)
+    complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
 
     call print_parallel('Using rovib coupling')
     kinetic = compute_kinetic_energy_matrix()

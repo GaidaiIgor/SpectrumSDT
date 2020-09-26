@@ -1,12 +1,16 @@
 module parabola
+  use iso_fortran_env, only: real64
+  implicit none
+
 contains
+
 !-----------------------------------------------------------------------
 !  Finds parabola using three points.
 !-----------------------------------------------------------------------
   subroutine find_parabola(r_l,pot_l,r_m,pot_m,r_r,pot_r,r,pot,a)
     implicit none
-    real*8 mat(3,3),r_l,pot_l,r_m,pot_m,r_r,pot_r,r,pot
-    real*8 det0,deta,detb,detc,a,b,c
+    real(real64) mat(3,3),r_l,pot_l,r_m,pot_m,r_r,pot_r,r,pot
+    real(real64) det0,deta,detb,detc,a,b,c
 
     mat(1,1) = r_l**2
     mat(1,2) = r_l
@@ -64,8 +68,8 @@ contains
     pot= a*r**2 + b*r + c
 
   contains
-    real*8 function det(a)
-      real*8 a(3,3)
+    real(real64) function det(a)
+      real(real64) a(3,3)
       det = a(1,1)*(a(2,2)*a(3,3) - a(3,2)*a(2,3)) + a(1,2)*(a(3,1)*a(2,3) - a(2,1)*a(3,3)) + a(1,3)*(a(2,1)*a(3,2) - a(3,1)*a(2,2))
     end function
   end subroutine

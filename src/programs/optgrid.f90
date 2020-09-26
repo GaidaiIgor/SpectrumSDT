@@ -7,8 +7,9 @@
 !-----------------------------------------------------------------------
 module general
   use constants
+  use iso_fortran_env, only: real64
   implicit none
-  real*8, parameter ::  m0 = isomass(1), &
+  real(real64), parameter ::  m0 = isomass(1), &
                         m1 = isomass(1), &
                         m2 = isomass(1), &
                         Mtot = m0+m1+m2, &
@@ -19,37 +20,38 @@ module general
                         r20 = 2.410d0, &
                         te0 = pi * 116.8 / 180 ! , &
                         
-  real*8 :: zpe
+  real(real64) :: zpe
   
-  real*8,allocatable::g1(:),g2(:),g3(:)
-  real*8,allocatable::jac1(:),jac2(:),jac3(:)
-  real*8 a1,a2,a3
-  real*8 Emax1,Emax2,Emax3
-  real*8 min1,max1
-  real*8 min2,max2
-  real*8 min3,max3
-  real*8 eps
+  real(real64),allocatable::g1(:),g2(:),g3(:)
+  real(real64),allocatable::jac1(:),jac2(:),jac3(:)
+  real(real64) a1,a2,a3
+  real(real64) Emax1,Emax2,Emax3
+  real(real64) min1,max1
+  real(real64) min2,max2
+  real(real64) min3,max3
+  real(real64) eps
   integer nenv1,nenv2,nenv3
   integer n1,n2,n3
   integer envtype1,envtype2,envtype3
   integer cs,rgrid,symmphi
   !--- Envelopes ---
   character(:), allocatable :: envpath
-  real*8 env1_d1,env1_dn
-  real*8 env2_d1,env2_dn
-  real*8 env3_d1,env3_dn
-  real*8,allocatable::env1(:),pot1(:),env1_2d(:)
-  real*8,allocatable::env2(:),pot2(:),env2_2d(:)
-  real*8,allocatable::env3(:),pot3(:),env3_2d(:)
-  real*8 enva1,enva2,enva3
-  real*8 envE1,envE2,envE3
-  real*8 envm1,envm2,envm3
-  real*8 energyoffset
+  real(real64) env1_d1,env1_dn
+  real(real64) env2_d1,env2_dn
+  real(real64) env3_d1,env3_dn
+  real(real64),allocatable::env1(:),pot1(:),env1_2d(:)
+  real(real64),allocatable::env2(:),pot2(:),env2_2d(:)
+  real(real64),allocatable::env3(:),pot3(:),env3_2d(:)
+  real(real64) enva1,enva2,enva3
+  real(real64) envE1,envE2,envE3
+  real(real64) envm1,envm2,envm3
+  real(real64) energyoffset
 end module
 
 program optgrid
-  use general
   use constants
+  use general
+  use iso_fortran_env, only: real64
   use optgrid_tools
   use path_utils
   implicit none
@@ -190,10 +192,10 @@ contains
   !  Find parabola
   !-----------------------------------------------------------------------
   subroutine find_parabola(env,pot,nenv,enva,envE,envm)
-    real*8 env(nenv),pot(nenv),enva,envE,envm
     integer nenv,i,im,il,ir
-    real*8 mat(3,3),d(3)
-    real*8 det0,det1,c
+    real(real64) env(nenv),pot(nenv),enva,envE,envm
+    real(real64) mat(3,3),d(3)
+    real(real64) det0,det1,c
     im = 1
     do i=1,nenv
       if(pot(i).lt.pot(im))im = i
@@ -230,8 +232,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  real*8 function det(a)
-    real*8 a(3,3)
+  real(real64) function det(a)
+    real(real64) a(3,3)
     det = a(1,1)*(a(2,2)*a(3,3) - a(3,2)*a(2,3)) + a(1,2)*(a(3,1)*a(2,3) - a(2,1)*a(3,3)) + a(1,3)*(a(2,1)*a(3,2) - a(3,1)*a(2,2))
   end function
   
@@ -240,8 +242,8 @@ contains
   !  Returns interpolated value of envelope at a given point
   !  Adds approximate ZPE value along two other coordinates
   !-----------------------------------------------------------------------
-  real*8 function potv1(r)
-    real*8 r
+  real(real64) function potv1(r)
+    real(real64) r
     if(r>env1(nenv1))then
       potv1 = pot1(nenv1)
     else
@@ -252,8 +254,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  real*8 function potv2(r)
-    real*8 r
+  real(real64) function potv2(r)
+    real(real64) r
     if(r>env2(nenv2))then
       potv2 = pot2(nenv2)
     else
@@ -264,8 +266,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  real*8 function potv3(r)
-    real*8 r
+  real(real64) function potv3(r)
+    real(real64) r
     if(symmphi==2.and.r<pi)then
       call splint(env3,pot3,env3_d1,env3_2d,nenv3,2*pi-r,potv3)
     else
@@ -277,8 +279,8 @@ contains
   !  PotEnv
   !  Smooth envelopes by Eckart function
   !-----------------------------------------------------------------------
-  real*8 function potenv1(r)
-    real*8 r,x
+  real(real64) function potenv1(r)
+    real(real64) r,x
     if(envtype1.eq.1)then
       x = r - envm1
       if(x.lt.0)then
@@ -298,8 +300,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  real*8 function potenv2(r)
-    real*8 r,x
+  real(real64) function potenv2(r)
+    real(real64) r,x
     if(envtype2.eq.1)then
       x = r - envm2
       if(x.lt.0)then
@@ -319,8 +321,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  real*8 function potenv3(r)
-    real*8 r,x
+  real(real64) function potenv3(r)
+    real(real64) r,x
     if(envtype3.eq.1)then
       x = r - envm3
       potenv3 = - envE3 * 4 / (exp(x/enva3) + exp(-x/enva3))**2
@@ -333,8 +335,8 @@ contains
   !  Grid derivative for rho
   !-----------------------------------------------------------------------
   subroutine der_rho(x,y,dydx)
-    real*8 x,y,dydx
-    real*8 argument
+    real(real64) x,y,dydx
+    real(real64) argument
     argument = 2*mu*(Emax1-potenv1(y)-gridextra(envm1,envm2))
     if (argument.gt.0.d0) then
       dydx = pi/DSQRT(argument)
@@ -347,8 +349,8 @@ contains
   !  Grid derivative for tet
   !-----------------------------------------------------------------------
   subroutine der_tet(x,y,dydx)
-    real*8 x,y,dydx
-    real*8 argument
+    real(real64) x,y,dydx
+    real(real64) argument
     argument = mu/2*(Emax2-potenv2(y)-gridextra(envm1,envm2))
     if (argument.gt.0.d0) then
       dydx = pi/(envm1*DSQRT(argument))
@@ -361,8 +363,8 @@ contains
   !  Grid derivative for phi
   !-----------------------------------------------------------------------
   subroutine der_phi(x,y,dydx)
-    real*8 x,y,dydx
-    real*8 argument
+    real(real64) x,y,dydx
+    real(real64) argument
     argument = mu/2*(Emax3-potenv3(y)-gridextra(envm1,envm2))
     if (argument.gt.0.d0) then
       dydx = pi/(envm1*sin(envm2)*DSQRT(argument))
@@ -374,8 +376,8 @@ contains
   !-----------------------------------------------------------------------
   !  Extra potential caused by conversion from Jacoby coordinates
   !-----------------------------------------------------------------------
-  real*8 function gridextra(rho,tet)
-    real*8 rho,tet
+  real(real64) function gridextra(rho,tet)
+    real(real64) rho,tet
     gridextra = - 2/(mu*rho**2)*(sin(2*tet)**(-2)+0.0625d0)
   end function
 
@@ -383,8 +385,8 @@ contains
   !  Grid derivative for R1
   !-----------------------------------------------------------------------
   subroutine der_r1(x,y,dydx)
-    real*8 x,y,dydx
-    real*8 argument
+    real(real64) x,y,dydx
+    real(real64) argument
     argument = 2*mu1*(Emax1-potenv1(y))
     if (argument.gt.0.d0) then
       dydx = pi/DSQRT(argument)
@@ -397,8 +399,8 @@ contains
   !  Grid derivative for R2
   !-----------------------------------------------------------------------
   subroutine der_r2(x,y,dydx)
-    real*8 x,y,dydx
-    real*8 argument
+    real(real64) x,y,dydx
+    real(real64) argument
     argument = 2*mu2*(Emax2-potenv2(y))
     if (argument.gt.0.d0) then
       dydx = pi/DSQRT(argument)
@@ -411,8 +413,8 @@ contains
   !  Grid derivative for Te
   !-----------------------------------------------------------------------
   subroutine der_te(x,y,dydx)
-    real*8 x,y,dydx
-    real*8 argument
+    real(real64) x,y,dydx
+    real(real64) argument
     argument = 2/(1/(mu1*envm1**2) + 1/(mu2*envm2**2) - 2*cos(envm3)/(m0*envm1*envm2)) * (Emax3-potenv3(y))
     if (argument.gt.0.d0) then
       dydx = pi/DSQRT(argument)

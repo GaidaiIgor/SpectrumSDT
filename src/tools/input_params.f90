@@ -1,4 +1,5 @@
 module input_params_mod
+  use iso_fortran_env, only: real64
   implicit none
 
   type :: input_params
@@ -16,7 +17,7 @@ module input_params_mod
 
     ! Basis
     integer :: basis_size_phi ! number of sines or cosines for 1D step
-    real*8 :: cutoff_energy ! solutions with energies higher than this are discarded from basis
+    real(real64) :: cutoff_energy ! solutions with energies higher than this are discarded from basis
     character(:), allocatable :: basis_root_path ! path to root folder for basis calculations
     integer :: basis_J ! J and K of basis set
     integer :: basis_K

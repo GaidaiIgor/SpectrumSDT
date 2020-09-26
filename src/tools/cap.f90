@@ -5,6 +5,7 @@ module cap_mod
   use constants
   use general_vars
   use input_params_mod
+  use iso_fortran_env, only: real64
   use parallel_utils
   implicit none
 
@@ -12,12 +13,12 @@ module cap_mod
   character(*), parameter :: capdir = 'caps'
   integer :: capid      ! CAP id
   integer :: ndbw       ! Number of de Broglie waves
-  real*8 :: capebar     ! Barrier energy used for CAPs
-  real*8 :: dac         ! Delta for strength
-  real*8 :: dwc         ! Delta for exponential
-  real*8 :: drc         ! Delta for position
-  real*8 :: emin        ! Emin for Manolopoulos CAP
-  real*8, allocatable :: all_caps(:, :) ! CAPs on grid
+  real(real64) :: capebar     ! Barrier energy used for CAPs
+  real(real64) :: dac         ! Delta for strength
+  real(real64) :: dwc         ! Delta for exponential
+  real(real64) :: drc         ! Delta for position
+  real(real64) :: emin        ! Emin for Manolopoulos CAP
+  real(real64), allocatable :: all_caps(:, :) ! CAPs on grid
 
 contains
 
@@ -28,26 +29,26 @@ contains
   !               3. Manolopoulos
   !-----------------------------------------------------------------------
   subroutine calc_cap(nr,g)
-    ! CAP #1
-    real*8 ac,wc,rc
-    real*8 d0
-    ! CAP #2
-    real*8,parameter :: strs(*) = (/ 1.92, 1.88, 1.85 /)
-    ! CAP #3
-    real*8,parameter :: aM = 0.112449d0
-    real*8,parameter :: bM = 0.00828735d0
-    real*8,parameter :: cM = 2.62206d0
-    real*8 dM
-    real*8 xM
-    ! Common
-    real*8,parameter :: eabsmin = 1 / autown
-    real*8 g(nr)     ! Grid
-    real*8 r         ! Running grid point
-    real*8 eabs      ! Absolute energy
-    real*8 dbl       ! De Broglie wavelength
-    real*8 dampstr   ! Damping strength
-    real*8 damplen   ! Damping length
     integer ir,nr
+    ! CAP #1
+    real(real64) ac,wc,rc
+    real(real64) d0
+    ! CAP #2
+    real(real64),parameter :: strs(*) = (/ 1.92, 1.88, 1.85 /)
+    ! CAP #3
+    real(real64),parameter :: aM = 0.112449d0
+    real(real64),parameter :: bM = 0.00828735d0
+    real(real64),parameter :: cM = 2.62206d0
+    real(real64) dM
+    real(real64) xM
+    ! Common
+    real(real64),parameter :: eabsmin = 1 / autown
+    real(real64) g(nr)     ! Grid
+    real(real64) r         ! Running grid point
+    real(real64) eabs      ! Absolute energy
+    real(real64) dbl       ! De Broglie wavelength
+    real(real64) dampstr   ! Damping strength
+    real(real64) damplen   ! Damping length
 
     ! Allocate array
     allocate(all_caps(nr,ncap))
@@ -129,7 +130,7 @@ contains
   !-----------------------------------------------------------------------
   subroutine init_caps(params, capebarin)
     class(input_params), intent(in) :: params
-    real*8 :: capebarin
+    real(real64) :: capebarin
     character(256) :: fn
 
     if (params % cap_type == 'none') then
@@ -158,27 +159,27 @@ contains
 ! Writes active (as specified by global capid) CAP/-i into *p*
 !-----------------------------------------------------------------------
   subroutine get_cap(p)
-    real*8 :: p(n1)
+    real(real64) :: p(n1)
     call assert(capid /= 0, 'Error: cap type is not specified')
     p = all_caps(:, capid)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns active (as specified by global capid) CAP/-i as real*8
+! Returns active (as specified by global capid) CAP/-i as real(real64)
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_real_cap() result(cap)
-    real*8, allocatable :: cap(:)
+    real(real64), allocatable :: cap(:)
     call assert(allocated(all_caps), 'Error: caps are not initialized')
     allocate(cap(n1))
     call get_cap(cap)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns active (as specified by global capid) CAP as complex*16
+! Returns active (as specified by global capid) CAP as complex(real64)
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_complex_cap() result(cap)
-    complex*16, allocatable :: cap(:)
-    real*8, allocatable :: imag_part(:)
+    complex(real64), allocatable :: cap(:)
+    real(real64), allocatable :: imag_part(:)
 
     call assert(allocated(all_caps), 'Error: caps are not initialized')
     allocate(cap(n1), imag_part(n1))

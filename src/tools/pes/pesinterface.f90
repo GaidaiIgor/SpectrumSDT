@@ -6,12 +6,13 @@
  module pesinterface_mod
    use constants
    use input_params_mod
+   use iso_fortran_env, only: real64
    use mpi
    use parallel_utils
    use pesgeneral
-
    implicit none
-   real*8 :: pes_mass(3)
+
+   real(real64) :: pes_mass(3)
 
    private
    public :: pes_mass
@@ -35,9 +36,9 @@
 ! Calculates vibrational potential at given point.
 ! init_pots has to be called first to set pes_mass
 !-----------------------------------------------------------------------
-  real*8 function calc_potvib(rho,tet,phi)
-    real*8 rho,tet,phi
-    real*8 vpot,r(3),r2(3),cart(9)
+  real(real64) function calc_potvib(rho,tet,phi)
+    real(real64) rho,tet,phi
+    real(real64) vpot,r(3),r2(3),cart(9)
 
     r2(1) = rho
     r2(2) = tet
@@ -81,10 +82,10 @@
 ! Calculates potential energy surface
 !-------------------------------------------------------------------------------------------------------------------------------------------
    subroutine calc_pots(grid1, grid2, grid3)
-     real*8 :: grid1(:), grid2(:), grid3(:)
+     real(real64) :: grid1(:), grid2(:), grid3(:)
      integer :: i1, i2, i3, n1, n2, n3, proc_k, first_k, k, proc_points, total_points, proc_id, ierr
      integer, allocatable :: proc_counts(:), proc_shifts(:)
-     real*8, allocatable :: proc_pot_vib_1d(:), global_pot_vib_1d(:)
+     real(real64), allocatable :: proc_pot_vib_1d(:), global_pot_vib_1d(:)
 
      n1 = size(grid1)
      n2 = size(grid2)

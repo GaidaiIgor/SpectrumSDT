@@ -1,6 +1,7 @@
 module optgrid_tools
   use constants
   use general_utils
+  use iso_fortran_env, only: real64
   use numerical_recipies
   implicit none
 
@@ -20,10 +21,10 @@ contains
   !  Alpha is fixed.
   !-----------------------------------------------------------------------
   subroutine generate_gridr(grid,jac,n,alpha,minr,eps,der)
-    real*8 grid(n),jac(n),x(0:n)
-    real*8 alpha,minr,eps,nextr
-    real*8 :: nextr_ode(1)
     integer i,n,nok,nbad
+    real(real64) grid(n),jac(n),x(0:n)
+    real(real64) alpha,minr,eps,nextr
+    real(real64) :: nextr_ode(1)
     external der
 
     x(0) = 0
@@ -47,10 +48,10 @@ contains
   !  Alpha is adjusted.
   !-----------------------------------------------------------------------
   subroutine generate_grida(grid,jac,n,alpha,minr,maxr,eps,der)
-    real*8 grid(n),jac(n),x(0:n+1)
-    real*8 alpha,alpha1,alpha2,minr,maxr,nextr,eps
-    real*8 :: nextr_ode(1)
     integer i,n,nok,nbad
+    real(real64) grid(n),jac(n),x(0:n+1)
+    real(real64) alpha,alpha1,alpha2,minr,maxr,nextr,eps
+    real(real64) :: nextr_ode(1)
     logical veryclose,allinrange
     external der
 
@@ -115,11 +116,11 @@ contains
   !-----------------------------------------------------------------------
   subroutine generate_gridn(grid,jac,n,alpha,minr,maxr,r0,eps,der)
     integer,parameter:: n0 = 1024
-    real*8,allocatable::grid(:),jac(:)
-    real*8 gridl(n0),gridr(n0),x(0:n0)
-    real*8 r0,alpha,minr,maxr,nextr,eps
-    real*8 :: nextr_rkdumb(1)
     integer i,n,nl,nr
+    real(real64),allocatable::grid(:),jac(:)
+    real(real64) gridl(n0),gridr(n0),x(0:n0)
+    real(real64) r0,alpha,minr,maxr,nextr,eps
+    real(real64) :: nextr_rkdumb(1)
     external der
 
     x(0) = 0
@@ -172,10 +173,10 @@ contains
   ! Generates grid with required number of points and boundaries. Step size is adjusted
   !-----------------------------------------------------------------------
   subroutine generate_equidistant_grid_points(minr, maxr, n, grid, jac, step)
-    real*8, intent(in) :: minr, maxr
+    real(real64), intent(in) :: minr, maxr
     integer, intent(in) :: n
-    real*8, allocatable, intent(out) :: grid(:), jac(:)
-    real*8, intent(out) :: step
+    real(real64), allocatable, intent(out) :: grid(:), jac(:)
+    real(real64), intent(out) :: step
     integer :: i
     
     allocate(grid(n), jac(n))
@@ -190,8 +191,8 @@ contains
   ! Generates grid with required step size and boundaries. Number of points is adjusted
   !-----------------------------------------------------------------------
   subroutine generate_equidistant_grid_step(minr, maxr, step, grid, jac, n)
-    real*8, intent(in) :: minr, maxr, step
-    real*8, allocatable, intent(out) :: grid(:), jac(:)
+    real(real64), intent(in) :: minr, maxr, step
+    real(real64), allocatable, intent(out) :: grid(:), jac(:)
     integer, intent(out) :: n
     
     grid = generate_real_range(minr + step / 2d0, maxr - step / 2d0, step)
@@ -206,11 +207,11 @@ contains
   !  Corresponding alpha is saved too
   !-----------------------------------------------------------------------
   subroutine print_grid(grid, jac, n, name, alpha, potvib)
-    real*8, intent(in) :: grid(n), jac(n)
     integer, intent(in) :: n
+    real(real64), intent(in) :: grid(n), jac(n)
     character(*), intent(in) :: name
-    real*8, intent(in) :: alpha
-    real*8, external :: potvib
+    real(real64), intent(in) :: alpha
+    real(real64), external :: potvib
     integer :: i
     
     ! external potvib

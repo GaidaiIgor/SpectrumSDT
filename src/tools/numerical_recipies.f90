@@ -1,11 +1,14 @@
 module numerical_recipies
+  use iso_fortran_env, only: real64
+  implicit none
+
 contains
 
        SUBROUTINE splint(xa,ya,yp1,y2a,n,x,y)
        INTEGER n
-       REAL*8 x,y,xa(n),y2a(n),ya(n),yp1
+       real(real64) x,y,xa(n),y2a(n),ya(n),yp1
        INTEGER k,khi,klo
-       REAL*8 a,b,h
+       real(real64) a,b,h
        klo=1
        khi=n
  1     if (khi-klo.gt.1) then
@@ -29,10 +32,10 @@ contains
 !-----------------------------------------------------------------------
        SUBROUTINE spline(x,y,n,yp1,ypn,y2)
        INTEGER n,NMAX
-       REAL*8 yp1,ypn,x(n),y(n),y2(n)
+       real(real64) yp1,ypn,x(n),y(n),y2(n)
        PARAMETER (NMAX=500)
        INTEGER i,k
-       REAL*8 p,qn,sig,un,u(NMAX)
+       real(real64) p,qn,sig,un,u(NMAX)
        if (yp1.gt..99e30) then
          y2(1)=0.d0
          u(1)=0.d0
@@ -71,11 +74,11 @@ contains
       INTEGER nstep,nvar,NMAX,NSTPMX
       PARAMETER (NMAX=50,NSTPMX=100000) 
       ! Maximum number of functions and maximum number of values to be stored.
-      REAL*8 x1,x2,vstart(nvar),xx(NSTPMX),y(NMAX,NSTPMX),result(nvar)
+      real(real64) x1,x2,vstart(nvar),xx(NSTPMX),y(NMAX,NSTPMX),result(nvar)
       EXTERNAL derivs
       ! COMMON /path/ xx,y ! Storage of results.
       INTEGER i,k
-      REAL*8 h,x,dv(NMAX),v(NMAX)
+      real(real64) h,x,dv(NMAX),v(NMAX)
       do i=1,nvar ! Load starting values.
         v(i)=vstart(i)
         y(i,1)=v(i)
@@ -106,11 +109,11 @@ contains
 !-----------------------------------------------------------------------
       SUBROUTINE rk4(y,dydx,n,x,h,yout,derivs)
       INTEGER n,NMAX
-      REAL*8 h,x,dydx(n),y(n),yout(n)
+      real(real64) h,x,dydx(n),y(n),yout(n)
       EXTERNAL derivs
       PARAMETER (NMAX=50) ! Set to the maximum number of functions.
       INTEGER i
-      REAL*8 h6,hh,xh,dym(NMAX),dyt(NMAX),yt(NMAX)
+      real(real64) h6,hh,xh,dym(NMAX),dyt(NMAX),yt(NMAX)
       hh=h*0.5d0
       h6=h/6d0
       xh=x+hh
@@ -138,11 +141,11 @@ contains
        SUBROUTINE rkqs(y,dydx,n,x,htry,eps,yscal,hdid,hnext,derivs)
        implicit none
        INTEGER n,NMAX
-       REAL*8 eps,hdid,hnext,htry,x,dydx(n),y(n),yscal(n)
+       real(real64) eps,hdid,hnext,htry,x,dydx(n),y(n),yscal(n)
        EXTERNAL derivs
        PARAMETER (NMAX=50)
        INTEGER i
-       REAL*8 errmax,h,htemp,xnew,yerr(NMAX),ytemp(NMAX),SAFETY,PGROW,PSHRNK,ERRCON
+       real(real64) errmax,h,htemp,xnew,yerr(NMAX),ytemp(NMAX),SAFETY,PGROW,PSHRNK,ERRCON
        PARAMETER (SAFETY=0.9d0,PGROW=-.2d0,PSHRNK=-.25d0,ERRCON=1.89e-4)
 
        h=htry
@@ -184,11 +187,11 @@ contains
        SUBROUTINE rkck(y,dydx,n,x,h,yout,yerr,derivs)
        implicit none
        INTEGER n,NMAX
-       REAL*8 h,x,dydx(n),y(n),yerr(n),yout(n)
+       real(real64) h,x,dydx(n),y(n),yerr(n),yout(n)
        EXTERNAL derivs
        PARAMETER (NMAX=50)
        INTEGER i
-       REAL*8 ak2(NMAX),ak3(NMAX),ak4(NMAX),ak5(NMAX),ak6(NMAX),ytemp(NMAX),A2,A3,A4,A5,A6,B21,B31,B32,B41,B42,B43,B51,B52,B53,B54,B61,B62,B63,B64,B65,C1,C3,C4,C6,DC1,DC3,DC4,DC5,DC6
+       real(real64) ak2(NMAX),ak3(NMAX),ak4(NMAX),ak5(NMAX),ak6(NMAX),ytemp(NMAX),A2,A3,A4,A5,A6,B21,B31,B32,B41,B42,B43,B51,B52,B53,B54,B61,B62,B63,B64,B65,C1,C3,C4,C6,DC1,DC3,DC4,DC5,DC6
        PARAMETER (A2=.2,A3=.3,A4=.6,A5=1.,A6=.875,B21=.2,B31=3./40.,B32=9./40.,B41=.3,B42=-.9,B43=1.2,B51=-11./54.,B52=2.5,B53=-70./27.,B54=35./27.,B61=1631./55296.,B62=175./512.,B63=575./13824.,B64=44275./110592., &
        B65=253./4096.,C1=37./378.,C3=250./621.,C4=125./594.,C6=512./1771.,DC1=C1-2825./27648.,DC3=C3-18575./48384.,DC4=C4-13525./55296.,DC5=-277./14336.,DC6=C6-.25)
 
@@ -238,7 +241,7 @@ contains
        SUBROUTINE odeint(ystart,nvar,x1,x2,eps,h1,hmin,nok,nbad,derivs,rkqs)
        implicit none
        INTEGER nbad,nok,nvar,KMAXX,MAXSTP,NMAX
-       REAL*8 eps,h1,hmin,x1,x2,ystart(nvar),TINY
+       real(real64) eps,h1,hmin,x1,x2,ystart(nvar),TINY
        EXTERNAL derivs,rkqs
        PARAMETER (MAXSTP=100000000,NMAX=50,KMAXX=200,TINY=1.e-30)
 ! Runge-Kutta driver with adaptive stepsize control. Integrate the starting values ystart(1:nvar)
@@ -250,7 +253,7 @@ contains
 ! rkqs is the name of the stepper routine to be used. /path/ contains its own information
 ! about how often an intermediate value is to be stored.
        INTEGER i,kmax,kount,nstp
-       REAL*8 dxsav,h,hdid,hnext,x,xsav,dydx(NMAX),xp(KMAXX),y(NMAX),yp(NMAX,KMAXX),yscal(NMAX)
+       real(real64) dxsav,h,hdid,hnext,x,xsav,dydx(NMAX),xp(KMAXX),y(NMAX),yp(NMAX,KMAXX),yscal(NMAX)
        ! COMMON /path/ kmax,kount,dxsav,xp,yp
        ! User storage for intermediate results. Preset dxsav and kmax.
        kmax=0

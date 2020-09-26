@@ -3,29 +3,31 @@
 ! Operator signatures are restricted, so they cannot be made local
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module matmul_operator_mod
-  ! use blas95 ! matrix-vector product
   use distributed_rovib_hamiltonian_mod
   use input_params_mod
+  use iso_fortran_env, only: real64
   use matrix_block_info_mod
   use mpi
   implicit none
 
   abstract interface
     subroutine matmul_operator(proc_rows, vector, result)
+      import :: real64
       integer :: proc_rows
-      complex*16 :: vector(proc_rows), result(proc_rows)
+      complex(real64) :: vector(proc_rows), result(proc_rows)
     end subroutine
     
     subroutine matmul_operator_real(proc_rows, vector, result)
+      import :: real64
       integer :: proc_rows
-      real*8 :: vector(proc_rows), result(proc_rows)
+      real(real64) :: vector(proc_rows), result(proc_rows)
     end subroutine
   end interface
 
   integer :: msize ! Hamiltonain size
   integer :: rog ! Row offset of the first row of this process
-  real*8, allocatable :: hamd(:, :) ! Hamiltonian matrices
-  complex*16, allocatable :: hamz(:, :)
+  real(real64), allocatable :: hamd(:, :) ! Hamiltonian matrices
+  complex(real64), allocatable :: hamz(:, :)
   type(distributed_rovib_hamiltonian), target :: rovib_ham
   procedure(matmul_operator), pointer :: active_matmul_operator
 
@@ -50,11 +52,11 @@ contains
 ! Multiplies a single n-block of compressed hamiltonian with a given vector v
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine ham_mult_block_compressed(ham, v, local_block_info, v_start, v_proc_out)
-    complex*16, intent(in) :: ham(:, :)
-    complex*16, intent(in) :: v(:)
+    complex(real64), intent(in) :: ham(:, :)
+    complex(real64), intent(in) :: v(:)
     class(matrix_block_info), intent(in) :: local_block_info
     integer, intent(in) :: v_start ! where the relevant part of v starts (block's global left border)
-    complex*16, intent(inout) :: v_proc_out(:)
+    complex(real64), intent(inout) :: v_proc_out(:)
     integer :: row1, row2, col1, col2, i, j, v_shift
 
     row1 = local_block_info % borders % top
@@ -75,10 +77,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine ham_mult_compressed(size_proc, v_proc_inp, v_proc_out)
     integer :: size_proc ! number of elements assigned to this processor
-    complex*16 :: v_proc_inp(size_proc) ! This processor's chunk of the vector that we need to multiply with Hamiltonian
-    complex*16 :: v_proc_out(size_proc) ! This processor's chunk of the result of multiplication
+    complex(real64) :: v_proc_inp(size_proc) ! This processor's chunk of the vector that we need to multiply with Hamiltonian
+    complex(real64) :: v_proc_out(size_proc) ! This processor's chunk of the result of multiplication
     integer :: ierr, K_row_ind, K_col_ind, n_row_ind, n_col_ind, v_start
-    complex*16 :: v(msize)
+    complex(real64) :: v(msize)
     type(matrix_block_info), pointer :: local_K_block_info, global_K_block_info, local_n_block_info, global_n_block_info
 
     call MPI_Allgatherv(v_proc_inp, size(v_proc_inp), MPI_DOUBLE_COMPLEX, v, rovib_ham % all_counts, rovib_ham % all_shifts, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
@@ -120,10 +122,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine ham_mult_old(size_proc, v_proc_inp, v_proc_out)
     integer :: size_proc ! number of elements assigned to this processor
-    complex*16 :: v_proc_inp(size_proc) ! This processor's chunk of the vector that we need to multiply with Hamiltonian
-    complex*16 :: v_proc_out(size_proc) ! This processor's chunk of the result of multiplication
+    complex(real64) :: v_proc_inp(size_proc) ! This processor's chunk of the vector that we need to multiply with Hamiltonian
+    complex(real64) :: v_proc_out(size_proc) ! This processor's chunk of the result of multiplication
     integer :: i, j, ierr
-    complex*16 :: v(msize)
+    complex(real64) :: v(msize)
 
     if (size_proc == msize) then
       v = v_proc_inp

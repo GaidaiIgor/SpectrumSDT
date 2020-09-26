@@ -9,6 +9,7 @@ module sdt
   use general_vars
   use input_params_mod
   use io_utils
+  use iso_fortran_env, only: real64
   use lapack_interface_mod
   use matmul_operator_mod
   use mpi
@@ -16,19 +17,15 @@ module sdt
   use pesgeneral
   use rovib_io_mod
   use slepc_solver_mod
-
-  ! Debug
-  use debug_tools
-
   implicit none
 
   ! Data types for arrays of variable size
   type array1d
-    real*8,allocatable :: a(:)
+    real(real64),allocatable :: a(:)
   endtype array1d
 
   type array2d
-    real*8,allocatable :: a(:,:)
+    real(real64),allocatable :: a(:,:)
   endtype array2d
 
   ! Mode constants
@@ -71,7 +68,7 @@ module sdt
   integer nvec2max ! Max number of 2D states in slice  before trnc
 
   ! Truncation parameters
-  real*8  trecut      ! Cut off energy
+  real(real64)  trecut      ! Cut off energy
 
 contains
 
@@ -140,8 +137,8 @@ contains
   !    SY and AS       0,1,2,3           1,2,3,4
   !-----------------------------------------------------------------------
   subroutine init_fbrbasis(basis)
-    real*8 basis(n3,n3b)
-    real*8 norm
+    real(real64) basis(n3,n3b)
+    real(real64) norm
     integer i,j,np
 
     ! Normalization coefficient
@@ -168,11 +165,11 @@ contains
   !  Calculates 1D Hamiltonian for coordinate #3 using FBR.
   !-----------------------------------------------------------------------
   subroutine init_matrix3fbr(ham,ic1,ic2)
-    real*8 ham(n3b,n3b)
-    real*8 basis(n3,n3b)
+    real(real64) ham(n3b,n3b)
+    real(real64) basis(n3,n3b)
     integer ic1,ic2,ic3
     integer i,j,np
-    real*8 coeff,sum
+    real(real64) coeff,sum
 
     ! Initialize basis
     call init_fbrbasis(basis)
@@ -206,7 +203,7 @@ contains
   !  Calculates symmetry of 1D state.
   !-----------------------------------------------------------------------
   subroutine symmetry_1d(psi,s3)
-    real*8 psi(n3),s3
+    real(real64) psi(n3),s3
     integer i3,k1,k2
     s3 = 0
     do i3=1,n3
@@ -232,11 +229,11 @@ contains
     integer ivec                      ! Good state number
     integer nnode                     ! Number of nodes
     integer k
-    real*8,allocatable::valraw(:)     ! Eigenvalues
-    real*8,allocatable::vecraw(:,:)   ! Eigenvectors on the grid
-    real*8,allocatable::vecrawb(:,:)  ! Basis expansion of eivectors
-    real*8,allocatable::basis(:,:)    ! FBR basis
-    real*8,allocatable::psi(:)        ! State
+    real(real64),allocatable::valraw(:)     ! Eigenvalues
+    real(real64),allocatable::vecraw(:,:)   ! Eigenvectors on the grid
+    real(real64),allocatable::vecrawb(:,:)  ! Basis expansion of eivectors
+    real(real64),allocatable::basis(:,:)    ! FBR basis
+    real(real64),allocatable::psi(:)        ! State
     character(256) fn                 ! File name
 
     ! Deallocate solution if allocated
@@ -311,10 +308,10 @@ contains
   !  Calculates 1D Hamiltonian for coordinate #2.
   !-----------------------------------------------------------------------
   subroutine init_matrix2(ham,ic1)
-    real*8 ham(n2,n2)
+    real(real64) ham(n2,n2)
     integer ic1
-    real*8 coeff
-    real*8 L
+    real(real64) coeff
+    real(real64) L
     integer i,j
 
     L = n2 * alpha2
@@ -332,7 +329,7 @@ contains
   !  Writes 2D vector.
   !-----------------------------------------------------------------------
   subroutine writ_vec2(vec,i1,is,sgn)
-    real*8, allocatable::vec(:)
+    real(real64), allocatable::vec(:)
     integer i1,is,sgn,i,j,l
     character(256) fn
     write(fn,'(2A,I0,A,I0,A)')outdir,'/vec2.',i1,'.',is,'.out'
@@ -351,7 +348,7 @@ contains
   !  Calculates symmetry of 2D state.
   !-----------------------------------------------------------------------
   subroutine symmetry_2d(psi,s3)
-    real*8 psi(n23),s3
+    real(real64) psi(n23),s3
     integer i2,i3,j1,j2,k1,k2
     s3 = 0
     do i2=1,n2
@@ -369,9 +366,9 @@ contains
   !  Transform 2D state from basis to grid. Real state.
   !-----------------------------------------------------------------------
   subroutine trans_bas_grd_d(basis,vec2bas,vec2grd)
-    real*8 basis(:,:)    ! FBR basis
-    real*8 vec2bas(:)    ! 2D vector in basis
-    real*8 vec2grd(:)    ! 2D vector on grid
+    real(real64) basis(:,:)    ! FBR basis
+    real(real64) vec2bas(:)    ! 2D vector in basis
+    real(real64) vec2grd(:)    ! 2D vector on grid
     integer is,i,j
 
     do is=1,n2
@@ -389,9 +386,9 @@ contains
   subroutine calc_2d(val2,vec2,sym2,nvec2,i1,val1,vec1,nvec1)
     type(array1d),allocatable::val1(:) ! 1D values  for each thread
     type(array2d),allocatable::vec1(:) ! 1D vectors for each thread
-    real*8,allocatable::vec2(:,:)      ! 2D vectors in basis
-    real*8,allocatable::val2(:)        ! 2D values
-    real*8,allocatable::sym2(:)        ! 2D symmetries
+    real(real64),allocatable::vec2(:,:)      ! 2D vectors in basis
+    real(real64),allocatable::val2(:)        ! 2D values
+    real(real64),allocatable::sym2(:)        ! 2D symmetries
     integer nvec1(n2)                  ! Num of 1D vecs in each thrd
     integer nvec2                      ! Num of 2D vecs
     integer i1                         ! Slice number
@@ -403,18 +400,18 @@ contains
     integer i,j,l,is
     integer,allocatable::offset(:)     ! Offsets in final matrix
     integer,allocatable::nbr(:)        ! Nums of good vecs in vecraw
-    real*8,allocatable::kin(:,:)       ! KEO matrix
-    real*8,allocatable::ham1(:,:)      ! One block
-    real*8,allocatable::ham2(:,:)      ! Contracted ham matrix
-    real*8,allocatable::valraw(:)      ! Eigenvalues
-    real*8,allocatable::symraw(:)      ! Symmetries
-    real*8,allocatable::vecraw(:)      ! One eigenvector  on grid
-    real*8,allocatable::vecrawb(:)     ! One eigenvector  in basis
-    real*8,allocatable::vecrawe(:,:)   ! All eigenvectors in eibasis
-    real*8,allocatable::basis(:,:)     ! FBR basis
-    real*8,allocatable::w(:)           ! Temporary array of eivalues
-    real*8 s3                          ! Symmetry along third coord
-    real*8 frac                        ! Fraction in equilat config
+    real(real64),allocatable::kin(:,:)       ! KEO matrix
+    real(real64),allocatable::ham1(:,:)      ! One block
+    real(real64),allocatable::ham2(:,:)      ! Contracted ham matrix
+    real(real64),allocatable::valraw(:)      ! Eigenvalues
+    real(real64),allocatable::symraw(:)      ! Symmetries
+    real(real64),allocatable::vecraw(:)      ! One eigenvector  on grid
+    real(real64),allocatable::vecrawb(:)     ! One eigenvector  in basis
+    real(real64),allocatable::vecrawe(:,:)   ! All eigenvectors in eibasis
+    real(real64),allocatable::basis(:,:)     ! FBR basis
+    real(real64),allocatable::w(:)           ! Temporary array of eivalues
+    real(real64) s3                          ! Symmetry along third coord
+    real(real64) frac                        ! Fraction in equilat config
     character(256) fn                  ! File name
 
     nb2 = sum(nvec1)
@@ -557,10 +554,10 @@ contains
     ! Variables for one slice
     type(array1d),allocatable::val1(:) ! 1D values
     type(array2d),allocatable::vec1(:) ! 1D vectors
-    real*8,allocatable::val2(:)        ! 2D values
-    real*8,allocatable::vec2(:,:)      ! 2D vectors in basis
-    real*8,allocatable::sym2(:)        ! 2D symmeties
-    real*8,allocatable::buf(:)         ! Temporary buffer
+    real(real64),allocatable::val2(:)        ! 2D values
+    real(real64),allocatable::vec2(:,:)      ! 2D vectors in basis
+    real(real64),allocatable::sym2(:)        ! 2D symmeties
+    real(real64),allocatable::buf(:)         ! Temporary buffer
     integer,allocatable::nvec1(:)      ! Number of 1D vectors
     integer nvec2                      ! Number of 2D vectors
     integer nb2                        ! Basis size
@@ -568,8 +565,8 @@ contains
     integer :: i, j, ierr
 
     ! Collective variables
-    real*8,allocatable::val2all(:,:)   ! 2D values
-    real*8,allocatable::sym2all(:,:)   ! 2D symmetries
+    real(real64),allocatable::val2all(:,:)   ! 2D values
+    real(real64),allocatable::sym2all(:,:)   ! 2D symmetries
     integer,allocatable::nvec1all(:,:) ! Number of 1D vectors
     integer,allocatable::nvec2all(:)   ! Number of 2D vectors
 
@@ -686,8 +683,8 @@ contains
   !  Frees 2D solution.
   !-----------------------------------------------------------------------
   subroutine free_2d(nvec,val,vec)
-    real*8,allocatable::vec(:,:)      ! 2D vectors in basis
-    real*8,allocatable::val(:)        ! 2D values
+    real(real64),allocatable::vec(:,:)      ! 2D vectors in basis
+    real(real64),allocatable::val(:)        ! 2D values
     integer nvec                      ! Num of 2D vecs
     nvec = 0
     if (allocated(val)) deallocate(val)
@@ -709,8 +706,8 @@ contains
   subroutine load_eibasis(isl,nvec1,val1,vec1,val2,vec2)
     type(array1d),allocatable::val1(:) ! 1D solutions eigenvalues for each thread
     type(array2d),allocatable::vec1(:) ! 1D solutions expansion coefficients (over sin/cos) for each thread
-    real*8,allocatable::vec2(:,:)      ! 2D solutions expansion coefficients (over 1D solutions)
-    real*8,allocatable::val2(:)        ! 2D eigenvalues
+    real(real64),allocatable::vec2(:,:)      ! 2D solutions expansion coefficients (over 1D solutions)
+    real(real64),allocatable::val2(:)        ! 2D eigenvalues
     integer,allocatable::nvec1(:)      ! Num of 1D solutions in each thread
     integer nvec2                      ! Num of 2D vecs
     integer nb2                        ! Size of 2D vector in basis
@@ -759,8 +756,8 @@ contains
   !-----------------------------------------------------------------------
   subroutine trans_eibas_bas(vec1,nvec1,vec2e,vec2b)
     type(array2d) vec1(:)    ! i-th element is a 2D array of 1D solutions in the i-th thread given as expansion coefficients over sin/cos basis
-    real*8        vec2b(:)   ! 2D vector in basis
-    real*8        vec2e(:)   ! expansion coefficients over 1D solutions
+    real(real64)        vec2b(:)   ! 2D vector in basis
+    real(real64)        vec2e(:)   ! expansion coefficients over 1D solutions
     integer nvec1(n2)        ! Number of 1D vectors in each thread
     integer is,i,j
 
@@ -783,11 +780,11 @@ contains
     type(array2d),allocatable::vec1(:) ! 1D vectors for each thread
     integer,allocatable::nvec1(:)      ! Num of 1D vectors
     ! 2D basis
-    real*8,allocatable::val2(:)        ! 2D values
-    real*8,allocatable::vec2e(:,:)     ! 2D vectors in eibasis repr
-    real*8,allocatable::vec2b(:)       ! 2D vector  in   basis repr
-    real*8,allocatable::vec2(:)        ! 2D vector  for output
-    real*8,allocatable::basis(:,:)     ! FBR basis
+    real(real64),allocatable::val2(:)        ! 2D values
+    real(real64),allocatable::vec2e(:,:)     ! 2D vectors in eibasis repr
+    real(real64),allocatable::vec2b(:)       ! 2D vector  in   basis repr
+    real(real64),allocatable::vec2(:)        ! 2D vector  for output
+    real(real64),allocatable::basis(:,:)     ! FBR basis
 
     ! Deallocate if already allocated
     if (allocated(vec2)) deallocate(vec2)
@@ -840,14 +837,14 @@ contains
     type(array1d),allocatable::val1r(:)   ! 1D values for ir
     type(array2d),allocatable::vec1c(:)   ! 1D vecs for ic
     type(array2d),allocatable::vec1r(:)   ! 1D vecs for ir
-    real*8,allocatable::vec2c(:,:)        ! 2D vecs in basis for ic
-    real*8,allocatable::vec2r(:,:)        ! 2D vecs in basis for ir
-    real*8,allocatable::val2c(:)          ! 2D eivalues for ic slice
-    real*8,allocatable::val2r(:)          ! 2D eivalues for ir slice
+    real(real64),allocatable::vec2c(:,:)        ! 2D vecs in basis for ic
+    real(real64),allocatable::vec2r(:,:)        ! 2D vecs in basis for ir
+    real(real64),allocatable::val2c(:)          ! 2D eivalues for ic slice
+    real(real64),allocatable::val2r(:)          ! 2D eivalues for ir slice
 
     ! 2D state arrays
-    real*8,allocatable::lambdac(:)        ! 2D state on the grid, ic
-    real*8,allocatable::lambdar(:)        ! 2D state on the grid, ir
+    real(real64),allocatable::lambdac(:)        ! 2D state on the grid, ic
+    real(real64),allocatable::lambdar(:)        ! 2D state on the grid, ir
 
     ! Arrays for data arrays length
     integer,allocatable::nvec1c(:)        ! Number of 1D vectors, ic
@@ -855,7 +852,7 @@ contains
     integer,allocatable::nvec2(:)         ! Number of 2D basis vectors
 
     ! Overlap
-    real*8,allocatable::olap(:,:)         ! Overlap matrix
+    real(real64),allocatable::olap(:,:)         ! Overlap matrix
     integer ic,ir                         ! Running block indices
     integer icmax,irmax                   ! Running block indices,max
     integer ibl                           ! Global block index

@@ -6,13 +6,12 @@ module state_properties_mod
   use general_utils
   use input_params_mod
   use io_utils
+  use iso_fortran_env, only: real64
   use mpi
   use parallel_utils
   use path_utils
   use rovib_io_mod
   use rovib_utils_mod
-
-  use debug_tools
   implicit none
 
   private
@@ -44,13 +43,13 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine find_barriers_n_indices(params, rho_grid, vdw_max, cov_n_inds, vdw_n_ind)
     class(input_params), intent(in) :: params
-    real*8, intent(in) :: rho_grid(:)
-    real*8, intent(in) :: vdw_max
+    real(real64), intent(in) :: rho_grid(:)
+    real(real64), intent(in) :: vdw_max
     integer, intent(out) :: cov_n_inds(3)
     integer, intent(out) :: vdw_n_ind
     integer :: i
     integer :: Js_interp(2)
-    real*8 :: positions_interp(3, 2), positions_estim(3) ! Barrier positions corresponding to low and high Js and estimation for current J
+    real(real64) :: positions_interp(3, 2), positions_estim(3) ! Barrier positions corresponding to low and high Js and estimation for current J
     character(:), allocatable :: channels_file_path
 
     call select_interpolating_Js(params % J, Js_interp)
@@ -72,11 +71,11 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calc_phi_integral(m1, m2, a, b, F_sym) result(integral_value)
     integer, intent(in) :: m1, m2 ! Frequency of integrand functions
-    real*8, intent(in) :: a, b ! Range of integration
+    real(real64), intent(in) :: a, b ! Range of integration
     integer, intent(in) :: F_sym ! Symmetry of integrand functions: 0 or 1 (same for both)
-    real*8 :: integral_value ! Result
+    real(real64) :: integral_value ! Result
     integer :: sign
-    real*8 :: norm
+    real(real64) :: norm
 
     call assert(m1 == 0 .or. m2 == 0 .means. F_sym == 0, 'm can be 0 only for symmetry 0')
     call assert(m1 >= 0 .and. m2 >= 0, 'm values should be non-negative')
@@ -99,11 +98,11 @@ contains
     class(input_params), intent(in) :: params
     class(array_2d_real), intent(in) :: As(:, :, :)
     integer, intent(in) :: K_val, n, l
-    real*8, intent(in) :: phi_range(2)
-    complex*16, intent(in) :: j_sums(:)
-    real*8 :: m_sum
+    real(real64), intent(in) :: phi_range(2)
+    complex(real64), intent(in) :: j_sums(:)
+    real(real64) :: m_sum
     integer :: K_ind, K_sym, K_ind_comp, m1, m2, m1_ind, m2_ind
-    real*8 :: product_coeff, phi_integral
+    real(real64) :: product_coeff, phi_integral
 
     call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
     m_sum = 0
@@ -136,11 +135,11 @@ contains
     ! Arrays of size 2 x N x L (or K x N x L if compression is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
     class(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
     class(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
-    real*8, allocatable :: p_dist(:, :, :, :) ! S x K x N x 3
+    real(real64), allocatable :: p_dist(:, :, :, :) ! S x K x N x 3
     integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, m_ind, j, phi_group_ind
-    real*8 :: i_sum
-    real*8 :: phi_range(2), phi_borders(4)
-    complex*16 :: j_sums(params % basis_size_phi) ! j-sums for different ms
+    real(real64) :: i_sum
+    real(real64) :: phi_range(2), phi_borders(4)
+    complex(real64) :: j_sums(params % basis_size_phi) ! j-sums for different ms
 
     if (params % molecule == '686') then
       phi_borders = [0d0, 60d0, 117.65d0, 180d0] / 180 * pi
@@ -184,9 +183,9 @@ contains
 ! Calculates channel-specific values of gamma using probability distributions of a given state
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_gamma_channels(p_dist_k, cap) result(gammas)
-    real*8, intent(in) :: p_dist_k(:, :, :) ! K x n x 3
-    real*8, intent(in) :: cap(:)
-    real*8 :: gammas(2) ! 1 - channel A, 2 - channel B
+    real(real64), intent(in) :: p_dist_k(:, :, :) ! K x n x 3
+    real(real64), intent(in) :: cap(:)
+    real(real64) :: gammas(2) ! 1 - channel A, 2 - channel B
     integer :: K_ind
 
     call assert(size(cap) == size(p_dist_k, 2), 'Size of cap array does not match p_dist')
@@ -205,12 +204,12 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_gamma_channels_all(params, p_dist, cap, gammas)
     class(input_params), intent(in) :: params
-    real*8, intent(in) :: p_dist(:, :, :, :)
-    real*8, intent(in) :: cap(:)
-    real*8, allocatable, intent(out) :: gammas(:, :)
+    real(real64), intent(in) :: p_dist(:, :, :, :)
+    real(real64), intent(in) :: cap(:)
+    real(real64), allocatable, intent(out) :: gammas(:, :)
     integer :: proc_first_state, proc_states, proc_k
     integer, allocatable :: recv_counts(:), recv_shifts(:)
-    real*8, allocatable :: gammas_chunk(:, :)
+    real(real64), allocatable :: gammas_chunk(:, :)
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
     ! Calculate proc chunks
@@ -232,10 +231,10 @@ contains
 ! 6 - infinity
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_pes_region_probabilities(p_dist_k, cov_n_inds, vdw_n_ind) result(region_probs)
-    real*8, intent(in) :: p_dist_k(:, :, :) ! K x n x 3
+    real(real64), intent(in) :: p_dist_k(:, :, :) ! K x n x 3
     integer, intent(in) :: cov_n_inds(3) ! indexes of the rho points that mark the border of well region in B, A and S regions respectively
     integer, intent(in) :: vdw_n_ind ! rho-index that marks the border of vdw area (common for all regions)
-    real*8 :: region_probs(6)
+    real(real64) :: region_probs(6)
 
     region_probs(1) = sum(p_dist_k(:, 1:cov_n_inds(3), 3))
     region_probs(2) = sum(p_dist_k(:, 1:cov_n_inds(2), 2)) + sum(p_dist_k(:, 1:cov_n_inds(1), 1))
@@ -251,13 +250,13 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind, region_probs)
     class(input_params), intent(in) :: params
-    real*8, intent(in) :: p_dist(:, :, :, :) ! state x K x n x 3
+    real(real64), intent(in) :: p_dist(:, :, :, :) ! state x K x n x 3
     integer, intent(in) :: cov_n_inds(3)
     integer, intent(in) :: vdw_n_ind
-    real*8, allocatable, intent(out) :: region_probs(:, :)
+    real(real64), allocatable, intent(out) :: region_probs(:, :)
     integer :: proc_first_state, proc_states, proc_k
     integer, allocatable :: recv_counts(:), recv_shifts(:)
-    real*8, allocatable :: region_probs_chunk(:, :)
+    real(real64), allocatable :: region_probs_chunk(:, :)
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
     ! Calculate local chunks
@@ -273,8 +272,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_K_dist(params, p_dist_k) result(K_dist)
     class(input_params), intent(in) :: params
-    real*8, intent(in) :: p_dist_k(:, :, :) ! K x n x 3
-    real*8 :: K_dist(params % J + 1) ! Distibution over all Ks, always includes all Ks
+    real(real64), intent(in) :: p_dist_k(:, :, :) ! K x n x 3
+    real(real64) :: K_dist(params % J + 1) ! Distibution over all Ks, always includes all Ks
     integer :: K_val, K_sym, K_ind, K_ind_comp
 
     K_dist = 0
@@ -295,12 +294,12 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_K_dist_all(params, p_dist, K_dists)
     class(input_params), intent(in) :: params
-    real*8, intent(in) :: p_dist(:, :, :, :) ! states x K x n x 3
-    real*8, allocatable, intent(out) :: K_dists(:, :)
+    real(real64), intent(in) :: p_dist(:, :, :, :) ! states x K x n x 3
+    real(real64), allocatable, intent(out) :: K_dists(:, :)
     integer :: proc_first_state, proc_states, proc_k
     integer, allocatable :: recv_counts(:), recv_shifts(:)
-    real*8 :: K_dist_error
-    real*8, allocatable :: K_dists_chunk(:, :)
+    real(real64) :: K_dist_error
+    real(real64), allocatable :: K_dists_chunk(:, :)
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
     ! Calculate local chunks
@@ -318,19 +317,19 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_state_properties(params, rho_grid, L, cap)
     class(input_params), intent(in) :: params
-    real*8, intent(in) :: rho_grid(:)
+    real(real64), intent(in) :: rho_grid(:)
     integer, intent(in) :: L ! Num of points along theta
-    real*8, optional, intent(in) :: cap(:)
+    real(real64), optional, intent(in) :: cap(:)
     integer :: N, vdw_n_ind
     integer :: cov_n_inds(3)
     integer, allocatable :: num_solutions_2d(:, :) ! K x n
     integer, allocatable :: num_solutions_1d(:, :, :)
-    real*8 :: vdw_max
-    real*8, allocatable :: energies_3d(:)
-    real*8, allocatable :: region_probs(:, :) ! num_states x 5
-    real*8, allocatable :: K_dists(:, :) ! num_states x (J + 1)
-    real*8, allocatable :: gammas(:, :) ! num_states x 2
-    real*8, allocatable :: p_dist(:, :, :, :) ! num_states x K x n x 3
+    real(real64) :: vdw_max
+    real(real64), allocatable :: energies_3d(:)
+    real(real64), allocatable :: region_probs(:, :) ! num_states x 5
+    real(real64), allocatable :: K_dists(:, :) ! num_states x (J + 1)
+    real(real64), allocatable :: gammas(:, :) ! num_states x 2
+    real(real64), allocatable :: p_dist(:, :, :, :) ! num_states x K x n x 3
     character(:), allocatable :: sym_path, spectrum_path
     ! Arrays of size 2 x N x L (or K x N x L if compressing is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
@@ -386,10 +385,10 @@ contains
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
 !   function check_orthonormality_1D(As) result(max_deviation)
 !     type(array_2d_real), intent(in) :: As(:, :, :)
-!     real*8 :: max_deviation ! from orthonormality
+!     real(real64) :: max_deviation ! from orthonormality
 !     integer :: K_ind, n, l, i1, i2
-!     real*8 :: overlap
-!     real*8, allocatable :: solution_set(:, :)
+!     real(real64) :: overlap
+!     real(real64), allocatable :: solution_set(:, :)
 !
 !     max_deviation = 0
 !     do K_ind = 1, size(As, 1)
@@ -412,9 +411,9 @@ contains
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
 !   function check_orthonormality_2D(As, Bs) result(max_deviation)
 !     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
-!     real*8 :: max_deviation ! from orthonormality
+!     real(real64) :: max_deviation ! from orthonormality
 !     integer :: K_ind, n, l, m_ind, j1, j2
-!     real*8 :: i1_sum, i2_sum, overlap
+!     real(real64) :: i1_sum, i2_sum, overlap
 !
 !     max_deviation = 0
 !     do K_ind = 1, size(As, 1)
@@ -448,11 +447,11 @@ contains
 !     class(input_params), intent(in) :: params
 !     integer, intent(in) :: k1_first, k2_first
 !     integer, optional, intent(in) :: k1_last, k2_last
-!     real*8 :: max_deviation
+!     real(real64) :: max_deviation
 !     integer :: K_val, K_sym, K_ind, K_ind_comp, n, l, m_ind, j, k1, k2, k1_last_act, k2_last_act
-!     real*8 :: i_sum
-!     complex*16 :: j1_sum, j2_sum
-!     complex*16 :: overlap
+!     real(real64) :: i_sum
+!     complex(real64) :: j1_sum, j2_sum
+!     complex(real64) :: overlap
 !
 !     k1_last_act = arg_or_default(k1_last, k1_first)
 !     k2_last_act = arg_or_default(k2_last, k2_first)

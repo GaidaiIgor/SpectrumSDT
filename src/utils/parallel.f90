@@ -1,6 +1,7 @@
 module parallel_utils
   use algorithms
   use general_utils
+  use iso_fortran_env, only: real64
   use mpi
   implicit none
 
@@ -96,9 +97,9 @@ contains
 ! Gathers local chunks on 0th processor
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine gather_chunks(chunk, counts, shifts, global)
-    real*8, intent(in) :: chunk(:, :)
+    real(real64), intent(in) :: chunk(:, :)
     integer, intent(in) :: counts(:), shifts(:)
-    real*8, allocatable, intent(out) :: global(:, :)
+    real(real64), allocatable, intent(out) :: global(:, :)
     integer :: ind, ierr
 
     ! Avoid calling MPI functions if MPI is not initialized

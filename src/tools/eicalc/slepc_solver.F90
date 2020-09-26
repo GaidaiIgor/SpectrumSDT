@@ -1,6 +1,7 @@
 module slepc_solver_mod
 #include <slepc/finclude/slepceps.h>
   use general_utils, only: num2str
+  use iso_fortran_env, only: real64
   use matmul_operator_mod, only: active_matmul_operator, msize, rovib_ham
   use parallel_utils, only: get_proc_id, get_proc_elem_range, print_parallel
   use slepcds
@@ -18,11 +19,11 @@ contains
   subroutine find_eigenpairs_slepc(n_eigs, ncv, mpd, eivals, eivecs)
     integer, intent(in) :: n_eigs
     integer, intent(in) :: ncv, mpd ! Convergence parameters. Both can be set to -1 to let SLEPc decide.
-    complex*16, allocatable, intent(out) :: eivals(:)
-    complex*16, allocatable, intent(out) :: eivecs(:, :)
+    complex(real64), allocatable, intent(out) :: eivals(:)
+    complex(real64), allocatable, intent(out) :: eivecs(:, :)
     integer :: n_conv, proc_first_eivec, proc_eivecs, proc_first_row, proc_rows, root
     integer, allocatable :: eivec_counts(:), eivec_shifts(:), row_counts(:), row_shifts(:)
-    complex*16 :: next_eivec_local(msize)
+    complex(real64) :: next_eivec_local(msize)
     PetscInt, parameter :: max_iterations = 1000000
     PetscInt :: ncv_petsc, mpd_petsc, n_eigs_petsc, n_conv_petsc, i_petsc, msize_petsc
     PetscErrorCode :: ierr

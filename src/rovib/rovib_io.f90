@@ -4,12 +4,10 @@ module rovib_io_mod
   use constants
   use io_utils
   use input_params_mod
+  use iso_fortran_env, only: real64
   use path_utils
   use rovib_utils_mod
   use string_mod
-
-  use debug_tools
-
   implicit none
   
 contains 
@@ -48,8 +46,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_solutions_2D(solutions_2d_path, energies_2d, exp_coeffs_2d)
     character(*), intent(in) :: solutions_2d_path
-    real*8, allocatable, intent(out) :: energies_2d(:)
-    real*8, allocatable, intent(out) :: exp_coeffs_2d(:, :) ! 2D solutions expansion coefficients over 1D solutions
+    real(real64), allocatable, intent(out) :: energies_2d(:)
+    real(real64), allocatable, intent(out) :: exp_coeffs_2d(:, :) ! 2D solutions expansion coefficients over 1D solutions
     integer :: file_unit, num_solutions, exp_size ! exp_size - number of coefficients in the basis expansion over 1D solutions
 
     open(newunit=file_unit, file=solutions_2d_path, form='unformatted')
@@ -69,8 +67,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function load_energies_3D(spec_path) result(energies_3d)
     character(*), intent(in) :: spec_path
-    real*8, allocatable :: energies_3d(:)
-    real*8, allocatable :: file_content(:, :)
+    real(real64), allocatable :: energies_3d(:)
+    real(real64), allocatable :: file_content(:, :)
 
     file_content = read_matrix_real(spec_path)
     energies_3d = file_content(:, 2)
@@ -82,7 +80,7 @@ contains
   subroutine load_solution_3D(solution_3d_path, exp_coeffs_size, exp_coeffs_3d)
     character(*), intent(in) :: solution_3d_path ! a path to the file with expansion coefficients
     integer, intent(in) :: exp_coeffs_size ! size of the vector (total number of 2D solutions) needs to be provided from the calling code
-    complex*16, allocatable, intent(out) :: exp_coeffs_3d(:) ! 3D solutions expansion coefficients over 2D solutions
+    complex(real64), allocatable, intent(out) :: exp_coeffs_3d(:) ! 3D solutions expansion coefficients over 2D solutions
     integer :: file_unit
 
     allocate(exp_coeffs_3d(exp_coeffs_size))
@@ -169,8 +167,8 @@ contains
     integer, intent(inout) :: num_solutions_2d(:, :)
     type(array_2d_real), allocatable, optional, intent(inout) :: Bs_plain(:, :) ! all Ls are stacked together
     integer :: n_val, l_val, next_start
-    real*8, allocatable :: energies_2d(:)
-    real*8, allocatable :: Bs_raw(:, :) ! Unarranged matrix of expansion coefficients. Single element of Bs_plain.
+    real(real64), allocatable :: energies_2d(:)
+    real(real64), allocatable :: Bs_raw(:, :) ! Unarranged matrix of expansion coefficients. Single element of Bs_plain.
     character(:), allocatable :: solutions_path ! path to file with all 2D solutions for given K and n
 
     do n_val = 1, N
@@ -261,10 +259,10 @@ contains
     integer, intent(in) :: N ! Num of points along rho
     integer, intent(in) :: num_solutions_2d(:, :)
     type(array_2d_complex), allocatable, intent(out) :: Cs(:, :) ! K x N. Inner dimensions: S_Kn x S
-    complex*16, allocatable, optional, intent(out) :: Cs_plain(:, :) ! Stacked over Ks and ns (in this order) version of Cs
+    complex(real64), allocatable, optional, intent(out) :: Cs_plain(:, :) ! Stacked over Ks and ns (in this order) version of Cs
     integer :: total_solutions_2d, first_elem, proc_elems, sln_ind, total_Ks, start_ind, K, K_ind, K_sym, K_ind_comp, n_val
-    complex*16, allocatable :: Cs_raw_col(:) ! column in Cs_raw
-    complex*16, allocatable :: Cs_raw(:, :) ! unarranged Cs
+    complex(real64), allocatable :: Cs_raw_col(:) ! column in Cs_raw
+    complex(real64), allocatable :: Cs_raw(:, :) ! unarranged Cs
     character(:), allocatable :: sym_path, exp_coeffs_path
 
     ! Count total number of 2D solutions
@@ -306,11 +304,11 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_lowest_barrier_info(channels_file_path, positions, energies)
     character(*), intent(in) :: channels_file_path
-    real*8, intent(out) :: positions(3)
-    real*8, optional, intent(out) :: energies(3)
+    real(real64), intent(out) :: positions(3)
+    real(real64), optional, intent(out) :: energies(3)
     integer :: file_unit, barrier_ind, group_ind ! group_ind: 1 - B, 2 - A, 3 - S
     integer :: found(3)
-    real*8 :: position, energy
+    real(real64) :: position, energy
 
     found = 0
     open(newunit = file_unit, file = channels_file_path)
@@ -338,8 +336,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine write_state_properties(params, energies, gammas, region_probs, K_dists)
     class(input_params), intent(in) :: params
-    real*8, intent(in) :: energies(:)
-    real*8, intent(in) :: gammas(:, :), region_probs(:, :), K_dists(:, :)
+    real(real64), intent(in) :: energies(:)
+    real(real64), intent(in) :: gammas(:, :), region_probs(:, :), K_dists(:, :)
     integer :: file_unit, i, k, K_val, col_width, cols_bar_K, cols_total
     character(:), allocatable :: sym_path, properties_result_path
     type(string), allocatable :: titles(:)

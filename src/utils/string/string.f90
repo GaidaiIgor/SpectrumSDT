@@ -1,5 +1,6 @@
 module string_mod
   use general_utils
+  use iso_fortran_env, only: real64
   implicit none
   
   interface string
@@ -91,7 +92,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function to_real(this) result(res)
     class(string), intent(in) :: this
-    real*8 :: res
+    real(real64) :: res
     character(:), allocatable :: char_str
     
     char_str = this % s
@@ -103,7 +104,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function to_complex(this) result(res)
     class(string), intent(in) :: this
-    complex*16 :: res
+    complex(real64) :: res
     character(:), allocatable :: char_str
     
     char_str = this % s

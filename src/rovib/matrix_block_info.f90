@@ -1,10 +1,7 @@
 module matrix_block_info_mod
   use block_borders_mod
   use general_utils
-
-  ! Debug
-  use parallel_utils
-  use debug_tools
+  use iso_fortran_env, only: real64
   implicit none
 
   private
@@ -306,8 +303,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function extract_from_matrix_matrix_block_info(this, matrix) result(block)
     class(matrix_block_info), intent(in) :: this
-    complex*16, target, intent(in) :: matrix(:, :)
-    complex*16, pointer :: block(:, :)
+    complex(real64), target, intent(in) :: matrix(:, :)
+    complex(real64), pointer :: block(:, :)
 
     call assert(.not. this % is_empty(), 'Error: attempt to extract from an empty block')
     block => matrix(this % borders % top : this % borders % bottom, this % borders % left : this % borders % right)

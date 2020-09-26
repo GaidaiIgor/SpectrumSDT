@@ -4,14 +4,11 @@ module distributed_rovib_hamiltonian_mod
   use formulas_mod
   use general_utils
   use input_params_mod
+  use iso_fortran_env, only: real64
   use k_block_info
   use matrix_block_info_mod
   use parallel_utils
   use path_utils
-
-  ! Debug
-  use debug_tools
-  use io_utils
   implicit none
 
   private
@@ -20,7 +17,7 @@ module distributed_rovib_hamiltonian_mod
   type :: distributed_rovib_hamiltonian
     type(matrix_block_info), pointer :: local_chunk_info => null() ! contains structure info on this chunk without regard for other chunks
     type(matrix_block_info), pointer :: global_chunk_info => null() ! contains structure info on thus chunk with regard for other chunks (location, borders, etc.)
-    complex*16, allocatable :: proc_chunk(:, :)
+    complex(real64), allocatable :: proc_chunk(:, :)
     integer, allocatable :: all_counts(:) ! how many rows each processor has
     integer, allocatable :: all_shifts(:) ! prefix sum of all_counts
     integer :: compression
@@ -198,7 +195,7 @@ contains
     integer, intent(in) :: K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns
     logical :: swap_condition
     integer :: file_unit, K_row_act, K_col_act, K_row_sym_act, slice_ind_row_act, slice_ind_col_act, rows_act, columns_act
-    real*8, allocatable :: block(:, :)
+    real(real64), allocatable :: block(:, :)
     character(:), allocatable :: sym_path, file_path
 
     ! Load identity matrix for regular diagonal overlaps
@@ -255,8 +252,8 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: ir, ic, K, K_load, K_ind, K_sym, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
-    real*8, allocatable :: overlap_block(:, :)
-    complex*16, pointer :: local_overlap_info_data(:, :)
+    real(real64), allocatable :: overlap_block(:, :)
+    complex(real64), pointer :: local_overlap_info_data(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
 
@@ -319,8 +316,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine include_kinetic_energy(this, kinetic)
     class(distributed_rovib_hamiltonian), target, intent(inout) :: this
-    complex*16, intent(in) :: kinetic(:, :) ! Kinetic energy matrix for rho grid
-    complex*16, pointer :: overlap_block(:, :)
+    complex(real64), intent(in) :: kinetic(:, :) ! Kinetic energy matrix for rho grid
+    complex(real64), pointer :: overlap_block(:, :)
     integer :: i, j, n, m, K1_ind, K2_ind, slice_ind_row, slice_ind_col
     type(matrix_block_info), pointer :: local_k_block_info, global_k_block_info, local_overlap_block_info, global_overlap_block_info
 
@@ -362,7 +359,7 @@ contains
   function load_eivals_2d(root_path, K, K_sym, slice_ind) result(eivals)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K, K_sym, slice_ind
-    real*8, allocatable :: eivals(:)
+    real(real64), allocatable :: eivals(:)
     integer :: file_unit, n_eivals
     character(:), allocatable :: k_path, sym_path, eivals_path
 
@@ -384,8 +381,8 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: K_ind, K, K_sym, n, m, K_load, slice_ind_row, slice_ind_col, col_shift, row, col
-    real*8, allocatable :: eivals(:)
-    complex*16, pointer :: overlap_block(:, :)
+    real(real64), allocatable :: eivals(:)
+    complex(real64), pointer :: overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_block_info, global_overlap_block_info, full_ham_overlap_block_info
 
@@ -459,10 +456,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine include_cap(this, cap, ham_info)
     class(distributed_rovib_hamiltonian), target, intent(inout) :: this
-    complex*16, intent(in) :: cap(:)
+    complex(real64), intent(in) :: cap(:)
     class(matrix_block_info), target, intent(in) :: ham_info
     integer :: ir, ic, n, m, K1_ind, K2_ind, slice_ind_row, slice_ind_col, col_shift, row, col
-    complex*16, pointer :: overlap_block(:, :)
+    complex(real64), pointer :: overlap_block(:, :)
     type(matrix_block_info), pointer :: local_k_block_info, global_k_block_info, local_overlap_block_info, global_overlap_block_info, full_ham_overlap_block_info
 
     ! Iterate through all K-blocks because we don't know where the diagonal blocks are in an arbitrary chunk
@@ -517,9 +514,9 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: K_ind, K, K_sym, ir, ic, K_load, slice_row_ind, slice_col_ind, rows, first_row, last_row, J_shift, K_shift, J_factor, K_factor
-    real*8, allocatable :: overlap_block_J(:, :), overlap_block_K(:, :)
-    complex*16, allocatable :: overlap_block_slice(:, :)
-    complex*16, pointer :: existing_overlap_block(:, :)
+    real(real64), allocatable :: overlap_block_J(:, :), overlap_block_K(:, :)
+    complex(real64), allocatable :: overlap_block_slice(:, :)
+    complex(real64), pointer :: existing_overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
 
@@ -599,9 +596,9 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, ir, ic, K_row_load, K_col_load, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
-    real*8 :: W
-    real*8, allocatable :: overlap_block(:, :)
-    complex*16, pointer :: local_overlap_info_data(:, :)
+    real(real64) :: W
+    real(real64), allocatable :: overlap_block(:, :)
+    complex(real64), pointer :: local_overlap_info_data(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
 
@@ -690,9 +687,9 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, K_row_load, K_col_load, ir, ic, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
-    real*8, allocatable :: overlap_block(:, :)
-    complex*16, allocatable :: overlap_block_slice(:, :)
-    complex*16, pointer :: existing_overlap_block(:, :)
+    real(real64), allocatable :: overlap_block(:, :)
+    complex(real64), allocatable :: overlap_block_slice(:, :)
+    complex(real64), pointer :: existing_overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
 
@@ -780,8 +777,8 @@ contains
   subroutine build(this, params, kinetic, cap)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     class(input_params), intent(in) :: params
-    complex*16, intent(in) :: kinetic(:, :) ! Kinetic energy for rho grid
-    complex*16, intent(in), optional :: cap(:) ! Complex absorbing potential for rho
+    complex(real64), intent(in) :: kinetic(:, :) ! Kinetic energy for rho grid
+    complex(real64), intent(in), optional :: cap(:) ! Complex absorbing potential for rho
     type(matrix_block_info) :: ham_info
 
     call load_rovib_hamiltonian_info(params, ham_info) ! loads blocks info for the whole hamiltonian (sizes, positions, borders)

@@ -2,9 +2,9 @@ module overlaps_extra_mod
   ! Contains procedures related to calculation of extra overlap terms: asymmetric and coriolis
   use array_1d_mod
   use array_2d_mod
-  ! use blas95 ! for dot product
   use formulas_mod
   use input_params_mod
+  use iso_fortran_env, only: real64
   use k_block_info
   use parallel_utils
   use path_utils
@@ -22,8 +22,8 @@ contains
   function expansion_1D_to_primitive(num_solutions_1d, exp_coeffs_1d, exp_coeffs_2d) result(exp_coeffs_2d_prim)
     integer, intent(in) :: num_solutions_1d(:) ! number of 1D vectors in each theta slice
     type(array_2d_real), intent(in) :: exp_coeffs_1d(:) ! i-th element is a 2D array of 1D solutions in the i-th theta slice given as expansion coefficients over sin/cos basis
-    real*8, intent(in) :: exp_coeffs_2d(:) ! expansion coefficients of a given 2D state over 1D solutions
-    real*8, allocatable :: exp_coeffs_2d_prim(:) ! expansion coefficients of the same 2D state over sin/cos basis
+    real(real64), intent(in) :: exp_coeffs_2d(:) ! expansion coefficients of a given 2D state over 1D solutions
+    real(real64), allocatable :: exp_coeffs_2d_prim(:) ! expansion coefficients of the same 2D state over sin/cos basis
     integer :: is, i, j ! is - theta slice index, i tracks current position in 1D expansion, j track current position in sin/cos output vector
     integer :: n_basis, n_prim_coeffs
 
@@ -45,8 +45,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_sym_term(params, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
-    real*8, intent(in) :: mu ! reduced mass
-    real*8, intent(in) :: rho_grid(:), theta_grid(:)
+    real(real64), intent(in) :: mu ! reduced mass
+    real(real64), intent(in) :: rho_grid(:), theta_grid(:)
     integer :: my_id, n_procs
     integer :: n, l, ir, ic, n_basis, file_unit
     ! Arrays for data arrays length
@@ -56,12 +56,12 @@ contains
     type(array_1d_real), allocatable :: energies_1d(:)
     type(array_2d_real), allocatable :: exp_coeffs_1d(:) ! Expansion coefficients of all 1D solutions over primitive basis set (sin/cos)
     ! Arrays for 2D eigenstates
-    real*8, allocatable :: energies_2d(:)
-    real*8, allocatable :: exp_coeffs_2d(:, :) ! Expansion coefficients of all 2D solutions over 1D solutions
-    real*8, allocatable :: exp_coeffs_2d_prim_row(:), exp_coeffs_2d_prim_col(:) ! Expansion coefficients of a 2D solution over primitive basis set (sin/cos)
+    real(real64), allocatable :: energies_2d(:)
+    real(real64), allocatable :: exp_coeffs_2d(:, :) ! Expansion coefficients of all 2D solutions over 1D solutions
+    real(real64), allocatable :: exp_coeffs_2d_prim_row(:), exp_coeffs_2d_prim_col(:) ! Expansion coefficients of a 2D solution over primitive basis set (sin/cos)
     ! Calculation of asym term
-    real*8, allocatable :: sym_block_J(:, :), sym_block_K(:, :)
-    real*8, allocatable :: sym_factors_J(:), sym_factors_K(:), partial_sum(:)
+    real(real64), allocatable :: sym_block_J(:, :), sym_block_K(:, :)
+    real(real64), allocatable :: sym_factors_J(:), sym_factors_K(:), partial_sum(:)
     character(:), allocatable :: sym_folder, block_info_path, sym_block_J_path, sym_block_K_path
     character(:), allocatable :: solutions_1d_path, solutions_2d_path
 
@@ -133,8 +133,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_coriolis_term(params, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
-    real*8, intent(in) :: mu ! reduced mass
-    real*8, intent(in) :: rho_grid(:), theta_grid(:)
+    real(real64), intent(in) :: mu ! reduced mass
+    real(real64), intent(in) :: rho_grid(:), theta_grid(:)
     integer :: my_id, n_procs
     integer :: n, m, l, ir, ic, n_basis, file_unit
     integer :: K_row, K_col, m_shift_row, m_shift_col, first_m_row, last_m_row, first_m_col, last_m_col, sym_row, sym_col
@@ -145,12 +145,12 @@ contains
     type(array_1d_real), allocatable :: energies_1d_row(:), energies_1d_col(:)
     type(array_2d_real), allocatable :: exp_coeffs_1d_row(:), exp_coeffs_1d_col(:) ! Expansion coefficients of all 1D solutions over primitive basis set (sin/cos)
     ! Arrays for 2D eigenstates
-    real*8, allocatable :: energies_2d_row(:), energies_2d_col(:)
-    real*8, allocatable :: exp_coeffs_2d_row(:, :), exp_coeffs_2d_col(:, :) ! Expansion coefficients of all 2D solutions over 1D solutions
-    real*8, allocatable :: exp_coeffs_2d_prim_row(:), exp_coeffs_2d_prim_col(:) ! Expansion coefficients of a 2D solution over primitive basis set (sin/cos)
+    real(real64), allocatable :: energies_2d_row(:), energies_2d_col(:)
+    real(real64), allocatable :: exp_coeffs_2d_row(:, :), exp_coeffs_2d_col(:, :) ! Expansion coefficients of all 2D solutions over 1D solutions
+    real(real64), allocatable :: exp_coeffs_2d_prim_row(:), exp_coeffs_2d_prim_col(:) ! Expansion coefficients of a 2D solution over primitive basis set (sin/cos)
     ! Calculation of coriolis term
-    real*8, allocatable :: cor_block(:, :)
-    real*8, allocatable :: cor_factors_m(:), m_product(:), cor_factors_b(:), partial_sum(:)
+    real(real64), allocatable :: cor_block(:, :)
+    real(real64), allocatable :: cor_factors_m(:), m_product(:), cor_factors_b(:), partial_sum(:)
     character(:), allocatable :: root_path, sym_folder_row, sym_folder_col, block_info_path_row, block_info_path_col, cor_block_path
     character(:), allocatable :: solutions_1d_path_row, solutions_1d_path_col, solutions_2d_path_row, solutions_2d_path_col
 
@@ -238,8 +238,8 @@ contains
   subroutine calculate_asym_term(params, K_row, K_col, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
     integer, intent(in) :: K_row, K_col ! pair of Ks to calculate asymmetric term
-    real*8, intent(in) :: mu ! reduced mass
-    real*8, intent(in) :: rho_grid(:), theta_grid(:)
+    real(real64), intent(in) :: mu ! reduced mass
+    real(real64), intent(in) :: rho_grid(:), theta_grid(:)
     integer :: my_id, n_procs
     integer :: n, l, ir, ic, n_basis, file_unit
     ! Arrays for data arrays length
@@ -249,12 +249,12 @@ contains
     type(array_1d_real), allocatable :: energies_1d_row(:), energies_1d_col(:)
     type(array_2d_real), allocatable :: exp_coeffs_1d_row(:), exp_coeffs_1d_col(:) ! Expansion coefficients of all 1D solutions over primitive basis set (sin/cos)
     ! Arrays for 2D eigenstates
-    real*8, allocatable :: energies_2d_row(:), energies_2d_col(:)
-    real*8, allocatable :: exp_coeffs_2d_row(:, :), exp_coeffs_2d_col(:, :) ! Expansion coefficients of all 2D solutions over 1D solutions
-    real*8, allocatable :: exp_coeffs_2d_prim_row(:), exp_coeffs_2d_prim_col(:) ! Expansion coefficients of a 2D solution over primitive basis set (sin/cos)
+    real(real64), allocatable :: energies_2d_row(:), energies_2d_col(:)
+    real(real64), allocatable :: exp_coeffs_2d_row(:, :), exp_coeffs_2d_col(:, :) ! Expansion coefficients of all 2D solutions over 1D solutions
+    real(real64), allocatable :: exp_coeffs_2d_prim_row(:), exp_coeffs_2d_prim_col(:) ! Expansion coefficients of a 2D solution over primitive basis set (sin/cos)
     ! Calculation of asym term
-    real*8, allocatable :: asym_block(:, :)
-    real*8, allocatable :: asym_factors(:), partial_sum(:)
+    real(real64), allocatable :: asym_block(:, :)
+    real(real64), allocatable :: asym_factors(:), partial_sum(:)
     character(:), allocatable :: root_path, sym_folder_row, sym_folder_col, block_info_path_row, block_info_path_col, asym_block_path
     character(:), allocatable :: solutions_1d_path_row, solutions_1d_path_col, solutions_2d_path_row, solutions_2d_path_col
 
@@ -350,8 +350,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_overlaps_extra(params, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
-    real*8, intent(in) :: mu
-    real*8, intent(in) :: rho_grid(:), theta_grid(:)
+    real(real64), intent(in) :: mu
+    real(real64), intent(in) :: rho_grid(:), theta_grid(:)
 
     call check_prerequisites(params)
     if (params % fix_basis_jk == 1) then

@@ -1,5 +1,6 @@
 module lapack_interface_mod
   use general_utils
+  use iso_fortran_env, only: real64
   implicit none
 
 contains
@@ -10,11 +11,11 @@ contains
 ! eivals - eigenvalues of matrix
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine lapack_eigensolver(matrix, eivals)
-    real*8, intent(inout) :: matrix(:, :)
-    real*8, intent(out) :: eivals(:)
+    real(real64), intent(inout) :: matrix(:, :)
+    real(real64), intent(out) :: eivals(:)
     integer :: work_size, info
-    real*8 :: work_size_query
-    real*8, allocatable :: work(:)
+    real(real64) :: work_size_query
+    real(real64), allocatable :: work(:)
 
     call assert(size(matrix, 1) == size(matrix, 2), 'Error: matrix is not square')
     call assert(size(matrix, 1) == size(eivals), 'Error: eivals array has to match matrix size')

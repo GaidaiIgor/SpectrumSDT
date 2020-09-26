@@ -1,7 +1,7 @@
 module array_2d_mod
 ! aggregates modules for all template types
-  use array_2d_complex_mod
   use array_2d_real_mod
+  use array_2d_complex_mod
   implicit none
 
   interface flatten_array_2d

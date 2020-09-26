@@ -3,6 +3,7 @@ module general_utils
   use general_real_mod
   use general_real_array_mod
   use general_char_str_mod
+  use iso_fortran_env, only: real64
   implicit none
 
   interface arg_or_default
@@ -31,10 +32,10 @@ module general_utils
 ! Compares given reals with specified precision
 !-----------------------------------------------------------------------
   function compare_reals(a, b, comp_precision) result(res)
-    real*8, intent(in) :: a, b
-    real*8, optional :: comp_precision
+    real(real64), intent(in) :: a, b
+    real(real64), optional :: comp_precision
     integer :: res
-    real*8 :: difference, precision_act
+    real(real64) :: difference, precision_act
 
     precision_act = arg_or_default(comp_precision, 1d-10)
     difference = a - b
@@ -51,9 +52,9 @@ module general_utils
 ! generates real grid using specified step
 !-----------------------------------------------------------------------
   function generate_real_range(start, end, step) result(grid)
-    real*8, intent(in) :: start, end, step
-    real*8, allocatable :: grid(:)
-    real*8 :: npointsf
+    real(real64), intent(in) :: start, end, step
+    real(real64), allocatable :: grid(:)
+    real(real64) :: npointsf
     integer :: npoints, i
 
     npointsf = (end - start) / step
@@ -72,11 +73,11 @@ module general_utils
 ! Generates equally spaced grid of points in the interval [start, end]
 !-----------------------------------------------------------------------
   function linspace(start, end, npoints) result(grid)
-    real*8, intent(in) :: start, end
+    real(real64), intent(in) :: start, end
     integer, intent(in) :: npoints
-    real*8 :: grid(npoints)
+    real(real64) :: grid(npoints)
     integer :: i
-    real*8 :: step
+    real(real64) :: step
 
     step = (end - start) / (npoints - 1)
     grid = [(start + i * step, i = 0, npoints - 1)]
@@ -90,12 +91,12 @@ module general_utils
 ! progress_step: controls how often progress should be reported (default is every 0.1)
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine track_progress(progress, progress_step, reset)
-    real*8, intent(in) :: progress
-    real*8, optional, intent(in) :: progress_step
+    real(real64), intent(in) :: progress
+    real(real64), optional, intent(in) :: progress_step
     integer, optional, intent(in) :: reset
     character, parameter :: carriage_return = achar(13)
-    real*8, save :: last_progress = 0
-    real*8 :: progress_step_act
+    real(real64), save :: last_progress = 0
+    real(real64) :: progress_step_act
 
     if (present(reset)) then
       if (reset == 1) then
@@ -106,7 +107,7 @@ module general_utils
     progress_step_act = merge(progress_step, 0.1d0, present(progress_step))
     if (compare_reals(progress, last_progress + progress_step_act) == 1) then
       last_progress = int(progress / progress_step_act) * progress_step_act
-      print '(A,x,F6.2,A$)', carriage_return, last_progress * 100, '% done'
+      write(*, '(A,1x,F6.2,A)', advance = 'no') carriage_return, last_progress * 100, '% done'
       if (compare_reals(last_progress, 1d0) == 0) then
         print *
       end if
@@ -208,10 +209,10 @@ module general_utils
 ! Find _row_ and _col_ index of maximum element in the _matrix_
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine find_max_loc_matrix(matrix, row, col)
-    real*8, intent(in) :: matrix(:, :)
+    real(real64), intent(in) :: matrix(:, :)
     integer, intent(out) :: row, col
     integer, allocatable :: max_loc_col(:) ! row of maximum in each column
-    real*8, allocatable :: max_val_col(:) ! value of maximum in each column
+    real(real64), allocatable :: max_val_col(:) ! value of maximum in each column
 
     max_loc_col = maxloc(matrix, 2)
     max_val_col = maxval(matrix, 2)

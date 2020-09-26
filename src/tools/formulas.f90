@@ -2,6 +2,7 @@ module formulas_mod
   ! Contains functions that evaluate simple physical formulas
   use constants
   use general_utils
+  use iso_fortran_env, only: real64
   implicit none
 
 contains
@@ -10,8 +11,8 @@ contains
 ! Calculates the value of rotational constant A, for given ozone reduced mass and geometry
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_rotational_a(mu, rho, theta) result(a)
-    real*8, intent(in) :: mu, rho, theta
-    real*8 :: a
+    real(real64), intent(in) :: mu, rho, theta
+    real(real64) :: a
     a = 1d0 / (mu * rho**2 * (1+sin(theta)))
   end function
 
@@ -19,8 +20,8 @@ contains
 ! Calculates the value of rotational constant B, for given ozone reduced mass and geometry
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_rotational_b(mu, rho, theta) result(b)
-    real*8, intent(in) :: mu, rho, theta
-    real*8 :: b
+    real(real64), intent(in) :: mu, rho, theta
+    real(real64) :: b
     b = 1d0 / (2d0 * mu * rho**2 * sin(theta)**2)
   end function
 
@@ -28,8 +29,8 @@ contains
 ! Calculates the value of rotational constant C, for given ozone reduced mass and geometry
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_rotational_c(mu, rho, theta) result(c)
-    real*8, intent(in) :: mu, rho, theta
-    real*8 :: c
+    real(real64), intent(in) :: mu, rho, theta
+    real(real64) :: c
     c = 1d0 / (mu * rho**2 * (1-sin(theta)))
   end function
 
@@ -38,7 +39,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_lambda_plus(J, K) result(res)
     integer, intent(in) :: J, K
-    real*8 :: res
+    real(real64) :: res
     res = sqrt(1d0 * (J + K + 1) * (J - K))
   end function
 
@@ -47,7 +48,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_U(J, K1, K2, parity) result(U)
     integer, intent(in) :: J, K1, K2, parity
-    real*8 :: U
+    real(real64) :: U
 
     call assert(K1 + 2 == K2 .or. K1 - 2 == K2 .or. K1 == 1 .and. K2 == 1, 'Wrong input for U')
     U = 0
@@ -74,7 +75,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_W(J, K1, K2, parity) result(W)
     integer, intent(in) :: J, K1, K2, parity
-    real*8 :: W
+    real(real64) :: W
 
     call assert(K1 + 1 == K2 .or. K1 - 1 == K2, 'Wrong input for W')
     if (K1 + 1 == K2) then ! above diagonal

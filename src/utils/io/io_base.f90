@@ -1,6 +1,6 @@
 module io_base_mod
   use general_utils
-  use iso_fortran_env, only : real64, output_unit
+  use iso_fortran_env, only: output_unit
   implicit none
   
 contains

@@ -1,5 +1,6 @@
 module algorithms
   use general_utils
+  use iso_fortran_env, only: real64
   implicit none
 
   interface prefix_sum
@@ -50,8 +51,8 @@ contains
 ! Sorts an array using bubble sort
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function bubble_sort_real(array, index_permutation) result(sorted)
-    real*8, intent(in) :: array(:)
-    real*8, allocatable :: sorted(:)
+    real(real64), intent(in) :: array(:)
+    real(real64), allocatable :: sorted(:)
     integer, allocatable, optional, intent(out) :: index_permutation(:)
     integer :: i, j
     integer, allocatable :: index_permutation_act(:)
@@ -77,9 +78,9 @@ contains
 ! Estimates the value of *query_y* at *query_x* by building line equation from 2 points in *known_xs* and *known_ys*
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine linear_estimation(known_xs, known_ys, query_x, query_y)
-    real*8, intent(in) :: known_xs(2), known_ys(2)
-    real*8, intent(in) :: query_x
-    real*8, intent(out) :: query_y
+    real(real64), intent(in) :: known_xs(2), known_ys(2)
+    real(real64), intent(in) :: query_x
+    real(real64), intent(out) :: query_y
     query_y = (known_ys(2) - known_ys(1)) / (known_xs(2) - known_xs(1)) * (query_x - known_xs(1)) + known_ys(1)
   end subroutine
 
