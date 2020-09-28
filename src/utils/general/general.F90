@@ -33,7 +33,7 @@ module general_utils
 !-----------------------------------------------------------------------
   function compare_reals(a, b, comp_precision) result(res)
     real(real64), intent(in) :: a, b
-    real(real64), optional :: comp_precision
+    real(real64), optional, intent(in) :: comp_precision
     integer :: res
     real(real64) :: difference, precision_act
 
@@ -45,6 +45,23 @@ module general_utils
       res = 1
     else if (difference < 0) then
       res = -1
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts real to integer, rounding up if within target accuracy of the next integer, otherwise down
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function real2int(a, comp_precision) result(res)
+    real(real64), intent(in) :: a
+    real(real64), optional, intent(in) :: comp_precision
+    integer :: res
+    real(real64) :: precision_act
+
+    precision_act = arg_or_default(comp_precision, 1d-10)
+    if (ceiling(a) - a < precision_act) then
+      res = ceiling(a)
+    else
+      res = int(a)
     end if
   end function
 
@@ -104,9 +121,9 @@ module general_utils
       end if
     end if
 
-    progress_step_act = merge(progress_step, 0.1d0, present(progress_step))
-    if (compare_reals(progress, last_progress + progress_step_act) == 1) then
-      last_progress = int(progress / progress_step_act) * progress_step_act
+    progress_step_act = iff(present(progress_step), progress_step, 0.1d0)
+    if (compare_reals(progress, last_progress + progress_step_act) >= 0) then
+      last_progress = real2int(progress / progress_step_act) * progress_step_act
       write(*, '(A,1x,F6.2,A)', advance = 'no') carriage_return, last_progress * 100, '% done'
       if (compare_reals(last_progress, 1d0) == 0) then
         print *

@@ -131,6 +131,7 @@ contains
   subroutine init_caps(params, capebarin)
     class(input_params), intent(in) :: params
     real(real64) :: capebarin
+    integer :: proc_id
     character(256) :: fn
 
     if (params % cap_type == 'none') then
@@ -148,9 +149,10 @@ contains
     capebar = capebarin
 
     call calc_cap(n1,g1)
-    write(fn,'(4A,I5.5,A)')outdir,'/',capdir,'/cap',myid+1,'.out'
+    proc_id = get_proc_id()
+    write(fn, '(4A,I5.5,A)') outdir, '/', capdir, '/cap', proc_id + 1, '.out'
 
-    if (get_proc_id() == 0 .and. params % mode == 'diagonalization') then
+    if (proc_id == 0 .and. params % mode == 'diagonalization') then
       call prnt_cap(fn)
     end if
   end subroutine

@@ -110,15 +110,15 @@ contains
 !-----------------------------------------------------------------------
   subroutine init_pottot(params)
     class(input_params), intent(in) :: params
-    integer i1, i2, i3
+    integer :: file_unit, i1, i2, i3
 
-    if(mode /= MODE_BASIS) return
+    if (mode /= MODE_BASIS) return
 
     ! Load vibrational potential
     allocate(pottot(n3, n2, n1))
-    open(1, file = append_path_token(gpath, 'potvib.dat'), form = 'unformatted')
-    read(1) pottot
-    close(1)
+    open(newunit = file_unit, file = append_path_token(gpath, 'pes.out'))
+    read(file_unit, *) pottot
+    close(file_unit)
 
     ! Add rotational and extra potentials
     do i1 = 1, n1

@@ -10,20 +10,17 @@ program pesprint
   use pesinterface_mod
 
   implicit none
-  integer :: ierr, file_unit
+  integer :: ierr
   type(input_params) :: params
 
   call init_parameters_pesprint(params)
   call load_optgrids()
   call calc_pots(g1, g2, g3)
 
-  open(newunit = file_unit, file = 'potvib.dat', form = 'unformatted')
-  write(file_unit) potvib
-  close(file_unit)
-  
-  if (params % print_potential == 1 .and. get_proc_id() == 0) then
+  if (get_proc_id() == 0) then
     call print_potvib()
   end if
+  
   call MPI_Finalize(ierr)
 
 contains
@@ -44,7 +41,7 @@ contains
 !-----------------------------------------------------------------------
 !  Loads optimized grids in APH coordinates.
 !-----------------------------------------------------------------------
-  subroutine load_optgrids
+  subroutine load_optgrids()
     integer i
     open(1,file='grid1.dat')
     read(1,*)n1

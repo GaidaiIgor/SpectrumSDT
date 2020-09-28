@@ -14,6 +14,7 @@ module sdt
   use matmul_operator_mod
   use mpi
   use parabola
+  use parallel_utils
   use pesgeneral
   use rovib_io_mod
   use slepc_solver_mod
@@ -75,7 +76,7 @@ contains
 !-----------------------------------------------------------------------
 !  Loads grids.
 !-----------------------------------------------------------------------
-  subroutine load_grids
+  subroutine load_grids()
     integer i
     
     open(2,file=gpath//'/grid1.dat')
@@ -550,7 +551,7 @@ contains
   !-----------------------------------------------------------------------
   !  Calculates 1D and 2D basis.
   !-----------------------------------------------------------------------
-  subroutine calc_basis
+  subroutine calc_basis()
     ! Variables for one slice
     type(array1d),allocatable::val1(:) ! 1D values
     type(array2d),allocatable::vec1(:) ! 1D vectors
@@ -562,7 +563,7 @@ contains
     integer nvec2                      ! Number of 2D vectors
     integer nb2                        ! Basis size
     integer mysl                       ! SLice number
-    integer :: i, j, ierr
+    integer :: i, j, ierr, proc_id
 
     ! Collective variables
     real(real64),allocatable::val2all(:,:)   ! 2D values
@@ -571,7 +572,8 @@ contains
     integer,allocatable::nvec2all(:)   ! Number of 2D vectors
 
     ! Set slice number
-    mysl = myid + 1
+    proc_id = get_proc_id()
+    mysl = proc_id + 1
 
     ! Calculate 1D
     call calc_1d(val1,vec1,nvec1,nb2,mysl)
@@ -601,7 +603,7 @@ contains
     call MPI_Gather(buf, nvec2max, MPI_DOUBLE_PRECISION, sym2all, nvec2max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
     ! Only root continues with printing
-    if (myid == 0) then
+    if (proc_id == 0) then
       print *, 'Basis done, writing summary'
 
       ! Write number of 1D vectors
@@ -831,7 +833,7 @@ contains
   !  Calculates overlaps and saves them on disk in binary form.
   !  Only blocks in upper triangle.
   !-----------------------------------------------------------------------
-  subroutine calc_overlap
+  subroutine calc_overlap()
     ! Arrays for 1D and 2D eigenstates
     type(array1d),allocatable::val1c(:)   ! 1D values for ic
     type(array1d),allocatable::val1r(:)   ! 1D values for ir
@@ -859,7 +861,7 @@ contains
 
     ! Miscellaneous
     character(256) fn
-    integer i,j
+    integer i, j
 
     ! Allocate arrays for vectors
     allocate(lambdac(n23b),lambdar(n23b))
@@ -890,7 +892,7 @@ contains
         ! Update block index
         ibl = ibl + 1
         ! Assign process
-        if (mod(ibl-1,nprocs) /= myid) cycle
+        if (mod(ibl - 1, get_num_procs()) /= get_proc_id()) cycle
 
         ! Load bases
         call load_eibasis(ic,nvec1c,val1c,vec1c,val2c,vec2c)

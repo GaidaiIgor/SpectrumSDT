@@ -26,8 +26,4 @@ module general_vars
 
   ! Directories
   character(:), allocatable :: outdir
-
-  ! Network
-  integer :: myid        ! Process id
-  integer :: nprocs      ! Number of processes
 end module
