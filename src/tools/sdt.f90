@@ -73,41 +73,6 @@ module sdt
 
 contains
 
-!-----------------------------------------------------------------------
-!  Loads grids.
-!-----------------------------------------------------------------------
-  subroutine load_grids()
-    integer i
-    
-    open(2,file=gpath//'/grid1.dat')
-    read(2,*)n1,alpha1
-    allocate(g1(n1),jac1(n1))
-    do i=1,n1
-      read(2,*)g1(i),jac1(i)
-    end do
-    close(2)
-    
-    open(2,file=gpath//'/grid2.dat')
-    read(2,*)n2,alpha2
-    allocate(g2(n2),jac2(n2))
-    do i=1,n2
-      read(2,*)g2(i),jac2(i)
-    end do
-    close(2)
-    
-    open(2,file=gpath//'/grid3.dat')
-    read(2,*)n3,alpha3
-    allocate(g3(n3),jac3(n3))
-    do i=1,n3
-      read(2,*)g3(i),jac3(i)
-    end do
-    close(2)
-    
-    ! Treat alpha2(3) as a grid step size
-    alpha2 = alpha2 * jac2(1)
-    alpha3 = alpha3 * jac3(1)
-  end subroutine
-
   !-----------------------------------------------------------------------
   !  Creates a sub directory.
   !-----------------------------------------------------------------------

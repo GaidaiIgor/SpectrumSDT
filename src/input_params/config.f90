@@ -1,8 +1,7 @@
-module config
+module config_mod
   use constants
   use dict_utils
   use dictionary
-  use ftlRegexModule
   use general_utils
   use input_params_mod
   use io_utils
@@ -67,7 +66,8 @@ contains
     fix_basis_jk = item_or_default(config_dict, 'fix_basis_jk', 'unset')
 
     call assert(stage /= 'unset', 'Error: stage has to be specified')
-    call assert(any(stage == [character(100) :: 'basis', 'overlaps', 'eigencalc', 'properties']), 'Error: allowed values of "stage" are "basis", "overlaps", "eigencalc" or "properties"')
+    call assert(any(stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigencalc', 'properties']), &
+        'Error: allowed values of "stage" are "grids", "basis", "overlaps", "eigencalc" or "properties"')
 
     if (any(stage == [character(100) :: 'overlaps', 'eigencalc', 'properties'])) then
       call assert(rovib_coupling /= 'unset', 'Error: rovib_coupling has to be specified')
@@ -134,17 +134,28 @@ contains
   function process_raw_config(config_dict) result(config)
     class(dictionary_t) :: config_dict ! intent(in)
     type(input_params) :: config
-    character(:), allocatable :: stage, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
-    integer :: rovib, fix_basis_jk, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, max_iterations, sequential, optimized_mult
+    integer :: rovib, fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, &
+        max_iterations, sequential, optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
-    real(real64) :: cutoff_energy
+    real(real64) :: grid_rho_from, grid_rho_to, grid_theta_from, grid_theta_to, grid_phi_from, grid_phi_to, cutoff_energy
+    character(:), allocatable :: stage, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
     type(string), allocatable :: tokens(:)
 
     ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults
     stage = item_or_default(config_dict, 'stage', '-1')
     rovib = str2int(item_or_default(config_dict, 'rovib_coupling', '-1'))
     fix_basis_jk = str2int(item_or_default(config_dict, 'fix_basis_jk', '-1'))
+
+    grid_rho_from = str2real(item_or_default(config_dict, 'grid_rho_from', '-1'))
+    grid_rho_to = str2real(item_or_default(config_dict, 'grid_rho_to', '-1'))
+    grid_rho_npoints = str2int(item_or_default(config_dict, 'grid_rho_npoints', '-1'))
+    grid_theta_from = str2real(item_or_default(config_dict, 'grid_theta_from', '-1'))
+    grid_theta_to = str2real(item_or_default(config_dict, 'grid_theta_to', '-1'))
+    grid_theta_npoints = str2int(item_or_default(config_dict, 'grid_theta_npoints', '-1'))
+    grid_phi_from = str2real(item_or_default(config_dict, 'grid_phi_from', '-1'))
+    grid_phi_to = str2real(item_or_default(config_dict, 'grid_phi_to', '-1'))
+    grid_phi_npoints = str2int(item_or_default(config_dict, 'grid_phi_npoints', '-1'))
 
     molecule = item_or_default(config_dict, 'molecule', '-1')
     J = str2int(item_or_default(config_dict, 'J', '-1'))
@@ -200,7 +211,8 @@ contains
     test_mode = item_or_default(config_dict, 'test_mode', '-1')
     debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
 
-    config = input_params(stage, rovib, fix_basis_jk, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, &
+    config = input_params(stage, rovib, fix_basis_jk, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_theta_from, grid_theta_to, grid_theta_npoints, grid_phi_from, grid_phi_to, &
+        grid_phi_npoints, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, &
         num_states, ncv, mpd, max_iterations, cap_type, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
   end function
 
@@ -210,6 +222,7 @@ contains
   subroutine set_defaults(params, optional_keys)
     class(input_params), intent(inout) :: params
     class(dictionary_t) :: optional_keys ! intent(in)
+    integer :: sequential_default
 
     if (params % cap_type == '-1' .and. ('cap_type' .in. optional_keys)) then
       params % cap_type = 'none'
@@ -224,7 +237,8 @@ contains
 
     ! Silent defaults. These parameters should not normally be changed.
     params % max_iterations = iff(params % max_iterations == -1, 10000, params % max_iterations)
-    params % sequential = iff(params % sequential == -1, 0, params % sequential)
+    sequential_default = iff(params % stage /= 'grids', 0, 1)
+    params % sequential = iff(params % sequential == -1, sequential_default, params % sequential)
     params % enable_terms(1) = iff(params % enable_terms(1) == -1, 1, params % enable_terms(1))
     params % enable_terms(2) = iff(params % enable_terms(2) == -1, 1, params % enable_terms(2))
     params % optimized_mult = iff(params % optimized_mult == -1, 1, params % optimized_mult)
@@ -232,12 +246,33 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of values of parameters
-! A value of -1 means the value was unassigned, which means it is unused in this mode and should not be checked
+! A value of -1 means the value was unassigned, which means it is unused in this mode.
 ! Therefore -1 is always considered a valid value (but that is not displayed in the error messages)
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_params_values(params)
     class(input_params), intent(in) :: params
     integer :: K_min
+
+    call assert((params % grid_rho_from .aeq. -1d0) .or. params % grid_rho_from >= 0, 'Error: grid_rho_from should be >= 0')
+    call assert((params % grid_rho_to .aeq. -1d0) .or. params % grid_rho_to >= 0, 'Error: grid_rho_to should be >= 0')
+    if (.not. (params % grid_rho_from .aeq. -1d0) .and. .not. (params % grid_rho_to .aeq. -1d0)) then
+      call assert(params % grid_rho_from < params % grid_rho_to, 'Error: grid_rho_from should be < grid_rho_to')
+    end if
+    call assert(params % grid_rho_npoints == -1 .or. params % grid_rho_npoints > 0, 'Error: grid_rho_npoints should be > 0')
+
+    call assert((params % grid_theta_from .aeq. -1d0) .or. params % grid_theta_from >= 0, 'Error: grid_theta_from should be >= 0')
+    call assert((params % grid_theta_to .aeq. -1d0) .or. params % grid_theta_to >= 0, 'Error: grid_theta_to should be >= 0')
+    if (.not. (params % grid_theta_from .aeq. -1d0) .and. .not. (params % grid_theta_to .aeq. -1d0)) then
+      call assert(params % grid_theta_from < params % grid_theta_to, 'Error: grid_theta_from should be < grid_theta_to')
+    end if
+    call assert(params % grid_theta_npoints == -1 .or. params % grid_theta_npoints > 0, 'Error: grid_theta_npoints should be > 0')
+
+    call assert((params % grid_phi_from .aeq. -1d0) .or. params % grid_phi_from >= 0, 'Error: grid_phi_from should be >= 0')
+    call assert((params % grid_phi_to .aeq. -1d0) .or. params % grid_phi_to >= 0, 'Error: grid_phi_to should be >= 0')
+    if (.not. (params % grid_phi_from .aeq. -1d0) .and. .not. (params % grid_phi_to .aeq. -1d0)) then
+      call assert(params % grid_phi_from < params % grid_phi_to, 'Error: grid_phi_from should be < grid_phi_to')
+    end if
+    call assert(params % grid_phi_npoints == -1 .or. params % grid_phi_npoints > 0, 'Error: grid_phi_npoints should be > 0')
 
     call assert(any(params % molecule == [character(len = 100) :: '-1', '686', '868']), 'Error: molecule can be "686" or "868"')
     call assert(params % J >= -1, 'Error: J should be >= 0')
@@ -261,7 +296,7 @@ contains
     call assert(params % mpd == -1 .or. params % mpd > 0, 'Error: mpd should be > 0')
     call assert(params % max_iterations == -1 .or. params % max_iterations > 0, 'Error: max_iterations should be > 0')
 
-    call assert(any(params % cap_type == [character(len = 100) :: 'none', 'Manolopoulos']), 'Error: cap_type can be "none" or "Manolopoulos"')
+    call assert(any(params % cap_type == [character(len = 100) :: '-1', 'none', 'Manolopoulos']), 'Error: cap_type can be "none" or "Manolopoulos"')
     call assert(any(params % sequential == [-1, 0, 1]), 'Error: sequential can be 0 or 1')
     call assert(any(params % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
     call assert(any(params % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) can be 0 or 1')
@@ -273,7 +308,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function process_user_settings(settings_path) result(params)
     character(*), intent(in) :: settings_path ! path to the file with settings
-    character(:), allocatable :: sequential
+    character(:), allocatable :: stage, sequential_default, sequential
     type(dictionary_t) :: raw_config, mandatory_keys, optional_keys, all_keys
     type(input_params) :: params
     integer :: ierr
@@ -281,7 +316,9 @@ contains
     ! Parse the raw file and structure its content into a dictionary
     raw_config = read_config_dict(settings_path)
     ! Pull out sequential ahead of time as we need to decide if parallel mode should be initialized first
-    sequential = item_or_default(raw_config, 'sequential', '0') ! Sequential execution is disabled by default
+    stage = item_or_default(raw_config, 'stage', 'unset')
+    sequential_default = iff(stage /= 'grids', '0', '1')
+    sequential = item_or_default(raw_config, 'sequential', sequential_default) ! Sequential execution is disabled by default
     if (sequential == '0') then
       call MPI_Init(ierr)
     end if

@@ -23,30 +23,14 @@ module general_utils
   end interface
 
   interface operator (.means.)
-    procedure :: logical_consequence
+    module procedure :: logical_consequence
   end interface
 
-  contains
-  
-!-----------------------------------------------------------------------
-! Compares given reals with specified precision
-!-----------------------------------------------------------------------
-  function compare_reals(a, b, comp_precision) result(res)
-    real(real64), intent(in) :: a, b
-    real(real64), optional, intent(in) :: comp_precision
-    integer :: res
-    real(real64) :: difference, precision_act
+  interface operator (.aeq.)
+    module procedure :: approximately_equal
+  end interface
 
-    precision_act = arg_or_default(comp_precision, 1d-10)
-    difference = a - b
-    if (abs(difference) < precision_act) then
-      res = 0
-    else if (difference > 0) then
-      res = 1
-    else if (difference < 0) then
-      res = -1
-    end if
-  end function
+contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts real to integer, rounding up if within target accuracy of the next integer, otherwise down

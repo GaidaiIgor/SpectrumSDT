@@ -5,7 +5,7 @@
 !-----------------------------------------------------------------------
 program spectrumsdt
   use cap_mod
-  use config
+  use config_mod
   use constants
   use debug_tools
   use distributed_rovib_hamiltonian_mod
@@ -40,6 +40,41 @@ program spectrumsdt
   end if
 
 contains
+
+!-----------------------------------------------------------------------
+!  Loads grids.
+!-----------------------------------------------------------------------
+  subroutine load_grids()
+    integer i
+    
+    open(2,file=gpath//'/grid_rho.dat')
+    read(2,*)n1,alpha1
+    allocate(g1(n1),jac1(n1))
+    do i=1,n1
+      read(2,*)g1(i),jac1(i)
+    end do
+    close(2)
+    
+    open(2,file=gpath//'/grid_theta.dat')
+    read(2,*)n2,alpha2
+    allocate(g2(n2),jac2(n2))
+    do i=1,n2
+      read(2,*)g2(i),jac2(i)
+    end do
+    close(2)
+    
+    open(2,file=gpath//'/grid_phi.dat')
+    read(2,*)n3,alpha3
+    allocate(g3(n3),jac3(n3))
+    do i=1,n3
+      read(2,*)g3(i),jac3(i)
+    end do
+    close(2)
+    
+    ! Treat alpha2(3) as a grid step size
+    alpha2 = alpha2 * jac2(1)
+    alpha3 = alpha3 * jac3(1)
+  end subroutine
 
 !-----------------------------------------------------------------------
 !  Initilialization.
@@ -82,7 +117,7 @@ contains
     end if
 
     ! Load grids
-    call load_grids
+    call load_grids()
 
     ! Setup shortcuts for products
     nn   = n1 * n2 * n3
@@ -264,28 +299,25 @@ contains
     end if
 
     ! Call appropriate subroutine
-    select case(mode)
-      case(MODE_BASIS)
-        call calc_basis
+    select case(params % stage)
+      case('basis')
+        call calc_basis()
 
-      case(MODE_OVERLAP)
-        call calc_overlap
+      case('overlaps')
+        call calc_overlap()
         call calculate_overlaps_extra(params, mu, g1, g2)
 
-      case(MODE_3DSDT)
+      case('eigencalc')
         call init_caps(params, 0d0)
         call calculate_states(params)
 
-      case(MODE_3DSDT_POST)
+      case('properties')
         if (params % cap_type /= 'none') then
           call init_caps(params, 0d0)
           call calculate_state_properties(params, g1, size(g2), get_real_cap())
         else
           call calculate_state_properties(params, g1, size(g2))
         end if
-
-      case default
-        call print_parallel('Config check has failed. Stage does not exist.')
     end select
 
     call print_parallel('Done')

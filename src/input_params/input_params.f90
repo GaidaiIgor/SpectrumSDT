@@ -8,6 +8,19 @@ module input_params_mod
     integer :: rovib_coupling ! enables/disables rovib_coupling coupling. 0 or 1
     integer :: fix_basis_jk ! use basis set with the same fixed values of J and K for all calculations
 
+    ! Grids
+    real(real64) :: grid_rho_from
+    real(real64) :: grid_rho_to
+    integer :: grid_rho_npoints
+
+    real(real64) :: grid_theta_from
+    real(real64) :: grid_theta_to
+    integer :: grid_theta_npoints
+
+    real(real64) :: grid_phi_from
+    real(real64) :: grid_phi_to
+    integer :: grid_phi_npoints
+
     ! System
     character(:), allocatable :: molecule ! isotope composition, like 686
     integer :: J ! Total angular momentum quantum number

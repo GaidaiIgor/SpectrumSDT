@@ -12,12 +12,32 @@ module stage_metadata_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns mandatory keys at grids stage
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_mandatory_keys_grids(config_dict) result(res)
+    class(dictionary_t) :: config_dict ! intent(in)
+    type(dictionary_t) :: res
+
+    call add_if_absent(res, 'stage', 'set')
+    call add_if_absent(res, 'grid_rho_from', 'set')
+    call add_if_absent(res, 'grid_rho_to', 'set')
+    call add_if_absent(res, 'grid_rho_npoints', 'set')
+    call add_if_absent(res, 'grid_theta_from', 'set')
+    call add_if_absent(res, 'grid_theta_to', 'set')
+    call add_if_absent(res, 'grid_theta_npoints', 'set')
+    call add_if_absent(res, 'grid_phi_from', 'set')
+    call add_if_absent(res, 'grid_phi_to', 'set')
+    call add_if_absent(res, 'grid_phi_npoints', 'set')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns mandatory keys at basis stage
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_mandatory_keys_basis(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
 
+    call add_if_absent(res, 'stage', 'set')
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'J', 'set')
     call add_if_absent(res, 'K', 'set')
@@ -35,6 +55,9 @@ contains
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
 
+    call add_if_absent(res, 'stage', 'set')
+    call add_if_absent(res, 'rovib_coupling', 'set')
+    call add_if_absent(res, 'fix_basis_jk', 'set')
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'K', 'set')
     call add_if_absent(res, 'symmetry', 'set')
@@ -52,6 +75,9 @@ contains
     type(dictionary_t) :: res
     character(:), allocatable :: rovib_coupling, fix_basis_jk
 
+    call add_if_absent(res, 'stage', 'set')
+    call add_if_absent(res, 'rovib_coupling', 'set')
+    call add_if_absent(res, 'fix_basis_jk', 'set')
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'J', 'set')
     call add_if_absent(res, 'symmetry', 'set')
@@ -81,6 +107,9 @@ contains
     type(dictionary_t) :: res
     character(:), allocatable :: rovib_coupling, fix_basis_jk
 
+    call add_if_absent(res, 'stage', 'set')
+    call add_if_absent(res, 'rovib_coupling', 'set')
+    call add_if_absent(res, 'fix_basis_jk', 'set')
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'J', 'set')
     call add_if_absent(res, 'symmetry', 'set')
@@ -113,7 +142,9 @@ contains
     character(:), allocatable :: stage
 
     stage = item_or_default(config_dict, 'stage', 'unset')
-    if (stage == 'basis') then
+    if (stage == 'grids') then
+      res = get_mandatory_keys_grids(config_dict)
+    else if (stage == 'basis') then
       res = get_mandatory_keys_basis(config_dict)
     else if (stage == 'overlaps') then
       res = get_mandatory_keys_overlaps(config_dict)
@@ -122,6 +153,14 @@ contains
     else if (stage == 'properties') then
       res = get_mandatory_keys_properties(config_dict)
     end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns optional keys at grids stage
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_optional_keys_grids(config_dict) result(res)
+    class(dictionary_t) :: config_dict ! intent(in)
+    type(dictionary_t) :: res
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -190,7 +229,9 @@ contains
     character(:), allocatable :: stage
 
     stage = item_or_default(config_dict, 'stage', 'unset')
-    if (stage == 'basis') then
+    if (stage == 'grids') then
+      res = get_optional_keys_grids(config_dict) 
+    else if (stage == 'basis') then
       res = get_optional_keys_basis(config_dict)
     else if (stage == 'overlaps') then
       res = get_optional_keys_overlaps(config_dict)
@@ -210,6 +251,16 @@ contains
     call add_if_absent(res, 'stage', 'set')
     call add_if_absent(res, 'rovib_coupling', 'set')
     call add_if_absent(res, 'fix_basis_jk', 'set')
+
+    call add_if_absent(res, 'grid_rho_from', 'set')
+    call add_if_absent(res, 'grid_rho_to', 'set')
+    call add_if_absent(res, 'grid_rho_npoints', 'set')
+    call add_if_absent(res, 'grid_theta_from', 'set')
+    call add_if_absent(res, 'grid_theta_to', 'set')
+    call add_if_absent(res, 'grid_theta_npoints', 'set')
+    call add_if_absent(res, 'grid_phi_from', 'set')
+    call add_if_absent(res, 'grid_phi_to', 'set')
+    call add_if_absent(res, 'grid_phi_npoints', 'set')
 
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'J', 'set')

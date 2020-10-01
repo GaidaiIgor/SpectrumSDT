@@ -1,3 +1,12 @@
+!-----------------------------------------------------------------------
+!  OptGrid (optgrid.f)
+!  Optimal grid generator, subroutines:
+!    1. (r,radial) Left end fixed, right end free, alpha is parameter
+!    2. (a,alpha)  Both ends are fixed, alpha is adjusted
+!    3. (n,number) Both ends are fixed, number of points is adjusted
+!  Author: Alexander Teplukhin, Igor Gayday
+!-----------------------------------------------------------------------
+  
 module optgrid_tools
   use constants
   use general_utils
@@ -7,19 +16,10 @@ module optgrid_tools
 
 contains
 
-  !-----------------------------------------------------------------------
-  !  OptGrid (optgrid.f)
-  !  Optimal grid generator, subroutines:
-  !    1. (r,radial) Left end fixed, right end free, alpha is parameter
-  !    2. (a,alpha)  Both ends are fixed, alpha is adjusted
-  !    3. (n,number) Both ends are fixed, number of points is adjusted
-  !  Author: Alexander Teplukhin
-  !-----------------------------------------------------------------------
-
-  !-----------------------------------------------------------------------
-  !  Generates a grid with fixed left end and free right end.
-  !  Alpha is fixed.
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates a grid with fixed left end and free right end.
+! Alpha is fixed.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine generate_gridr(grid,jac,n,alpha,minr,eps,der)
     integer i,n,nok,nbad
     real(real64) grid(n),jac(n),x(0:n)
@@ -42,11 +42,11 @@ contains
     enddo
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Generates a grid within required boundaries.
-  !  Solves from the left to the right.
-  !  Alpha is adjusted.
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates a grid within required boundaries.
+! Solves from the left to the right.
+! Alpha is adjusted.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine generate_grida(grid,jac,n,alpha,minr,maxr,eps,der)
     integer i,n,nok,nbad
     real(real64) grid(n),jac(n),x(0:n+1)
@@ -109,11 +109,11 @@ contains
     enddo
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Generates a grid within required boundaries.
-  !  Number of points is adjusted.
-  !  Makes symmetric distribution of points for symmetric derivative.
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates a grid within required boundaries.
+! Number of points is adjusted.
+! Makes symmetric distribution of points for symmetric derivative.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine generate_gridn(grid,jac,n,alpha,minr,maxr,r0,eps,der)
     integer,parameter:: n0 = 1024
     integer i,n,nl,nr
@@ -168,10 +168,9 @@ contains
       call der(0.0d0,grid(i),jac(i))
     enddo
   end subroutine
-
-  !-----------------------------------------------------------------------
-  ! Generates grid with required number of points and boundaries. Step size is adjusted
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates grid with required number of points and boundaries. Step size is adjusted.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine generate_equidistant_grid_points(minr, maxr, n, grid, jac, step)
     real(real64), intent(in) :: minr, maxr
     integer, intent(in) :: n
@@ -187,9 +186,9 @@ contains
     step = grid(2) - grid(1)
   end subroutine
 
-  !-----------------------------------------------------------------------
-  ! Generates grid with required step size and boundaries. Number of points is adjusted
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates grid with required step size and boundaries. Number of points is adjusted.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine generate_equidistant_grid_step(minr, maxr, step, grid, jac, n)
     real(real64), intent(in) :: minr, maxr, step
     real(real64), allocatable, intent(out) :: grid(:), jac(:)
@@ -201,25 +200,21 @@ contains
     jac = 1d0
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Print Grid
-  !  Saves grid, Jacobian and potential on the grid to the *.dat file
-  !  Corresponding alpha is saved too
-  !-----------------------------------------------------------------------
-  subroutine print_grid(grid, jac, n, name, alpha, potvib)
-    integer, intent(in) :: n
-    real(real64), intent(in) :: grid(n), jac(n)
-    character(*), intent(in) :: name
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Saves grid, Jacobian and alpha to a file.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine print_grid(grid, jac, alpha, file_name)
+    real(real64), intent(in) :: grid(:), jac(:)
+    character(*), intent(in) :: file_name
     real(real64), intent(in) :: alpha
-    real(real64), external :: potvib
-    integer :: i
+    integer :: i, file_unit
     
-    ! external potvib
-    open(1,file=name)
-    write(1,*)n,alpha
-    do i=1,n
-      write(1,'(3F30.17)')grid(i),jac(i),potvib(grid(i))*autown
+    call assert(size(grid) == size(jac), 'Error: grid and jac have to have the same size')
+    open(newunit = file_unit, file = file_name)
+    write(file_unit, *) size(grid), alpha
+    do i = 1, size(grid)
+      write(file_unit, '(2G23.15)') grid(i), jac(i)
     enddo
-    close(1)
+    close(file_unit)
   end subroutine
 end module

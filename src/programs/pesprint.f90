@@ -3,7 +3,7 @@
 !  Author: Alexander Teplukhin, Igor Gayday
 !-----------------------------------------------------------------------
 program pesprint
-  use config
+  use config_mod
   use input_params_mod
   use parallel_utils
   use pesgeneral
@@ -43,21 +43,21 @@ contains
 !-----------------------------------------------------------------------
   subroutine load_optgrids()
     integer i
-    open(1,file='grid1.dat')
+    open(1,file='grid_rho.dat')
     read(1,*)n1
     allocate(g1(n1))
     do i=1,n1
       read(1,*)g1(i)
     enddo
     close(1)
-    open(1,file='grid2.dat')
+    open(1,file='grid_theta.dat')
     read(1,*)n2
     allocate(g2(n2))
     do i=1,n2
       read(1,*)g2(i)
     enddo
     close(1)
-    open(1,file='grid3.dat')
+    open(1,file='grid_phi.dat')
     read(1,*)n3
     allocate(g3(n3))
     do i=1,n3
