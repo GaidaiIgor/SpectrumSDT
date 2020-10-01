@@ -3,8 +3,8 @@ module input_params_mod
   implicit none
 
   type :: input_params
-    ! Mode
-    character(:), allocatable :: mode ! basis, overlaps, diagonalization or properties
+    ! Behavior control
+    character(:), allocatable :: stage ! basis, overlaps, eigencalc or properties
     integer :: rovib_coupling ! enables/disables rovib_coupling coupling. 0 or 1
     integer :: fix_basis_jk ! use basis set with the same fixed values of J and K for all calculations
 
@@ -22,12 +22,11 @@ module input_params_mod
     integer :: basis_J ! J and K of basis set
     integer :: basis_K
 
-    ! Diagonalization
-    character(:), allocatable :: solver
-    integer :: num_states ! desired number of eigenstates from diagonalization
-    integer :: ncv ! number of vectors in arnoldi basis during diagonalization
+    ! Eigencalc
+    integer :: num_states ! desired number of eigenstates from eigencalc
+    integer :: ncv ! number of vectors in arnoldi basis during eigencalc
     integer :: mpd ! maximum projected dimension, slepc only
-    integer :: max_iterations ! maximum number of iterations during diagonalization
+    integer :: max_iterations ! maximum number of iterations during eigencalc
     
     ! CAP
     character(:), allocatable :: cap_type
@@ -36,9 +35,6 @@ module input_params_mod
     character(:), allocatable :: grid_path ! path to folder with grid calculations
     character(:), allocatable :: root_path ! path to root folder for main calculations
     character(:), allocatable :: channels_root ! path to folder with channels data
-
-    ! Extra info
-    integer :: print_potential
 
     ! Debug
     integer :: sequential ! triggers sequential execution

@@ -79,7 +79,7 @@
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates potential energy surface
+! Calculates potential energy surface for each combination of points in *grids*
 !-------------------------------------------------------------------------------------------------------------------------------------------
    subroutine calc_pots(grid1, grid2, grid3)
      real(real64) :: grid1(:), grid2(:), grid3(:)
@@ -91,12 +91,13 @@
      n2 = size(grid2)
      n3 = size(grid3)
      total_points = n1 * n2 * n3
+     proc_id = get_proc_id()
      call get_proc_elem_range(total_points, first_k, proc_points, proc_counts, proc_shifts)
      allocate(proc_pot_vib_1d(proc_points))
 
      ! Calculate a chunk
      do proc_k = 1, proc_points
-       if (get_proc_id() == 0) then
+       if (proc_id == 0) then
          call track_progress(proc_k * 1d0 / proc_points, 0.01d0)
        end if
 
@@ -106,7 +107,6 @@
      end do
 
      ! Allocate global storage on 0th proc
-     proc_id = get_proc_id()
      if (proc_id == 0) then
        allocate(global_pot_vib_1d(total_points))
      end if
@@ -115,16 +115,7 @@
      call MPI_Gatherv(proc_pot_vib_1d, size(proc_pot_vib_1d), MPI_DOUBLE_PRECISION, global_pot_vib_1d, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
      if (proc_id == 0) then
-       allocate(potvib(n3, n2, n1))
-       k = 1
-       do i1 = 1, n1
-         do i2 = 1, n2
-           do i3 = 1, n3
-             potvib(i3, i2, i1) = global_pot_vib_1d(k)
-             k = k + 1
-           end do
-         end do
-       end do
+       potvib = reshape(global_pot_vib_1d, [n3, n2, n1])
      end if
    end subroutine
 

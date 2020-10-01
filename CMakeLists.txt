@@ -21,21 +21,21 @@ set(numerical_recipies ${prefix}/src/tools/numerical_recipies.f90)
 set(external_sources ${dawes_pes} ${numerical_recipies})
 
 # Source file dependencies
+set(constants ${prefix}/src/utils/constants.f90)
+set(general_vars ${prefix}/src/tools/general_vars.f90)
+set(debug_tools ${prefix}/src/tools/debug_tools.f90)
+set(input_params ${prefix}/src/input_params/input_params.f90)
+set(parabola ${prefix}/src/tools/parabola.f90)
+
 set(general_char_str ${prefix}/src/utils/general/general_char_str.F90)
 set(general_integer ${general_char_str} ${prefix}/src/utils/general/general_integer.F90)
 set(general_real ${general_char_str} ${prefix}/src/utils/general/general_real.F90)
 set(general_real_array ${prefix}/src/utils/general/general_real_array.F90)
 set(general_utils ${general_integer} ${general_real} ${general_real_array} ${general_char_str} ${prefix}/src/utils/general/general.F90)
 
-set(constants ${prefix}/src/utils/constants.f90)
 set(fourier_transform ${constants} ${general_utils} ${prefix}/src/utils/fourier_transform.f90)
 set(formulas ${general_utils} ${constants} ${prefix}/src/tools/formulas.f90)
-set(general_vars ${prefix}/src/tools/general_vars.f90)
-set(debug_tools ${prefix}/src/tools/debug_tools.f90)
-set(input_params ${prefix}/src/tools/input_params.f90)
 set(rovib_utils ${input_params} ${prefix}/src/utils/rovib_utils.f90)
-set(parabola ${prefix}/src/tools/parabola.f90)
-
 set(algorithms ${general_utils} ${prefix}/src/utils/algorithms.f90)
 set(parallel_utils ${algorithms} ${general_utils} ${prefix}/src/utils/parallel.f90)
 set(cap ${constants} ${general_vars} ${input_params} ${parallel_utils} ${prefix}/src/tools/cap.f90)
@@ -65,6 +65,7 @@ set(dict_integer_array ${prefix}/src/utils/dict/dict_integer_array.F90)
 set(dict_char_str ${prefix}/src/utils/dict/dict_char_str.F90)
 set(dict_utils ${dict_integer} ${dict_integer_array} ${dict_char_str} ${string} ${vector_string} ${prefix}/src/utils/dict/dict.F90)
 
+set(stage_metadata ${dict_utils} ${prefix}/src/input_params/stage_metadata.F90)
 set(string_utils ${vector_string} ${prefix}/src/utils/string/string_utils.f90)
 
 set(io_base ${general_utils} ${prefix}/src/utils/io/io_base.f90)
@@ -75,7 +76,7 @@ set(io_utils ${io_base} ${io_integer} ${io_real} ${io_complex} ${prefix}/src/uti
 
 set(system ${general_utils} ${io_utils} ${prefix}/src/utils/system.f90)
 set(path_utils ${general_utils} ${input_params} ${parallel_utils} ${system} ${prefix}/src/utils/path.f90)
-set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${string_utils} ${debug_tools} ${prefix}/src/tools/config.f90)
+set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${stage_metadata} ${string_utils} ${prefix}/src/input_params/config.f90)
 set(pesgeneral ${constants} ${formulas} ${input_params} ${general_utils} ${general_vars} ${prefix}/src/tools/pes/pesgeneral.f90)
 set(pesinterface ${constants} ${dawes_pes} ${path_utils} ${input_params} ${parallel_utils} ${pesgeneral} ${prefix}/src/tools/pes/pesinterface.f90)
 

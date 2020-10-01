@@ -23,14 +23,21 @@ program spectrumsdt
   use sdt
   use slepc_solver_mod
   use state_properties_mod
-  implicit none
 
+  implicit none
+  integer :: ierr
   type(input_params) :: params
+
+  ! Processes input parameters and enables MPI if sequential mode is not requested
   params = process_user_settings('spectrumsdt.config')
   call init_parameters(params)
   call init_pottot(params)
   call calc_kin()
   call calc_sdt(params)
+
+  if (params % sequential == 0) then
+    call MPI_Finalize(ierr)
+  end if
 
 contains
 
@@ -46,13 +53,13 @@ contains
     trecut = params % cutoff_energy
 
     ! Old params are stored in plain variables defined in sdt.f90
-    if (params % mode == 'basis') then
+    if (params % stage == 'basis') then
       mode = 1
-    else if (params % mode == 'overlaps') then
+    else if (params % stage == 'overlaps') then
       mode = 2
-    else if (params % mode == 'diagonalization') then
+    else if (params % stage == 'eigencalc') then
       mode = 3
-    else if (params % mode == 'properties') then
+    else if (params % stage == 'properties') then
       mode = 4
     end if
 
@@ -67,7 +74,7 @@ contains
     sym_path = get_sym_path_params(params)
     bpath = get_basis_path(sym_path)
     opath = get_overlaps_path(sym_path)
-    dpath = get_diagonalization_path(sym_path)
+    dpath = get_eigencalc_path(sym_path)
 
     ! Set output directory
     if (.not. (mode == 0)) then
@@ -228,11 +235,8 @@ contains
 
     call set_matmul_variables(params) ! rovib_ham is already set
     call print_parallel('Eigenvalue solver has started')
-
-    if (params % solver == 'slepc') then
-      call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
-      call print_spectrum(params, eivals, eivecs)
-    end if
+    call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
+    call print_spectrum(params, eivals, eivecs)
   end subroutine
 
 !-----------------------------------------------------------------------
@@ -243,11 +247,11 @@ contains
     integer :: ready, ierr
 
     ! Write information
-    call print_parallel('Mode: ' // params % mode)
+    call print_parallel('Stage: ' // params % stage)
     call print_parallel('Processes: ' // num2str(get_num_procs()))
 
     ! Setup directories
-    if (params % mode == 'properties') then
+    if (params % stage == 'properties') then
       ready = 1
     else
       if (get_proc_id() == 0) then
@@ -281,10 +285,9 @@ contains
         end if
 
       case default
-        call print_parallel('Config check has failed. Mode does not exist.')
+        call print_parallel('Config check has failed. Stage does not exist.')
     end select
 
     call print_parallel('Done')
-    call MPI_Finalize(ierr)
   end subroutine
 end program

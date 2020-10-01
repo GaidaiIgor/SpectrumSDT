@@ -9,7 +9,7 @@ contains
 ! Returns item by given key or default value if the key is not present in the dictionary
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(item_or_default_,TEMPLATE_TYPE_NAME)(dic, key, default) result(res)
-    type(dictionary_t), intent(inout) :: dic ! inout because assign does not declare it as in
+    type(dictionary_t) :: dic ! intent(in)
     character(*), intent(in) :: key
     TEMPLATE_TYPE, intent(in) :: default
     TEMPLATE_TYPE_OUT :: res

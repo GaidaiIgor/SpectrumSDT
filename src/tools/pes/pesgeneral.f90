@@ -66,10 +66,9 @@ contains
       shift = -zpe_88
     end if
 
-    ! Set threshold ?
     ! Large reduced mass gives both small ZPE and rotpot in channel
     maxmu = max(mu0,mu1,mu2)
-    threshold = klarge**2 / (2*maxmu*r0**2) ! TODO: what is that for?
+    threshold = klarge**2 / (2*maxmu*r0**2)
   end subroutine
 
   !-----------------------------------------------------------------------

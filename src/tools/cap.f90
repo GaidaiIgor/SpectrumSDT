@@ -152,7 +152,7 @@ contains
     proc_id = get_proc_id()
     write(fn, '(4A,I5.5,A)') outdir, '/', capdir, '/cap', proc_id + 1, '.out'
 
-    if (proc_id == 0 .and. params % mode == 'diagonalization') then
+    if (proc_id == 0 .and. params % stage == 'eigencalc') then
       call prnt_cap(fn)
     end if
   end subroutine

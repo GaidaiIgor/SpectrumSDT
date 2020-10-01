@@ -3,9 +3,9 @@
 !  Optimal grid generator for ozone PES in coordinates:
 !    1. APH
 !    2. Valence (bonds and angle)
-!  Author: Alexander Teplukhin
+!  Author: Alexander Teplukhin, Igor Gayday
 !-----------------------------------------------------------------------
-module general
+module global_vars
   use constants
   use iso_fortran_env, only: real64
   implicit none
@@ -18,10 +18,9 @@ module general
                         mu2 = m0*m2/(m0+m2), &
                         r10 = 2.410d0, &
                         r20 = 2.410d0, &
-                        te0 = pi * 116.8 / 180 ! , &
+                        te0 = pi * 116.8 / 180
                         
   real(real64) :: zpe
-  
   real(real64),allocatable::g1(:),g2(:),g3(:)
   real(real64),allocatable::jac1(:),jac2(:),jac3(:)
   real(real64) a1,a2,a3
@@ -50,16 +49,16 @@ end module
 
 program optgrid
   use constants
-  use general
+  use global_vars
   use iso_fortran_env, only: real64
   use optgrid_tools
   use path_utils
   implicit none
 
-  call input_parameters
+  call input_parameters()
   allocate(env1(nenv1), pot1(nenv1), env1_2d(nenv1), env2(nenv2), pot2(nenv2), env2_2d(nenv2), env3(nenv3), pot3(nenv3), env3_2d(nenv3), g1(n1), g2(n2), g3(n3), jac1(n1), jac2(n2), jac3(n3))
 
-  call input_envelopes
+  call input_envelopes()
   call find_parabola(env1,pot1,nenv1,enva1,envE1,envm1)
   call find_parabola(env2,pot2,nenv2,enva2,envE2,envm2)
   call find_parabola(env3,pot3,nenv3,enva3,envE3,envm3)
@@ -105,13 +104,14 @@ program optgrid
   call print_grid(g2,jac2,n2,'grid2.dat',a2,potv2)
   call print_grid(g3,jac3,n3,'grid3.dat',a3,potv3)
   print *, 'Done'
+
 contains
 
   !-----------------------------------------------------------------------
   !  Input Parameters
   !  J vector, number of point along each coordinate, initial alpha
   !-----------------------------------------------------------------------
-  subroutine input_parameters
+  subroutine input_parameters()
     integer :: m0_code, m1_code, m2_code, total_code
     open(1,file='optgrid.config')
     read(1,*) n1,n2,n3
@@ -155,7 +155,7 @@ contains
   !  Input Envelopes
   !  Loads potential along MEP for each coordinate
   !-----------------------------------------------------------------------
-  subroutine input_envelopes
+  subroutine input_envelopes()
     integer i
     open(1, file = append_path_token(envpath, 'MEP1.dat'), status='old')
     do i=1,nenv1

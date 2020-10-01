@@ -133,13 +133,13 @@ contains
     character(:), allocatable :: res
     integer :: K
 
-    K = merge(-1, params % K(1), params % rovib_coupling == 1 .and. params % mode /= 'overlaps')
+    K = merge(-1, params % K(1), params % rovib_coupling == 1 .and. params % stage /= 'overlaps')
     res = get_k_folder_path(params % root_path, K)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with calculation results for a given symmetry and Ks
-! Parity is relevant for coupled diagonalization only
+! Parity is relevant for coupled eigencalcs only
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_sym_path_int(k_path, sym_code, parity) result(res)
     character(*), intent(in) :: k_path
@@ -193,7 +193,7 @@ contains
     character(:), allocatable :: k_path
 
     k_path = get_k_folder_path_params(params)
-    parity = merge(params % parity, -1, params % rovib_coupling == 1 .and. params % mode /= 'overlaps')
+    parity = merge(params % parity, -1, params % rovib_coupling == 1 .and. params % stage /= 'overlaps')
     res = get_sym_path_int(k_path, params % symmetry, parity)
   end function
 
@@ -364,24 +364,24 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with diagonalization calculations
+! Generates path to folder with eigenpairs calculations
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_diagonalization_path(sym_path) result(res)
+  function get_eigencalc_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    res = append_path_tokens(sym_path, 'diagonalization')
+    res = append_path_tokens(sym_path, 'eigencalc')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with diagonalization results calculations
+! Generates path to folder with eigenpairs results calculations
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_diagonalization_results_path(sym_path) result(res)
+  function get_eigencalc_results_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    character(:), allocatable :: diagonalization_path
+    character(:), allocatable :: eigencalc_path
 
-    diagonalization_path = get_diagonalization_path(sym_path)
-    res = append_path_tokens(diagonalization_path, '3dsdt')
+    eigencalc_path = get_eigencalc_path(sym_path)
+    res = append_path_tokens(eigencalc_path, '3dsdt')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -390,10 +390,10 @@ contains
   function get_expansion_coefficients_3d_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    character(:), allocatable :: diagonalization_results_path
+    character(:), allocatable :: eigencalc_results_path
 
-    diagonalization_results_path = get_diagonalization_results_path(sym_path)
-    res = append_path_tokens(diagonalization_results_path, 'exps')
+    eigencalc_results_path = get_eigencalc_results_path(sym_path)
+    res = append_path_tokens(eigencalc_results_path, 'exps')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -416,10 +416,10 @@ contains
   function get_spectrum_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    character(:), allocatable :: diagonalization_results_path
+    character(:), allocatable :: eigencalc_results_path
 
-    diagonalization_results_path = get_diagonalization_results_path(sym_path)
-    res = append_path_tokens(diagonalization_results_path, 'spec.out')
+    eigencalc_results_path = get_eigencalc_results_path(sym_path)
+    res = append_path_tokens(eigencalc_results_path, 'spec.out')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
