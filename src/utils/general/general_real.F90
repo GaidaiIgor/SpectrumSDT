@@ -59,4 +59,13 @@ module general_real_mod
     res = compare_reals(a, b) == 0
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks if a is approximately equal to b or less
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function approximately_less_equal(a, b) result(res)
+    real(real64), intent(in) :: a, b
+    logical :: res
+    res = compare_reals(a, b) < 1
+  end function
+
 end module

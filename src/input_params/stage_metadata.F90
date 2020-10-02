@@ -4,12 +4,31 @@
 module stage_metadata_mod
   use dict_utils
   use dictionary
+  use string_mod
   implicit none
 
   private
   public :: get_mandatory_keys, get_optional_keys, get_all_keys
 
 contains
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Adds the first key from *keys* present in *config_dict* to *key_set*
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine add_first_present(key_set, config_dict, keys)
+    class(dictionary_t), intent(inout) :: key_set
+    class(dictionary_t) :: config_dict ! intent(in)
+    class(string), intent(in) :: keys(:)
+    integer :: i
+    character(:), allocatable :: next_key
+
+    do i = 1, size(keys)
+      next_key = keys(i) % to_char_str()
+      if (next_key .in. config_dict) then
+        call add_if_absent(key_set, next_key, 'set')
+        exit
+      end if
+    end do
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns mandatory keys at grids stage
@@ -21,13 +40,14 @@ contains
     call add_if_absent(res, 'stage', 'set')
     call add_if_absent(res, 'grid_rho_from', 'set')
     call add_if_absent(res, 'grid_rho_to', 'set')
-    call add_if_absent(res, 'grid_rho_npoints', 'set')
     call add_if_absent(res, 'grid_theta_from', 'set')
     call add_if_absent(res, 'grid_theta_to', 'set')
-    call add_if_absent(res, 'grid_theta_npoints', 'set')
     call add_if_absent(res, 'grid_phi_from', 'set')
     call add_if_absent(res, 'grid_phi_to', 'set')
-    call add_if_absent(res, 'grid_phi_npoints', 'set')
+
+    call add_first_present(res, config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
+    call add_first_present(res, config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
+    call add_first_present(res, config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -255,12 +275,17 @@ contains
     call add_if_absent(res, 'grid_rho_from', 'set')
     call add_if_absent(res, 'grid_rho_to', 'set')
     call add_if_absent(res, 'grid_rho_npoints', 'set')
+    call add_if_absent(res, 'grid_rho_step', 'set')
+
     call add_if_absent(res, 'grid_theta_from', 'set')
     call add_if_absent(res, 'grid_theta_to', 'set')
     call add_if_absent(res, 'grid_theta_npoints', 'set')
+    call add_if_absent(res, 'grid_theta_step', 'set')
+
     call add_if_absent(res, 'grid_phi_from', 'set')
     call add_if_absent(res, 'grid_phi_to', 'set')
     call add_if_absent(res, 'grid_phi_npoints', 'set')
+    call add_if_absent(res, 'grid_phi_step', 'set')
 
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'J', 'set')

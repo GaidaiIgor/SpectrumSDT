@@ -30,6 +30,10 @@ module general_utils
     module procedure :: approximately_equal
   end interface
 
+  interface operator (.ale.)
+    module procedure :: approximately_less_equal
+  end interface
+
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

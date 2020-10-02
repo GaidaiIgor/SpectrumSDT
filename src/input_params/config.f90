@@ -78,6 +78,37 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Makes sure only one of the parameters in the group is set
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_only_one_set(config_dict, group)
+    class(dictionary_t) :: config_dict ! intent(in)
+    class(string), intent(in) :: group(:)
+    logical :: is_set
+    integer :: i
+    character(:), allocatable :: next_key
+
+    is_set = .false.
+    do i = 1, size(group)
+      next_key = group(i) % to_char_str()
+      if (next_key .in. config_dict) then
+        call assert(.not. is_set, 'Only one of the following keys can be set: ' // string_arr_to_char_str(group))
+        is_set = .true.
+      end if
+    end do
+    call assert(is_set, 'One of the following keys has be to specified: ' // string_arr_to_char_str(group))
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks group conditions
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_parameter_groups(config_dict)
+    class(dictionary_t) :: config_dict ! intent(in)
+    call check_only_one_set(config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
+    call check_only_one_set(config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
+    call check_only_one_set(config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks whether all mandatory keys of this stage are specified in config
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_mandatory_keys(config_dict, mandatory_keys)
@@ -138,7 +169,7 @@ contains
         max_iterations, sequential, optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
-    real(real64) :: grid_rho_from, grid_rho_to, grid_theta_from, grid_theta_to, grid_phi_from, grid_phi_to, cutoff_energy
+    real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, cutoff_energy
     character(:), allocatable :: stage, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
     type(string), allocatable :: tokens(:)
 
@@ -150,12 +181,17 @@ contains
     grid_rho_from = str2real(item_or_default(config_dict, 'grid_rho_from', '-1'))
     grid_rho_to = str2real(item_or_default(config_dict, 'grid_rho_to', '-1'))
     grid_rho_npoints = str2int(item_or_default(config_dict, 'grid_rho_npoints', '-1'))
+    grid_rho_step = str2real(item_or_default(config_dict, 'grid_rho_step', '-1'))
+
     grid_theta_from = str2real(item_or_default(config_dict, 'grid_theta_from', '-1'))
     grid_theta_to = str2real(item_or_default(config_dict, 'grid_theta_to', '-1'))
     grid_theta_npoints = str2int(item_or_default(config_dict, 'grid_theta_npoints', '-1'))
+    grid_theta_step = str2real(item_or_default(config_dict, 'grid_theta_step', '-1'))
+
     grid_phi_from = str2real(item_or_default(config_dict, 'grid_phi_from', '-1'))
     grid_phi_to = str2real(item_or_default(config_dict, 'grid_phi_to', '-1'))
     grid_phi_npoints = str2int(item_or_default(config_dict, 'grid_phi_npoints', '-1'))
+    grid_phi_step = str2real(item_or_default(config_dict, 'grid_phi_step', '-1'))
 
     molecule = item_or_default(config_dict, 'molecule', '-1')
     J = str2int(item_or_default(config_dict, 'J', '-1'))
@@ -211,8 +247,8 @@ contains
     test_mode = item_or_default(config_dict, 'test_mode', '-1')
     debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
 
-    config = input_params(stage, rovib, fix_basis_jk, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_theta_from, grid_theta_to, grid_theta_npoints, grid_phi_from, grid_phi_to, &
-        grid_phi_npoints, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, &
+    config = input_params(stage, rovib, fix_basis_jk, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, grid_theta_from, grid_theta_to, grid_theta_npoints, &
+        grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, &
         num_states, ncv, mpd, max_iterations, cap_type, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
   end function
 
@@ -254,25 +290,32 @@ contains
     integer :: K_min
 
     call assert((params % grid_rho_from .aeq. -1d0) .or. params % grid_rho_from >= 0, 'Error: grid_rho_from should be >= 0')
-    call assert((params % grid_rho_to .aeq. -1d0) .or. params % grid_rho_to >= 0, 'Error: grid_rho_to should be >= 0')
+    call assert((params % grid_rho_to .aeq. -1d0) .or. params % grid_rho_to > 0, 'Error: grid_rho_to should be > 0')
     if (.not. (params % grid_rho_from .aeq. -1d0) .and. .not. (params % grid_rho_to .aeq. -1d0)) then
       call assert(params % grid_rho_from < params % grid_rho_to, 'Error: grid_rho_from should be < grid_rho_to')
     end if
     call assert(params % grid_rho_npoints == -1 .or. params % grid_rho_npoints > 0, 'Error: grid_rho_npoints should be > 0')
+    call assert((params % grid_rho_step .aeq. -1d0) .or. params % grid_rho_step > 0, 'Error: grid_rho_step should be > 0')
 
     call assert((params % grid_theta_from .aeq. -1d0) .or. params % grid_theta_from >= 0, 'Error: grid_theta_from should be >= 0')
-    call assert((params % grid_theta_to .aeq. -1d0) .or. params % grid_theta_to >= 0, 'Error: grid_theta_to should be >= 0')
+    call assert((params % grid_theta_from .aeq. -1d0) .or. params % grid_theta_from < pi, 'Error: grid_theta_from should be < pi')
+    call assert((params % grid_theta_to .aeq. -1d0) .or. params % grid_theta_to > 0, 'Error: grid_theta_to should be > 0')
+    call assert((params % grid_theta_to .aeq. -1d0) .or. params % grid_theta_to < pi, 'Error: grid_theta_to should be < pi')
     if (.not. (params % grid_theta_from .aeq. -1d0) .and. .not. (params % grid_theta_to .aeq. -1d0)) then
       call assert(params % grid_theta_from < params % grid_theta_to, 'Error: grid_theta_from should be < grid_theta_to')
     end if
     call assert(params % grid_theta_npoints == -1 .or. params % grid_theta_npoints > 0, 'Error: grid_theta_npoints should be > 0')
+    call assert((params % grid_theta_step .aeq. -1d0) .or. params % grid_theta_step > 0, 'Error: grid_theta_step should be > 0')
 
     call assert((params % grid_phi_from .aeq. -1d0) .or. params % grid_phi_from >= 0, 'Error: grid_phi_from should be >= 0')
-    call assert((params % grid_phi_to .aeq. -1d0) .or. params % grid_phi_to >= 0, 'Error: grid_phi_to should be >= 0')
+    call assert((params % grid_phi_from .aeq. -1d0) .or. params % grid_phi_from < 2*pi, 'Error: grid_phi_from should be < 2*pi')
+    call assert((params % grid_phi_to .aeq. -1d0) .or. params % grid_phi_to > 0, 'Error: grid_phi_to should be > 0')
+    call assert((params % grid_phi_to .aeq. -1d0) .or. (params % grid_phi_to .ale. 2*pi), 'Error: grid_phi_to should be <= 2*pi')
     if (.not. (params % grid_phi_from .aeq. -1d0) .and. .not. (params % grid_phi_to .aeq. -1d0)) then
       call assert(params % grid_phi_from < params % grid_phi_to, 'Error: grid_phi_from should be < grid_phi_to')
     end if
     call assert(params % grid_phi_npoints == -1 .or. params % grid_phi_npoints > 0, 'Error: grid_phi_npoints should be > 0')
+    call assert((params % grid_phi_step .aeq. -1d0) .or. params % grid_phi_step > 0, 'Error: grid_phi_step should be > 0')
 
     call assert(any(params % molecule == [character(len = 100) :: '-1', '686', '868']), 'Error: molecule can be "686" or "868"')
     call assert(params % J >= -1, 'Error: J should be >= 0')
@@ -324,6 +367,7 @@ contains
     end if
 
     call check_behavior_control_values(raw_config)
+    call check_parameter_groups(raw_config)
     mandatory_keys = get_mandatory_keys(raw_config)
     optional_keys = get_optional_keys(raw_config)
     all_keys = get_all_keys()

@@ -12,14 +12,17 @@ module input_params_mod
     real(real64) :: grid_rho_from
     real(real64) :: grid_rho_to
     integer :: grid_rho_npoints
+    real(real64) :: grid_rho_step
 
     real(real64) :: grid_theta_from
     real(real64) :: grid_theta_to
     integer :: grid_theta_npoints
+    real(real64) :: grid_theta_step
 
     real(real64) :: grid_phi_from
     real(real64) :: grid_phi_to
     integer :: grid_phi_npoints
+    real(real64) :: grid_phi_step
 
     ! System
     character(:), allocatable :: molecule ! isotope composition, like 686

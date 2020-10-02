@@ -65,7 +65,7 @@ set(dict_integer_array ${prefix}/src/utils/dict/dict_integer_array.F90)
 set(dict_char_str ${prefix}/src/utils/dict/dict_char_str.F90)
 set(dict_utils ${dict_integer} ${dict_integer_array} ${dict_char_str} ${string} ${vector_string} ${prefix}/src/utils/dict/dict.F90)
 
-set(stage_metadata ${dict_utils} ${prefix}/src/input_params/stage_metadata.F90)
+set(stage_metadata ${dict_utils} ${string} ${prefix}/src/input_params/stage_metadata.F90)
 set(string_utils ${vector_string} ${prefix}/src/utils/string/string_utils.f90)
 
 set(io_base ${general_utils} ${prefix}/src/utils/io/io_base.f90)

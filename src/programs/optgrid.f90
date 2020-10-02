@@ -24,14 +24,14 @@ module global_vars
   real(real64) :: zpe
   real(real64),allocatable :: grid_rho(:), grid_theta(:), grid_phi(:)
   real(real64),allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
-  real(real64) :: alpha_rho, alpha_theta, alpha_phi
+  real(real64) :: rho_step, theta_step, phi_step
   real(real64) :: Emax1,Emax2,Emax3
   real(real64) :: rho_from, rho_to
   real(real64) :: theta_from, theta_to
   real(real64) :: phi_from, phi_to
   real(real64) :: eps
   integer :: nenv1,nenv2,nenv3
-  integer :: npoints_rho, npoints_theta, npoints_phi
+  integer :: rho_npoints, theta_npoints, phi_npoints
   integer :: envtype1,envtype2,envtype3
   integer :: rgrid,symmphi
   !--- Envelopes ---
@@ -62,12 +62,28 @@ program optgrid
 
   params = process_user_settings('spectrumsdt.config')
   call input_parameters(params)
-  call generate_equidistant_grid_points(params % grid_rho_from, params % grid_rho_to, params % grid_rho_npoints, grid_rho, jac_rho, alpha_rho)
-  call generate_equidistant_grid_points(params % grid_theta_from, params % grid_theta_to, params % grid_theta_npoints, grid_theta, jac_theta, alpha_theta)
-  call generate_equidistant_grid_points(params % grid_phi_from, params % grid_phi_to, params % grid_phi_npoints, grid_phi, jac_phi, alpha_phi)
-  call print_grid(grid_rho, jac_rho, alpha_rho, 'grid_rho.dat')
-  call print_grid(grid_theta, jac_theta, alpha_theta, 'grid_theta.dat')
-  call print_grid(grid_phi, jac_phi, alpha_phi, 'grid_phi.dat')
+
+  if (params % grid_rho_npoints == -1) then
+    call generate_equidistant_grid_step(params % grid_rho_from, params % grid_rho_to, params % grid_rho_step, grid_rho, jac_rho, rho_npoints)
+  else
+    call generate_equidistant_grid_points(params % grid_rho_from, params % grid_rho_to, params % grid_rho_npoints, grid_rho, jac_rho, rho_step)
+  end if
+
+  if (params % grid_theta_npoints == -1) then
+    call generate_equidistant_grid_step(params % grid_theta_from, params % grid_theta_to, params % grid_theta_step, grid_theta, jac_theta, theta_npoints)
+  else
+    call generate_equidistant_grid_points(params % grid_theta_from, params % grid_theta_to, params % grid_theta_npoints, grid_theta, jac_theta, theta_step)
+  end if
+
+  if (params % grid_phi_npoints == -1) then
+    call generate_equidistant_grid_step(params % grid_phi_from, params % grid_phi_to, params % grid_phi_step, grid_phi, jac_phi, phi_npoints)
+  else
+    call generate_equidistant_grid_points(params % grid_phi_from, params % grid_phi_to, params % grid_phi_npoints, grid_phi, jac_phi, phi_step)
+  end if
+
+  call print_grid(grid_rho, jac_rho, rho_step, 'grid_rho.dat')
+  call print_grid(grid_theta, jac_theta, theta_step, 'grid_theta.dat')
+  call print_grid(grid_phi, jac_phi, phi_step, 'grid_phi.dat')
   print *, 'Done'
 
   ! allocate(env1(nenv1), pot1(nenv1), env1_2d(nenv1), env2(nenv2), pot2(nenv2), env2_2d(nenv2), env3(nenv3), pot3(nenv3), env3_2d(nenv3), g1(n1), g2(n2), g3(n3), jac1(n1), jac2(n2), jac3(n3))
@@ -114,13 +130,18 @@ contains
 
     rho_from = params % grid_rho_from
     rho_to = params % grid_rho_to
-    npoints_rho = params % grid_rho_npoints
+    rho_npoints = params % grid_rho_npoints
+    rho_step = params % grid_rho_step
+
     theta_from = params % grid_theta_from
     theta_to = params % grid_theta_to
-    npoints_theta = params % grid_theta_npoints
+    theta_npoints = params % grid_theta_npoints
+    theta_step = params % grid_theta_step
+
     phi_from = params % grid_phi_from
     phi_to = params % grid_phi_to
-    npoints_phi = params % grid_phi_npoints
+    phi_npoints = params % grid_phi_npoints
+    phi_step = params % grid_phi_step
 
     Emax1 = 0d0
     Emax2 = 0d0
@@ -128,9 +149,6 @@ contains
     nenv1 = 1
     nenv2 = 1
     nenv3 = 1
-    alpha_rho = 0d0
-    alpha_theta = 0d0
-    alpha_phi = 0d0
     envtype1 = 2
     envtype2 = 2
     envtype3 = 2
