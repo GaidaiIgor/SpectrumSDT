@@ -8,7 +8,7 @@ module string_mod
   end interface
   
   interface assignment(=)
-    procedure :: assign_char_str, assign_char_str_array
+    module procedure :: assign_char_str, assign_char_str_array
   end interface
   
   type :: string 
@@ -17,9 +17,9 @@ module string_mod
     procedure :: write => write_string
     generic :: write(formatted) => write
 
+    procedure :: compare_char_str
     procedure :: compare_string
-    procedure :: compare_string_arr
-    generic :: operator(==) => compare_string, compare_string_arr
+    generic :: operator(==) => compare_char_str, compare_string
     
     procedure :: to_char_str
     procedure :: to_integer
@@ -32,7 +32,7 @@ module string_mod
 contains
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes
+! Writes string
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine write_string(this, unit, iotype, v_list, iostat, iomsg)
     class(string), intent(in) :: this
@@ -43,27 +43,24 @@ contains
     character(*), intent(inout) :: iomsg
     write(unit, *) this % s
   end subroutine
-  
-!---------------------------------------------------------------------------------------------------------------------------------------------
-! Compares two strings
-!---------------------------------------------------------------------------------------------------------------------------------------------
-  function compare_string(this, other) result(res)
-    class(string), intent(in) :: this, other
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Compares with char str
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  elemental function compare_char_str(this, char_str) result(res)
+    class(string), intent(in) :: this
+    character(*), intent(in) :: char_str
     logical :: res
-    res = this % s == other % s
+    res = this % s == char_str
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Compares a string with an array of strings
+! Compares two strings
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  function compare_string_arr(this, others) result(res)
-    class(string), intent(in) :: this
-    class(string), intent(in) :: others(:)
-    logical, allocatable :: res(:)
-    integer :: i
-
-    allocate(res(size(others)))
-    res = [(this % s == others(i) % s, i = 1, size(others))]
+  elemental function compare_string(this, other) result(res)
+    class(string), intent(in) :: this, other
+    logical :: res
+    res = this % s == other % s
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
@@ -135,7 +132,7 @@ contains
   end function
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! MODULE FUNCTIONS
+! MODULE PROCEDURES
 !---------------------------------------------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Constructs a string from a char string
@@ -149,7 +146,7 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Constructs a string array from a char string array. Input char strings are trimmed.
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  function to_string_char_str_arr_trim(char_str_arr) result(str_arr)
+  function to_string_char_str_arr(char_str_arr) result(str_arr)
     character(*), intent(in) :: char_str_arr(:)
     type(string), allocatable :: str_arr(:)
     integer :: i

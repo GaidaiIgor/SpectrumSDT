@@ -4,15 +4,18 @@ module input_params_mod
 
   type :: input_params
     ! Behavior control
-    character(:), allocatable :: stage ! basis, overlaps, eigencalc or properties
-    integer :: rovib_coupling ! enables/disables rovib_coupling coupling. 0 or 1
+    character(:), allocatable :: stage ! grids, basis, overlaps, eigencalc or properties
+    integer :: optimized_grid_rho ! optimized distribution of rho grid points
+    integer :: rovib_coupling ! enables/disables rovib_coupling coupling
     integer :: fix_basis_jk ! use basis set with the same fixed values of J and K for all calculations
+    character(:), allocatable :: cap_type ! type of Complex Absorbing Potential
 
     ! Grids
     real(real64) :: grid_rho_from
     real(real64) :: grid_rho_to
     integer :: grid_rho_npoints
     real(real64) :: grid_rho_step
+    character(:), allocatable :: envelope_rho_path
 
     real(real64) :: grid_theta_from
     real(real64) :: grid_theta_to
@@ -44,10 +47,7 @@ module input_params_mod
     integer :: mpd ! maximum projected dimension, slepc only
     integer :: max_iterations ! maximum number of iterations during eigencalc
     
-    ! CAP
-    character(:), allocatable :: cap_type
-    
-    ! Paths
+    ! Misc paths
     character(:), allocatable :: grid_path ! path to folder with grid calculations
     character(:), allocatable :: root_path ! path to root folder for main calculations
     character(:), allocatable :: channels_root ! path to folder with channels data

@@ -36,6 +36,7 @@ contains
   function get_mandatory_keys_grids(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
+    character(:), allocatable :: optimized_grid_rho
 
     call add_if_absent(res, 'stage', 'set')
     call add_if_absent(res, 'grid_rho_from', 'set')
@@ -45,9 +46,14 @@ contains
     call add_if_absent(res, 'grid_phi_from', 'set')
     call add_if_absent(res, 'grid_phi_to', 'set')
 
-    call add_first_present(res, config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
-    call add_first_present(res, config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
-    call add_first_present(res, config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
+    call add_first_present(res, config_dict, to_string_char_str_arr([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
+    call add_first_present(res, config_dict, to_string_char_str_arr([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
+    call add_first_present(res, config_dict, to_string_char_str_arr([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
+
+    optimized_grid_rho = item_or_default(config_dict, 'optimized_grid_rho', '0')
+    if (optimized_grid_rho == '1') then
+      call add_if_absent(res, 'envelope_rho_path', 'set')
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -181,6 +187,7 @@ contains
   function get_optional_keys_grids(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
+    call add_if_absent(res, 'optimized_grid_rho', 'set')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -209,10 +216,10 @@ contains
     type(dictionary_t) :: res
     character(:), allocatable :: rovib_coupling
 
+    call add_if_absent(res, 'cap_type', 'set')
     call add_if_absent(res, 'ncv', 'set')
     call add_if_absent(res, 'mpd', 'set')
     call add_if_absent(res, 'max_iterations', 'set')
-    call add_if_absent(res, 'cap_type', 'set')
     call add_if_absent(res, 'sequential', 'set')
 
     rovib_coupling = item_or_default(res, 'rovib_coupling', 'unset')
@@ -269,13 +276,16 @@ contains
     type(dictionary_t) :: res
 
     call add_if_absent(res, 'stage', 'set')
+    call add_if_absent(res, 'optimized_grid_rho', 'set')
     call add_if_absent(res, 'rovib_coupling', 'set')
     call add_if_absent(res, 'fix_basis_jk', 'set')
+    call add_if_absent(res, 'cap_type', 'set')
 
     call add_if_absent(res, 'grid_rho_from', 'set')
     call add_if_absent(res, 'grid_rho_to', 'set')
     call add_if_absent(res, 'grid_rho_npoints', 'set')
     call add_if_absent(res, 'grid_rho_step', 'set')
+    call add_if_absent(res, 'envelope_rho_path', 'set')
 
     call add_if_absent(res, 'grid_theta_from', 'set')
     call add_if_absent(res, 'grid_theta_to', 'set')
@@ -303,8 +313,6 @@ contains
     call add_if_absent(res, 'ncv', 'set')
     call add_if_absent(res, 'mpd', 'set')
     call add_if_absent(res, 'max_iterations', 'set')
-    
-    call add_if_absent(res, 'cap_type', 'set')
     
     call add_if_absent(res, 'grid_path', 'set')
     call add_if_absent(res, 'root_path', 'set')

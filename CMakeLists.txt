@@ -93,7 +93,7 @@ set(lapack_interface ${general_utils} ${prefix}/src/interface/lapack.f90)
 set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${input_params} ${io_utils} ${lapack_interface} ${matmul_operator} ${parabola} ${parallel_utils} ${pesgeneral} ${rovib_io} ${slepc_solver} ${debug_tools} ${prefix}/src/tools/sdt.f90)
 set(optgrid_tools ${general_utils} ${numerical_recipies} ${prefix}/src/tools/optgrid_tools.f90)
 
-set(optgrid ${config} ${constants} ${input_params} ${optgrid_tools} ${path_utils} ${prefix}/src/programs/optgrid.f90)
+set(optgrid ${config} ${constants} ${general_utils} ${input_params} ${numerical_recipies} ${optgrid_tools} ${path_utils} ${prefix}/src/programs/optgrid.f90)
 set(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${prefix}/src/programs/pesprint.f90)
 set(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${fourier_transform} ${general_vars} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} ${prefix}/src/programs/spectrumsdt.F90)
 

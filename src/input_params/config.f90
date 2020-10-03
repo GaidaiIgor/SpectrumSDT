@@ -52,28 +52,83 @@ contains
     end do
     close(file_unit)
   end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! If *key* is not present in *config_dict*, it adds *key*/*value* pair to both *config_dict* and *set_keys*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine set_default(key, value, config_dict, set_keys)
+    character(*), intent(in) :: key, value
+    class(dictionary_t), intent(inout) :: config_dict, set_keys
+
+    if (key .in. config_dict) then
+      return
+    end if
+    call add_if_absent(config_dict, key, value)
+    call add_if_absent(set_keys, key, value)
+  end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Sets default values in *config_dict* and returns actually set keys.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function set_defaults(config_dict) result(set_keys)
+    class(dictionary_t), intent(inout) :: config_dict
+    type(dictionary_t) :: set_keys
+    character(:), allocatable :: stage, sequential
+
+    call set_default('optimized_grid_rho', '0', config_dict, set_keys)
+    call set_default('cap_type', 'none', config_dict, set_keys)
+    call set_default('ncv', '-1', config_dict, set_keys)
+    call set_default('mpd', '-1', config_dict, set_keys)
+
+    ! These parameters should not normally be changed and their defaults are not announced
+    call set_default('max_iterations', '10000', config_dict, set_keys)
+    call set_default('enable_terms', '11', config_dict, set_keys)
+    call set_default('optimized_mult', '1', config_dict, set_keys)
+
+    ! Conditional defaults
+    stage = item_or_default(config_dict, 'stage', 'unset')
+    sequential = iff(stage /= 'grids', '0', '1')
+    call set_default('sequential', sequential, config_dict, set_keys)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Makes sure *key* is present in *config_dict* and the corresponding value is set to one of the allowed values
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_value_one_of(config_dict, key, allowed_values)
+    class(dictionary_t) :: config_dict ! intent(in)
+    character(*), intent(in) :: key
+    class(string), intent(in) :: allowed_values(:)
+    character(:), allocatable :: value
+
+    value = item_or_default(config_dict, key, 'unset')
+    call assert(value /= 'unset', 'Error: the following key has to be specified: ' // key)
+    call assert(any(allowed_values == value), 'Error: allowed values of "' // key // '" are: ' // string_arr_to_char_str(allowed_values))
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks whether behavior control variables have legit values. This has to be done ahead of normal checking since these values alter
-! checking behavior.
+! checking behavior itself.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_behavior_control_values(config_dict)
     class(dictionary_t) :: config_dict ! intent(in)
-    character(:), allocatable :: stage, rovib_coupling, fix_basis_jk
+    character(:), allocatable :: stage
 
+    call check_value_one_of(config_dict, 'stage', string([character(100) :: 'grids', 'basis', 'overlaps', 'eigencalc', 'properties']))
     stage = item_or_default(config_dict, 'stage', 'unset')
-    rovib_coupling = item_or_default(config_dict, 'rovib_coupling', 'unset')
-    fix_basis_jk = item_or_default(config_dict, 'fix_basis_jk', 'unset')
 
-    call assert(stage /= 'unset', 'Error: stage has to be specified')
-    call assert(any(stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigencalc', 'properties']), &
-        'Error: allowed values of "stage" are "grids", "basis", "overlaps", "eigencalc" or "properties"')
+    if (stage == 'grids') then
+      call check_value_one_of(config_dict, 'optimized_grid_rho', string(['0', '1']))
+    end if
 
-    if (any(stage == [character(100) :: 'overlaps', 'eigencalc', 'properties'])) then
-      call assert(rovib_coupling /= 'unset', 'Error: rovib_coupling has to be specified')
-      call assert(fix_basis_jk /= 'unset', 'Error: fix_basis_jk has to be specified')
-      call assert(rovib_coupling == '0' .or. rovib_coupling == '1', 'Error: allowed values of "rovib_coupling" are 0 or 1')
-      call assert(fix_basis_jk == '0' .or. fix_basis_jk == '1', 'Error: allowed values of "fix_basis_jk" are 0 or 1')
+    if (stage == 'overlaps') then
+      call check_value_one_of(config_dict, 'rovib_coupling', string(['0', '1']))
+      call check_value_one_of(config_dict, 'fix_basis_jk', string(['0', '1']))
+    end if
+
+    if (stage == 'eigencalc' .or. stage == 'properties') then
+      call check_value_one_of(config_dict, 'rovib_coupling', string(['0', '1']))
+      call check_value_one_of(config_dict, 'fix_basis_jk', string(['0', '1']))
+      call check_value_one_of(config_dict, 'cap_type', string([character(100) :: 'none', 'Manolopoulos']))
     end if
   end subroutine
 
@@ -103,9 +158,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_parameter_groups(config_dict)
     class(dictionary_t) :: config_dict ! intent(in)
-    call check_only_one_set(config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
-    call check_only_one_set(config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
-    call check_only_one_set(config_dict, to_string_char_str_arr_trim([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
+    call check_only_one_set(config_dict, to_string_char_str_arr([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
+    call check_only_one_set(config_dict, to_string_char_str_arr([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
+    call check_only_one_set(config_dict, to_string_char_str_arr([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -143,8 +198,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks whether some of the specified keys will be unused
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_unused_keys(config_dict, mandatory_keys, optional_keys)
-    class(dictionary_t) :: config_dict, mandatory_keys, optional_keys ! intent(in)
+  subroutine check_unused_keys(config_dict, mandatory_keys, optional_keys, set_default_keys)
+    class(dictionary_t) :: config_dict, mandatory_keys, optional_keys, set_default_keys ! intent(in)
     integer :: i
     character(:), allocatable :: next_key
     type(string), allocatable :: config_keys(:)
@@ -152,7 +207,7 @@ contains
     config_keys = key_set(config_dict)
     do i = 1, size(config_keys)
       next_key = config_keys(i) % to_char_str()
-      if (.not. ((next_key .in. mandatory_keys) .or. (next_key .in. optional_keys))) then
+      if (.not. ((next_key .in. mandatory_keys) .or. (next_key .in. optional_keys) .or. (next_key .in. set_default_keys))) then
         call print_parallel('Info: the following key is not used at this stage: ' // next_key)
       end if
     end do
@@ -165,23 +220,26 @@ contains
   function process_raw_config(config_dict) result(config)
     class(dictionary_t) :: config_dict ! intent(in)
     type(input_params) :: config
-    integer :: rovib, fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, &
+    integer :: optimized_grid_rho, rovib_coupling, fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, &
         max_iterations, sequential, optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
     real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, cutoff_energy
-    character(:), allocatable :: stage, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
+    character(:), allocatable :: stage, envelope_rho_path, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
     type(string), allocatable :: tokens(:)
 
     ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults
     stage = item_or_default(config_dict, 'stage', '-1')
-    rovib = str2int(item_or_default(config_dict, 'rovib_coupling', '-1'))
+    optimized_grid_rho = str2int(item_or_default(config_dict, 'optimized_grid_rho', '-1'))
+    rovib_coupling = str2int(item_or_default(config_dict, 'rovib_coupling', '-1'))
     fix_basis_jk = str2int(item_or_default(config_dict, 'fix_basis_jk', '-1'))
+    cap_type = item_or_default(config_dict, 'cap_type', '-1')
 
     grid_rho_from = str2real(item_or_default(config_dict, 'grid_rho_from', '-1'))
     grid_rho_to = str2real(item_or_default(config_dict, 'grid_rho_to', '-1'))
     grid_rho_npoints = str2int(item_or_default(config_dict, 'grid_rho_npoints', '-1'))
     grid_rho_step = str2real(item_or_default(config_dict, 'grid_rho_step', '-1'))
+    envelope_rho_path = item_or_default(config_dict, 'envelope_rho_path', '-1')
 
     grid_theta_from = str2real(item_or_default(config_dict, 'grid_theta_from', '-1'))
     grid_theta_to = str2real(item_or_default(config_dict, 'grid_theta_to', '-1'))
@@ -226,8 +284,6 @@ contains
     mpd = str2int(item_or_default(config_dict, 'mpd', '-1'))
     max_iterations = str2int(item_or_default(config_dict, 'max_iterations', '-1'))
 
-    cap_type = item_or_default(config_dict, 'cap_type', '-1')
-
     grid_path = item_or_default(config_dict, 'grid_path', '-1')
     root_path = item_or_default(config_dict, 'root_path', '-1')
     channels_root = item_or_default(config_dict, 'channels_root', '-1')
@@ -247,38 +303,11 @@ contains
     test_mode = item_or_default(config_dict, 'test_mode', '-1')
     debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
 
-    config = input_params(stage, rovib, fix_basis_jk, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, grid_theta_from, grid_theta_to, grid_theta_npoints, &
-        grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, &
-        num_states, ncv, mpd, max_iterations, cap_type, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
+    config = input_params(stage, optimized_grid_rho, rovib_coupling, fix_basis_jk, cap_type, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, envelope_rho_path, grid_theta_from, &
+        grid_theta_to, grid_theta_npoints, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, &
+        molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, num_states, ncv, &
+        mpd, max_iterations, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
   end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Sets default values
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine set_defaults(params, optional_keys)
-    class(input_params), intent(inout) :: params
-    class(dictionary_t) :: optional_keys ! intent(in)
-    integer :: sequential_default
-
-    if (params % cap_type == '-1' .and. ('cap_type' .in. optional_keys)) then
-      params % cap_type = 'none'
-      call print_parallel('cap_type is not specified. Assuming default = none')
-    end if
-    if (params % ncv == -1 .and. ('ncv' .in. optional_keys)) then
-      call print_parallel('ncv is not specified. Its value will be determined by SLEPc')
-    end if
-    if (params % mpd == -1 .and. ('mpd' .in. optional_keys)) then
-      call print_parallel('mpd is not specified. Its value will be determined by SLEPc')
-    end if
-
-    ! Silent defaults. These parameters should not normally be changed.
-    params % max_iterations = iff(params % max_iterations == -1, 10000, params % max_iterations)
-    sequential_default = iff(params % stage /= 'grids', 0, 1)
-    params % sequential = iff(params % sequential == -1, sequential_default, params % sequential)
-    params % enable_terms(1) = iff(params % enable_terms(1) == -1, 1, params % enable_terms(1))
-    params % enable_terms(2) = iff(params % enable_terms(2) == -1, 1, params % enable_terms(2))
-    params % optimized_mult = iff(params % optimized_mult == -1, 1, params % optimized_mult)
-  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of values of parameters
@@ -339,7 +368,6 @@ contains
     call assert(params % mpd == -1 .or. params % mpd > 0, 'Error: mpd should be > 0')
     call assert(params % max_iterations == -1 .or. params % max_iterations > 0, 'Error: max_iterations should be > 0')
 
-    call assert(any(params % cap_type == [character(len = 100) :: '-1', 'none', 'Manolopoulos']), 'Error: cap_type can be "none" or "Manolopoulos"')
     call assert(any(params % sequential == [-1, 0, 1]), 'Error: sequential can be 0 or 1')
     call assert(any(params % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
     call assert(any(params % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) can be 0 or 1')
@@ -347,36 +375,64 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! If *key* was default-set and is actually used at this stage, prints a standard notification message or custom *message*, if given.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine announce_default(key, set_default_keys, optional_keys, message)
+    character(*), intent(in) :: key
+    class(dictionary_t) :: set_default_keys, optional_keys ! intent(in)
+    character(*), optional, intent(in) :: message
+    character(:), allocatable :: default_value
+
+    if ((key .in. set_default_keys) .and. (key .in. optional_keys)) then
+      if (present(message)) then
+        call print_parallel(message)
+      else
+        default_value = item_or_default(set_default_keys, key, 'unset')
+        call print_parallel(key // 'is not specified. Assuming default = ' // default_value)
+      end if
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Announces previously set default if its value is going to be used, as specified by *optional_keys*
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine announce_defaults(set_default_keys, optional_keys)
+    class(dictionary_t) :: set_default_keys, optional_keys ! intent(in)
+    call announce_default('optimized_grid_rho', set_default_keys, optional_keys)
+    call announce_default('cap_type', set_default_keys, optional_keys)
+    call announce_default('ncv', set_default_keys, optional_keys, message = 'ncv is not specified. Its value will be determined by SLEPc')
+    call announce_default('mpd', set_default_keys, optional_keys, message = 'mpd is not specified. Its value will be determined by SLEPc')
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Assigns default values to some parameters if unset by user. Not all parameters have reasonable defaults.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function process_user_settings(settings_path) result(params)
     character(*), intent(in) :: settings_path ! path to the file with settings
-    character(:), allocatable :: stage, sequential_default, sequential
-    type(dictionary_t) :: raw_config, mandatory_keys, optional_keys, all_keys
+    type(dictionary_t) :: config_dict, set_default_keys, mandatory_keys, optional_keys, all_keys
     type(input_params) :: params
     integer :: ierr
     
     ! Parse the raw file and structure its content into a dictionary
-    raw_config = read_config_dict(settings_path)
+    config_dict = read_config_dict(settings_path)
+    set_default_keys = set_defaults(config_dict)
     ! Pull out sequential ahead of time as we need to decide if parallel mode should be initialized first
-    stage = item_or_default(raw_config, 'stage', 'unset')
-    sequential_default = iff(stage /= 'grids', '0', '1')
-    sequential = item_or_default(raw_config, 'sequential', sequential_default) ! Sequential execution is disabled by default
-    if (sequential == '0') then
+    if (item_or_default(config_dict, 'sequential', '0') == '0') then
       call MPI_Init(ierr)
     end if
 
-    call check_behavior_control_values(raw_config)
-    call check_parameter_groups(raw_config)
-    mandatory_keys = get_mandatory_keys(raw_config)
-    optional_keys = get_optional_keys(raw_config)
+    call check_behavior_control_values(config_dict)
+    call check_parameter_groups(config_dict)
+    mandatory_keys = get_mandatory_keys(config_dict)
+    optional_keys = get_optional_keys(config_dict)
     all_keys = get_all_keys()
-    call check_mandatory_keys(raw_config, mandatory_keys)
-    call check_extra_keys(raw_config, all_keys)
-    call check_unused_keys(raw_config, mandatory_keys, optional_keys)
 
-    params = process_raw_config(raw_config)
-    call set_defaults(params, optional_keys)
+    call check_mandatory_keys(config_dict, mandatory_keys)
+    call check_extra_keys(config_dict, all_keys)
+    call check_unused_keys(config_dict, mandatory_keys, optional_keys, set_default_keys)
+
+    params = process_raw_config(config_dict)
     call check_params_values(params)
+    call announce_defaults(set_default_keys, optional_keys)
   end function
 end module
