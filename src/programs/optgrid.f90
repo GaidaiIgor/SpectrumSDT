@@ -52,7 +52,7 @@ program optgrid
     allocate(env_grid(env_npoints), env_values(env_npoints), spline_deriv_2nd(env_npoints))
     call input_envelopes()
     call find_parabola(env_grid, env_values, env_npoints, env_fit_param, env_fit_min_y, env_fit_min_x)
-    call generate_gridn(grid_rho, jac_rho, params % grid_rho_npoints, params % grid_rho_step, params % grid_rho_from, params % grid_rho_to, env_fit_min_x, eps, der_rho)
+    call generate_gridn(grid_rho, jac_rho, params % grid_rho_npoints, params % grid_rho_step, params % grid_rho_from, params % grid_rho_to, env_fit_min_x, eps, optgrid_diff_rhs)
   else
     if (params % grid_rho_npoints == -1) then
       call generate_equidistant_grid_step(params % grid_rho_from, params % grid_rho_to, params % grid_rho_step, grid_rho, jac_rho, rho_npoints)
@@ -86,14 +86,14 @@ program optgrid
   !   call generate_grida(g2,jac2,n2,a2,min2,max2,eps,der_tet)
   !   call generate_grida(g3,jac3,n3,a3,min3,max3,eps,der_phi)
   !   a1 = (a2+a3)/2
-  !   call generate_gridr(g1,jac1,n1,a1,min1,eps,der_rho)
+  !   call generate_gridr(g1,jac1,n1,a1,min1,eps,optgrid_diff_rhs)
   ! case(2)
-  !   call generate_grida(g1,jac1,n1,a1,min1,max1,eps,der_rho)
+  !   call generate_grida(g1,jac1,n1,a1,min1,max1,eps,optgrid_diff_rhs)
   !   call generate_grida(g2,jac2,n2,a2,min2,max2,eps,der_tet)
   !   call generate_grida(g3,jac3,n3,a3,min3,max3,eps,der_phi)
   ! case default
   !   deallocate(g1, g2, g3, jac1, jac2, jac3)
-  !   call generate_gridn(g1,jac1,n1,a1,min1,max1,env_fit_min_x,eps,der_rho)
+  !   call generate_gridn(g1,jac1,n1,a1,min1,max1,env_fit_min_x,eps,optgrid_diff_rhs)
   !   ! call generate_gridn(g2,jac2,n2,a2,min2,max2,envm2,eps,der_tet)
   !
   !   ! Select step/points mode
@@ -200,32 +200,36 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates envelope potential for optimized grid. Left side is represented by Eckart function fitted on rho MEP, right by rho MEP itself.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  real(real64) function envelope_potential(r)
-    real(real64) r,x
+  function envelope_potential(r) result(res)
+    real(real64), intent(in) :: r
+    real(real64) :: res
+    real(real64) :: x
+
     x = r - env_fit_min_x
     if (x < 0) then
-      envelope_potential = -env_fit_min_y * 4 / (exp(x/env_fit_param) + exp(-x/env_fit_param))**2
+      res = -env_fit_min_y * 4 / (exp(x/env_fit_param) + exp(-x/env_fit_param))**2
     else
       if (r > env_grid(env_npoints)) then
-        envelope_potential = env_values(env_npoints)
+        res = env_values(env_npoints)
       else
-        envelope_potential = splint(env_grid, env_values, spline_deriv_2nd, r)
+        res = splint(env_grid, env_values, spline_deriv_2nd, r)
       endif
     endif
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Right-hand side of differential equation for optimized grid generation.
+! Represents a 1-equation system, so only the first element of y and dydx is used.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine der_rho(x,y,dydx)
-    real(real64) x,y,dydx
-    real(real64) argument
-    argument = 2 * mu * (env_emax - envelope_potential(y))
-    if (argument > 0) then
-      dydx = pi / sqrt(argument)
-    else
-      stop 'Potential is greater than env_emax'
-    endif
+  subroutine optgrid_diff_rhs(x, y, dydx)
+    real(real64), intent(in) :: x ! not used, but required for interface conformance
+    real(real64), intent(in) :: y(:)
+    real(real64), intent(out) :: dydx(:)
+    real(real64) :: argument
+
+    argument = 2 * mu * (env_emax - envelope_potential(y(1)))
+    call assert(argument > 0, 'Error: potential is greater than env_emax')
+    dydx(1) = pi / sqrt(argument)
   end subroutine
 
 end

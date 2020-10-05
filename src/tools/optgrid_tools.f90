@@ -1,12 +1,3 @@
-!-----------------------------------------------------------------------
-!  OptGrid (optgrid.f)
-!  Optimal grid generator, subroutines:
-!    1. (r,radial) Left end fixed, right end free, alpha is parameter
-!    2. (a,alpha)  Both ends are fixed, alpha is adjusted
-!    3. (n,number) Both ends are fixed, number of points is adjusted
-!  Author: Alexander Teplukhin, Igor Gayday
-!-----------------------------------------------------------------------
-  
 module optgrid_tools
   use constants
   use general_utils
@@ -17,156 +8,173 @@ module optgrid_tools
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates a grid with fixed left end and free right end.
-! Alpha is fixed.
+! Simplified interface to rkdumb for the case of a signle equation to use scalars instead of arrays of size 1.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine generate_gridr(grid,jac,n,alpha,minr,eps,der)
-    integer i,n,nok,nbad
-    real(real64) grid(n),jac(n),x(0:n)
-    real(real64) alpha,minr,eps,nextr
-    real(real64) :: nextr_ode(1)
-    external der
+  function rkdumb_single(vstart, x1, x2, nstep, derivs) result(v)
+    real(real64) :: vstart, x1, x2
+    integer :: nstep
+    procedure(diff_equations_rhs) :: derivs
+    real(real64) :: v
+    real(real64) :: vstart_arr(1), v_arr(1)
 
-    x(0) = 0
-    do i=1,n
-      x(i) = alpha*i - alpha/2
-    enddo
-    nextr = minr
-    do i=1,n
-      nextr_ode(1) = nextr
-      call odeint(nextr_ode,1,x(i-1),x(i),eps,alpha/10.d0,0.d0,nok,nbad,der,rkqs)
-      nextr = nextr_ode(1)
-      
-      grid(i) = nextr
-      call der(0.0d0,nextr,jac(i))
-    enddo
-  end subroutine
+    vstart_arr(1) = vstart
+    v_arr = rkdumb(vstart_arr, x1, x2, nstep, derivs)
+    v = v_arr(1)
+  end function
 
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates a grid within required boundaries.
-! Solves from the left to the right.
-! Alpha is adjusted.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine generate_grida(grid,jac,n,alpha,minr,maxr,eps,der)
-    integer i,n,nok,nbad
-    real(real64) grid(n),jac(n),x(0:n+1)
-    real(real64) alpha,alpha1,alpha2,minr,maxr,nextr,eps
-    real(real64) :: nextr_ode(1)
-    logical veryclose,allinrange
-    external der
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+! ! Generates a grid with fixed left end and free right end.
+! ! Alpha is fixed.
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+!   subroutine generate_gridr(grid,jac,n,alpha,minr,eps,der)
+!     integer i,n,nok,nbad
+!     real(real64) grid(n),jac(n),x(0:n)
+!     real(real64) alpha,minr,eps,nextr
+!     real(real64) :: nextr_ode(1)
+!     external der
+!
+!     x(0) = 0
+!     do i=1,n
+!       x(i) = alpha*i - alpha/2
+!     enddo
+!     nextr = minr
+!     do i=1,n
+!       nextr_ode(1) = nextr
+!       call odeint(nextr_ode,1,x(i-1),x(i),eps,alpha/10.d0,0.d0,nok,nbad,der,rkqs)
+!       nextr = nextr_ode(1)
+!
+!       grid(i) = nextr
+!       call der(0.0d0,nextr,jac(i))
+!     enddo
+!   end subroutine
 
-    ! Iteratively change alpha and regenerate the grid
-    veryclose = .false.
-    alpha1 = 0
-    do
-      ! Calculate working grid
-      x(0) = 0
-      do i=1,n
-        x(i) = alpha*i - alpha/2
-      enddo
-      x(n+1) = x(n) + alpha/2
-      ! Calculate physical grid
-      nextr = minr
-      allinrange = .false.
-      do i=1,n+1
-        nextr_ode(1) = nextr
-        call odeint(nextr_ode,1,x(i-1),x(i),eps,alpha/10.d0,0.d0,nok,nbad,der,rkqs)
-        nextr = nextr_ode(1)
-        
-        if(i.eq.n+1.and.nextr.le.maxr)then
-          allinrange = .true.
-        else
-          if(nextr.gt.maxr)exit
-          grid(i) = nextr
-          call der(0.0d0,nextr,jac(i))
-        endif
-      enddo
-      if(allinrange)then
-        print *,alpha,'Before'
-      else
-        print *,alpha,'After'
-      endif
-      ! Adjust alpha
-      if(veryclose)then
-        if(allinrange)then
-          alpha1 = alpha
-        else
-          alpha2 = alpha
-        endif
-        alpha = (alpha1 + alpha2) / 2
-        if(abs(alpha1-alpha2).le.eps)exit
-      else
-        if(.not.allinrange)then
-          veryclose = .true.
-          alpha2 = alpha
-          alpha = (alpha1 + alpha2) / 2
-        else
-          alpha1 = alpha
-          alpha2 = alpha
-          alpha = alpha * 1.01
-        endif
-      endif
-    enddo
-  end subroutine
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+! ! Generates a grid within required boundaries.
+! ! Solves from the left to the right.
+! ! Alpha is adjusted.
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+!   subroutine generate_grida(grid,jac,n,alpha,minr,maxr,eps,der)
+!     integer i,n,nok,nbad
+!     real(real64) grid(n),jac(n),x(0:n+1)
+!     real(real64) alpha,alpha1,alpha2,minr,maxr,nextr,eps
+!     real(real64) :: nextr_ode(1)
+!     logical veryclose,allinrange
+!     external der
+!
+!     ! Iteratively change alpha and regenerate the grid
+!     veryclose = .false.
+!     alpha1 = 0
+!     do
+!       ! Calculate working grid
+!       x(0) = 0
+!       do i=1,n
+!         x(i) = alpha*i - alpha/2
+!       enddo
+!       x(n+1) = x(n) + alpha/2
+!       ! Calculate physical grid
+!       nextr = minr
+!       allinrange = .false.
+!       do i=1,n+1
+!         nextr_ode(1) = nextr
+!         call odeint(nextr_ode,1,x(i-1),x(i),eps,alpha/10.d0,0.d0,nok,nbad,der,rkqs)
+!         nextr = nextr_ode(1)
+!
+!         if(i.eq.n+1.and.nextr.le.maxr)then
+!           allinrange = .true.
+!         else
+!           if(nextr.gt.maxr)exit
+!           grid(i) = nextr
+!           call der(0.0d0,nextr,jac(i))
+!         endif
+!       enddo
+!       if(allinrange)then
+!         print *,alpha,'Before'
+!       else
+!         print *,alpha,'After'
+!       endif
+!       ! Adjust alpha
+!       if(veryclose)then
+!         if(allinrange)then
+!           alpha1 = alpha
+!         else
+!           alpha2 = alpha
+!         endif
+!         alpha = (alpha1 + alpha2) / 2
+!         if(abs(alpha1-alpha2).le.eps)exit
+!       else
+!         if(.not.allinrange)then
+!           veryclose = .true.
+!           alpha2 = alpha
+!           alpha = (alpha1 + alpha2) / 2
+!         else
+!           alpha1 = alpha
+!           alpha2 = alpha
+!           alpha = alpha * 1.01
+!         endif
+!       endif
+!     enddo
+!   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates a grid within required boundaries.
 ! Number of points is adjusted.
 ! Makes symmetric distribution of points for symmetric derivative.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine generate_gridn(grid,jac,n,alpha,minr,maxr,r0,eps,der)
+  subroutine generate_gridn(grid, jac, n, alpha, minr, maxr, r0, eps, der)
     integer,parameter:: n0 = 1024
     integer i,n,nl,nr
     real(real64),allocatable::grid(:),jac(:)
     real(real64) gridl(n0),gridr(n0),x(0:n0)
     real(real64) r0,alpha,minr,maxr,nextr,eps
-    real(real64) :: nextr_rkdumb(1)
-    external der
+    procedure(diff_equations_rhs) :: der
 
+    ! Set up grid pre-image
     x(0) = 0
-    do i=1,n0
+    do i = 1, n0
       x(i) = alpha*i - alpha/2
-    enddo
-    nextr = r0
-    do i=1,n0
-      ! call odeint(nextr,1,x(i-1),x(i),eps,alpha/10.d0,0.d0,nok,nbad,der,rkqs)
-      nextr_rkdumb(1) = nextr
-      call rkdumb(nextr_rkdumb, 1, x(i-1), x(i), 2048, der, nextr_rkdumb)
-      nextr = nextr_rkdumb(1)
+    end do
 
-      if(nextr>maxr)exit
-      gridr(i) = nextr
-    enddo
-    nr = i-1
-    x = - x
+    ! Generate right branch (relative to minimum at r0)
     nextr = r0
-    do i=1,n0
-      ! call odeint(nextr,1,x(i-1),x(i),eps,alpha/10.d0,0.d0,nok,nbad,der,rkqs)
-      nextr_rkdumb(1) = nextr
-      call rkdumb(nextr_rkdumb, 1, x(i-1), x(i), 2048, der, nextr_rkdumb)
-      nextr = nextr_rkdumb(1)
+    do i = 1, n0
+      nextr = rkdumb_single(nextr, x(i - 1), x(i), 2048, der)
+      if (nextr > maxr) then
+        exit
+      end if
+      gridr(i) = nextr
+    end do
+    nr = i-1
+
+    ! Generate left branch (relative to minimum at r0)
+    x = -x
+    nextr = r0
+    do i = 1, n0
+      nextr = rkdumb_single(nextr, x(i - 1), x(i), 2048, der)
       
-      if(nextr<minr)then
-        if(mod(nr+i-1,2)==1)then
+      if (nextr < minr) then
+        ! Add an extra point on left if the total number of points is odd
+        if (mod(nr+i-1, 2) == 1) then
           gridl(i) = nextr
           nl = i
         else
           nl = i - 1
         endif
         exit
-      endif
+      end if
       gridl(i) = nextr
-    enddo
+    end do
+
+    ! Merge branches
     n = nl + nr
-    allocate(grid(n),jac(n))
-    do i=1,n
-      if(i<=nl)then
+    allocate(grid(n), jac(n))
+    do i = 1, n
+      if (i <= nl) then
         grid(i) = gridl(nl-i+1)
       else
         grid(i) = gridr(i-nl)
-      endif
-      call der(0.0d0,grid(i),jac(i))
-    enddo
+      end if
+      call der(0d0, grid(i:i), jac(i:i))
+    end do
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
