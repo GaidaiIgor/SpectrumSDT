@@ -27,8 +27,7 @@ module global_vars
   integer :: rho_npoints, theta_npoints, phi_npoints
   !--- Envelopes ---
   character(:), allocatable :: env_path
-  real(real64) :: env_der1, env_dern
-  real(real64), allocatable :: env_grid(:), env_values(:), env_der_2nd(:)
+  real(real64), allocatable :: env_grid(:), env_values(:), spline_deriv_2nd(:)
   real(real64) :: env_fit_param, env_fit_min_y, env_fit_min_x
 end module
 
@@ -50,7 +49,7 @@ program optgrid
   call input_parameters(params)
 
   if (params % optimized_grid_rho == 1) then
-    allocate(env_grid(env_npoints), env_values(env_npoints), env_der_2nd(env_npoints))
+    allocate(env_grid(env_npoints), env_values(env_npoints), spline_deriv_2nd(env_npoints))
     call input_envelopes()
     call find_parabola(env_grid, env_values, env_npoints, env_fit_param, env_fit_min_y, env_fit_min_x)
     call generate_gridn(grid_rho, jac_rho, params % grid_rho_npoints, params % grid_rho_step, params % grid_rho_from, params % grid_rho_to, env_fit_min_x, eps, der_rho)
@@ -139,7 +138,8 @@ contains
 ! Loads rho MEP and prepares spline information.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine input_envelopes()
-    integer i
+    integer :: i
+    real(real64) :: spline_deriv_left, spline_deriv_right
     open(1, file = append_path_token(env_path, 'MEP_rho.dat'), status='old')
     do i=1,env_npoints
       read(1,*) env_grid(i), env_values(i)
@@ -147,9 +147,9 @@ contains
     close(1)
 
     ! Calculates derivatives at the endpoints for spline
-    env_der1 = (env_values(2) - env_values(1)) / (env_grid(2) - env_grid(1))
-    env_dern = (env_values(env_npoints) - env_values(env_npoints-1)) / (env_grid(env_npoints) - env_grid(env_npoints-1))
-    call spline(env_grid, env_values, env_npoints, env_der1, env_dern,  env_der_2nd)
+    spline_deriv_left = (env_values(2) - env_values(1)) / (env_grid(2) - env_grid(1))
+    spline_deriv_right = (env_values(env_npoints) - env_values(env_npoints-1)) / (env_grid(env_npoints) - env_grid(env_npoints-1))
+    call spline(env_grid, env_values, spline_deriv_left, spline_deriv_right, spline_deriv_2nd)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -209,7 +209,7 @@ contains
       if (r > env_grid(env_npoints)) then
         envelope_potential = env_values(env_npoints)
       else
-        call splint(env_grid, env_values, env_der1, env_der_2nd, env_npoints, r, envelope_potential)
+        envelope_potential = splint(env_grid, env_values, spline_deriv_2nd, r)
       endif
     endif
   end function

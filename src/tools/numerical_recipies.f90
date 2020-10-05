@@ -4,72 +4,151 @@ module numerical_recipies
 
 contains
 
-       SUBROUTINE splint(xa,ya,yp1,y2a,n,x,y)
-       INTEGER n
-       real(real64) x,y,xa(n),y2a(n),ya(n),yp1
-       INTEGER k,khi,klo
-       real(real64) a,b,h
-       klo=1
-       khi=n
- 1     if (khi-klo.gt.1) then
-         k=(khi+klo)/2
-         if(xa(k).gt.x)then
-           khi=k
-         else
-           klo=k
-         endif
-       goto 1
-       endif
-       h=xa(khi)-xa(klo)
-       if (h.eq.0.d0) stop 658
-       a=(xa(khi)-x)/h
-       b=(x-xa(klo))/h
-       y=a*ya(klo)+b*ya(khi)+((a**3-a)*y2a(klo)+(b**3-b)*y2a(khi))*(h**2)/6.d0
-       return
-       END
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Solves for a vector u of size N the tridiagonal linear set using a
+! serial algorithm. Input vectors b (diagonal elements) and r (right-hand sides) have size N,
+! while a and c (off-diagonal elements) are size N − 1.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  SUBROUTINE tridag(a,b,c,r,u)
+    REAL(real64), DIMENSION(:), INTENT(IN) :: a,b,c,r
+    REAL(real64), DIMENSION(:), INTENT(OUT) :: u
+    REAL(real64), DIMENSION(size(b)) :: gam ! One vector of workspace, gam is needed.
+    INTEGER :: n,j
+    REAL(real64) :: bet
+
+    if (any(size(a) + 1 /= [size(b), size(c) + 1, size(r), size(u)])) then
+      stop 'Size mismatch in tridag'
+    end if
+    n = size(a) + 1
+    bet=b(1)
+    if (bet == 0d0) then
+      ! If this happens then you should rewrite your equations as a set of order N − 1, with u2 trivially eliminated.
+      stop 'tridag_ser: Error at code stage 1'
+    end if
+    u(1)=r(1)/bet
+    do j=2,n ! Decomposition and forward substitution.
+      gam(j)=c(j-1)/bet
+      bet=b(j)-a(j-1)*gam(j)
+      if (bet == 0d0) then
+        stop 'tridag_ser: Error at code stage 2'
+      end if
+      u(j)=(r(j)-a(j-1)*u(j-1))/bet
+    end do
+    do j=n-1,1,-1 ! Backsubstitution.
+      u(j)=u(j)-gam(j+1)*u(j+1)
+    end do
+  END SUBROUTINE tridag
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Given arrays x(1:n) and y(1:n) containing a tabulated function, i.e., yi = f(xi), with
-! x1 < x2 < ... < xN , and given values yp1 and ypn for the first derivative of the interpolating function at points 1 and n, respectively, this routine returns an array y2(1:n) of
-! length n which contains the second derivatives of the interpolating function at the tabulated
-! points xi. If yp1 and/or ypn are equal to 10^30 or larger, the routine is signaled to set
-! the corresponding boundary condition for a natural spline, with zero second derivative on
-! that boundary.
-! Parameter: NMAX is the largest anticipated value of n.
+! Given arrays x and y of length N containing a tabulated function, i.e., yi = f(xi), with x1 <
+! x2 < ... < xN , and given values yp1 and ypn for the first derivative of the interpolating
+! function at points 1 and N, respectively, this routine returns an array y2 of length N
+! that contains the second derivatives of the interpolating function at the tabulated points
+! xi. If yp1 and/or ypn are equal to 10^30 or larger, the routine is signaled to set the
+! corresponding boundary condition for a natural spline, with zero second derivative on that
+! boundary.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-       SUBROUTINE spline(x,y,n,yp1,ypn,y2)
-       INTEGER n,NMAX
-       real(real64) yp1,ypn,x(n),y(n),y2(n)
-       PARAMETER (NMAX=500)
-       INTEGER i,k
-       real(real64) p,qn,sig,un,u(NMAX)
-       if (yp1.gt..99e30) then
-         y2(1)=0.d0
-         u(1)=0.d0
-       else
-         y2(1)=-0.5d0
-         u(1)=(3.d0/(x(2)-x(1)))*((y(2)-y(1))/(x(2)-x(1))-yp1)
-       endif
-       do 11 i=2,n-1
-         sig=(x(i)-x(i-1))/(x(i+1)-x(i-1))
-         p=sig*y2(i-1)+2.d0
-         y2(i)=(sig-1.d0)/p
-         u(i)=(6.d0*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))-sig*u(i-1))/p
- 11    continue
-       if (ypn.gt..99e30) then
-       qn=0.d0
-       un=0.d0
-       else
-       qn=0.5d0
-       un=(3.d0/(x(n)-x(n-1)))*(ypn-(y(n)-y(n-1))/(x(n)-x(n-1)))
-       endif
-       y2(n)=(un-qn*u(n-1))/(qn*y2(n-1)+1.d0)
-       do 12 k=n-1,1,-1
-         y2(k)=y2(k)*y2(k+1)+u(k)
- 12    continue
-       return
-       END
-       
+  SUBROUTINE spline(x,y,yp1,ypn,y2)
+    REAL(real64), DIMENSION(:), INTENT(IN) :: x,y
+    REAL(real64), INTENT(IN) :: yp1,ypn
+    REAL(real64), DIMENSION(:), INTENT(OUT) :: y2
+    INTEGER :: n
+    REAL(real64), DIMENSION(size(x)) :: a,b,c,r
+
+    if (size(x) /= size(y) .or. size(x) /= size(y2)) then
+      stop 'Size of x, y and y2 has to be the same in spline'
+    end if
+    n = size(x)
+    c(1:n-1)=x(2:n)-x(1:n-1) ! Set up the tridiagonal equations.
+    r(1:n-1)=6d0*((y(2:n)-y(1:n-1))/c(1:n-1))
+    r(2:n-1)=r(2:n-1)-r(1:n-2)
+    a(2:n-1)=c(1:n-2)
+    b(2:n-1)=2d0*(c(2:n-1)+a(2:n-1))
+    b(1)=1d0
+    b(n)=1d0
+    if (yp1 > 0.99d30) then ! The lower boundary condition is set either to be "natural"
+      r(1)=0d0
+      c(1)=0d0
+    else ! or else to have a specified first derivative.
+      r(1)=(3d0/(x(2)-x(1)))*((y(2)-y(1))/(x(2)-x(1))-yp1)
+      c(1)=0.5d0
+    end if ! The upper boundary condition is set either to be "natural"
+    if (ypn > 0.99d30) then
+      r(n)=0d0
+      a(n)=0d0
+    else ! or else to have a specified first derivative.
+      r(n)=(-3d0/(x(n)-x(n-1)))*((y(n)-y(n-1))/(x(n)-x(n-1))-ypn)
+      a(n)=0.5d0
+    end if
+    call tridag(a(2:n),b(1:n),c(1:n-1),r(1:n),y2(1:n))
+  END SUBROUTINE spline
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Given an array xx(1:N), and given a value x, returns a value j such that x is between
+! xx(j) and xx(j + 1). xx must be monotonic, either increasing or decreasing. j = 0 or
+! j = N is returned to indicate that x is out of range.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  FUNCTION locate(xx,x)
+    REAL(real64), DIMENSION(:), INTENT(IN) :: xx
+    REAL(real64), INTENT(IN) :: x
+    INTEGER :: locate
+    INTEGER :: n,jl,jm,ju
+    LOGICAL :: ascnd
+    n=size(xx)
+    ascnd = (xx(n) >= xx(1)) ! True if ascending order of table, false otherwise.
+    jl=0 ! Initialize lower
+    ju=n+1 ! and upper limits.
+    do
+      if (ju-jl <= 1) then
+        exit
+      end if
+      jm=(ju+jl)/2 ! Compute a midpoint,
+      if (ascnd .eqv. (x >= xx(jm))) then
+        jl=jm ! and replace either the lower limit
+      else
+        ju=jm ! or the upper limit, as appropriate.
+      end if
+    end do
+    if (x == xx(1)) then ! set the output, being careful with the endpoints.
+      locate=1
+    else if (x == xx(n)) then
+      locate=n-1
+    else
+      locate=jl
+    end if
+  END FUNCTION locate
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Given the arrays xa and ya, which tabulate a function (with the xa_i’s in increasing or
+! decreasing order), and given the array y2a, which is the output from spline, and
+! given a value of x, this routine returns a cubic-spline interpolated value. The arrays xa, ya
+! and y2a are all of the same size.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  FUNCTION splint(xa,ya,y2a,x)
+    REAL(real64), DIMENSION(:), INTENT(IN) :: xa,ya,y2a
+    REAL(real64), INTENT(IN) :: x
+    REAL(real64) :: splint
+    INTEGER :: khi,klo,n
+    REAL(real64) :: a,b,h
+    if (size(xa) /= size(ya) .or. size(xa) /= size(y2a)) then
+      stop 'Sizes of xa, ya and y2a have to be equal in splint'
+    end if
+    n=size(xa)
+    ! We will find the right place in the table by means of locate’s bisection algorithm. This is
+    ! optimal if sequential calls to this routine are at random values of x. If sequential calls are in
+    ! order, and closely spaced, one would do better to store previous values of klo and khi and
+    ! test if they remain appropriate on the next call.
+    klo=max(min(locate(xa,x),n-1),1)
+    khi=klo+1 ! klo and khi now bracket the input value of x.
+    h=xa(khi)-xa(klo)
+    if (h == 0d0) then
+      stop "Bad xa input in splint. The xa's must be distinct"
+    end if
+    a=(xa(khi)-x)/h ! Cubic spline polynomial is now evaluated.
+    b=(x-xa(klo))/h
+    splint=a*ya(klo)+b*ya(khi)+((a**3-a)*y2a(klo)+(b**3-b)*y2a(khi))*(h**2)/6d0
+  END FUNCTION splint
+
 !-----------------------------------------------------------------------
 ! USES rk4
 ! Starting from initial values vstart(1:nvar) known at x1 use fourth-order Runge-Kutta to
