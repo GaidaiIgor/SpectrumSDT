@@ -27,9 +27,16 @@ contains
        y=a*ya(klo)+b*ya(khi)+((a**3-a)*y2a(klo)+(b**3-b)*y2a(khi))*(h**2)/6.d0
        return
        END
-       
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Given arrays x(1:n) and y(1:n) containing a tabulated function, i.e., yi = f(xi), with
+! x1 < x2 < ... < xN , and given values yp1 and ypn for the first derivative of the interpolating function at points 1 and n, respectively, this routine returns an array y2(1:n) of
+! length n which contains the second derivatives of the interpolating function at the tabulated
+! points xi. If yp1 and/or ypn are equal to 10^30 or larger, the routine is signaled to set
+! the corresponding boundary condition for a natural spline, with zero second derivative on
+! that boundary.
+! Parameter: NMAX is the largest anticipated value of n.
+!-------------------------------------------------------------------------------------------------------------------------------------------
        SUBROUTINE spline(x,y,n,yp1,ypn,y2)
        INTEGER n,NMAX
        real(real64) yp1,ypn,x(n),y(n),y2(n)

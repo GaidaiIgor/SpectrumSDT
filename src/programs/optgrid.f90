@@ -14,38 +14,22 @@ module global_vars
                         m1 = isomass(1), &
                         m2 = isomass(1), &
                         Mtot = m0+m1+m2, &
-                        mu = sqrt(m0*m1*m2/Mtot), &
-                        mu1 = m0*m1/(m0+m1), &
-                        mu2 = m0*m2/(m0+m2), &
-                        r10 = 2.410d0, &
-                        r20 = 2.410d0, &
-                        te0 = pi * 116.8 / 180
+                        mu = sqrt(m0*m1*m2/Mtot)
                         
-  real(real64) :: zpe
   real(real64),allocatable :: grid_rho(:), grid_theta(:), grid_phi(:)
   real(real64),allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
   real(real64) :: rho_step, theta_step, phi_step
-  real(real64) :: Emax1,Emax2,Emax3
   real(real64) :: rho_from, rho_to
   real(real64) :: theta_from, theta_to
   real(real64) :: phi_from, phi_to
-  real(real64) :: eps
-  integer :: nenv1,nenv2,nenv3
+  real(real64) :: env_emax, eps
+  integer :: env_npoints
   integer :: rho_npoints, theta_npoints, phi_npoints
-  integer :: envtype1,envtype2,envtype3
-  integer :: rgrid,symmphi
   !--- Envelopes ---
-  character(:), allocatable :: envpath
-  real(real64) :: env1_d1,env1_dn
-  real(real64) :: env2_d1,env2_dn
-  real(real64) :: env3_d1,env3_dn
-  real(real64),allocatable :: env1(:),pot1(:),env1_2d(:)
-  real(real64),allocatable :: env2(:),pot2(:),env2_2d(:)
-  real(real64),allocatable :: env3(:),pot3(:),env3_2d(:)
-  real(real64) :: enva1,enva2,enva3
-  real(real64) :: envE1,envE2,envE3
-  real(real64) :: envm1,envm2,envm3
-  real(real64) :: energyoffset
+  character(:), allocatable :: env_path
+  real(real64) :: env_der1, env_dern
+  real(real64), allocatable :: env_grid(:), env_values(:), env_der_2nd(:)
+  real(real64) :: env_fit_param, env_fit_min_y, env_fit_min_x
 end module
 
 program optgrid
@@ -66,11 +50,10 @@ program optgrid
   call input_parameters(params)
 
   if (params % optimized_grid_rho == 1) then
-    allocate(env1(nenv1), pot1(nenv1), env1_2d(nenv1), env2(nenv2), pot2(nenv2), env2_2d(nenv2), env3(nenv3), pot3(nenv3), env3_2d(nenv3))
+    allocate(env_grid(env_npoints), env_values(env_npoints), env_der_2nd(env_npoints))
     call input_envelopes()
-    call find_parabola(env1, pot1, nenv1, enva1, envE1, envm1)
-    call find_parabola(env2, pot2, nenv2, enva2, envE2, envm2)
-    call generate_gridn(grid_rho, jac_rho, params % grid_rho_npoints, params % grid_rho_step, params % grid_rho_from, params % grid_rho_to, envm1, eps, der_rho)
+    call find_parabola(env_grid, env_values, env_npoints, env_fit_param, env_fit_min_y, env_fit_min_x)
+    call generate_gridn(grid_rho, jac_rho, params % grid_rho_npoints, params % grid_rho_step, params % grid_rho_from, params % grid_rho_to, env_fit_min_x, eps, der_rho)
   else
     if (params % grid_rho_npoints == -1) then
       call generate_equidistant_grid_step(params % grid_rho_from, params % grid_rho_to, params % grid_rho_step, grid_rho, jac_rho, rho_npoints)
@@ -111,7 +94,7 @@ program optgrid
   !   call generate_grida(g3,jac3,n3,a3,min3,max3,eps,der_phi)
   ! case default
   !   deallocate(g1, g2, g3, jac1, jac2, jac3)
-  !   call generate_gridn(g1,jac1,n1,a1,min1,max1,envm1,eps,der_rho)
+  !   call generate_gridn(g1,jac1,n1,a1,min1,max1,env_fit_min_x,eps,der_rho)
   !   ! call generate_gridn(g2,jac2,n2,a2,min2,max2,envm2,eps,der_tet)
   !
   !   ! Select step/points mode
@@ -126,18 +109,16 @@ program optgrid
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Input parameters.
-! J vector, number of point along each coordinate, initial alpha.
+! Loads input parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine input_parameters(params)
     class(input_params), intent(in) :: params
-    integer :: m0_code, m1_code, m2_code, total_code
 
     rho_from = params % grid_rho_from
     rho_to = params % grid_rho_to
     rho_npoints = params % grid_rho_npoints
     rho_step = params % grid_rho_step
-    envpath = params % envelope_rho_path ! '/home/installbot/SpectrumSDT/extra/spectrum/optgrid/dawes/J00K000'
+    env_path = params % envelope_rho_path
 
     theta_from = params % grid_theta_from
     theta_to = params % grid_theta_to
@@ -149,115 +130,30 @@ contains
     phi_npoints = params % grid_phi_npoints
     phi_step = params % grid_phi_step
 
-    Emax1 = 414 / autown
-    Emax2 = 207 / autown
-    Emax3 = 0d0
-    nenv1 = 494
-    nenv2 = 300
-    nenv3 = 300
-    envtype1 = iff(params % optimized_grid_rho == 1, 1, 2)
-    envtype2 = 2
-    envtype3 = 2
-    symmphi = 2
+    env_emax = 414.4466 / autown
+    env_npoints = 494
     eps = 1d-12
-    rgrid = 3
-    m1_code = 16
-    m0_code = 16
-    m2_code = 16
-
-    total_code = m0_code + m1_code + m2_code
-    if (total_code == 48) then
-      zpe = zpe_66
-    else if (total_code == 50) then
-      zpe = zpe_68
-    else if (total_code == 52) then
-      zpe = zpe_88
-    end if
-  end subroutine
-
-  ! !-----------------------------------------------------------------------
-  ! !  Input Parameters
-  ! !  J vector, number of point along each coordinate, initial alpha
-  ! !-----------------------------------------------------------------------
-  ! subroutine input_parameters()
-  !   integer :: m0_code, m1_code, m2_code, total_code
-  !   open(1,file='optgrid.config')
-  !   read(1,*) n1,n2,n3
-  !   read(1,*) nenv1,nenv2,nenv3
-  !   read(1,*) a1,a2,a3
-  !   read(1, *) envtype1, envtype2, envtype3
-  !   read(1, *) min1, max1, Emax1
-  !   read(1, *) min2, max2, Emax2
-  !
-  !   envpath = resolve_relative_exe_path('../extra/spectrum/optgrid/dawes/J00K000')
-  !   if (envtype3 == 1) then
-  !     read(1, *) min3, max3, Emax3, symmphi
-  !   elseif (envtype3 == 2) then
-  !     read(1, *) min3, max3, n3, symmphi
-  !   end if
-  !
-  !   read(1,*)cs,eps,rgrid
-  !   read(1, *) m1_code, m0_code, m2_code
-  !   if(cs.eq.2)then
-  !     read(1,*)energyoffset
-  !     min3 = pi * min3 / 180
-  !     max3 = pi * max3 / 180
-  !     energyoffset = energyoffset / autown
-  !   endif
-  !   close(1)
-  !   Emax1 = Emax1 / autown
-  !   Emax2 = Emax2 / autown
-  !   Emax3 = Emax3 / autown
-  !
-  !   total_code = m0_code + m1_code + m2_code
-  !   if (total_code == 48) then
-  !     zpe = zpe_66
-  !   else if (total_code == 50) then
-  !     zpe = zpe_68
-  !   else if (total_code == 52) then
-  !     zpe = zpe_88
-  !   end if
-  ! end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Input Envelopes
-  !  Loads potential along MEP for each coordinate
-  !-----------------------------------------------------------------------
-  subroutine input_envelopes()
-    integer i
-    open(1, file = append_path_token(envpath, 'MEP1.dat'), status='old')
-    do i=1,nenv1
-      read(1,*) env1(i), pot1(i)
-    enddo
-    close(1)
-    pot1 = pot1 / autown + zpe
-    open(1, file = append_path_token(envpath, 'MEP2.dat'), status='old')
-    do i=1,nenv2
-      read(1,*) env2(i), pot2(i)
-    enddo
-    close(1)
-    pot2 = pot2 / autown + zpe
-    open(1, file = append_path_token(envpath, 'MEP3.dat'), status='old')
-    do i=1,nenv3
-      read(1,*) env3(i), pot3(i)
-    enddo
-    close(1)
-    pot3 = pot3 / autown + zpe
-
-    ! Preparation for extrapolation of envelopes
-    env1_d1 = (pot1(2)-pot1(1))/(env1(2)-env1(1))
-    env1_dn = (pot1(nenv1)-pot1(nenv1-1))/(env1(nenv1)-env1(nenv1-1))
-    call spline(env1,pot1,nenv1,env1_d1,env1_dn,env1_2d)
-    env2_d1 = (pot2(2)-pot2(1))/(env2(2)-env2(1))
-    env2_dn = (pot2(nenv2)-pot2(nenv2-1))/(env2(nenv2)-env2(nenv2-1))
-    call spline(env2,pot2,nenv2,env2_d1,env2_dn,env2_2d)
-    env3_d1 = (pot3(2)-pot3(1))/(env3(2)-env3(1))
-    env3_dn = (pot3(nenv3)-pot3(nenv3-1))/(env3(nenv3)-env3(nenv3-1))
-    call spline(env3,pot3,nenv3,env3_d1,env3_dn,env3_2d)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Find parabola
+! Loads rho MEP and prepares spline information.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine input_envelopes()
+    integer i
+    open(1, file = append_path_token(env_path, 'MEP_rho.dat'), status='old')
+    do i=1,env_npoints
+      read(1,*) env_grid(i), env_values(i)
+    enddo
+    close(1)
+
+    ! Calculates derivatives at the endpoints for spline
+    env_der1 = (env_values(2) - env_values(1)) / (env_grid(2) - env_grid(1))
+    env_dern = (env_values(env_npoints) - env_values(env_npoints-1)) / (env_grid(env_npoints) - env_grid(env_npoints-1))
+    call spline(env_grid, env_values, env_npoints, env_der1, env_dern,  env_der_2nd)
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Finds parameters of fitting parabola.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine find_parabola(env,pot,nenv,enva,envE,envm)
     integer nenv,i,im,il,ir
@@ -266,14 +162,10 @@ contains
     real(real64) det0,det1,c
     im = 1
     do i=1,nenv
-      if(pot(i).lt.pot(im))im = i
+      if (pot(i) < pot(im)) im = i
     enddo
-    do il=im,1,-1
-      if(pot(il)-pot(im).gt.energyoffset)exit
-    enddo
-    do ir=im,nenv
-      if(pot(ir)-pot(im).gt.energyoffset)exit
-    enddo
+    il = im - 1
+    ir = im + 1
     mat(1,1) = env(il)**2
     mat(1,2) = env(il)
     mat(1,3) = 1
@@ -298,55 +190,42 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! 
+! Calculates 3x3 matrix determinant.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   real(real64) function det(a)
     real(real64) a(3,3)
     det = a(1,1)*(a(2,2)*a(3,3) - a(3,2)*a(2,3)) + a(1,2)*(a(3,1)*a(2,3) - a(2,1)*a(3,3)) + a(1,3)*(a(2,1)*a(3,2) - a(3,1)*a(2,2))
   end function
   
-  !-----------------------------------------------------------------------
-  !  PotEnv
-  !  Smooth envelopes by Eckart function
-  !-----------------------------------------------------------------------
-  real(real64) function potenv1(r)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates envelope potential for optimized grid. Left side is represented by Eckart function fitted on rho MEP, right by rho MEP itself.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  real(real64) function envelope_potential(r)
     real(real64) r,x
-    if(envtype1.eq.1)then
-      x = r - envm1
-      if(x.lt.0)then
-        potenv1 = -envE1 * 4 / (exp(x/enva1) + exp(-x/enva1))**2
-      else
-        if(r>env1(nenv1))then
-          potenv1 = pot1(nenv1)
-        else
-          call splint(env1,pot1,env1_d1,env1_2d,nenv1,r,potenv1)
-        endif
-      endif
+    x = r - env_fit_min_x
+    if (x < 0) then
+      envelope_potential = -env_fit_min_y * 4 / (exp(x/env_fit_param) + exp(-x/env_fit_param))**2
     else
-      potenv1 = - envE1
+      if (r > env_grid(env_npoints)) then
+        envelope_potential = env_values(env_npoints)
+      else
+        call splint(env_grid, env_values, env_der1, env_der_2nd, env_npoints, r, envelope_potential)
+      endif
     endif
   end function
 
-  !-----------------------------------------------------------------------
-  !  Grid derivative for rho
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Right-hand side of differential equation for optimized grid generation.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine der_rho(x,y,dydx)
     real(real64) x,y,dydx
     real(real64) argument
-    argument = 2*mu*(Emax1-potenv1(y)-gridextra(envm1,envm2))
-    if (argument.gt.0.d0) then
-      dydx = pi/DSQRT(argument)
+    argument = 2 * mu * (env_emax - envelope_potential(y))
+    if (argument > 0) then
+      dydx = pi / sqrt(argument)
     else
-      stop 'Potential is greater than Emax1'
+      stop 'Potential is greater than env_emax'
     endif
   end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Extra potential caused by conversion from Jacoby coordinates
-  !-----------------------------------------------------------------------
-  real(real64) function gridextra(rho,tet)
-    real(real64) rho,tet
-    gridextra = - 2/(mu*rho**2)*(sin(2*tet)**(-2)+0.0625d0)
-  end function
 
 end
