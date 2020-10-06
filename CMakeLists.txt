@@ -91,7 +91,7 @@ set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${rovib_
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${debug_tools} ${prefix}/src/tools/eicalc/slepc_solver.F90)
 set(lapack_interface ${general_utils} ${prefix}/src/interface/lapack.f90)
 set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${input_params} ${io_utils} ${lapack_interface} ${matmul_operator} ${parabola} ${parallel_utils} ${pesgeneral} ${rovib_io} ${slepc_solver} ${debug_tools} ${prefix}/src/tools/sdt.f90)
-set(optgrid_tools ${general_utils} ${numerical_recipies} ${prefix}/src/tools/optgrid_tools.f90)
+set(optgrid_tools ${general_utils} ${numerical_recipies} ${vector} ${prefix}/src/tools/optgrid_tools.f90)
 
 set(optgrid ${config} ${constants} ${general_utils} ${input_params} ${numerical_recipies} ${optgrid_tools} ${path_utils} ${prefix}/src/programs/optgrid.f90)
 set(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${prefix}/src/programs/pesprint.f90)

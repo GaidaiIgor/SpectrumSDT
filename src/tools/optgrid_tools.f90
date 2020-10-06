@@ -3,6 +3,7 @@ module optgrid_tools
   use general_utils
   use iso_fortran_env, only: real64
   use numerical_recipies
+  use vector_mod
   implicit none
 
 contains
@@ -116,65 +117,57 @@ contains
 !   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates a grid within required boundaries.
-! Number of points is adjusted.
-! Makes symmetric distribution of points for symmetric derivative.
+! Generates an optimized grid from *from* to *to*.
+! Step specifies step on grid pre-image. Step on the actual grid is variable. Number of points is adjusted.
+! *start* is a point between *from* and *to* from where generation begins in left and right direction.
+! This allows for symmetric distribution of points if *deriv* is symmetric.
+! *deriv* evaluates the right-hand side of the differential equation that defines the optimized grid.
+! Resulting optimized grid is returned in *grid*. The corresponding values of *deriv* at grid points are returned in *jac*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine generate_gridn(grid, jac, n, alpha, minr, maxr, r0, eps, der)
-    integer,parameter:: n0 = 1024
-    integer i,n,nl,nr
-    real(real64),allocatable::grid(:),jac(:)
-    real(real64) gridl(n0),gridr(n0),x(0:n0)
-    real(real64) r0,alpha,minr,maxr,nextr,eps
-    procedure(diff_equations_rhs) :: der
+  subroutine generate_optgrid_step(from, to, start, step, deriv, grid, jac)
+    real(real64), intent(in) :: from, to, start, step
+    procedure(diff_equations_rhs) :: deriv
+    real(real64), allocatable, intent(out) :: grid(:), jac(:)
+    real(real64) :: prev_x, next_x, next_point
+    type(vector_real) :: grid_left, grid_right
 
-    ! Set up grid pre-image
-    x(0) = 0
-    do i = 1, n0
-      x(i) = alpha*i - alpha/2
-    end do
-
-    ! Generate right branch (relative to minimum at r0)
-    nextr = r0
-    do i = 1, n0
-      nextr = rkdumb_single(nextr, x(i - 1), x(i), 2048, der)
-      if (nextr > maxr) then
+    ! Generate right branch (relative to minimum at start)
+    next_point = start
+    prev_x = 0
+    next_x = step / 2
+    grid_right = vector_real()
+    do
+      next_point = rkdumb_single(next_point, prev_x, next_x, 2048, deriv)
+      if (next_point > to) then
         exit
       end if
-      gridr(i) = nextr
+      call grid_right % push(next_point)
+      prev_x = next_x
+      next_x = next_x + step
     end do
-    nr = i-1
 
-    ! Generate left branch (relative to minimum at r0)
-    x = -x
-    nextr = r0
-    do i = 1, n0
-      nextr = rkdumb_single(nextr, x(i - 1), x(i), 2048, der)
-      
-      if (nextr < minr) then
-        ! Add an extra point on left if the total number of points is odd
-        if (mod(nr+i-1, 2) == 1) then
-          gridl(i) = nextr
-          nl = i
-        else
-          nl = i - 1
-        endif
+    ! Generate left branch (relative to minimum at start)
+    next_point = start
+    prev_x = 0
+    next_x = -step / 2
+    grid_left = vector_real()
+    do
+      next_point = rkdumb_single(next_point, prev_x, next_x, 2048, deriv)
+      ! Add an extra point on left if the total number of points is odd
+      if (next_point < from .and. mod(grid_right % get_size() + grid_left % get_size(), 2) == 0) then
         exit
       end if
-      gridl(i) = nextr
+      call grid_left % push(next_point)
+      prev_x = next_x
+      next_x = next_x - step
     end do
 
-    ! Merge branches
-    n = nl + nr
-    allocate(grid(n), jac(n))
-    do i = 1, n
-      if (i <= nl) then
-        grid(i) = gridl(nl-i+1)
-      else
-        grid(i) = gridr(i-nl)
-      end if
-      call der(0d0, grid(i:i), jac(i:i))
-    end do
+    ! Merge branches: grid_left is used as common storage for both branches
+    call grid_left % reverse()
+    call grid_left % append_vector(grid_right)
+    grid = grid_left % to_array()
+    allocate(jac(size(grid)))
+    call deriv(0d0, grid, jac)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

@@ -52,7 +52,7 @@ subroutine CONCAT2(push_,TEMPLATE_TYPE_NAME)(this, value)
   TEMPLATE_TYPE, intent(in) :: value
   TEMPLATE_TYPE_OUT, allocatable :: temp(:)
 
-  if (this%size == size(this % storage)) then
+  if (this % size == size(this % storage)) then
     allocate(temp(this % size * this % resize_factor)) ! make a new allocation
     temp(1:this % size) = this % storage ! move items to new allocation
     call move_alloc(temp, this % storage) ! swap pointers, deallocate old pointer

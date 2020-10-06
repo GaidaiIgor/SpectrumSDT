@@ -52,7 +52,7 @@ program optgrid
     allocate(env_grid(env_npoints), env_values(env_npoints), spline_deriv_2nd(env_npoints))
     call input_envelopes()
     call find_parabola(env_grid, env_values, env_npoints, env_fit_param, env_fit_min_y, env_fit_min_x)
-    call generate_gridn(grid_rho, jac_rho, params % grid_rho_npoints, params % grid_rho_step, params % grid_rho_from, params % grid_rho_to, env_fit_min_x, eps, optgrid_diff_rhs)
+    call generate_optgrid_step(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_step, optgrid_diff_rhs, grid_rho, jac_rho)
   else
     if (params % grid_rho_npoints == -1) then
       call generate_equidistant_grid_step(params % grid_rho_from, params % grid_rho_to, params % grid_rho_step, grid_rho, jac_rho, rho_npoints)
@@ -200,7 +200,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates envelope potential for optimized grid. Left side is represented by Eckart function fitted on rho MEP, right by rho MEP itself.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function envelope_potential(r) result(res)
+  impure elemental function envelope_potential(r) result(res)
     real(real64), intent(in) :: r
     real(real64) :: res
     real(real64) :: x
@@ -225,11 +225,11 @@ contains
     real(real64), intent(in) :: x ! not used, but required for interface conformance
     real(real64), intent(in) :: y(:)
     real(real64), intent(out) :: dydx(:)
-    real(real64) :: argument
+    real(real64), allocatable :: argument(:)
 
-    argument = 2 * mu * (env_emax - envelope_potential(y(1)))
-    call assert(argument > 0, 'Error: potential is greater than env_emax')
-    dydx(1) = pi / sqrt(argument)
+    argument = 2 * mu * (env_emax - envelope_potential(y))
+    call assert(all(argument > 0), 'Error: potential is greater than env_emax')
+    dydx = pi / sqrt(argument)
   end subroutine
 
 end
