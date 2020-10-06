@@ -64,19 +64,19 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Reads an entire file specified by file_path
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  function read_file(file_path, destruct) result(content)
+  function read_file(file_path, delete) result(content)
     character(*), intent(in) :: file_path
-    integer, optional, intent(in) :: destruct ! Deletes file after read
+    integer, optional, intent(in) :: delete ! Deletes file after read
     character(:), allocatable :: content
-    integer :: file_unit, file_size, destruct_act
+    integer :: file_unit, file_size, delete_act
 
     open(newunit = file_unit, file = file_path, action = 'read', form = 'unformatted', access = 'stream')
     inquire(unit = file_unit, size = file_size)
     allocate(character(file_size) :: content)
     read(file_unit) content
 
-    destruct_act = arg_or_default(destruct, 0)
-    if (destruct_act == 0) then
+    delete_act = arg_or_default(delete, 0)
+    if (delete_act == 0) then
       close(file_unit)
     else
       close(file_unit, status = 'delete')

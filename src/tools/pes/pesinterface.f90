@@ -5,13 +5,12 @@
 !-----------------------------------------------------------------------
  module pesinterface_mod
    use constants
-   use input_params_mod
    use iso_fortran_env, only: real64
    use mpi
    use parallel_utils
    use pesgeneral
-   implicit none
 
+   implicit none
    real(real64) :: pes_mass(3)
 
    private
@@ -23,13 +22,11 @@
 !-----------------------------------------------------------------------
 !  Initialization.
 !-----------------------------------------------------------------------
-  subroutine init_pots(params)
-    class(input_params), intent(in) :: params
-    
-    call init_pots_general(params)
-    pes_mass(1) = m0
-    pes_mass(2) = m1
-    pes_mass(3) = m2
+  subroutine init_pots()
+    ! call init_pots_general(params)
+    pes_mass(1) = isomass(3)
+    pes_mass(2) = isomass(1)
+    pes_mass(3) = isomass(1)
   end subroutine
 
 !-----------------------------------------------------------------------

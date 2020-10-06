@@ -152,15 +152,16 @@ contains
 !-----------------------------------------------------------------------
   subroutine init_pottot(params)
     class(input_params), intent(in) :: params
-    integer :: file_unit, i1, i2, i3
+    integer :: file_unit, iostat, i1, i2, i3
 
     if (mode /= MODE_BASIS) return
 
     ! Load vibrational potential
     allocate(pottot(n3, n2, n1))
     open(newunit = file_unit, file = append_path_token(gpath, 'pes.out'))
-    read(file_unit, *) pottot
+    read(file_unit, *, iostat = iostat) pottot
     close(file_unit)
+    call assert(.not. is_iostat_end(iostat), 'Error: size of pes.out is not sufficient for the specified grids')
 
     ! Add rotational and extra potentials
     do i1 = 1, n1

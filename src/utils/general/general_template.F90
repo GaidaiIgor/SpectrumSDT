@@ -5,7 +5,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! returns arg if it's present, otherwise default
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  TEMPLATE_ELEMENTAL function CONCAT2(arg_or_default_,TEMPLATE_TYPE_NAME)(arg, default) result(res)
+  pure TEMPLATE_ELEMENTAL function CONCAT2(arg_or_default_,TEMPLATE_TYPE_NAME)(arg, default) result(res)
     TEMPLATE_TYPE, intent(in), optional :: arg
     TEMPLATE_TYPE, intent(in) :: default
     TEMPLATE_TYPE_OUT :: res
@@ -32,7 +32,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Ternary if operator
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(iff_,TEMPLATE_TYPE_NAME)(condition, true_res, false_res) result(res)
+  pure function CONCAT2(iff_,TEMPLATE_TYPE_NAME)(condition, true_res, false_res) result(res)
     logical, intent(in) :: condition
     TEMPLATE_TYPE, intent(in) :: true_res, false_res
     TEMPLATE_TYPE_OUT :: res

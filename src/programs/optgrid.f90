@@ -18,15 +18,8 @@ module global_vars
                         
   real(real64),allocatable :: grid_rho(:), grid_theta(:), grid_phi(:)
   real(real64),allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
-  real(real64) :: rho_step, theta_step, phi_step
-  real(real64) :: rho_from, rho_to
-  real(real64) :: theta_from, theta_to
-  real(real64) :: phi_from, phi_to
-  real(real64) :: env_emax, eps
+  real(real64) :: env_emax
   integer :: env_npoints
-  integer :: rho_npoints, theta_npoints, phi_npoints
-  !--- Envelopes ---
-  character(:), allocatable :: env_path
   real(real64), allocatable :: env_grid(:), env_values(:), spline_deriv_2nd(:)
   real(real64) :: env_fit_param, env_fit_min_y, env_fit_min_x
 end module
@@ -46,103 +39,56 @@ program optgrid
   type(input_params) :: params
 
   params = process_user_settings('spectrumsdt.config')
-  call input_parameters(params)
+  env_emax = 414.4466 / autown
+  env_npoints = 494
 
   if (params % optimized_grid_rho == 1) then
     allocate(env_grid(env_npoints), env_values(env_npoints), spline_deriv_2nd(env_npoints))
-    call input_envelopes()
+    call input_envelopes(params)
     call find_parabola(env_grid, env_values, env_npoints, env_fit_param, env_fit_min_y, env_fit_min_x)
-    call generate_optgrid_step(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_step, optgrid_diff_rhs, grid_rho, jac_rho)
+    if (params % grid_rho_npoints == -1) then
+      call generate_optimized_grid_step(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_step, optgrid_diff_rhs, grid_rho, jac_rho, params % grid_rho_npoints)
+    else
+      call generate_optimized_grid_points(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_npoints, optgrid_diff_rhs, grid_rho, jac_rho, params % grid_rho_step)
+    end if
   else
     if (params % grid_rho_npoints == -1) then
-      call generate_equidistant_grid_step(params % grid_rho_from, params % grid_rho_to, params % grid_rho_step, grid_rho, jac_rho, rho_npoints)
+      call generate_equidistant_grid_step(params % grid_rho_from, params % grid_rho_to, params % grid_rho_step, grid_rho, jac_rho, params % grid_rho_npoints)
     else
-      call generate_equidistant_grid_points(params % grid_rho_from, params % grid_rho_to, params % grid_rho_npoints, grid_rho, jac_rho, rho_step)
+      call generate_equidistant_grid_points(params % grid_rho_from, params % grid_rho_to, params % grid_rho_npoints, grid_rho, jac_rho, params % grid_rho_step)
     end if
   end if
 
   if (params % grid_theta_npoints == -1) then
-    call generate_equidistant_grid_step(params % grid_theta_from, params % grid_theta_to, params % grid_theta_step, grid_theta, jac_theta, theta_npoints)
+    call generate_equidistant_grid_step(params % grid_theta_from, params % grid_theta_to, params % grid_theta_step, grid_theta, jac_theta, params % grid_theta_npoints)
   else
-    call generate_equidistant_grid_points(params % grid_theta_from, params % grid_theta_to, params % grid_theta_npoints, grid_theta, jac_theta, theta_step)
+    call generate_equidistant_grid_points(params % grid_theta_from, params % grid_theta_to, params % grid_theta_npoints, grid_theta, jac_theta, params % grid_theta_step)
   end if
 
   if (params % grid_phi_npoints == -1) then
-    call generate_equidistant_grid_step(params % grid_phi_from, params % grid_phi_to, params % grid_phi_step, grid_phi, jac_phi, phi_npoints)
+    call generate_equidistant_grid_step(params % grid_phi_from, params % grid_phi_to, params % grid_phi_step, grid_phi, jac_phi, params % grid_phi_npoints)
   else
-    call generate_equidistant_grid_points(params % grid_phi_from, params % grid_phi_to, params % grid_phi_npoints, grid_phi, jac_phi, phi_step)
+    call generate_equidistant_grid_points(params % grid_phi_from, params % grid_phi_to, params % grid_phi_npoints, grid_phi, jac_phi, params % grid_phi_step)
   end if
 
-  call print_grid(grid_rho, jac_rho, rho_step, 'grid_rho.dat')
-  call print_grid(grid_theta, jac_theta, theta_step, 'grid_theta.dat')
-  call print_grid(grid_phi, jac_phi, phi_step, 'grid_phi.dat')
+  call print_grid(grid_rho, jac_rho, params % grid_rho_step, 'grid_rho.dat')
+  call print_grid(grid_theta, jac_theta, params % grid_theta_step, 'grid_theta.dat')
+  call print_grid(grid_phi, jac_phi, params % grid_phi_step, 'grid_phi.dat')
   print *, 'Done'
-
-  ! call find_parabola(env3,pot3,nenv3,enva3,envE3,envm3)
-  ! if (symmphi == 2) envm3 = pi
-
-  ! select case (rgrid)
-  ! case(1)
-  !   call generate_grida(g2,jac2,n2,a2,min2,max2,eps,der_tet)
-  !   call generate_grida(g3,jac3,n3,a3,min3,max3,eps,der_phi)
-  !   a1 = (a2+a3)/2
-  !   call generate_gridr(g1,jac1,n1,a1,min1,eps,optgrid_diff_rhs)
-  ! case(2)
-  !   call generate_grida(g1,jac1,n1,a1,min1,max1,eps,optgrid_diff_rhs)
-  !   call generate_grida(g2,jac2,n2,a2,min2,max2,eps,der_tet)
-  !   call generate_grida(g3,jac3,n3,a3,min3,max3,eps,der_phi)
-  ! case default
-  !   deallocate(g1, g2, g3, jac1, jac2, jac3)
-  !   call generate_gridn(g1,jac1,n1,a1,min1,max1,env_fit_min_x,eps,optgrid_diff_rhs)
-  !   ! call generate_gridn(g2,jac2,n2,a2,min2,max2,envm2,eps,der_tet)
-  !
-  !   ! Select step/points mode
-  !   if (n2 == 0) then
-  !     call generate_equidistant_grid_step(min2, max2, a2, g2, jac2, n2)
-  !   else
-  !     call generate_equidistant_grid_points(min2, max2, n2, g2, jac2, a2)
-  !   end if
-  !   call generate_equidistant_grid_points(min3, max3, n3, g3, jac3, a3)
-  ! end select
 
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads input parameters.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine input_parameters(params)
-    class(input_params), intent(in) :: params
-
-    rho_from = params % grid_rho_from
-    rho_to = params % grid_rho_to
-    rho_npoints = params % grid_rho_npoints
-    rho_step = params % grid_rho_step
-    env_path = params % envelope_rho_path
-
-    theta_from = params % grid_theta_from
-    theta_to = params % grid_theta_to
-    theta_npoints = params % grid_theta_npoints
-    theta_step = params % grid_theta_step
-
-    phi_from = params % grid_phi_from
-    phi_to = params % grid_phi_to
-    phi_npoints = params % grid_phi_npoints
-    phi_step = params % grid_phi_step
-
-    env_emax = 414.4466 / autown
-    env_npoints = 494
-    eps = 1d-12
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads rho MEP and prepares spline information.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine input_envelopes()
+  subroutine input_envelopes(params)
+    class(input_params), intent(in) :: params
     integer :: i
     real(real64) :: spline_deriv_left, spline_deriv_right
-    open(1, file = append_path_token(env_path, 'MEP_rho.dat'), status='old')
-    do i=1,env_npoints
-      read(1,*) env_grid(i), env_values(i)
+
+    open(1, file = params % envelope_rho_path, status='old')
+    do i = 1, env_npoints
+      read(1, *) env_grid(i), env_values(i)
     enddo
     close(1)
 

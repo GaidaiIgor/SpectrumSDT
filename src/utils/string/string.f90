@@ -135,26 +135,18 @@ contains
 ! MODULE PROCEDURES
 !---------------------------------------------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Constructs a string from a char string
+! Constructs a string from a char string. Trims by default.
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  elemental function to_string_char_str(char_str) result(str)
+  elemental function to_string_char_str(char_str, trim_arg) result(str)
     character(*), intent(in) :: char_str
+    integer, optional, intent(in) :: trim_arg
     type(string) :: str
-    str % s = char_str
-  end function
-  
-!---------------------------------------------------------------------------------------------------------------------------------------------
-! Constructs a string array from a char string array. Input char strings are trimmed.
-!---------------------------------------------------------------------------------------------------------------------------------------------
-  function to_string_char_str_arr(char_str_arr) result(str_arr)
-    character(*), intent(in) :: char_str_arr(:)
-    type(string), allocatable :: str_arr(:)
-    integer :: i
+    integer :: trim_arg_act
+    character(:), allocatable :: char_str_act
 
-    allocate(str_arr(size(char_str_arr)))
-    do i = 1, size(char_str_arr)
-      str_arr(i) = string(trim(char_str_arr(i)))
-    end do
+    trim_arg_act = arg_or_default(trim_arg, 1)
+    char_str_act = iff(trim_arg_act == 1, trim(char_str), char_str)
+    str % s = char_str_act
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------

@@ -76,14 +76,14 @@ def main():
     requested_K = int(args.K) if args.K != 'all' else -1
     overlaps_rovib = 1 if basis_J == J and basis_K == requested_K else 0 # enable rovibrational coupling for overlaps only if basis J/K coincide with the requested J/K
 
-    folder_names = [["K_{0}"], ["even", "odd"], ["basis", "overlaps", "diagonalization", "properties"]]
-    folder_params = [["K = {0}"], ["symmetry = 0", "symmetry = 1"], ["mode = basis", "mode = overlaps\nrovib_coupling = " + str(overlaps_rovib), 
-        "mode = diagonalization\nrovib_coupling = 0\nmpd = " + str(int(num_states_base * mpd_mult)), "mode = properties\nrovib_coupling = 0"]]
+    folder_names = [["K_{0}"], ["even", "odd"], ["basis", "overlaps", "eigencalc", "properties"]]
+    folder_params = [["K = {0}"], ["symmetry = 0", "symmetry = 1"], ["stage = basis", "stage = overlaps\nrovib_coupling = " + str(overlaps_rovib), 
+        "stage = eigencalc\nrovib_coupling = 0\nmpd = " + str(int(num_states_base * mpd_mult)), "stage = properties\nrovib_coupling = 0"]]
 
-    folder_names_cor = [["K_all"], ["parity_0", "parity_1"], ["even", "odd"], ["diagonalization", "properties"]]
+    folder_names_cor = [["K_all"], ["parity_0", "parity_1"], ["even", "odd"], ["eigencalc", "properties"]]
     folder_params_cor = [["K = all\nrovib_coupling = 1"], ["parity = 0\nnum_states = " + str(num_states_p0) + "\nmpd = " + str(int(num_states_p0 * mpd_mult)), 
         "parity = 1\nnum_states = " + str(num_states_p1) + "\nmpd = " + str(int(num_states_p1 * mpd_mult))], ["symmetry = 0", "symmetry = 1"], 
-        ["mode = diagonalization", "mode = properties"]]
+        ["stage = eigencalc", "stage = properties"]]
 
     target_folders = []
     config_lines = []

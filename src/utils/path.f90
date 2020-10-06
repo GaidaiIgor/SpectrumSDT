@@ -67,7 +67,7 @@ contains
     character(:), allocatable :: path
 
     call get_command_argument(0, path_arg)
-    path = execute_shell_command('readlink -f $(which ' // path_arg // ')', '.temp' // num2str(get_proc_id()))
+    path = execute_shell_command('readlink -f $(which ' // trim(path_arg) // ')', '.temp' // num2str(get_proc_id()))
     path = get_path_head(path)
     ! only if path is non-empty
     if (len(path) /= 0) then

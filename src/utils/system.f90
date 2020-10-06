@@ -21,6 +21,6 @@ contains
     file_name_act = arg_or_default(file_name, '.command_output.txt')
     command_act = command // ' > ' // file_name_act
     call execute_command_line(command_act)
-    output = read_file(file_name_act, destruct = 1)
+    output = read_file(file_name_act, delete = 1)
   end function
 end module

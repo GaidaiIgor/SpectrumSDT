@@ -3,40 +3,25 @@
 !  Author: Alexander Teplukhin, Igor Gayday
 !-----------------------------------------------------------------------
 program pesprint
-  use config_mod
-  use input_params_mod
   use parallel_utils
   use pesgeneral
   use pesinterface_mod
 
   implicit none
   integer :: ierr
-  type(input_params) :: params
 
-  call init_parameters_pesprint(params)
+  call MPI_Init(ierr)
+  call init_pots()
   call load_optgrids()
   call calc_pots(g1, g2, g3)
 
   if (get_proc_id() == 0) then
     call print_potvib()
   end if
-  
+  call print_parallel('Done')
   call MPI_Finalize(ierr)
 
 contains
-
-!-----------------------------------------------------------------------
-!  Loads parameters.
-!-----------------------------------------------------------------------
-  subroutine init_parameters_pesprint(params)
-    type(input_params), intent(inout) :: params
-    logical :: config_exists
-
-    inquire(file = 'spectrumsdt.config', exist = config_exists)
-    call assert(config_exists, 'Error: spectrumsdt.config does not exist')
-    params = process_user_settings('spectrumsdt.config')
-    call init_pots(params)
-  end subroutine
 
 !-----------------------------------------------------------------------
 !  Loads optimized grids in APH coordinates.

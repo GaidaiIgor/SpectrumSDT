@@ -78,7 +78,7 @@ set(system ${general_utils} ${io_utils} ${prefix}/src/utils/system.f90)
 set(path_utils ${general_utils} ${input_params} ${parallel_utils} ${system} ${prefix}/src/utils/path.f90)
 set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${stage_metadata} ${string_utils} ${prefix}/src/input_params/config.f90)
 set(pesgeneral ${constants} ${formulas} ${input_params} ${general_utils} ${general_vars} ${prefix}/src/tools/pes/pesgeneral.f90)
-set(pesinterface ${constants} ${dawes_pes} ${path_utils} ${input_params} ${parallel_utils} ${pesgeneral} ${prefix}/src/tools/pes/pesinterface.f90)
+set(pesinterface ${constants} ${dawes_pes} ${path_utils} ${parallel_utils} ${pesgeneral} ${prefix}/src/tools/pes/pesinterface.f90)
 
 set(block_borders ${prefix}/src/rovib/block_borders.f90)
 set(matrix_block_info ${block_borders} ${general_utils} ${prefix}/src/rovib/matrix_block_info.f90)
@@ -94,7 +94,7 @@ set(sdt ${algorithms} ${cap} ${constants} ${general_vars} ${input_params} ${io_u
 set(optgrid_tools ${general_utils} ${numerical_recipies} ${vector} ${prefix}/src/tools/optgrid_tools.f90)
 
 set(optgrid ${config} ${constants} ${general_utils} ${input_params} ${numerical_recipies} ${optgrid_tools} ${path_utils} ${prefix}/src/programs/optgrid.f90)
-set(pesprint ${config} ${input_params} ${parallel_utils} ${pesgeneral} ${pesinterface} ${prefix}/src/programs/pesprint.f90)
+set(pesprint ${parallel_utils} ${pesgeneral} ${pesinterface} ${prefix}/src/programs/pesprint.f90)
 set(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${distributed_rovib_hamiltonian} ${fourier_transform} ${general_vars} ${input_params} ${io_utils} ${matmul_operator} ${overlaps_extra} ${parallel_utils} ${path_utils} ${pesgeneral} ${sdt} ${slepc_solver} ${state_properties} ${prefix}/src/programs/spectrumsdt.F90)
 
 # Disable all warnings and standard conformation checks for external sources

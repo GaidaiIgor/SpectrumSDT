@@ -158,9 +158,14 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_parameter_groups(config_dict)
     class(dictionary_t) :: config_dict ! intent(in)
-    call check_only_one_set(config_dict, to_string_char_str_arr([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
-    call check_only_one_set(config_dict, to_string_char_str_arr([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
-    call check_only_one_set(config_dict, to_string_char_str_arr([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
+    character(:), allocatable :: stage
+
+    stage = item_or_default(config_dict, 'stage', 'unset')
+    if (stage == 'grids') then
+      call check_only_one_set(config_dict, string([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
+      call check_only_one_set(config_dict, string([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
+      call check_only_one_set(config_dict, string([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
+    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

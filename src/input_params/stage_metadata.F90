@@ -46,9 +46,9 @@ contains
     call add_if_absent(res, 'grid_phi_from', 'set')
     call add_if_absent(res, 'grid_phi_to', 'set')
 
-    call add_first_present(res, config_dict, to_string_char_str_arr([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
-    call add_first_present(res, config_dict, to_string_char_str_arr([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
-    call add_first_present(res, config_dict, to_string_char_str_arr([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
+    call add_first_present(res, config_dict, string([character(100) :: 'grid_rho_npoints', 'grid_rho_step']))
+    call add_first_present(res, config_dict, string([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
+    call add_first_present(res, config_dict, string([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
 
     optimized_grid_rho = item_or_default(config_dict, 'optimized_grid_rho', '0')
     if (optimized_grid_rho == '1') then
