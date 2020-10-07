@@ -17,8 +17,8 @@ program pesprint
 
   if (get_proc_id() == 0) then
     call print_potvib()
+    print *, 'Done'
   end if
-  call print_parallel('Done')
   call MPI_Finalize(ierr)
 
 contains

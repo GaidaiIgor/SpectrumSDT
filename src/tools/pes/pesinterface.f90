@@ -27,6 +27,7 @@
     pes_mass(1) = isomass(3)
     pes_mass(2) = isomass(1)
     pes_mass(3) = isomass(1)
+    shift = -zpe_68
   end subroutine
 
 !-----------------------------------------------------------------------

@@ -180,7 +180,7 @@ contains
     mandatory_keys_plain = key_set(mandatory_keys)
     do i = 1, size(mandatory_keys_plain)
       next_key = mandatory_keys_plain(i) % to_char_str()
-      call assert(next_key .in. config_dict, 'Error: the following key has to be specified at this stage: ' // next_key)
+      call assert(next_key .in. config_dict, 'Error: the following key has to be specified: ' // next_key)
     end do
   end subroutine
 
@@ -213,7 +213,7 @@ contains
     do i = 1, size(config_keys)
       next_key = config_keys(i) % to_char_str()
       if (.not. ((next_key .in. mandatory_keys) .or. (next_key .in. optional_keys) .or. (next_key .in. set_default_keys))) then
-        call print_parallel('Info: the following key is not used at this stage: ' // next_key)
+        call print_parallel('Info: the following key is not used: ' // next_key)
       end if
     end do
   end subroutine
@@ -380,7 +380,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! If *key* was default-set and is actually used at this stage, prints a standard notification message or custom *message*, if given.
+! If *key* was default-set and is actually used with current settings, prints a standard notification message or custom *message*, if given.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine announce_default(key, set_default_keys, optional_keys, message)
     character(*), intent(in) :: key
@@ -393,7 +393,7 @@ contains
         call print_parallel(message)
       else
         default_value = item_or_default(set_default_keys, key, 'unset')
-        call print_parallel(key // 'is not specified. Assuming default = ' // default_value)
+        call print_parallel(key // ' is not specified. Assuming default = ' // default_value)
       end if
     end if
   end subroutine

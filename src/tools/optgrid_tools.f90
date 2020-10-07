@@ -162,12 +162,14 @@ contains
     integer, intent(in) :: npoints
     real(real64), allocatable, intent(out) :: grid(:), jac(:)
     real(real64), optional, intent(out) :: step
-    
-    grid = linspace(from + step/2, to - step/2, npoints)
+    real(real64) :: step_act
+
+    step_act = (to - from) / npoints
+    grid = linspace(from + step_act/2, to - step_act/2, npoints)
     allocate(jac(size(grid)))
     jac = 1
     if (present(step)) then
-      step = grid(2) - grid(1)
+      step = step_act
     end if
   end subroutine
 
