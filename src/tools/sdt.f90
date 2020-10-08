@@ -207,7 +207,7 @@ contains
     call free_1d(nvec,val,vec)
 
     ! Allocate ararys
-    allocate(valraw(n3b), vecrawb(n3b,n3b), basis(n3,n3b), psi(n3), val(n2), vec(n2), nbr(n3b), nvec(n2))
+    allocate(vecrawb(n3b,n3b), basis(n3,n3b), psi(n3), val(n2), vec(n2), nbr(n3b), nvec(n2))
     call init_fbrbasis(basis)
 
     ! Solve eigenvalue problem for each thread
@@ -456,7 +456,7 @@ contains
     ! Solve eigenvalue problem
     nvec2 = nvec2max
     if (nvec2>nb2) nvec2 = nb2
-    allocate(w(nb2),valraw(nvec2),vecrawe(nb2,nvec2))
+    allocate(valraw(nvec2), vecrawe(nb2, nvec2))
 
     call lapack_eigensolver(ham2, w)
     valraw  = w(1:nvec2)

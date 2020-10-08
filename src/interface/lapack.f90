@@ -12,13 +12,13 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine lapack_eigensolver(matrix, eivals)
     real(real64), intent(inout) :: matrix(:, :)
-    real(real64), intent(out) :: eivals(:)
+    real(real64), allocatable, intent(out) :: eivals(:)
     integer :: work_size, info
-    real(real64) :: work_size_query
+    real(real64) :: work_size_query(1)
     real(real64), allocatable :: work(:)
 
-    call assert(size(matrix, 1) == size(matrix, 2), 'Error: matrix is not square')
-    call assert(size(matrix, 1) == size(eivals), 'Error: eivals array has to match matrix size')
+    call assert(size(matrix, 1) == size(matrix, 2), 'Error: matrix is not square in lapack_eigensolver')
+    allocate(eivals(size(matrix, 1)))
 
     ! Workspace size query
     work_size = -1
@@ -26,7 +26,7 @@ contains
     call assert(info == 0, 'Error: lapack work space query has failed, info =' // num2str(info))
 
     ! Actual solution
-    work_size = int(work_size_query)
+    work_size = int(work_size_query(1))
     allocate(work(work_size))
     call dsyev('V', 'U', size(matrix, 1), matrix, size(matrix, 1), eivals, work, work_size, info)
     call assert(info == 0, 'Error: lapack eigensolver has failed, info =' // num2str(info))
