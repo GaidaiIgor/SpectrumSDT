@@ -18,7 +18,6 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     cd ~/SpectrumSDT/libs/fdict
     printf 'FC=gfortran\nFFLAGS = -g\n' > setup.make
     make
-    PREFIX=build make install
     ```
 
     2. FTL

@@ -11,9 +11,9 @@ project(SpectrumSDT)
 enable_language(Fortran)
 
 # Specify where to look for external module files (-I option)
-include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict/build/include ${prefix}/libs/ftl/build/include/ftl ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
+include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict ${prefix}/libs/ftl/build/include/ftl ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
 # Specify where to look for libraries (-L option)
-link_directories(${prefix}/libs/fdict/build/lib ${prefix}/libs/ftl/build/lib ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
+link_directories(${prefix}/libs/fdict ${prefix}/libs/ftl/build/lib ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
 
 # External sources. Dependency of Dawes' pes on path_utils is factored into pesinterface to avoid compiling path_utils with Dawes' flags
 set(dawes_pes ${prefix}/PES/dawes/src/PES_3D_subroutine_ozone_L3.f90 ${prefix}/PES/dawes/src/splin.f90 ${prefix}/PES/dawes/src/dynamic_parameters_3D.f90 ${prefix}/PES/dawes/src/2D-spline.f ${prefix}/PES/dawes/src/VLGRoo.f ${prefix}/PES/dawes/src/CJe.f ${prefix}/PES/dawes/src/C6Js.f ${prefix}/PES/dawes/src/cleb.f ${prefix}/PES/dawes/src/Celr.f ${prefix}/PES/dawes/src/C6r.f ${prefix}/PES/dawes/src/faclog.f ${prefix}/PES/dawes/src/index.f90)
