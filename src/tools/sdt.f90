@@ -6,6 +6,7 @@ module sdt
   use algorithms
   use cap_mod
   use constants
+  use fourier_transform_mod
   use general_vars
   use input_params_mod
   use io_utils
@@ -270,26 +271,40 @@ contains
     close(1)
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Calculates 1D Hamiltonian for coordinate #2.
-  !-----------------------------------------------------------------------
-  subroutine init_matrix2(ham,ic1)
-    real(real64) ham(n2,n2)
-    integer ic1
-    real(real64) coeff
-    real(real64) L
-    integer i,j
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Computes kinetic energy matrix for a particle with given reduced *mass* in DVR basis described by the remaining arguments
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function compute_kinetic_energy_dvr(mass, num_points, period, jac) result(matrix)
+    real(real64), intent(in) :: mass
+    integer, intent(in) :: num_points
+    real(real64), intent(in) :: period
+    real(real64), optional, intent(in) :: jac(:)
+    complex(real64), allocatable :: matrix(:, :)
 
-    L = n2 * alpha2
-    coeff = pi**2 / (mu * L**2) * 4 / grho2(ic1)
-    do i=1,n2
-      ham(i,i) = coeff * (n2**2 + 2) / 6d0
-      do j=i+1,n2
-        ham(i,j) = (-1)**(i-j) * coeff / sin((i-j) * pi / n2)**2
-        ham(j,i) = ham(i,j)
-      end do
-    end do
-  end subroutine
+    if (present(jac)) then
+      matrix = dft_derivative2_optimized_dvr(jac, period)
+    else
+      if (mod(num_points, 2) == 0) then
+        matrix = dft_derivative2_equidistant_dvr_analytical(num_points, period)
+      else
+        matrix = dft_derivative2_equidistant_dvr(num_points, period)
+      end if
+    end if
+    matrix = -matrix / (2 * mass)
+  end function
+
+  !-----------------------------------------------------------------------
+  ! Calculates 1D Hamiltonian for theta.
+  !-----------------------------------------------------------------------
+  function compute_hamiltonian_theta(rho_ind) result(ham)
+    integer, intent(in) :: rho_ind
+    real(real64), allocatable :: ham(:, :)
+    complex(real64), allocatable :: ham_complex(:, :)
+
+    ham_complex = compute_kinetic_energy_dvr(mu, n2, n2 * alpha2)
+    call assert(maxval(abs(aimag(ham_complex))) < 1d-10, 'Error: unexpected imaginary components of equidistant theta DVR')
+    ham = 4 / g1(rho_ind)**2 * real(ham_complex)
+  end function
 
   !-----------------------------------------------------------------------
   !  Writes 2D vector.
@@ -384,17 +399,17 @@ contains
     ! Deallocate solution if allocated
     call free_2d(nvec2,val2,vec2)
     if (allocated(sym2)) deallocate(sym2)
+
     ! Allocate arrays
-    allocate(kin(n2,n2),ham2(nb2,nb2),offset(n2))
+    allocate(ham2(nb2, nb2), offset(n2))
 
     ! Calculate offsets in final matrix
     offset(1) = 0
     do i = 2, n2
       offset(i) = offset(i-1) + nvec1(i-1)
     end do
-
     ! Initialize kinetic matrix
-    call init_matrix2(kin,i1)
+    kin = compute_hamiltonian_theta(i1)
 
     ! Prepare hamiltonian in basis
     ! Loop over columns

@@ -9,7 +9,6 @@ program spectrumsdt
   use constants
   use debug_tools
   use distributed_rovib_hamiltonian_mod
-  use fourier_transform_mod
   use general_vars
   use input_params_mod
   use io_utils
@@ -32,7 +31,6 @@ program spectrumsdt
   params = process_user_settings('spectrumsdt.config')
   call init_parameters(params)
   call init_pottot(params)
-  call calc_kin()
   call calc_sdt(params)
 
   if (params % sequential == 0) then
@@ -45,7 +43,7 @@ contains
 !  Loads grids.
 !-----------------------------------------------------------------------
   subroutine load_grids()
-    integer i
+    integer :: i
     
     open(2,file=gpath//'/grid_rho.dat')
     read(2,*)n1,alpha1
@@ -119,6 +117,10 @@ contains
     ! Load grids
     call load_grids()
 
+    ! Init grid derivatives
+    grho2 = g1**2
+    sintet2 = sin(g2)**2
+
     ! Setup shortcuts for products
     nn   = n1 * n2 * n3
     n12  = n1 * n2
@@ -173,36 +175,6 @@ contains
     end do
   end subroutine
 
-!-----------------------------------------------------------------------
-!  Calculates kinetic energy matrices
-!-----------------------------------------------------------------------
-  subroutine calc_kin()
-    integer :: i
-    complex(real64) :: dvr_basis(n1, n1)
-
-    allocate(sintet2(n2), grho2(n1))
-    do i = 1, n1
-      grho2(i) = g1(i)**2
-    end do
-    do i = 1, n2
-      sintet2(i) = sin(g2(i))**2
-    end do
-
-    dvr_basis = 0d0
-    do i = 1, n1
-      dvr_basis(i, i) = 1d0
-    end do
-    der1z = dft_derivative2_jac(dvr_basis, jac1, n1 * alpha1)
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes kinetic energy matrix. *calc_kin* has to be called first to initialize *der1z*
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function compute_kinetic_energy_matrix() result(matrix)
-    complex(real64), allocatable :: matrix(:, :)
-    matrix = -der1z / (2d0 * mu)
-  end function
-
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints spectrum
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -255,7 +227,12 @@ contains
     complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
 
     call print_parallel('Using rovib coupling')
-    kinetic = compute_kinetic_energy_matrix()
+    if (params % optimized_grid_rho == 1) then
+      kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1, jac1)
+    else
+      kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1)
+    end if
+
     rovib_ham % compression = merge(1, 0, params % optimized_mult == 1) ! Global in matmul_operator_mod
     if (rovib_ham % compression == 0) then
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')

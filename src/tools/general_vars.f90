@@ -5,7 +5,7 @@ module general_vars
   use iso_fortran_env, only: real64
   implicit none
   real(real64), allocatable :: grho2(:), sintet2(:)
-  complex(real64), allocatable :: freq1z(:), der1z(:, :)
+  complex(real64), allocatable :: freq1z(:)
 
   ! Masses
   integer :: mol        ! Molecule code, for example, 686

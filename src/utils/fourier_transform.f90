@@ -3,7 +3,7 @@ module fourier_transform_mod
 ! Contains procedures related to Fourier Transform
 !-------------------------------------------------------------------------------------------------------------------------------------------
   use constants, only : pi
-  use general_utils, only : linspace
+  use general_utils
   use iso_fortran_env, only : real64
 
   implicit none
@@ -104,22 +104,60 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the 2nd derivative of an optimized DVR basis, taking into account its Jacobian
+! Calculates the 2nd derivative of a regular equidistant DVR basis specified by *number of points* and *period*, using an analytical 
+! expression that works for the case of even number of points.
+! I was not able to find analogous one for the case of odd number of points.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function dft_derivative2_jac(basis, jac, period) result(basis_deriv2)
-    complex(real64), intent(in) :: basis(:, :)
+  function dft_derivative2_equidistant_dvr_analytical(npoints, period) result(dvr_deriv2)
+    integer, intent(in) :: npoints
+    real(real64), intent(in) :: period
+    complex(real64), allocatable :: dvr_deriv2(:, :)
+    integer :: i, j
+    
+    call assert(mod(npoints, 2) == 0, 'Error: analytical expression for 2nd derivative of equidistant DVR is only known for the case of even number of points')
+    allocate(dvr_deriv2(npoints, npoints))
+    do j = 1, size(dvr_deriv2, 2)
+      do i = 1, size(dvr_deriv2, 1)
+        if (i == j) then
+          dvr_deriv2(i, i) = -(pi / period)**2 * (npoints**2 + 2) / 3
+        else
+          dvr_deriv2(i, j) = (-1)**(i - j) * (-2) * (pi / period)**2 / sin((i - j) * pi / npoints)**2
+        end if
+      end do
+    end do
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates the 2nd derivative of a regular equidistant DVR basis specified by *number of points* and *period*
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function dft_derivative2_equidistant_dvr(npoints, period) result(dvr_deriv2)
+    integer, intent(in) :: npoints
+    real(real64), intent(in) :: period
+    complex(real64), allocatable :: dvr_deriv2(:, :)
+    integer :: j
+    
+    dvr_deriv2 = identity_matrix(npoints)
+    do j = 1, size(dvr_deriv2, 2)
+      dvr_deriv2(:, j) = dft_derivative(dvr_deriv2(:, j), period, 2)
+    end do
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates the 2nd derivative of an optimized DVR basis, specified by its *Jacobian* and *period*
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function dft_derivative2_optimized_dvr(jac, period) result(dvr_deriv2)
     real(real64), intent(in) :: jac(:)
     real(real64), intent(in) :: period
-    complex(real64) :: basis_deriv2(size(basis, 1), size(basis, 2))
-    integer :: n
+    complex(real64), allocatable :: dvr_deriv2(:, :)
+    integer :: j
     
-    basis_deriv2 = basis
-    do n = 1, size(basis_deriv2, 2)
-      basis_deriv2(:, n) = basis_deriv2(:, n) / sqrt(jac)
-      basis_deriv2(:, n) = dft_derivative(basis_deriv2(:, n), period, 1)
-      basis_deriv2(:, n) = basis_deriv2(:, n) / jac
-      basis_deriv2(:, n) = dft_derivative(basis_deriv2(:, n), period, 1)
-      basis_deriv2(:, n) = basis_deriv2(:, n) / sqrt(jac)
+    dvr_deriv2 = identity_matrix(size(jac))
+    do j = 1, size(dvr_deriv2, 2)
+      dvr_deriv2(:, j) = dvr_deriv2(:, j) / sqrt(jac)
+      dvr_deriv2(:, j) = dft_derivative(dvr_deriv2(:, j), period, 1)
+      dvr_deriv2(:, j) = dvr_deriv2(:, j) / jac
+      dvr_deriv2(:, j) = dft_derivative(dvr_deriv2(:, j), period, 1)
+      dvr_deriv2(:, j) = dvr_deriv2(:, j) / sqrt(jac)
     end do
   end function
 

@@ -99,7 +99,6 @@ contains
     step_power_left = -4
     do
       call generate_optimized_grid_step(from, to, start, 2 ** step_power_left, deriv, grid, jac)
-      print *, 'left npts:', size(grid), step_power_left
       if (size(grid) > npoints) then
         exit
       end if
@@ -110,7 +109,6 @@ contains
     step_power_right = 0
     do
       call generate_optimized_grid_step(from, to, start, 2 ** step_power_right, deriv, grid, jac)
-      print *, 'right npts:', size(grid), step_power_right
       if (size(grid) < npoints) then
         exit
       end if
@@ -121,7 +119,6 @@ contains
     do
       step_power_middle = (step_power_left + step_power_right) / 2
       call generate_optimized_grid_step(from, to, start, 2 ** step_power_middle, deriv, grid, jac)
-      print *, 'middle npts:', size(grid), step_power_middle
       if (size(grid) == npoints) then
         exit
       end if
