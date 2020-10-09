@@ -4,7 +4,7 @@ A parallel Fortran program for calculation of ro-vibrational energy levels and l
 
 0. Prerequisites
     1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake`, `gfortran`, `mpich`, `libblas-dev`, `liblapack-dev`.  
-    Tested with gfortran 9.3.0 and mpich 3.3.2.
+    Tested with `gfortran 9.3.0` and `mpich 3.3.2`.
     2. Make sure you machine has at least 2GB of RAM (for compilation)
 
 1. Clone the repo
