@@ -32,15 +32,15 @@ DEFINES =
 ifeq ($(PLATFORM), gnu)
 	COMPILER = gfortran
 	FLAGS = -std=f2008 -fall-intrinsics -ffree-line-length-none -Wall -Wextra -Wpedantic -Wno-target-lifetime -Wno-compare-reals -J$(BUILDDIR)
-	SOFLAGS = -fPIC
-	SOLDFLAGS = -shared
+	SOFLAGS =
+	SOLDFLAGS =
 	CXXCOMPILER = g++
 	CXXFLAGS = -std=c++11 -Ofast -march=native
 	SUPPRESSIONS = --suppressions=gfortran.supp
 else ifeq ($(PLATFORM), intel)
 	COMPILER = ifort
-	SOFLAGS = -fPIC
-	SOLDFLAGS = -shared
+	SOFLAGS =
+	SOLDFLAGS =
 	FLAGS = -stand f08 -warn -diag-disable=5268 -module $(BUILDDIR)
 	CXXCOMPILER = g++
 	CXXFLAGS = -std=c++11 -fast -xHost
@@ -48,8 +48,8 @@ else ifeq ($(PLATFORM), intel)
 else ifeq ($(PLATFORM), nag)
 	COMPILER = nagfor
 	FLAGS = -fpp -colour -I$(BUILDDIR) -mdir $(BUILDDIR)
-	SOFLAGS = -PIC
-	SOLDFLAGS = -Wl,-shared
+	SOFLAGS =
+	SOLDFLAGS =
 	CXXCOMPILER = g++
 	CXXFLAGS = -std=c++11 -fast -xHost
 	SUPPRESSIONS =
@@ -57,7 +57,7 @@ else
   $(error unrecognized PLATFORM)
 endif
 
-USE_PCRE ?= true
+USE_PCRE ?= false
 ifeq ($(USE_PCRE), true)
 	DEFINES += -DUSE_PCRE
 	LDFLAGS = -lpcreposix -lpcre
@@ -82,11 +82,11 @@ endif
 
 # Make commands:
 
-libftl: $(BUILDDIR)/libftl.so
+libftl: $(BUILDDIR)/libftl.a
 
 install: libftl
 	mkdir -p $(PREFIX)/lib
-	cp $(BUILDDIR)/libftl.so $(PREFIX)/lib/
+	cp $(BUILDDIR)/libftl.a $(PREFIX)/lib/
 	mkdir -p $(PREFIX)/include/ftl
 	cp $(BUILDDIR)/ftlkindsmodule.mod $(PREFIX)/include/ftl
 	cp $(BUILDDIR)/ftlhashmodule.mod $(PREFIX)/include/ftl
@@ -119,8 +119,8 @@ cleanall:
 
 # Shared library of non-template components:
 
-$(BUILDDIR)/libftl.so: $(BUILDDIR)/ftlKinds.o $(BUILDDIR)/ftlString.o $(BUILDDIR)/ftlHash.o $(BUILDDIR)/ftlRegex.o $(BUILDDIR)/ftlRegex_c.o
-	$(COMPILER) $(FLAGS) $(INCLUDES) $(DEFINES) $^ $(LDFLAGS) $(SOLDFLAGS) -o $@
+$(BUILDDIR)/libftl.a: $(BUILDDIR)/ftlKinds.o $(BUILDDIR)/ftlString.o $(BUILDDIR)/ftlHash.o $(BUILDDIR)/ftlRegex.o $(BUILDDIR)/ftlRegex_c.o
+	ar cr $@ $^
 
 
 # Unit tests:

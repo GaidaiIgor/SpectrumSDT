@@ -104,7 +104,7 @@ add_executable(optgrid ${optgrid})
 target_link_libraries(optgrid fdict ftl blas lapack)
 
 add_executable(pesprint ${pesprint})
-target_link_libraries(pesprint fdict ftl pcreposix blas lapack)
+target_link_libraries(pesprint fdict ftl blas lapack)
 
 add_executable(spectrumsdt ${spectrumsdt})
-target_link_libraries(spectrumsdt fdict ftl blas lapack pcreposix petsc slepc)
+target_link_libraries(spectrumsdt fdict ftl blas lapack petsc slepc)
