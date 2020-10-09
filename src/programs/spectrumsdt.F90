@@ -227,7 +227,7 @@ contains
     complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
 
     call print_parallel('Using rovib coupling')
-    if (params % optimized_grid_rho == 1) then
+    if (params % use_optimized_grid_rho == 1) then
       kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1, jac1)
     else
       kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1)

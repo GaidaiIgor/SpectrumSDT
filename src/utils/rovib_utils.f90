@@ -50,7 +50,7 @@ contains
 
     K_ind = get_k_ind(K, params % K(1))
     K_sym = get_k_symmetry(K, params % symmetry)
-    K_ind_comp = merge(K_sym + 1, K_ind, params % fix_basis_jk == 1) ! compressed index for possibly compressed structures
+    K_ind_comp = merge(K_sym + 1, K_ind, params % use_fix_basis_jk == 1) ! compressed index for possibly compressed structures
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

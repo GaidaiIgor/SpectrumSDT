@@ -42,7 +42,7 @@ program optgrid
   env_emax = 414.4466 / autown
   env_npoints = 494
 
-  if (params % optimized_grid_rho == 1) then
+  if (params % use_optimized_grid_rho == 1) then
     allocate(env_grid(env_npoints), env_values(env_npoints), spline_deriv_2nd(env_npoints))
     call input_envelopes(params)
     call find_parabola(env_grid, env_values, env_npoints, env_fit_param, env_fit_min_y, env_fit_min_x)

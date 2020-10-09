@@ -36,7 +36,7 @@ contains
   function get_mandatory_keys_grids(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
-    character(:), allocatable :: optimized_grid_rho
+    character(:), allocatable :: use_optimized_grid_rho
 
     call add_if_absent(res, 'stage', 'set')
     call add_if_absent(res, 'grid_rho_from', 'set')
@@ -50,8 +50,8 @@ contains
     call add_first_present(res, config_dict, string([character(100) :: 'grid_theta_npoints', 'grid_theta_step']))
     call add_first_present(res, config_dict, string([character(100) :: 'grid_phi_npoints', 'grid_phi_step']))
 
-    optimized_grid_rho = item_or_default(config_dict, 'optimized_grid_rho', '0')
-    if (optimized_grid_rho == '1') then
+    use_optimized_grid_rho = item_or_default(config_dict, 'use_optimized_grid_rho', '0')
+    if (use_optimized_grid_rho == '1') then
       call add_if_absent(res, 'envelope_rho_path', 'set')
     end if
   end function
@@ -82,8 +82,8 @@ contains
     type(dictionary_t) :: res
 
     call add_if_absent(res, 'stage', 'set')
-    call add_if_absent(res, 'rovib_coupling', 'set')
-    call add_if_absent(res, 'fix_basis_jk', 'set')
+    call add_if_absent(res, 'use_rovib_coupling', 'set')
+    call add_if_absent(res, 'use_fix_basis_jk', 'set')
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'K', 'set')
     call add_if_absent(res, 'symmetry', 'set')
@@ -99,11 +99,11 @@ contains
   function get_mandatory_keys_eigencalc(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
-    character(:), allocatable :: rovib_coupling, fix_basis_jk
+    character(:), allocatable :: use_rovib_coupling, use_fix_basis_jk
 
     call add_if_absent(res, 'stage', 'set')
-    call add_if_absent(res, 'rovib_coupling', 'set')
-    call add_if_absent(res, 'fix_basis_jk', 'set')
+    call add_if_absent(res, 'use_rovib_coupling', 'set')
+    call add_if_absent(res, 'use_fix_basis_jk', 'set')
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'J', 'set')
     call add_if_absent(res, 'symmetry', 'set')
@@ -111,11 +111,11 @@ contains
     call add_if_absent(res, 'grid_path', 'set')
     call add_if_absent(res, 'root_path', 'set')
 
-    rovib_coupling = item_or_default(res, 'rovib_coupling', 'unset')
-    fix_basis_jk = item_or_default(res, 'fix_basis_jk', 'unset')
-    if (rovib_coupling == '1') then
+    use_rovib_coupling = item_or_default(res, 'use_rovib_coupling', 'unset')
+    use_fix_basis_jk = item_or_default(res, 'use_fix_basis_jk', 'unset')
+    if (use_rovib_coupling == '1') then
       call add_if_absent(res, 'parity', 'set')
-      if (fix_basis_jk == '1') then
+      if (use_fix_basis_jk == '1') then
         call add_if_absent(res, 'basis_root_path', 'set')
         call add_if_absent(res, 'basis_J', 'set')
         call add_if_absent(res, 'basis_K', 'set')
@@ -131,11 +131,11 @@ contains
   function get_mandatory_keys_properties(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
-    character(:), allocatable :: rovib_coupling, fix_basis_jk
+    character(:), allocatable :: use_rovib_coupling, use_fix_basis_jk
 
     call add_if_absent(res, 'stage', 'set')
-    call add_if_absent(res, 'rovib_coupling', 'set')
-    call add_if_absent(res, 'fix_basis_jk', 'set')
+    call add_if_absent(res, 'use_rovib_coupling', 'set')
+    call add_if_absent(res, 'use_fix_basis_jk', 'set')
     call add_if_absent(res, 'molecule', 'set')
     call add_if_absent(res, 'J', 'set')
     call add_if_absent(res, 'symmetry', 'set')
@@ -145,11 +145,11 @@ contains
     call add_if_absent(res, 'root_path', 'set')
     call add_if_absent(res, 'channels_root', 'set')
 
-    rovib_coupling = item_or_default(res, 'rovib_coupling', 'unset')
-    fix_basis_jk = item_or_default(res, 'fix_basis_jk', 'unset')
-    if (rovib_coupling == '1') then
+    use_rovib_coupling = item_or_default(res, 'use_rovib_coupling', 'unset')
+    use_fix_basis_jk = item_or_default(res, 'use_fix_basis_jk', 'unset')
+    if (use_rovib_coupling == '1') then
       call add_if_absent(res, 'parity', 'set')
-      if (fix_basis_jk == '1') then
+      if (use_fix_basis_jk == '1') then
         call add_if_absent(res, 'basis_root_path', 'set')
         call add_if_absent(res, 'basis_J', 'set')
         call add_if_absent(res, 'basis_K', 'set')
@@ -187,7 +187,7 @@ contains
   function get_optional_keys_grids(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
-    call add_if_absent(res, 'optimized_grid_rho', 'set')
+    call add_if_absent(res, 'use_optimized_grid_rho', 'set')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -214,7 +214,7 @@ contains
   function get_optional_keys_eigencalc(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
-    character(:), allocatable :: rovib_coupling
+    character(:), allocatable :: use_rovib_coupling
 
     call add_if_absent(res, 'cap_type', 'set')
     call add_if_absent(res, 'ncv', 'set')
@@ -222,8 +222,8 @@ contains
     call add_if_absent(res, 'max_iterations', 'set')
     call add_if_absent(res, 'sequential', 'set')
 
-    rovib_coupling = item_or_default(res, 'rovib_coupling', 'unset')
-    if (rovib_coupling == '1') then
+    use_rovib_coupling = item_or_default(res, 'use_rovib_coupling', 'unset')
+    if (use_rovib_coupling == '1') then
       call add_if_absent(res, 'K', 'set')
       call add_if_absent(res, 'enable_terms', 'set')
       call add_if_absent(res, 'optimized_mult', 'set')
@@ -236,13 +236,13 @@ contains
   function get_optional_keys_properties(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
-    character(:), allocatable :: rovib_coupling
+    character(:), allocatable :: use_rovib_coupling
 
     call add_if_absent(res, 'cap_type', 'set')
     call add_if_absent(res, 'sequential', 'set')
 
-    rovib_coupling = item_or_default(res, 'rovib_coupling', 'unset')
-    if (rovib_coupling == '1') then
+    use_rovib_coupling = item_or_default(res, 'use_rovib_coupling', 'unset')
+    if (use_rovib_coupling == '1') then
       call add_if_absent(res, 'K', 'set')
     end if
   end function
@@ -276,9 +276,9 @@ contains
     type(dictionary_t) :: res
 
     call add_if_absent(res, 'stage', 'set')
-    call add_if_absent(res, 'optimized_grid_rho', 'set')
-    call add_if_absent(res, 'rovib_coupling', 'set')
-    call add_if_absent(res, 'fix_basis_jk', 'set')
+    call add_if_absent(res, 'use_optimized_grid_rho', 'set')
+    call add_if_absent(res, 'use_rovib_coupling', 'set')
+    call add_if_absent(res, 'use_fix_basis_jk', 'set')
     call add_if_absent(res, 'cap_type', 'set')
 
     call add_if_absent(res, 'grid_rho_from', 'set')

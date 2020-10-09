@@ -133,7 +133,7 @@ contains
     character(:), allocatable :: res
     integer :: K
 
-    K = merge(-1, params % K(1), params % rovib_coupling == 1 .and. params % stage /= 'overlaps')
+    K = merge(-1, params % K(1), params % use_rovib_coupling == 1 .and. params % stage /= 'overlaps')
     res = get_k_folder_path(params % root_path, K)
   end function
 
@@ -193,7 +193,7 @@ contains
     character(:), allocatable :: k_path
 
     k_path = get_k_folder_path_params(params)
-    parity = merge(params % parity, -1, params % rovib_coupling == 1 .and. params % stage /= 'overlaps')
+    parity = merge(params % parity, -1, params % use_rovib_coupling == 1 .and. params % stage /= 'overlaps')
     res = get_sym_path_int(k_path, params % symmetry, parity)
   end function
 

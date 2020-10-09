@@ -137,7 +137,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 1D expansion coefficients for fix_basis_jk = 1
+! Loads and rearranges 1D expansion coefficients for use_fix_basis_jk = 1
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
     class(input_params), intent(in) :: params
@@ -225,7 +225,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 2D expansion coefficients when fix_basis_jk = 1
+! Loads and rearranges 2D expansion coefficients when use_fix_basis_jk = 1
 ! Bs: Outer dimensions: 2 x N x L. Inner dimensions: S_Knl x S_Kn. All coeffs of a single 2D solution should be collected over different Ls.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)

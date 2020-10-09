@@ -5,9 +5,9 @@ module input_params_mod
   type :: input_params
     ! Behavior control
     character(:), allocatable :: stage ! grids, basis, overlaps, eigencalc or properties
-    integer :: optimized_grid_rho ! optimized distribution of rho grid points
-    integer :: rovib_coupling ! enables/disables rovib_coupling coupling
-    integer :: fix_basis_jk ! use basis set with the same fixed values of J and K for all calculations
+    integer :: use_optimized_grid_rho ! optimized distribution of rho grid points
+    integer :: use_rovib_coupling ! enables/disables use_rovib_coupling coupling
+    integer :: use_fix_basis_jk ! use basis set with the same fixed values of J and K for all calculations
     character(:), allocatable :: cap_type ! type of Complex Absorbing Potential
 
     ! Grids
@@ -30,7 +30,7 @@ module input_params_mod
     ! System
     character(:), allocatable :: molecule ! isotope composition, like 686
     integer :: J ! Total angular momentum quantum number
-    integer :: K(2) ! Boundaries of K-range for rovib_coupling calculation. In symmetric top rotor both values should be the same
+    integer :: K(2) ! Boundaries of K-range for use_rovib_coupling calculation. In symmetric top rotor both values should be the same
     integer :: parity ! 0(+) or 1(-)
     integer :: symmetry ! 0 (even, cos, +) or 1 (odd, sin, -). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
 

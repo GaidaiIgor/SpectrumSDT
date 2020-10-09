@@ -75,7 +75,7 @@ contains
     type(dictionary_t) :: set_keys
     character(:), allocatable :: stage, sequential
 
-    call set_default('optimized_grid_rho', '0', config_dict, set_keys)
+    call set_default('use_optimized_grid_rho', '0', config_dict, set_keys)
     call set_default('cap_type', 'none', config_dict, set_keys)
     call set_default('ncv', '-1', config_dict, set_keys)
     call set_default('mpd', '-1', config_dict, set_keys)
@@ -117,17 +117,17 @@ contains
     stage = item_or_default(config_dict, 'stage', 'unset')
 
     if (stage == 'grids') then
-      call check_value_one_of(config_dict, 'optimized_grid_rho', string(['0', '1']))
+      call check_value_one_of(config_dict, 'use_optimized_grid_rho', string(['0', '1']))
     end if
 
     if (stage == 'overlaps') then
-      call check_value_one_of(config_dict, 'rovib_coupling', string(['0', '1']))
-      call check_value_one_of(config_dict, 'fix_basis_jk', string(['0', '1']))
+      call check_value_one_of(config_dict, 'use_rovib_coupling', string(['0', '1']))
+      call check_value_one_of(config_dict, 'use_fix_basis_jk', string(['0', '1']))
     end if
 
     if (stage == 'eigencalc' .or. stage == 'properties') then
-      call check_value_one_of(config_dict, 'rovib_coupling', string(['0', '1']))
-      call check_value_one_of(config_dict, 'fix_basis_jk', string(['0', '1']))
+      call check_value_one_of(config_dict, 'use_rovib_coupling', string(['0', '1']))
+      call check_value_one_of(config_dict, 'use_fix_basis_jk', string(['0', '1']))
       call check_value_one_of(config_dict, 'cap_type', string([character(100) :: 'none', 'Manolopoulos']))
     end if
   end subroutine
@@ -225,7 +225,7 @@ contains
   function process_raw_config(config_dict) result(config)
     class(dictionary_t) :: config_dict ! intent(in)
     type(input_params) :: config
-    integer :: optimized_grid_rho, rovib_coupling, fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, &
+    integer :: use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, &
         max_iterations, sequential, optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
@@ -235,9 +235,9 @@ contains
 
     ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults
     stage = item_or_default(config_dict, 'stage', '-1')
-    optimized_grid_rho = str2int(item_or_default(config_dict, 'optimized_grid_rho', '-1'))
-    rovib_coupling = str2int(item_or_default(config_dict, 'rovib_coupling', '-1'))
-    fix_basis_jk = str2int(item_or_default(config_dict, 'fix_basis_jk', '-1'))
+    use_optimized_grid_rho = str2int(item_or_default(config_dict, 'use_optimized_grid_rho', '-1'))
+    use_rovib_coupling = str2int(item_or_default(config_dict, 'use_rovib_coupling', '-1'))
+    use_fix_basis_jk = str2int(item_or_default(config_dict, 'use_fix_basis_jk', '-1'))
     cap_type = item_or_default(config_dict, 'cap_type', '-1')
 
     grid_rho_from = str2real(item_or_default(config_dict, 'grid_rho_from', '-1'))
@@ -308,7 +308,7 @@ contains
     test_mode = item_or_default(config_dict, 'test_mode', '-1')
     debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
 
-    config = input_params(stage, optimized_grid_rho, rovib_coupling, fix_basis_jk, cap_type, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, envelope_rho_path, grid_theta_from, &
+    config = input_params(stage, use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, cap_type, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, envelope_rho_path, grid_theta_from, &
         grid_theta_to, grid_theta_npoints, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, &
         molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, num_states, ncv, &
         mpd, max_iterations, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
@@ -354,7 +354,7 @@ contains
     call assert(any(params % molecule == [character(len = 100) :: '-1', '686', '868']), 'Error: molecule can be "686" or "868"')
     call assert(params % J >= -1, 'Error: J should be >= 0')
     call assert(any(params % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
-    if (any(params % stage == [character(len = 100) :: 'eigencalc', 'properties']) .and. params % rovib_coupling == 1) then
+    if (any(params % stage == [character(len = 100) :: 'eigencalc', 'properties']) .and. params % use_rovib_coupling == 1) then
       K_min = get_k_start(params % J, params % parity)
       call assert(all(params % K == -1) .or. all(params % K >= K_min), 'Error: K(1:2) should be >= mod(J+p, 2)')
     else
@@ -403,7 +403,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine announce_defaults(set_default_keys, optional_keys)
     class(dictionary_t) :: set_default_keys, optional_keys ! intent(in)
-    call announce_default('optimized_grid_rho', set_default_keys, optional_keys)
+    call announce_default('use_optimized_grid_rho', set_default_keys, optional_keys)
     call announce_default('cap_type', set_default_keys, optional_keys)
     call announce_default('ncv', set_default_keys, optional_keys, message = 'ncv is not specified. Its value will be determined by SLEPc')
     call announce_default('mpd', set_default_keys, optional_keys, message = 'mpd is not specified. Its value will be determined by SLEPc')
