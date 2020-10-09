@@ -15,6 +15,7 @@ program spectrumsdt
   use iso_fortran_env, only : real64
   use matmul_operator_mod
   use mpi
+  use optgrid_mod
   use overlaps_extra_mod
   use parallel_utils
   use path_utils
@@ -29,8 +30,10 @@ program spectrumsdt
 
   ! Processes input parameters and enables MPI if sequential mode is not requested
   params = process_user_settings('spectrumsdt.config')
-  call init_parameters(params)
-  call init_pottot(params)
+  if (params % stage /= 'grids') then
+    call init_parameters(params)
+    call init_pottot(params)
+  end if
   call calc_sdt(params)
 
   if (params % sequential == 0) then
@@ -278,6 +281,9 @@ contains
 
     ! Call appropriate subroutine
     select case(params % stage)
+      case('grids')
+        call generate_grids(params)
+
       case('basis')
         call calc_basis()
 
