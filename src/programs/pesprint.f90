@@ -4,7 +4,6 @@
 !-----------------------------------------------------------------------
 program pesprint
   use parallel_utils
-  use pesgeneral
   use pesinterface_mod
 
   implicit none
@@ -51,4 +50,20 @@ contains
     close(1)
   end subroutine
   
+  !-----------------------------------------------------------------------
+  !  Prints vibrational potential on 3D grid.
+  !-----------------------------------------------------------------------
+  subroutine print_potvib()
+    integer :: i1, i2, i3, file_unit
+    open(newunit = file_unit, file = 'pes.out')
+    do i1 = 1, size(potvib, 3)
+      do i2 = 1, size(potvib, 2)
+        do i3 = 1, size(potvib, 1)
+          write(file_unit, '(G23.15)') potvib(i3, i2, i1)
+        end do
+      end do
+    end do
+    close(file_unit)
+  end subroutine
+
 end program

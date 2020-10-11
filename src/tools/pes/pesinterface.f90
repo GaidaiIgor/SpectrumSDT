@@ -8,13 +8,12 @@
    use iso_fortran_env, only: real64
    use mpi
    use parallel_utils
-   use pesgeneral
 
    implicit none
    real(real64) :: pes_mass(3)
+   real(real64), allocatable :: potvib(:, :, :) ! Electronic potential
 
    private
-   public :: pes_mass
    public :: init_pots, calc_potvib, calc_pots
 
  contains
@@ -23,11 +22,19 @@
 !  Initialization.
 !-----------------------------------------------------------------------
   subroutine init_pots()
-    ! call init_pots_general(params)
     pes_mass(1) = isomass(3)
     pes_mass(2) = isomass(1)
     pes_mass(3) = isomass(1)
-    shift = -zpe_68
+
+    ! select corresponding ZPE
+    total_code = a1 * a2 * a3
+    if (total_code == 216) then
+      shift = -zpe_66
+    else if (total_code == 288) then
+      shift = -zpe_68
+    else if (total_code == 384) then
+      shift = -zpe_88
+    end if
   end subroutine
 
 !-----------------------------------------------------------------------

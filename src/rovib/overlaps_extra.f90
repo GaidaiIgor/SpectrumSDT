@@ -71,7 +71,7 @@ contains
     n_basis = params % basis_size_phi
     allocate(sym_factors_J(size(theta_grid)), sym_factors_K(size(theta_grid)), partial_sum(size(theta_grid)))
 
-    sym_folder = get_sym_path_root(params % root_path, params % K(1), params % symmetry)
+    sym_folder = get_sym_path(params)
     block_info_path = get_block_info_path(sym_folder)
     num_solutions_2d = load_basis_size_2d(block_info_path)
 
@@ -162,7 +162,7 @@ contains
 
     root_path = params % root_path
     K_row = params % K(1)
-    K_col = merge(K_row, K_row + 1, params % use_fix_basis_jk == 1)
+    K_col = iff(params % use_fix_basis_jk == 1, K_row, K_row + 1)
     sym_row = params % symmetry
     sym_col = 1 - sym_row ! opposite symmetry for column block
 

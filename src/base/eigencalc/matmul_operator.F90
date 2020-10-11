@@ -36,7 +36,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Sets module variables
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine set_matmul_variables(params)
+  subroutine init_matmul(params)
     class(input_params), intent(in) :: params
 
     rog = rovib_ham % global_chunk_info % subblocks(1, 1) % borders % top - 1

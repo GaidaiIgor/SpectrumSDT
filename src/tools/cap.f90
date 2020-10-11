@@ -6,11 +6,9 @@ module cap_mod
   use general_vars
   use input_params_mod
   use iso_fortran_env, only: real64
-  use parallel_utils
   implicit none
 
   integer, parameter :: ncap = 3 ! Number of CAPs
-  character(*), parameter :: capdir = 'caps'
   integer :: capid      ! CAP id
   integer :: ndbw       ! Number of de Broglie waves
   real(real64) :: capebar     ! Barrier energy used for CAPs
@@ -109,30 +107,10 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
-  !  Prints CAP.
-  !-----------------------------------------------------------------------
-  subroutine prnt_cap(fn)
-    integer i1,id
-    character(*)::fn
-    open(1,file=fn)
-    do i1=1,size(all_caps,1)
-      write(1,'(I3)',advance='no')i1
-      do id=1,ncap
-        write(1,'(F25.17)',advance='no') all_caps(i1,id) * autown
-      end do
-      write(1,*)
-    end do
-    close(1)
-  end subroutine
-
-  !-----------------------------------------------------------------------
   ! Initializes CAPs (complex absorbing potential)
   !-----------------------------------------------------------------------
-  subroutine init_caps(params, capebarin)
+  subroutine init_caps(params)
     class(input_params), intent(in) :: params
-    real(real64) :: capebarin
-    integer :: proc_id
-    character(256) :: fn
 
     if (params % cap_type == 'none') then
       capid = 0
@@ -146,15 +124,9 @@ contains
     drc = 0
     ndbw = 3
     emin = 7 / autown
-    capebar = capebarin
+    capebar = 0
 
-    call calc_cap(n1,g1)
-    proc_id = get_proc_id()
-    write(fn, '(4A,I5.5,A)') outdir, '/', capdir, '/cap', proc_id + 1, '.out'
-
-    if (proc_id == 0 .and. params % stage == 'eigencalc') then
-      call prnt_cap(fn)
-    end if
+    call calc_cap(n1, g1)
   end subroutine
 
 !-----------------------------------------------------------------------

@@ -1,5 +1,7 @@
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Contains functions that evaluate simple physical formulas
+!-------------------------------------------------------------------------------------------------------------------------------------------
 module formulas_mod
-  ! Contains functions that evaluate simple physical formulas
   use constants
   use general_utils
   use iso_fortran_env, only: real64

@@ -1,14 +1,17 @@
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Distributed Hamiltonian class
+!-------------------------------------------------------------------------------------------------------------------------------------------
 module distributed_rovib_hamiltonian_mod
   use block_borders_mod
-  use rovib_utils_mod
-  use formulas_mod
   use general_utils
+  use formulas_mod
   use input_params_mod
   use iso_fortran_env, only: real64
   use k_block_info
   use matrix_block_info_mod
   use parallel_utils
-  use path_utils
+  use rovib_utils_mod
+  use spectrumsdt_paths_mod
   implicit none
 
   private

@@ -2,13 +2,17 @@
 ! Contains historically global variables shared by some other modules
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module general_vars
+  use constants, only: isomass
+  use input_params_mod
   use iso_fortran_env, only: real64
+  use path_utils
+  use spectrumsdt_paths_mod
   implicit none
+
   real(real64), allocatable :: grho2(:), sintet2(:)
   complex(real64), allocatable :: freq1z(:)
 
   ! Masses
-  integer :: mol        ! Molecule code, for example, 686
   real(real64) :: m0          ! Mass of central atom
   real(real64) :: m1          ! Mass of 1st terminal atom
   real(real64) :: m2          ! Mass of 2nd terminal atom
@@ -24,6 +28,66 @@ module general_vars
   real(real64), allocatable :: jac1(:), jac2(:), jac3(:)
   real(real64) :: alpha1, alpha2, alpha3
 
-  ! Directories
-  character(:), allocatable :: outdir
+contains
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Initializes masses
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine init_masses(params)
+    class(input_params), intent(in) :: params
+    integer :: mol, a1, a2, a3
+
+    mol = str2int(params % molecule)
+    ! Set masses: split the mass number into digits
+    a1 = mod(mol/100, 10)
+    a2 = mod(mol/10,  10)
+    a3 = mod(mol,     10)
+    if( a1<6.or.a1>8 .or. a2<6.or.a2>8 .or. a3<6.or.a3>8 ) stop 'Wrong molecule'
+
+    m1 = isomass(a1-5)
+    m0 = isomass(a2-5)
+    m2 = isomass(a3-5)
+    mtot = m0 + m1 + m2
+    mu = sqrt(m0 * m1 * m2 / mtot)
+    mu0 = m1 * m2 / (m1 + m2)
+    mu1 = m0 * m2 / (m0 + m2)
+    mu2 = m0 * m1 / (m0 + m1)
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Loads grids, jacobians, alphas (steps)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine init_grids(params)
+    class(input_params), intent(in) :: params
+    integer :: i, file_unit
+    
+    open(newunit = file_unit, file = get_grid_rho_path(params))
+    read(file_unit, *) n1, alpha1
+    allocate(g1(n1), jac1(n1))
+    do i = 1, n1
+      read(file_unit, *) g1(i), jac1(i)
+    end do
+    close(file_unit)
+    
+    open(newunit = file_unit, file = get_grid_theta_path(params))
+    read(file_unit, *) n2, alpha2
+    allocate(g2(n2), jac2(n2))
+    do i = 1, n2
+      read(file_unit, *) g2(i), jac2(i)
+    end do
+    close(file_unit)
+    
+    open(newunit = file_unit, file = get_grid_phi_path(params))
+    read(file_unit, *) n3, alpha3
+    allocate(g3(n3), jac3(n3))
+    do i = 1, n3
+      read(file_unit, *) g3(i), jac3(i)
+    end do
+    close(file_unit)
+    
+    ! Treat alpha2(3) as a grid step size
+    alpha2 = alpha2 * jac2(1)
+    alpha3 = alpha3 * jac3(1)
+  end subroutine
+
 end module

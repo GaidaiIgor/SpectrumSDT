@@ -1,24 +1,17 @@
-!----------------------------------------------------------------------
-! Calculates basis for sdt and some of the overlaps
-! Author: Alexander Teplukhin
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Procedures related to calculation of basis for Hamiltonian and base overlaps
+!-------------------------------------------------------------------------------------------------------------------------------------------
 module sdt
-  use algorithms
-  use cap_mod
-  use constants
-  use fourier_transform_mod
+  use constants, only: autown, pi
+  use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_vars
   use input_params_mod
-  use io_utils
   use iso_fortran_env, only: real64
   use lapack_interface_mod
-  use matmul_operator_mod
   use mpi
-  use parabola
   use parallel_utils
-  use pesgeneral
-  use rovib_io_mod
-  use slepc_solver_mod
+  use potential_mod, only: pottot
+  use spectrumsdt_paths_mod
   implicit none
 
   ! Data types for arrays of variable size
@@ -40,22 +33,8 @@ module sdt
   integer,parameter::SY_SY          = 5
   integer,parameter::SY_AS          = 6
 
-  ! Directories
-  character(:),allocatable::gpath ! Grid
-  character(:),allocatable::bpath ! Basis
-  character(:),allocatable::opath ! Overlap
-  character(:),allocatable::dpath ! Diagonalization
-  character(10), parameter :: dirs(*) = [character(10) :: 'basis', 'overlap', '3dsdt', '3dsdtp', '3dsdts', 'chrecog', 'chdiag', 'chdiags', 'basprobs']
-  character(*),parameter::logdir='logs'
-  character(*),parameter::expdir='exps'
-
-  ! Number of groups (pathways)
-  ! Each group is a 60 deg area along phi (only the first 180 deg are considered because of symmetry)
-  integer,parameter::ngr = 3
-
   ! Control variables
   integer mode     ! Mode
-  ! logical dvr      ! DVR or FBR
   integer sy       ! Symmetry/basis
 
   ! Sizes
@@ -74,27 +53,72 @@ module sdt
 
 contains
 
-  !-----------------------------------------------------------------------
-  !  Creates a sub directory.
-  !-----------------------------------------------------------------------
-  subroutine subdir(dir)
-    character(*) dir
-    call execute_command_line('mkdir -p ' // outdir // '/' // dir)
+!-----------------------------------------------------------------------
+!  Initilialization.
+!-----------------------------------------------------------------------
+  subroutine init_sdt(params)
+    type(input_params), intent(in) :: params
+
+    nstate = params % num_states
+    n3b = params % basis_size_phi
+    trecut = params % cutoff_energy
+
+    ! Old params are stored in plain variables defined in sdt.f90
+    if (params % stage == 'basis') then
+      mode = 1
+    else if (params % stage == 'overlaps') then
+      mode = 2
+    else if (params % stage == 'eigencalc') then
+      mode = 3
+    else if (params % stage == 'properties') then
+      mode = 4
+    end if
+
+    if (params % symmetry == 0) then
+      sy = 5
+    else if (params % symmetry == 1) then
+      sy = 6
+    end if
+
+    ! Init grid derivatives
+    grho2 = g1**2
+    sintet2 = sin(g2)**2
+
+    ! Setup shortcuts for products
+    nn   = n1 * n2 * n3
+    n12  = n1 * n2
+    n23  = n2 * n3
+    n23b = n2 * n3b
+
+    ! Set ranges of basis sizes
+    nvec1min = 3
+    nvec1max = n3
+    nvec2max = 400
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Creates main directory.
-  !-----------------------------------------------------------------------
-  integer function maindir()
-    call subdir('')
-    if (mode == MODE_3DSDT) then
-      call subdir(capdir)
-      call subdir(expdir)
-    elseif (mode == MODE_3DSDT_POST) then
-      call subdir(capdir)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Creates output directories
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine init_output_directories(params)
+    class(input_params), intent(in) :: params
+    integer :: ierr
+
+    if (get_proc_id() == 0) then
+      if (params % stage == 'basis') then
+        call create_path(get_basis_results_path(get_sym_path(params)))
+      end if
+      if (params % stage == 'overlaps') then
+        call create_path(get_overlaps_results_path(get_sym_path(params)))
+      end if
+      if (params % stage == 'eigencalc') then
+        call create_path(get_eigencalc_results_path(get_sym_path(params)))
+      end if
     end if
-    maindir = 1
-  end function
+
+    if (params % sequential == 0) then
+      call MPI_Barrier(MPI_COMM_WORLD, ierr)
+    end if
+  end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates FBR basis on the grid.
@@ -184,7 +208,8 @@ contains
   !  Solves 1D problems for each thread in the slice.
   !  Serial solution.
   !-----------------------------------------------------------------------
-  subroutine calc_1d(val,vec,nvec,nb2,i1)
+  subroutine calc_1d(params, val, vec, nvec, nb2, i1)
+    class(input_params), intent(in) :: params
     type(array1d),allocatable::val(:) ! 1D values  for each thread
     type(array2d),allocatable::vec(:) ! 1D vectors for each thread
     integer,allocatable::nvec(:)      ! Num of 1D vecs in each thread
@@ -195,13 +220,12 @@ contains
     integer i3                        ! State number in thread
     integer ivec                      ! Good state number
     integer nnode                     ! Number of nodes
-    integer k
+    integer :: k, file_unit
     real(real64),allocatable::valraw(:)     ! Eigenvalues
     real(real64),allocatable::vecraw(:,:)   ! Eigenvectors on the grid
     real(real64),allocatable::vecrawb(:,:)  ! Basis expansion of eivectors
     real(real64),allocatable::basis(:,:)    ! FBR basis
     real(real64),allocatable::psi(:)        ! State
-    character(256) fn                 ! File name
 
     ! Deallocate solution if allocated
     call free_1d(nvec,val,vec)
@@ -259,16 +283,15 @@ contains
     end do
 
     ! Save results in binary file
-    write(fn,'(2A,I0,A)')outdir,'/bas1.',i1,'.bin.out'
-    open(1,file=fn,form='unformatted')
-    write(1)nvec
-    do i2=1,n2
+    open(newunit = file_unit, file = get_solutions_1d_path(get_sym_path(params), i1), form = 'unformatted')
+    write(file_unit) nvec
+    do i2 = 1, n2
       if (nvec(i2) /= 0) then
-        write(1)val(i2)%a
-        write(1)vec(i2)%a
+        write(file_unit) val(i2) % a
+        write(file_unit) vec(i2) % a
       end if
     end do
-    close(1)
+    close(file_unit)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -305,25 +328,6 @@ contains
     call assert(maxval(abs(aimag(ham_complex))) < 1d-10, 'Error: unexpected imaginary components of equidistant theta DVR')
     ham = 4 / g1(rho_ind)**2 * real(ham_complex)
   end function
-
-  !-----------------------------------------------------------------------
-  !  Writes 2D vector.
-  !-----------------------------------------------------------------------
-  subroutine writ_vec2(vec,i1,is,sgn)
-    real(real64), allocatable::vec(:)
-    integer i1,is,sgn,i,j,l
-    character(256) fn
-    write(fn,'(2A,I0,A,I0,A)')outdir,'/vec2.',i1,'.',is,'.out'
-    open(1,file=fn)
-    do i=1,n2
-      do j=1,n3
-        l = (i-1)*n3 + j
-        write(1,'(F25.17)',advance='no')vec(l) * sgn
-      end do
-      write(1,*)
-    end do
-    close(1)
-  end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates symmetry of 2D state.
@@ -364,7 +368,8 @@ contains
   !  Serial solution.
   !  Returns 2D vectors in basis representation to save memory.
   !-----------------------------------------------------------------------
-  subroutine calc_2d(val2,vec2,sym2,nvec2,i1,val1,vec1,nvec1)
+  subroutine calc_2d(params, val2, vec2, sym2, nvec2, i1, val1, vec1, nvec1)
+    class(input_params), intent(in) :: params
     type(array1d),allocatable::val1(:) ! 1D values  for each thread
     type(array2d),allocatable::vec1(:) ! 1D vectors for each thread
     real(real64),allocatable::vec2(:,:)      ! 2D vectors in basis
@@ -378,7 +383,7 @@ contains
     integer ivec                       ! Good state number
     integer nvec1c                     ! Number of 1D vectors in ic
     integer nvec1r                     ! Number of 1D vectors in ir
-    integer i,j,l,is
+    integer :: i, j, l, is, file_unit
     integer,allocatable::offset(:)     ! Offsets in final matrix
     integer,allocatable::nbr(:)        ! Nums of good vecs in vecraw
     real(real64),allocatable::kin(:,:)       ! KEO matrix
@@ -393,7 +398,6 @@ contains
     real(real64),allocatable::w(:)           ! Temporary array of eivalues
     real(real64) s3                          ! Symmetry along third coord
     real(real64) frac                        ! Fraction in equilat config
-    character(256) fn                  ! File name
 
     nb2 = sum(nvec1)
     ! Deallocate solution if allocated
@@ -518,20 +522,20 @@ contains
     end if
 
     ! Save results in binary file for 3D solution
-    write(fn,'(2A,I0,A)')outdir,'/bas2.',i1,'.bin.out'
-    open(1,file=fn,form='unformatted')
-    write(1)ivec,nb2
+    open(newunit = file_unit, file = get_solutions_2d_path(get_sym_path(params), i1), form = 'unformatted')
+    write(file_unit) ivec, nb2
     if (ivec /= 0) then
-      write(1) val2
-      write(1) vec2
+      write(file_unit) val2
+      write(file_unit) vec2
     end if
-    close(1)
+    close(file_unit)
   end subroutine
 
   !-----------------------------------------------------------------------
   !  Calculates 1D and 2D basis.
   !-----------------------------------------------------------------------
-  subroutine calc_basis()
+  subroutine calc_basis(params)
+    class(input_params), intent(in) :: params
     ! Variables for one slice
     type(array1d),allocatable::val1(:) ! 1D values
     type(array2d),allocatable::vec1(:) ! 1D vectors
@@ -543,7 +547,7 @@ contains
     integer nvec2                      ! Number of 2D vectors
     integer nb2                        ! Basis size
     integer mysl                       ! SLice number
-    integer :: i, j, ierr, proc_id
+    integer :: i, j, ierr, proc_id, file_unit
 
     ! Collective variables
     real(real64),allocatable::val2all(:,:)   ! 2D values
@@ -556,11 +560,11 @@ contains
     mysl = proc_id + 1
 
     ! Calculate 1D
-    call calc_1d(val1,vec1,nvec1,nb2,mysl)
+    call calc_1d(params, val1, vec1, nvec1, nb2, mysl)
 
     ! Calculate 2D
     if (nb2 /= 0) then
-      call calc_2d(val2,vec2,sym2,nvec2,mysl,val1,vec1,nvec1)
+      call calc_2d(params, val2, vec2, sym2, nvec2, mysl, val1, vec1, nvec1)
     end if
 
     ! Allocate collective arrays on root
@@ -586,55 +590,31 @@ contains
     if (proc_id == 0) then
       print *, 'Basis done, writing summary'
 
-      ! Write number of 1D vectors
-      open(1,file=outdir//'/nvec1.dat')
-      write(1,'(10X)',advance='no')
-      do j=1,n1
-        write(1,'(I10)',advance='no')j
-      end do
-      write(1,*)
-      do i=1,n2
-        write(1,'(I10)',advance='no')i
-        do j=1,n1
-          write(1,'(I10)',advance='no')nvec1all(i,j)
-        end do
-        write(1,*)
-      end do
-      close(1)
-
       ! Write number of 2D vectors
-      open(1,file=outdir//'/nvec2.dat')
-      do i=1,n1
-        write(1,'(2I10)')i,nvec2all(i)
+      open(newunit = file_unit, file = get_block_info_path(get_sym_path(params)))
+      do i = 1, n1
+        write(file_unit, '(2I10)') i, nvec2all(i)
       end do
-      close(1)
+      close(file_unit)
 
       ! Write 2D eivalues and symmetries
-      open(1,file=outdir//'/val2.out')
-      open(2,file=outdir//'/sym2.out')
-      write(1,'(10X)',advance='no')
-      write(2,'(10X)',advance='no')
-      do j=1,n1
-        write(1,'(I25)',advance='no')j
-        write(2,'(I25)',advance='no')j
+      open(newunit = file_unit, file = get_2d_energies_path(get_sym_path(params)))
+      write(file_unit, '(10X)', advance = 'no')
+      do j = 1, n1
+        write(file_unit, '(I25)', advance = 'no') j
       end do
-      write(1,*)
-      write(2,*)
-      do i=1,nvec2max
-        write(1,'(I10)',advance='no')i
-        write(2,'(I10)',advance='no')i
-        do j=1,n1
-          write(1,'(F25.17)',advance='no')val2all(i,j) * autown ! constants
-          write(2,'(F25.17)',advance='no')sym2all(i,j)
+      write(file_unit, *)
+      do i = 1, nvec2max
+        write(file_unit, '(I10)', advance = 'no') i
+        do j = 1, n1
+          write(file_unit, '(F25.17)', advance = 'no') val2all(i, j) * autown ! constants
         end do
-        write(1,*)
-        write(2,*)
+        write(file_unit, *)
       end do
-      close(1)
-      close(2)
+      close(file_unit)
 
       ! Write total number of 2D basis functions
-      write(*,*)'nvec2tot: ',sum(nvec2all)
+      print *, 'nvec2tot: ', sum(nvec2all)
     end if
   end subroutine
 
@@ -674,18 +654,26 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
-  !  Loads 2D vector in basis repr or on grid.
+  !  Loads number of 2D states only.
   !-----------------------------------------------------------------------
-  function getdir(m) result(res)
-    character(:),allocatable :: res
-    integer   m ! Mode
-    res = trim(dirs(m))
-  end function
+  subroutine load_nvec2(sym_path, nvec2)
+    character(*), intent(in) :: sym_path
+    integer, allocatable :: nvec2(:)
+    integer :: i, file_unit
+
+    allocate(nvec2(n1))
+    open(newunit = file_unit, file = get_block_info_path(sym_path))
+    do i = 1, n1
+      read(file_unit, '(10X,I10)') nvec2(i)
+    end do
+    close(file_unit)
+  end subroutine
 
   !-----------------------------------------------------------------------
   !  Loads 1D and 2D eigenvector basis for given slice.
   !-----------------------------------------------------------------------
-  subroutine load_eibasis(isl,nvec1,val1,vec1,val2,vec2)
+  subroutine load_eibasis(sym_path, isl, nvec1, val1, vec1, val2, vec2)
+    character(*), intent(in) :: sym_path
     type(array1d),allocatable::val1(:) ! 1D solutions eigenvalues for each thread
     type(array2d),allocatable::vec1(:) ! 1D solutions expansion coefficients (over sin/cos) for each thread
     real(real64),allocatable::vec2(:,:)      ! 2D solutions expansion coefficients (over 1D solutions)
@@ -694,40 +682,32 @@ contains
     integer nvec2                      ! Num of 2D vecs
     integer nb2                        ! Size of 2D vector in basis
     integer isl                        ! Slice number
-    integer i
-    character(:),allocatable::ldir
-    character(256) fn
+    integer :: i, file_unit
     
     ! Deallocate arrays if allocated
     call free_1d(nvec1,val1,vec1)
     call free_2d(nvec2,val2,vec2)
 
-    ! Get load directory
-    ldir = bpath // '/' // getdir(MODE_BASIS)
-    ! Get file name
-    write(fn,'(2A,I0,A)')ldir,'/bas2.',isl,'.bin.out'
     ! Load 2D solution
-    open(1,file=fn,form='unformatted')
-    read(1)nvec2,nb2
-    if (nvec2 == 0)return ! Exit right away, if empty
+    open(newunit = file_unit, file = get_solutions_2d_path(sym_path, isl), form = 'unformatted')
+    read(file_unit) nvec2, nb2
+    if (nvec2 == 0) return ! Exit right away, if empty
     allocate(val2(nvec2),vec2(nb2,nvec2))
-    read(1)val2
-    read(1)vec2
-    close(1)
+    read(file_unit) val2
+    read(file_unit) vec2
+    close(file_unit)
 
-    ! Get file name
-    write(fn,'(2A,I0,A)')ldir,'/bas1.',isl,'.bin.out'
     ! Load 1D solution
     allocate(nvec1(n2),val1(n2),vec1(n2))
-    open(1,file=fn,form='unformatted')
-    read(1)nvec1
-    do i=1,n2
-      if (nvec1(i) == 0)cycle
+    open(newunit = file_unit, file = get_solutions_1d_path(sym_path, isl), form = 'unformatted')
+    read(file_unit) nvec1
+    do i = 1, n2
+      if (nvec1(i) == 0) cycle
       allocate(val1(i)%a(nvec1(i)),vec1(i)%a(n3b,nvec1(i)))
-      read(1)val1(i)%a
-      read(1)vec1(i)%a
+      read(file_unit) val1(i) % a
+      read(file_unit) vec1(i) % a
     end do
-    close(1)
+    close(file_unit)
   end subroutine
 
   !-----------------------------------------------------------------------
@@ -752,68 +732,11 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
-  !  Loads 2D vector in basis repr or on grid.
-  !-----------------------------------------------------------------------
-  subroutine load_vec2(vec2,isl,ist,ongrid)
-    integer isl,ist
-    logical ongrid
-    ! 1D basis
-    type(array1d),allocatable::val1(:) ! 1D values  for each thread
-    type(array2d),allocatable::vec1(:) ! 1D vectors for each thread
-    integer,allocatable::nvec1(:)      ! Num of 1D vectors
-    ! 2D basis
-    real(real64),allocatable::val2(:)        ! 2D values
-    real(real64),allocatable::vec2e(:,:)     ! 2D vectors in eibasis repr
-    real(real64),allocatable::vec2b(:)       ! 2D vector  in   basis repr
-    real(real64),allocatable::vec2(:)        ! 2D vector  for output
-    real(real64),allocatable::basis(:,:)     ! FBR basis
-
-    ! Deallocate if already allocated
-    if (allocated(vec2)) deallocate(vec2)
-
-    ! Allocate basis repr
-    allocate(vec2b(n23b))
-    ! Load eibasis
-    call load_eibasis(isl,nvec1,val1,vec1,val2,vec2e)
-    ! Transform from eigenvector basis
-    call trans_eibas_bas(vec1,nvec1,vec2e(:,ist),vec2b)
-    ! Transform to grid if requested
-    if (ongrid) then
-      allocate(basis(n3,n3b))
-      call init_fbrbasis(basis)
-
-      ! Get normalized grid function
-      allocate(vec2(n23))
-      call trans_bas_grd_d(basis,vec2b,vec2)
-      vec2 = vec2 / sqrt(alpha2)
-    ! Or return basis repr
-    else
-      allocate(vec2(n23b))
-      vec2 = vec2b
-    end if
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Loads number of 2D states only.
-  !-----------------------------------------------------------------------
-  subroutine load_nvec2(nvec2)
-    integer,allocatable::nvec2(:)
-    character(:),allocatable::ldir
-    integer i
-    allocate(nvec2(n1))
-    ldir = bpath // '/' // getdir(MODE_BASIS)
-    open(1,file=ldir//'/nvec2.dat')
-    do i=1,n1
-      read(1,'(10X,I10)')nvec2(i)
-    enddo
-    close(1)
-  end subroutine
-
-  !-----------------------------------------------------------------------
   !  Calculates overlaps and saves them on disk in binary form.
   !  Only blocks in upper triangle.
   !-----------------------------------------------------------------------
-  subroutine calc_overlap()
+  subroutine calc_overlap(params)
+    class(input_params), intent(in) :: params
     ! Arrays for 1D and 2D eigenstates
     type(array1d),allocatable::val1c(:)   ! 1D values for ic
     type(array1d),allocatable::val1r(:)   ! 1D values for ir
@@ -840,14 +763,13 @@ contains
     integer ibl                           ! Global block index
 
     ! Miscellaneous
-    character(256) fn
-    integer i, j
+    integer :: i, j, file_unit
 
     ! Allocate arrays for vectors
     allocate(lambdac(n23b),lambdar(n23b))
 
     ! Load nvec2, calculate offsets and final matrix size
-    call load_nvec2(nvec2)
+    call load_nvec2(get_sym_path(params), nvec2)
 
     ! Setup global block index
     ibl = 0
@@ -875,8 +797,8 @@ contains
         if (mod(ibl - 1, get_num_procs()) /= get_proc_id()) cycle
 
         ! Load bases
-        call load_eibasis(ic,nvec1c,val1c,vec1c,val2c,vec2c)
-        call load_eibasis(ir,nvec1r,val1r,vec1r,val2r,vec2r)
+        call load_eibasis(get_sym_path(params), ic, nvec1c, val1c, vec1c, val2c, vec2c)
+        call load_eibasis(get_sym_path(params), ir, nvec1r, val1r, vec1r, val2r, vec2r)
 
         ! Calculate overlap matrix, olap = vec2r * vec2c
         allocate(olap(nvec2(ir),nvec2(ic)))
@@ -889,10 +811,9 @@ contains
         end do
 
         ! Save block
-        write(fn,'(2A,I0,A,I0,A)') outdir, '/overlap.', ir, '.', ic, '.bin.out'
-        open(1,file=fn,form='unformatted')
-        write(1)olap
-        close(1)
+        open(newunit = file_unit, file = get_regular_overlap_file_path(get_sym_path(params), ir, ic), form = 'unformatted')
+        write(file_unit) olap
+        close(file_unit)
 
         ! Deallocate matrix
         deallocate(olap)

@@ -1,3 +1,6 @@
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Procedures related to post-processing of wave functions obtained during the `eigencalc` stage
+!-------------------------------------------------------------------------------------------------------------------------------------------
 module state_properties_mod
   use algorithms
   use array_1d_mod
@@ -336,7 +339,7 @@ contains
     type(array_2d_complex), allocatable :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
 
     ! Load energies
-    sym_path = get_sym_path_params(params)
+    sym_path = get_sym_path(params)
     spectrum_path = get_spectrum_path(sym_path)
     energies_3d = load_energies_3D(spectrum_path)
 

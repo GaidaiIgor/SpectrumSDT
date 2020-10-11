@@ -5,8 +5,9 @@ module rovib_io_mod
   use io_utils
   use input_params_mod
   use iso_fortran_env, only: real64
-  use path_utils
+  use parallel_utils
   use rovib_utils_mod
+  use spectrumsdt_paths_mod
   use string_mod
   implicit none
   
@@ -275,7 +276,7 @@ contains
     ! Load raw matrix
     call get_proc_elem_range(params % num_states, first_elem, proc_elems)
     allocate(Cs_raw(total_solutions_2d, proc_elems))
-    sym_path = get_sym_path_params(params)
+    sym_path = get_sym_path(params)
     do sln_ind = first_elem, first_elem + proc_elems - 1
       exp_coeffs_path = get_solution_3d_path(sym_path, sln_ind)
       call load_solution_3D(exp_coeffs_path, total_solutions_2d, Cs_raw_col)
@@ -348,7 +349,7 @@ contains
     end if
 
     call assert(size(region_probs, 1) == size(K_dists, 1) .and. size(region_probs, 1) == size(gammas, 1), 'Sizes of input arrays have to be the same')
-    sym_path = get_sym_path_params(params)
+    sym_path = get_sym_path(params)
     properties_result_path = get_properties_result_path(sym_path)
 
     cols_bar_K = 1 + size(gammas, 2) + size(region_probs, 2)
