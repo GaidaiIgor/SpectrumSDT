@@ -317,7 +317,7 @@ contains
     real(real64), allocatable :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
 
-    env_emax = 414.4466 / autown
+    env_emax = params % envelope_rho_max_energy / autown ! 414.4466
     env_npoints = 494
     rho_step = params % grid_rho_step
     theta_step = params % grid_theta_step

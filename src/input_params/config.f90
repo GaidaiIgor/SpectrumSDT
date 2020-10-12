@@ -225,11 +225,11 @@ contains
   function process_raw_config(config_dict) result(config)
     class(dictionary_t) :: config_dict ! intent(in)
     type(input_params) :: config
-    integer :: use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, &
-        max_iterations, sequential, optimized_mult
+    integer :: use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, &
+        basis_K, ncv, mpd, num_states, max_iterations, sequential, optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
-    real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, cutoff_energy
+    real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, cutoff_energy
     character(:), allocatable :: stage, envelope_rho_path, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
     type(string), allocatable :: tokens(:)
 
@@ -245,6 +245,7 @@ contains
     grid_rho_npoints = str2int(item_or_default(config_dict, 'grid_rho_npoints', '-1'))
     grid_rho_step = str2real(item_or_default(config_dict, 'grid_rho_step', '-1'))
     envelope_rho_path = item_or_default(config_dict, 'envelope_rho_path', '-1')
+    envelope_rho_max_energy = str2real(item_or_default(config_dict, 'envelope_rho_max_energy', '-1'))
 
     grid_theta_from = str2real(item_or_default(config_dict, 'grid_theta_from', '-1'))
     grid_theta_to = str2real(item_or_default(config_dict, 'grid_theta_to', '-1'))
@@ -308,8 +309,8 @@ contains
     test_mode = item_or_default(config_dict, 'test_mode', '-1')
     debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
 
-    config = input_params(stage, use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, cap_type, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, envelope_rho_path, grid_theta_from, &
-        grid_theta_to, grid_theta_npoints, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, &
+    config = input_params(stage, use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, cap_type, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, &
+        envelope_rho_path, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_npoints, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, &
         molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, num_states, ncv, &
         mpd, max_iterations, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
   end function

@@ -53,6 +53,7 @@ contains
     use_optimized_grid_rho = item_or_default(config_dict, 'use_optimized_grid_rho', '0')
     if (use_optimized_grid_rho == '1') then
       call add_if_absent(res, 'envelope_rho_path', 'set')
+      call add_if_absent(res, 'envelope_rho_max_energy', 'set')
     end if
   end function
 
@@ -286,6 +287,7 @@ contains
     call add_if_absent(res, 'grid_rho_npoints', 'set')
     call add_if_absent(res, 'grid_rho_step', 'set')
     call add_if_absent(res, 'envelope_rho_path', 'set')
+    call add_if_absent(res, 'envelope_rho_max_energy', 'set')
 
     call add_if_absent(res, 'grid_theta_from', 'set')
     call add_if_absent(res, 'grid_theta_to', 'set')
