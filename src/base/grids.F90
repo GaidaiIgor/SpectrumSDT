@@ -6,6 +6,7 @@ module grids_mod
   use constants
   use general_utils
   use input_params_mod
+  use io_utils
   use iso_fortran_env, only: real64
   use numerical_recipies
   use path_utils
@@ -22,9 +23,8 @@ module grids_mod
                         mu = sqrt(m0*m1*m2/Mtot)
                         
   real(real64) :: env_emax
-  integer :: env_npoints
   real(real64), allocatable :: env_grid(:), env_values(:), spline_deriv_2nd(:)
-  real(real64) :: env_fit_param, env_fit_min_y, env_fit_min_x
+  real(real64) :: env_fit_param, env_fit_min_abs_energy, env_fit_min_x
 
 contains
 
@@ -33,18 +33,17 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine input_envelopes(params)
     class(input_params), intent(in) :: params
-    integer :: i
     real(real64) :: spline_deriv_left, spline_deriv_right
+    real(real64), allocatable :: envelope_matrix(:, :)
 
-    open(1, file = params % envelope_rho_path, status='old')
-    do i = 1, env_npoints
-      read(1, *) env_grid(i), env_values(i)
-    enddo
-    close(1)
+    envelope_matrix = read_matrix_real(params % envelope_rho_path)
+    env_grid = envelope_matrix(:, 1)
+    env_values = envelope_matrix(:, 2)
 
     ! Calculates derivatives at the endpoints for spline
     spline_deriv_left = (env_values(2) - env_values(1)) / (env_grid(2) - env_grid(1))
-    spline_deriv_right = (env_values(env_npoints) - env_values(env_npoints-1)) / (env_grid(env_npoints) - env_grid(env_npoints-1))
+    spline_deriv_right = (env_values(size(env_values)) - env_values(size(env_values) - 1)) / (env_grid(size(env_grid)) - env_grid(size(env_grid) - 1))
+    allocate(spline_deriv_2nd(size(env_values)))
     call spline(env_grid, env_values, spline_deriv_left, spline_deriv_right, spline_deriv_2nd)
   end subroutine
 
@@ -59,13 +58,14 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Finds parameters of fitting parabola.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine find_parabola(env,pot,nenv,enva,envE,envm)
-    integer nenv,i,im,il,ir
-    real(real64) env(nenv),pot(nenv),enva,envE,envm
+  subroutine find_parabola(env, pot, enva, envE, envm)
+    real(real64), intent(in) :: env(:), pot(:)
+    real(real64), intent(out) :: enva, envE, envm
+    integer :: i, im, il, ir
     real(real64) mat(3,3),d(3)
     real(real64) det0,det1,c
     im = 1
-    do i=1,nenv
+    do i = 1, size(pot)
       if (pot(i) < pot(im)) im = i
     enddo
     il = im - 1
@@ -118,10 +118,10 @@ contains
 
     x = r - env_fit_min_x
     if (x < 0) then
-      res = -env_fit_min_y * 4 / (exp(x/env_fit_param) + exp(-x/env_fit_param))**2
+      res = -env_fit_min_abs_energy * 4 / (exp(x/env_fit_param) + exp(-x/env_fit_param))**2
     else
-      if (r > env_grid(env_npoints)) then
-        res = env_values(env_npoints)
+      if (r > env_grid(size(env_grid))) then
+        res = env_values(size(env_values))
       else
         res = splint(env_grid, env_values, spline_deriv_2nd, r)
       endif
@@ -318,15 +318,13 @@ contains
     real(real64), allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
 
     env_emax = params % envelope_rho_max_energy / autown ! 414.4466
-    env_npoints = 494
     rho_step = params % grid_rho_step
     theta_step = params % grid_theta_step
     phi_step = params % grid_phi_step
 
     if (params % use_optimized_grid_rho == 1) then
-      allocate(env_grid(env_npoints), env_values(env_npoints), spline_deriv_2nd(env_npoints))
       call input_envelopes(params)
-      call find_parabola(env_grid, env_values, env_npoints, env_fit_param, env_fit_min_y, env_fit_min_x)
+      call find_parabola(env_grid, env_values, env_fit_param, env_fit_min_abs_energy, env_fit_min_x)
       if (params % grid_rho_npoints == -1) then
         call generate_optimized_grid_step(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_step, optgrid_diff_rhs, grid_rho, jac_rho)
       else
