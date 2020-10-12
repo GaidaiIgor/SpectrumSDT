@@ -21,8 +21,8 @@ program spectrumsdt
   ! Processes input parameters and enables MPI if sequential mode is not requested
   params = process_user_settings('spectrumsdt.config')
   call init_debug(params)
+  call init_masses(params)
   if (params % stage /= 'grids') then
-    call init_masses(params)
     call init_grids(params)
   end if
   if (params % stage == 'basis') then

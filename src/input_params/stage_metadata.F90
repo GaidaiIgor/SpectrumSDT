@@ -52,6 +52,7 @@ contains
 
     use_optimized_grid_rho = item_or_default(config_dict, 'use_optimized_grid_rho', '0')
     if (use_optimized_grid_rho == '1') then
+      call add_if_absent(res, 'molecule', 'set')
       call add_if_absent(res, 'envelope_rho_path', 'set')
       call add_if_absent(res, 'envelope_rho_max_energy', 'set')
     end if

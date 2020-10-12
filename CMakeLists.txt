@@ -92,7 +92,7 @@ set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${prefix}
 set(lapack_interface ${general_utils} ${prefix}/src/interface/lapack.f90)
 set(sdt ${constants} ${fourier_transform} ${general_vars} ${input_params} ${lapack_interface} ${parallel_utils} ${potential} ${spectrumsdt_paths} ${prefix}/src/base/sdt.f90)
 set(spectrum ${cap} ${constants} ${general_utils} ${general_vars} ${input_params} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.F90)
-set(grids ${config} ${constants} ${general_utils} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.F90)
+set(grids ${config} ${constants} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.F90)
 
 set(pesprint ${parallel_utils} ${pesinterface} ${prefix}/src/programs/pesprint.f90)
 

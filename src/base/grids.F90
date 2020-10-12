@@ -5,6 +5,7 @@ module grids_mod
   use config_mod
   use constants
   use general_utils
+  use general_vars, only: mu
   use input_params_mod
   use io_utils
   use iso_fortran_env, only: real64
@@ -16,12 +17,6 @@ module grids_mod
   private
   public :: generate_grids
 
-  real(real64), parameter :: m0 = isomass(1), &
-                        m1 = isomass(1), &
-                        m2 = isomass(1), &
-                        Mtot = m0+m1+m2, &
-                        mu = sqrt(m0*m1*m2/Mtot)
-                        
   real(real64) :: env_emax
   real(real64), allocatable :: env_grid(:), env_values(:), spline_deriv_2nd(:)
   real(real64) :: env_fit_param, env_fit_min_abs_energy, env_fit_min_x
@@ -50,9 +45,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates 3x3 matrix determinant.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  real(real64) function det(a)
-    real(real64) a(3,3)
-    det = a(1,1)*(a(2,2)*a(3,3) - a(3,2)*a(2,3)) + a(1,2)*(a(3,1)*a(2,3) - a(2,1)*a(3,3)) + a(1,3)*(a(2,1)*a(3,2) - a(3,1)*a(2,2))
+  function det(a) result(res)
+    real(real64) :: a(3, 3)
+    real(real64) :: res
+    res = a(1,1)*(a(2,2)*a(3,3) - a(3,2)*a(2,3)) + a(1,2)*(a(3,1)*a(2,3) - a(2,1)*a(3,3)) + a(1,3)*(a(2,1)*a(3,2) - a(3,1)*a(2,2))
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -61,52 +57,25 @@ contains
   subroutine find_parabola(env, pot, enva, envE, envm)
     real(real64), intent(in) :: env(:), pot(:)
     real(real64), intent(out) :: enva, envE, envm
-    integer :: i, im, il, ir
-    real(real64) mat(3,3),d(3)
-    real(real64) det0,det1,c
-    im = 1
-    do i = 1, size(pot)
-      if (pot(i) < pot(im)) im = i
-    enddo
-    il = im - 1
-    ir = im + 1
-    mat(1,1) = env(il)**2
-    mat(1,2) = env(il)
-    mat(1,3) = 1
-    mat(2,1) = env(im)**2
-    mat(2,2) = env(im)
-    mat(2,3) = 1
-    mat(3,1) = env(ir)**2
-    mat(3,2) = env(ir)
-    mat(3,3) = 1
-    d(1) = pot(il)
-    d(2) = pot(im)
-    d(3) = pot(ir)
+    integer :: im
+    real(real64) :: d(3)
+    real(real64) :: mat(3, 3)
+    real(real64) :: det0, det1, c
+
+    im = minloc(pot, 1)
+    mat(:, 1) = env(im-1 : im+1) ** 2
+    mat(:, 2) = env(im-1 : im+1)
+    mat(:, 3) = 1
+    d = pot(im-1 : im+1)
     det0 = det(mat)
-    mat(1,1) = d(1)
-    mat(2,1) = d(2)
-    mat(3,1) = d(3)
+    mat(:, 1) = d
     det1 = det(mat)
     c = det1 / det0
+
     envE = abs(pot(im))
     enva = sqrt(envE/c)
     envm = env(im)
   end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Simplified interface to rkdumb for the case of a signle equation to use scalars instead of arrays of size 1.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function rkdumb_single(vstart, x1, x2, nstep, derivs) result(v)
-    real(real64) :: vstart, x1, x2
-    integer :: nstep
-    procedure(diff_equations_rhs) :: derivs
-    real(real64) :: v
-    real(real64) :: vstart_arr(1), v_arr(1)
-
-    vstart_arr(1) = vstart
-    v_arr = rkdumb(vstart_arr, x1, x2, nstep, derivs)
-    v = v_arr(1)
-  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates envelope potential for optimized grid. Left side is represented by Eckart function fitted on rho MEP, right by rho MEP itself.
@@ -142,6 +111,21 @@ contains
     call assert(all(argument > 0), 'Error: potential is greater than env_emax')
     dydx = pi / sqrt(argument)
   end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Simplified interface to rkdumb for the case of a signle equation to use scalars instead of arrays of size 1.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function rkdumb_single(vstart, x1, x2, nstep, derivs) result(v)
+    real(real64) :: vstart, x1, x2
+    integer :: nstep
+    procedure(diff_equations_rhs) :: derivs
+    real(real64) :: v
+    real(real64) :: vstart_arr(1), v_arr(1)
+
+    vstart_arr(1) = vstart
+    v_arr = rkdumb(vstart_arr, x1, x2, nstep, derivs)
+    v = v_arr(1)
+  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates an optimized grid from *from* to *to*.
