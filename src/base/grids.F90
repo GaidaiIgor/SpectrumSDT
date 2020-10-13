@@ -277,7 +277,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints grid, Jacobian and step to a file.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine print_grid(grid, jac, step, file_name)
+  subroutine write_grid(grid, jac, step, file_name)
     real(real64), intent(in) :: grid(:), jac(:)
     character(*), intent(in) :: file_name
     real(real64), intent(in) :: step
@@ -290,6 +290,42 @@ contains
       write(file_unit, '(2G23.15)') grid(i), jac(i)
     enddo
     close(file_unit)
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Prints a file specified by *file_name* with APH coordinates at which the values of PES are requested.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine write_pes_request_aph(grid_rho, grid_theta, grid_phi, file_name)
+    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    character(*), intent(in) :: file_name
+    integer, parameter :: col_width = 25
+    integer :: file_unit, i1, i2, i3
+
+    open(newunit = file_unit, file = file_name)
+    write(file_unit, *) size(grid_rho) * size(grid_theta) * size(grid_phi)
+    write(file_unit, '(3A' // num2str(col_width) // ')') align_center('rho (Bohr)', col_width), align_center('theta (rad)', col_width), align_center('phi (rad)', col_width)
+    do i1 = 1, size(grid_rho)
+      do i2 = 1, size(grid_theta)
+        do i3 = 1, size(grid_phi)
+          write(file_unit, '(3G' // num2str(col_width) // '.15)') grid_rho(i1), grid_theta(i2), grid_phi(i3)
+        end do
+      end do
+    end do
+    close(file_unit)
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Prints a file specified by *file_name* with coordinates at which the values of PES are requested.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine write_pes_request(grid_rho, grid_theta, grid_phi, file_name, coordinates)
+    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    character(*), intent(in) :: file_name, coordinates
+
+    if (coordinates == 'aph') then
+      call write_pes_request_aph(grid_rho, grid_theta, grid_phi, file_name)
+    else
+      stop 'Error: unknown coordinates'
+    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -334,8 +370,10 @@ contains
       call generate_equidistant_grid_points(params % grid_phi_from, params % grid_phi_to, params % grid_phi_npoints, grid_phi, jac_phi, phi_step)
     end if
 
-    call print_grid(grid_rho, jac_rho, rho_step, 'grid_rho.dat')
-    call print_grid(grid_theta, jac_theta, theta_step, 'grid_theta.dat')
-    call print_grid(grid_phi, jac_phi, phi_step, 'grid_phi.dat')
+    call write_grid(grid_rho, jac_rho, rho_step, 'grid_rho.dat')
+    call write_grid(grid_theta, jac_theta, theta_step, 'grid_theta.dat')
+    call write_grid(grid_phi, jac_phi, phi_step, 'grid_phi.dat')
+
+    call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', 'aph')
   end subroutine
 end
