@@ -1,7 +1,7 @@
 subroutine IMLS(jac3,V,SO_flag)  
   use dynamic_parameters
-  use ssplin
-  use path_utils
+  use splin
+  use path_resolution_mod
   implicit none
   integer :: i,initflag,SO_flag
   real*8 :: xi(3),temp3,jac3(3),h2wn,v,cartt(9),dist(3),dist_temp(3),vec1(2),vec2(2),bohr,pii
@@ -62,10 +62,9 @@ subroutine IMLS(jac3,V,SO_flag)
     dist_tol=0.7d0
     allocate(jac(3),jac2(3))
 
-    path = resolve_relative_exe_path('../PES/dawes/data/PES_2663_QZ_F12_20.dat')
+    path = resolve_relative_exe_path('../dawes/data/PES_2663_QZ_F12_20.dat')
     OPEN(UNIT = 652, FILE = path, FORM = 'UNFORMATTED', ACCESS = 'SEQUENTIAL')
     read(652) count3
-    write(*,*) 'data points',count3/2
     current_geom=0d0
     allocate(stored_weights(count3),stored_weights_ind(count3))
     read(652) order_1

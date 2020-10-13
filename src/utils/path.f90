@@ -29,16 +29,16 @@ contains
     get_path_tail = path(ind_slash+1:)
   end function
 
-!-----------------------------------------------------------------------
-! extracts everything before the last token in path
-!-----------------------------------------------------------------------
-  function get_path_head(path)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Extracts everything before the last token in path.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_path_head(path) result(head)
     character(*), intent(in) :: path
-    character(:), allocatable :: get_path_head
+    character(:), allocatable :: head
     integer :: ind_slash
 
     ind_slash = index(path, '/', .true.)
-    get_path_head = path(:ind_slash-1)
+    head = path(:ind_slash-1)
   end function
   
 !-----------------------------------------------------------------------
@@ -54,26 +54,6 @@ contains
     do i = 1,n_tokens
       strip_path_tokens = get_path_head(strip_path_tokens)
     end do
-  end function
-  
-!-----------------------------------------------------------------------
-! resolves a path relative to location of executable file
-!-----------------------------------------------------------------------
-  function resolve_relative_exe_path(relative_exe_path) result(res)
-    character(*), intent(in) :: relative_exe_path
-    character(:), allocatable :: res
-    character(512) :: path_arg
-    character(:), allocatable :: path
-
-    call get_command_argument(0, path_arg)
-    path = execute_shell_command('readlink -f $(which ' // trim(path_arg) // ')', '.temp' // num2str(get_proc_id()))
-    path = get_path_head(path)
-    ! only if path is non-empty
-    if (len(path) /= 0) then
-      path = trim(path) // '/'
-    end if
-    path = trim(path) // relative_exe_path
-    res = trim(path)
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------

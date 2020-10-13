@@ -1,5 +1,5 @@
- module ssplin
- use path_utils
+ module splin
+ use path_resolution_mod
 implicit none
 
 ! Global variables within this module 
@@ -34,7 +34,7 @@ CONTAINS
   double precision yy,zz
   character(len = :), allocatable :: path
 
-  path = resolve_relative_exe_path('../PES/dawes/data/tabCn-roo.res')
+  path = resolve_relative_exe_path('../dawes/data/tabCn-roo.res')
 ! step 1: read xi and yi from tabCn-roo.res, xmin, xmax, n
   open (newunit = file_unit, file = path, status = 'old')
   read(file_unit,*)
@@ -42,7 +42,7 @@ CONTAINS
   read(file_unit,*)(ll(nl,i),i=1,6),(coef(nl,n),n=1,nr)
   enddo
   close(file_unit)
-  path = resolve_relative_exe_path('../PES/dawes/data/PolarO2_D2h_aVQZ_roo.res')
+  path = resolve_relative_exe_path('../dawes/data/PolarO2_D2h_aVQZ_roo.res')
   open(newunit = file_unit, file = path, status = 'old')
   read(file_unit,*)
   read(file_unit,*)
@@ -240,4 +240,4 @@ xmax = 3.3
 call spline_d (xi, yi, b, c, d, nr) 
 200 format (3f12.5)
  end subroutine initspline2
-end module ssplin
+end module splin

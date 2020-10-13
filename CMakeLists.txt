@@ -15,10 +15,8 @@ include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict
 # Specify where to look for libraries (-L option)
 link_directories(${prefix}/libs/fdict ${prefix}/libs/ftl/build/lib ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
 
-# External sources. Dependency of Dawes' pes on path_utils is factored into pesinterface to avoid compiling path_utils with Dawes' flags
-set(dawes_pes ${prefix}/PES/dawes/src/PES_3D_subroutine_ozone_L3.f90 ${prefix}/PES/dawes/src/splin.f90 ${prefix}/PES/dawes/src/dynamic_parameters_3D.f90 ${prefix}/PES/dawes/src/2D-spline.f ${prefix}/PES/dawes/src/VLGRoo.f ${prefix}/PES/dawes/src/CJe.f ${prefix}/PES/dawes/src/C6Js.f ${prefix}/PES/dawes/src/cleb.f ${prefix}/PES/dawes/src/Celr.f ${prefix}/PES/dawes/src/C6r.f ${prefix}/PES/dawes/src/faclog.f ${prefix}/PES/dawes/src/index.f90)
 set(numerical_recipies ${prefix}/src/tools/numerical_recipies.f90)
-set(external_sources ${dawes_pes} ${numerical_recipies})
+set(external_sources ${numerical_recipies})
 
 # Source file dependencies
 set(constants ${prefix}/src/utils/constants.f90)
@@ -78,7 +76,6 @@ set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${prefix}/s
 set(general_vars ${constants} ${input_params} ${path_utils} ${spectrumsdt_paths} ${prefix}/src/tools/general_vars.f90)
 set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${stage_metadata} ${string_utils} ${prefix}/src/input_params/config.f90)
 set(potential ${formulas} ${input_params} ${general_vars} ${spectrumsdt_paths} ${prefix}/src/base/potential.F90)
-set(pesinterface ${constants} ${dawes_pes} ${path_utils} ${parallel_utils} ${prefix}/src/tools/pes/pesinterface.f90)
 
 set(block_borders ${prefix}/src/base/hamiltonian/block_borders.F90)
 set(matrix_block_info ${block_borders} ${general_utils} ${prefix}/src/base/hamiltonian/matrix_block_info.F90)
@@ -94,15 +91,10 @@ set(sdt ${constants} ${fourier_transform} ${general_vars} ${input_params} ${lapa
 set(spectrum ${cap} ${constants} ${general_utils} ${general_vars} ${input_params} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.F90)
 set(grids ${config} ${constants} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.F90)
 
-set(pesprint ${parallel_utils} ${pesinterface} ${prefix}/src/programs/pesprint.f90)
-
 set(spectrumsdt ${cap} ${config} ${debug_tools} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/programs/spectrumsdt.F90)
 
 # Disable all warnings and standard conformation checks for external sources
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")
-
-add_executable(pesprint ${pesprint})
-target_link_libraries(pesprint fdict ftl blas lapack)
 
 add_executable(spectrumsdt ${spectrumsdt})
 target_link_libraries(spectrumsdt fdict ftl blas lapack petsc slepc)

@@ -1,12 +1,11 @@
 	subroutine dataread
-        use path_utils
+        use path_resolution_mod
         implicit real*8(a-h,o-z)
         parameter (pi=3.141592653589793d0)    
         parameter (nx=100,ny=100)
         common /pest/pesmin,ydat(nx,ny),xdat(nx),ve(nx,ny),ind(nx)
         character(:), allocatable :: path
-        path = resolve_relative_exe_path(
-     &    '../PES/dawes/data/SOcorrdata.dat')
+        path = resolve_relative_exe_path('../dawes/data/SOcorrdata.dat')
         open(98, file = path, status = 'old')
 C        open(66,file='check.txt')
          do i=1,nx

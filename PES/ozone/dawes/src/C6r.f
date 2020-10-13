@@ -1,34 +1,43 @@
-      subroutine cnelr(mla,mpla,ipp,Ma,Mb,clb)
-      use ssplin
-* energie electrostatique de X(3P)+OH(X2Pi)
+      subroutine c6r(mla,mpla,Ma,ipp,Mb,c6lb)
+      use splin
+* a partir du fichier tabCn.res
       implicit real*8(a-h,o-z)
       parameter (Nip=1,lmax=2)
-      dimension clb(0:lmax)
+      dimension C6lb(0:lmax)
       dimension xi(nr),yi(nr),b(nr),c(nr),d(nr)
       common/droo/roo
       common/dcc/ic
-       if(Ma.ne.mla-mpla)then
-       write(6,*)'Erreur de Ma',Ma
-       stop
-       endif
-       do lb=1,lmax
-       clb(lb)=0.d0
+      data l1,l1p/1,1/
+      data l2,l2p/1,1/
+      data z0,un/0.d0,1.d0/
+      n=l1+l1p+l2+l2p+2
+       xl1=dfloat(l1)
+       xl1p=dfloat(l1p)
+       xl2=dfloat(l2)
+       xl2p=dfloat(l2p)
+c      write(6,101)l1,l1p,l2,l2p
+ 101   format('# l1 l1p l2 l2p =',4i3)
+       do lb=0,lmax
+       c6lb(lb)=0.d0
        enddo
-       l1=2
-       do l2=1,lmax
-       Lb=l2
-       if(iabs(Mb).le.Lb)then
+       do lb=iabs(Mb),lmax
+       c6t=0.d0
+       do la=iabs(Ma),lmax
+       ml=min0(la,lb)
+       do lambda=iabs(la-lb),la+lb
+       enddo
+       enddo
        ic=ic+1
        call initspline(ic,xi,yi,b,c,d)
-       cc=ispline(roo,xi,yi,b,c,d,nr)
-c      read(10,108)imla,impla,jpp,iMa,iMb,iLb,cc
+       c6t=ispline(roo,xi,yi,b,c,d,nr)
+!      read(10,*)imla,impla,jpp,iMa,iMb,iLb,c6t
        imla=ll(ic,1)
        impla=ll(ic,2)
        jpp=ll(ic,3)
        iMa=ll(ic,4)
        iMb=ll(ic,5)
        iLb=ll(ic,6)
-c       write(11,108) imla,impla,jpp,iMa,iMb,iLb,cc
+c       write(11,106),imla,impla,jpp,iMa,iMb,iLb,c6t
        if(iabs(imla-mla).ne.0)then
        print *,'# erreur de lecture de Mla',imla,mla
        stop
@@ -53,12 +62,8 @@ c       write(11,108) imla,impla,jpp,iMa,iMb,iLb,cc
        print *,'# erreur de lecture de ipp',jpp,ipp
        stop
        endif
-  108  format(i3,'&',i3,'&',i3,'&',i3,'&',i3,'&',i3,'&',g16.8)
-*      print *
-       clb(l2)=cc
-       else
-       clb(l2)=0.d0
-       endif
+       c6lb(lb)=c6t
        enddo
+  106  format(i3,'&',i3,'&',i3,'&',i3,'&',i3,'&',i3,'&',g16.8)
        return
        end 

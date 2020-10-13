@@ -91,9 +91,7 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints progress %
 ! progress: current progress of some process (a number from 0 to 1)
-! last_progress: the value of progress for the previous call. If it exceeds the value of progress by more than progress_step, progress is 
-! reported.
-! progress_step: controls how often progress should be reported (default is every 0.1)
+! progress_step: controls how often progress should be reported (default is every 10%)
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine track_progress(progress, progress_step, reset)
     real(real64), intent(in) :: progress

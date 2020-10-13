@@ -1,5 +1,5 @@
 c       program VLGRoo
-c       use ssplin
+c       use splin
 c       implicit real*8(a-h,o-z)
 * calcul de l'energie  Electrostatique +  Dispersion pour l'etat fondamental
 * gam en degree, r et R en bohr, energies en cm-1
@@ -27,7 +27,7 @@ c       enddo
 c       enddo
 c       end
        subroutine buildmatrix(roo,rr,gam,vmf,vmfso)
-       USe ssplin
+       use splin
        implicit real*8(a-h,o-z)
 * 7 constantes: q_1^0(OH), q_2^0(OH),q_2^2(OH),Q_0(O),DelE(3P_0-^3P_1)
 *  Del1O=DE(^3P_1-^3P_0), Del2O=DE(^3P_2-^3P_0),DelOH=DE(^2Pi_1/2-^2Pi_3/2)
