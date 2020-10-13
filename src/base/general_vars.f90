@@ -9,9 +9,6 @@ module general_vars
   use spectrumsdt_paths_mod
   implicit none
 
-  real(real64), allocatable :: grho2(:), sintet2(:)
-  complex(real64), allocatable :: freq1z(:)
-
   ! Masses
   real(real64) :: m0          ! Mass of central atom
   real(real64) :: m1          ! Mass of 1st terminal atom

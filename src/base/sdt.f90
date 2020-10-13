@@ -80,10 +80,6 @@ contains
       sy = 6
     end if
 
-    ! Init grid derivatives
-    grho2 = g1**2
-    sintet2 = sin(g2)**2
-
     ! Setup shortcuts for products
     nn   = n1 * n2 * n3
     n12  = n1 * n2
@@ -165,7 +161,7 @@ contains
     ! Initialize basis
     call init_fbrbasis(basis)
     ! Coefficient in Hamiltonian
-    coeff = - 1 / (2d0 * mu) * 4 / grho2(ic1) / sintet2(ic2)
+    coeff = - 1 / (2d0 * mu) * 4 / g1(ic1)**2 / sin(g2(ic2))**2
 
     ! Build potential energy matrix
     do i=1,n3b
