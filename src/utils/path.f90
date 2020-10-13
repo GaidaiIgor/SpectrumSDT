@@ -3,8 +3,6 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module path_utils
   use general_utils
-  use parallel_utils, only: get_proc_id
-  use system_mod
   implicit none
 
 contains
