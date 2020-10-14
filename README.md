@@ -69,7 +69,7 @@ cp ~/SpectrumSDT/config_examples/grids.config spectrumsdt.config
 ~/SpectrumSDT/build/spectrumsdt
 ```
 After this, `pes.in` file should be generated. This file specifies a total number of points and a list of APH coordinates where the value of electronic potential is required.
-Before proceeding to the next stage user should provide file `pes.out` with the values of potential at the requested coordinates in atomic units of energy (Hartree).
+Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at the requested coordinates in atomic units of energy (Hartree).
 
 2. Calculate the values of PES. Here we will use an example program that reads `pes.in` and uses the PES of ozone calculated by Dawes et al. to generate `pes.out`. First, compile the program:
 ```
@@ -115,4 +115,4 @@ mpiexec -n <n_procs> spectrumsdt
 cd ../eigencalc
 mpiexec -n <n_procs> spectrumsdt
 ```
-Solutions will be printed into `states.fwc` file.
+Lowest 50 rovibrational energy levels of ozone-686 J=0 will be printed into `states.fwc` file.
