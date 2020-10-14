@@ -226,7 +226,10 @@ contains
     character(*), intent(in) :: mass_str
     real(real64) :: mass
 
-    if (mass_str == 'o16') then
+    if (mass_str == '-1') then
+      ! Not specified
+      mass = -1
+    else if (mass_str == 'o16') then
       mass = oxygen_masses(1)
     else if (mass_str == 'o17') then
       mass = oxygen_masses(2)

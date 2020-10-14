@@ -44,7 +44,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     make all
     ```
 
-3. Build the main programs  
+3. Build the main program  
 `cd ~/SpectrumSDT`
 
     1. Specify custom compiler options (optional)  
@@ -52,40 +52,44 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     You can create a file named `compiler_options.cmake` to specify your custom compile options instead of the default ones.  
     A few presets for different compilers can be found in the `compiler_options_alternative` folder.
 
-    2. Build the executables  
-    Note: do not move the executables to another folder since some paths are resolved relative to their location.  
+    2. Build the executable  
+    Note: do not move the executable to another folder since some paths are resolved relative to its location.  
     ```
     mkdir build && cd build
     cmake ..
-    make optgrid
-    make pesprint
     make spectrumsdt
     ```
 
-# A basic example of running
+# A basic example of running (ozone)
 
 1. Generate the grids
 ```
 mkdir ~/SpectrumSDT_runs && cd ~/SpectrumSDT_runs
-cp ~/SpectrumSDT/config_examples/optgrid_smaller.config optgrid.config
-~/SpectrumSDT/build/optgrid
+cp ~/SpectrumSDT/config_examples/grids.config spectrumsdt.config
+~/SpectrumSDT/build/spectrumsdt
 ```
-If executed successfully, three grid files should appear in the current folder.
+After this, `pes.in` file should be generated. This file specifies a total number of points and a list of APH coordinates where the value of electronic potential is required.
+Before proceeding to the next stage user should provide file `pes.out` with the values of potential at the requested coordinates in atomic units of energy (Hartree).
 
-2. Calculate the values of PES
+2. Calculate the values of PES. Here we will use an example program that reads `pes.in` and uses the PES of ozone calculated by Dawes et al. to generate `pes.out`. First, compile the program:
 ```
-cp ~/SpectrumSDT/config_examples/pesprint.config spectrumsdt.config
-mpiexec -n <n_procs> ~/SpectrumSDT/build/pesprint
+cd ~/SpectrumSDT/PES/ozone/
+mkdir build && cd build
+bash ../compile_pesprint.sh
 ```
-Replace `<n_procs>` with however many MPI tasks you want to use.  
-If executed successfully, potvib.dat file should appear in the current folder.
+Now run:
+```
+cd ~/SpectrumSDT_runs
+mpiexec -n <n_procs> ~/SpectrumSDT/PES/ozone/build/pesprint 686
+```
+Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pes.out` is generated and we can proceed to the main calculations.
 
 3. Setup SpectrumSDT directory structure
 ```
 mkdir J_0 && cd J_0
-cp ~/SpectrumSDT/config_examples/spectrumsdt_smaller.config spectrumsdt.config
+cp ~/SpectrumSDT/config_examples/spectrumsdt.config .
 ```
-Edit spectrumsdt.config and replace username in the paths.  
+Edit spectrumsdt.config and replace `username` in the paths. Then execute:  
 `~/SpectrumSDT/scripts/init_spectrum_folders.py -K 0`
 
 4. Calculate basis
@@ -93,8 +97,8 @@ Edit spectrumsdt.config and replace username in the paths.
 cd K_0/even/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
-Here `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/grid1.dat` (16 in this example).  
-In `fix_basis_jk` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
+Here `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/grid_rho.dat` (16 in this example).  
+In `use_fix_basis_jk = 1` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
 ```
 cd ../../odd/basis
 mpiexec -n 16 spectrumsdt
@@ -108,7 +112,7 @@ mpiexec -n <n_procs> spectrumsdt
 
 6. Calculate eigenpairs
 ```
-cd ../diagonalization
+cd ../eigencalc
 mpiexec -n <n_procs> spectrumsdt
 ```
-Solutions will be printed into `3dsdt/spec.out` file.
+Solutions will be printed into `states.fwc` file.

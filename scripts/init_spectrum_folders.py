@@ -77,11 +77,11 @@ def main():
     overlaps_rovib = 1 if basis_J == J and basis_K == requested_K else 0 # enable rovibrational coupling for overlaps only if basis J/K coincide with the requested J/K
 
     folder_names = [["K_{0}"], ["even", "odd"], ["basis", "overlaps", "eigencalc", "properties"]]
-    folder_params = [["K = {0}"], ["symmetry = 0", "symmetry = 1"], ["stage = basis", "stage = overlaps\nrovib_coupling = " + str(overlaps_rovib), 
-        "stage = eigencalc\nrovib_coupling = 0\nmpd = " + str(int(num_states_base * mpd_mult)), "stage = properties\nrovib_coupling = 0"]]
+    folder_params = [["K = {0}"], ["symmetry = 0", "symmetry = 1"], ["stage = basis", "stage = overlaps\nuse_rovib_coupling = " + str(overlaps_rovib), 
+        "stage = eigencalc\nuse_rovib_coupling = 0\nmpd = " + str(int(num_states_base * mpd_mult)), "stage = properties\nuse_rovib_coupling = 0"]]
 
     folder_names_cor = [["K_all"], ["parity_0", "parity_1"], ["even", "odd"], ["eigencalc", "properties"]]
-    folder_params_cor = [["K = all\nrovib_coupling = 1"], ["parity = 0\nnum_states = " + str(num_states_p0) + "\nmpd = " + str(int(num_states_p0 * mpd_mult)), 
+    folder_params_cor = [["K = all\nuse_rovib_coupling = 1"], ["parity = 0\nnum_states = " + str(num_states_p0) + "\nmpd = " + str(int(num_states_p0 * mpd_mult)), 
         "parity = 1\nnum_states = " + str(num_states_p1) + "\nmpd = " + str(int(num_states_p1 * mpd_mult))], ["symmetry = 0", "symmetry = 1"], 
         ["stage = eigencalc", "stage = properties"]]
 
@@ -92,8 +92,8 @@ def main():
     if args.K is None:
         # Specific Ks are not provied, so generate all
         # Set up symmetric top folders
-        fix_basis_jk = int(config.params["fix_basis_jk"]) if "fix_basis_jk" in config.params else 0
-        if fix_basis_jk == 0:
+        use_fix_basis_jk = int(config.params["use_fix_basis_jk"]) if "use_fix_basis_jk" in config.params else 0
+        if use_fix_basis_jk == 0:
             K_range = range(J + 1)
         else:
             basis_K = int(config.params["basis_K"])
