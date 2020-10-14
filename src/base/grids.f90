@@ -115,15 +115,15 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Simplified interface to rkdumb for the case of a signle equation to use scalars instead of arrays of size 1.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function rkdumb_single(vstart, x1, x2, nstep, derivs) result(v)
+  function rkdumb_single(vstart, x1, x2, rk_nsteps, derivs) result(v)
     real(real64) :: vstart, x1, x2
-    integer :: nstep
+    integer :: rk_nsteps
     procedure(diff_equations_rhs) :: derivs
     real(real64) :: v
     real(real64) :: vstart_arr(1), v_arr(1)
 
     vstart_arr(1) = vstart
-    v_arr = rkdumb(vstart_arr, x1, x2, nstep, derivs)
+    v_arr = rkdumb(vstart_arr, x1, x2, rk_nsteps, derivs)
     v = v_arr(1)
   end function
 
@@ -134,9 +134,11 @@ contains
 ! This allows for symmetric distribution of points if *deriv* is symmetric.
 ! *deriv* evaluates the right-hand side of the differential equation that defines the optimized grid.
 ! Resulting optimized grid is returned in *grid*. The corresponding values of *deriv* at grid points are returned in *jac*.
+! *rk_nsteps* controls how many steps are used for differential equation propagation.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine generate_optimized_grid_step(from, to, start, step, deriv, grid, jac, npoints)
+  subroutine generate_optimized_grid_step(from, to, start, step, rk_nsteps, deriv, grid, jac, npoints)
     real(real64), intent(in) :: from, to, start, step
+    integer, intent(in) :: rk_nsteps
     procedure(diff_equations_rhs) :: deriv
     real(real64), allocatable, intent(out) :: grid(:), jac(:)
     integer, optional, intent(out) :: npoints
@@ -149,7 +151,7 @@ contains
     next_x = step / 2
     grid_right = vector_real()
     do
-      next_point = rkdumb_single(next_point, prev_x, next_x, 2048, deriv)
+      next_point = rkdumb_single(next_point, prev_x, next_x, rk_nsteps, deriv)
       if (next_point > to) then
         exit
       end if
@@ -164,7 +166,7 @@ contains
     next_x = -step / 2
     grid_left = vector_real()
     do
-      next_point = rkdumb_single(next_point, prev_x, next_x, 2048, deriv)
+      next_point = rkdumb_single(next_point, prev_x, next_x, rk_nsteps, deriv)
       ! Add an extra point on left if the total number of points is odd
       ! if (next_point < from .and. mod(grid_right % get_size() + grid_left % get_size(), 2) == 0) then
       if (next_point < from) then
@@ -191,9 +193,9 @@ contains
 ! Calls `generate_optimized_grid_step` for different values of *step* until desired *number of points* is achieved.
 ! Final value of *step* is returned.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine generate_optimized_grid_points(from, to, start, npoints, deriv, grid, jac, step)
+  subroutine generate_optimized_grid_points(from, to, start, npoints, rk_nsteps, deriv, grid, jac, step)
     real(real64), intent(in) :: from, to, start
-    integer, intent(in) :: npoints
+    integer, intent(in) :: npoints, rk_nsteps
     procedure(diff_equations_rhs) :: deriv
     real(real64), allocatable, intent(out) :: grid(:), jac(:)
     real(real64), optional, intent(out) :: step
@@ -202,7 +204,7 @@ contains
     ! Find initial left boundary
     step_power_left = -4
     do
-      call generate_optimized_grid_step(from, to, start, 2 ** step_power_left, deriv, grid, jac)
+      call generate_optimized_grid_step(from, to, start, 2 ** step_power_left, rk_nsteps, deriv, grid, jac)
       if (size(grid) > npoints) then
         exit
       end if
@@ -212,7 +214,7 @@ contains
     ! Find initial right boundary
     step_power_right = 0
     do
-      call generate_optimized_grid_step(from, to, start, 2 ** step_power_right, deriv, grid, jac)
+      call generate_optimized_grid_step(from, to, start, 2 ** step_power_right, rk_nsteps, deriv, grid, jac)
       if (size(grid) < npoints) then
         exit
       end if
@@ -222,7 +224,7 @@ contains
     ! Find step matching specified number of points
     do
       step_power_middle = (step_power_left + step_power_right) / 2
-      call generate_optimized_grid_step(from, to, start, 2 ** step_power_middle, deriv, grid, jac)
+      call generate_optimized_grid_step(from, to, start, 2 ** step_power_middle, rk_nsteps, deriv, grid, jac)
       if (size(grid) == npoints) then
         exit
       end if
@@ -346,9 +348,11 @@ contains
       call input_envelopes(params)
       call find_parabola(env_grid, env_values, env_fit_param, env_fit_min_abs_energy, env_fit_min_x)
       if (params % grid_rho_npoints == -1) then
-        call generate_optimized_grid_step(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_step, optgrid_diff_rhs, grid_rho, jac_rho)
+        call generate_optimized_grid_step(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_step, &
+            params % optimized_grid_solver_steps, optgrid_diff_rhs, grid_rho, jac_rho)
       else
-        call generate_optimized_grid_points(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_npoints, optgrid_diff_rhs, grid_rho, jac_rho, rho_step)
+        call generate_optimized_grid_points(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_npoints, &
+            params % optimized_grid_solver_steps, optgrid_diff_rhs, grid_rho, jac_rho, rho_step)
       end if
     else
       if (params % grid_rho_npoints == -1) then
@@ -376,4 +380,5 @@ contains
 
     call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', 'aph')
   end subroutine
-end
+
+end module

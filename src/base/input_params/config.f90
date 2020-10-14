@@ -76,6 +76,7 @@ contains
     character(:), allocatable :: stage, sequential
 
     call set_default('use_optimized_grid_rho', '0', config_dict, set_keys)
+    call set_default('optimized_grid_solver_steps', '2048', config_dict, set_keys)
     call set_default('cap_type', 'none', config_dict, set_keys)
     call set_default('ncv', '-1', config_dict, set_keys)
     call set_default('mpd', '-1', config_dict, set_keys)
@@ -238,13 +239,13 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Parses user-provided value of K
+! Parses user-provided value of `K`
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_K(K_str, J, parity) result(K)
     character(*), intent(in) :: K_str
     integer, intent(in) :: J, parity
-    integer :: pos
     integer :: K(2)
+    integer :: pos
     type(string), allocatable :: tokens(:)
     
     if (K_str == 'all') then
@@ -266,18 +267,35 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Parses user-provided value of `enable_terms`
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function parse_enable_terms(enable_terms_str) result(enable_terms)
+    character(*), intent(in) :: enable_terms_str
+    integer :: enable_terms(2)
+    
+    if (enable_terms_str == '-1') then
+      ! Mark as not set
+      enable_terms(1) = -1
+      enable_terms(2) = -1
+    else
+      enable_terms(1) = str2int(enable_terms_str(1:1))
+      enable_terms(2) = str2int(enable_terms_str(2:2))
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Interprets the values set by user in *config_dict* and fills out *config* structure. This procedure does not make assumptions about
 ! default values of not specified optional arguments.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function process_raw_config(config_dict) result(config)
     class(dictionary_t) :: config_dict ! intent(in)
     type(input_params) :: config
-    integer :: use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, &
-        basis_K, ncv, mpd, num_states, max_iterations, sequential, optimized_mult
+    integer :: use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, grid_rho_npoints, optimized_grid_solver_steps, grid_theta_npoints, &
+        grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, basis_K, ncv, mpd, num_states, max_iterations, sequential, optimized_mult
     integer :: K(2), enable_terms(2)
     real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, &
         mass_central, mass_terminal1, mass_terminal2, cutoff_energy
-    character(:), allocatable :: stage, envelope_rho_path, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
+    character(:), allocatable :: stage, envelope_rho_path, basis_root_path, cap_type, grid_path, root_path, channels_root, debug_mode, test_mode, debug_param_1
 
     ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults
     stage = item_or_default(config_dict, 'stage', '-1')
@@ -292,6 +310,7 @@ contains
     grid_rho_step = str2real(item_or_default(config_dict, 'grid_rho_step', '-1'))
     envelope_rho_path = item_or_default(config_dict, 'envelope_rho_path', '-1')
     envelope_rho_max_energy = str2real(item_or_default(config_dict, 'envelope_rho_max_energy', '-1'))
+    optimized_grid_solver_steps = str2int(item_or_default(config_dict, 'optimized_grid_solver_steps', '-1'))
 
     grid_theta_from = str2real(item_or_default(config_dict, 'grid_theta_from', '-1'))
     grid_theta_to = str2real(item_or_default(config_dict, 'grid_theta_to', '-1'))
@@ -327,22 +346,15 @@ contains
     channels_root = item_or_default(config_dict, 'channels_root', '-1')
 
     sequential = str2int(item_or_default(config_dict, 'sequential', '-1'))
-    enable_terms_str = item_or_default(config_dict, 'enable_terms', '-1')
-    if (enable_terms_str == '-1') then
-      ! Mark as not set
-      enable_terms(1) = -1
-      enable_terms(2) = -1
-    else
-      enable_terms(1) = str2int(enable_terms_str(1:1))
-      enable_terms(2) = str2int(enable_terms_str(2:2))
-    end if
+    enable_terms = parse_enable_terms(item_or_default(config_dict, 'enable_terms', '-1'))
     optimized_mult = str2int(item_or_default(config_dict, 'optimized_mult', '-1'))
     debug_mode = item_or_default(config_dict, 'debug_mode', '-1')
     test_mode = item_or_default(config_dict, 'test_mode', '-1')
     debug_param_1 = item_or_default(config_dict, 'debug_param_1', '-1')
 
     config = input_params(stage, use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, cap_type, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, &
-        envelope_rho_path, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_npoints, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, &
+        envelope_rho_path, envelope_rho_max_energy, optimized_grid_solver_steps, grid_theta_from, grid_theta_to, grid_theta_npoints, grid_theta_step, &
+        grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, &
         mass_central, mass_terminal1, mass_terminal2, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, num_states, ncv, &
         mpd, max_iterations, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
   end function
@@ -363,6 +375,7 @@ contains
     end if
     call assert(params % grid_rho_npoints == -1 .or. params % grid_rho_npoints > 0, 'Error: grid_rho_npoints should be > 0')
     call assert((params % grid_rho_step .aeq. -1d0) .or. params % grid_rho_step > 0, 'Error: grid_rho_step should be > 0')
+    call assert(params % optimized_grid_solver_steps == -1 .or. params % optimized_grid_solver_steps > 0, 'Error: optimized_grid_solver_steps should be > 0')
 
     call assert((params % grid_theta_from .aeq. -1d0) .or. params % grid_theta_from >= 0, 'Error: grid_theta_from should be >= 0')
     call assert((params % grid_theta_from .aeq. -1d0) .or. params % grid_theta_from < pi, 'Error: grid_theta_from should be < pi')

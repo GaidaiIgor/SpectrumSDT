@@ -17,6 +17,7 @@ module input_params_mod
     real(real64) :: grid_rho_step
     character(:), allocatable :: envelope_rho_path
     real(real64) :: envelope_rho_max_energy
+    integer :: optimized_grid_solver_steps
 
     real(real64) :: grid_theta_from
     real(real64) :: grid_theta_to

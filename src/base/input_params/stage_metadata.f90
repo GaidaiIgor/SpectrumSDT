@@ -199,7 +199,13 @@ contains
   function get_optional_keys_grids(config_dict) result(res)
     class(dictionary_t) :: config_dict ! intent(in)
     type(dictionary_t) :: res
+    character(:), allocatable :: use_optimized_grid_rho
+
     call add_if_absent(res, 'use_optimized_grid_rho', 'set')
+    use_optimized_grid_rho = item_or_default(config_dict, 'use_optimized_grid_rho', '0')
+    if (use_optimized_grid_rho == '1') then
+      call add_if_absent(res, 'optimized_grid_solver_steps', 'set')
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -299,6 +305,7 @@ contains
     call add_if_absent(res, 'grid_rho_step', 'set')
     call add_if_absent(res, 'envelope_rho_path', 'set')
     call add_if_absent(res, 'envelope_rho_max_energy', 'set')
+    call add_if_absent(res, 'optimized_grid_solver_steps', 'set')
 
     call add_if_absent(res, 'grid_theta_from', 'set')
     call add_if_absent(res, 'grid_theta_to', 'set')
