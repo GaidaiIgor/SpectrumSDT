@@ -229,8 +229,9 @@ contains
         basis_K, ncv, mpd, num_states, max_iterations, sequential, optimized_mult
     integer :: pos
     integer :: K(2), enable_terms(2)
-    real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, cutoff_energy
-    character(:), allocatable :: stage, envelope_rho_path, molecule, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
+    real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, &
+        mass_central, mass_terminal1, mass_terminal2, cutoff_energy
+    character(:), allocatable :: stage, envelope_rho_path, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
     type(string), allocatable :: tokens(:)
 
     ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults
@@ -257,7 +258,9 @@ contains
     grid_phi_npoints = str2int(item_or_default(config_dict, 'grid_phi_npoints', '-1'))
     grid_phi_step = str2real(item_or_default(config_dict, 'grid_phi_step', '-1'))
 
-    molecule = item_or_default(config_dict, 'molecule', '-1')
+    mass_central = str2real(item_or_default(config_dict, 'mass_central', '-1')) * amu_to_aum
+    mass_terminal1 = str2real(item_or_default(config_dict, 'mass_terminal1', '-1')) * amu_to_aum
+    mass_terminal2 = str2real(item_or_default(config_dict, 'mass_terminal2', '-1')) * amu_to_aum
     J = str2int(item_or_default(config_dict, 'J', '-1'))
     parity = str2int(item_or_default(config_dict, 'parity', '-1'))
     K_str = item_or_default(config_dict, 'K', '-1')
@@ -280,7 +283,7 @@ contains
     symmetry = str2int(item_or_default(config_dict, 'symmetry', '-1'))
 
     basis_size_phi = str2int(item_or_default(config_dict, 'basis_size_phi', '-1'))
-    cutoff_energy = str2real(item_or_default(config_dict, 'cutoff_energy', '-1')) / autown
+    cutoff_energy = str2real(item_or_default(config_dict, 'cutoff_energy', '-1')) / au_to_wn
     basis_root_path = item_or_default(config_dict, 'basis_root_path', '-1')
     basis_J = str2int(item_or_default(config_dict, 'basis_J', '-1'))
     basis_K = str2int(item_or_default(config_dict, 'basis_K', '-1'))
@@ -311,7 +314,7 @@ contains
 
     config = input_params(stage, use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, cap_type, grid_rho_from, grid_rho_to, grid_rho_npoints, grid_rho_step, &
         envelope_rho_path, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_npoints, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_npoints, grid_phi_step, &
-        molecule, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, num_states, ncv, &
+        mass_central, mass_terminal1, mass_terminal2, J, K, parity, symmetry, basis_size_phi, cutoff_energy, basis_root_path, basis_J, basis_K, num_states, ncv, &
         mpd, max_iterations, grid_path, root_path, channels_root, sequential, enable_terms, optimized_mult, debug_mode, test_mode, debug_param_1)
   end function
 
@@ -352,7 +355,9 @@ contains
     call assert(params % grid_phi_npoints == -1 .or. params % grid_phi_npoints > 0, 'Error: grid_phi_npoints should be > 0')
     call assert((params % grid_phi_step .aeq. -1d0) .or. params % grid_phi_step > 0, 'Error: grid_phi_step should be > 0')
 
-    call assert(any(params % molecule == [character(len = 100) :: '-1', '686', '868']), 'Error: molecule can be "686" or "868"')
+    call assert((params % mass_central .aeq. -1d0) .or. params % mass_central > 0, 'Error: mass_central should be > 0')
+    call assert((params % mass_terminal1 .aeq. -1d0) .or. params % mass_terminal1 > 0, 'Error: mass_terminal1 should be > 0')
+    call assert((params % mass_terminal2 .aeq. -1d0) .or. params % mass_terminal2 > 0, 'Error: mass_terminal2 should be > 0')
     call assert(params % J >= -1, 'Error: J should be >= 0')
     call assert(any(params % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
     if (any(params % stage == [character(len = 100) :: 'eigencalc', 'properties']) .and. params % use_rovib_coupling == 1) then

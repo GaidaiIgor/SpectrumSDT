@@ -3,7 +3,7 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module spectrum_mod
   use cap_mod, only: get_complex_cap
-  use constants, only: autown
+  use constants, only: au_to_wn
   use general_utils
   use general_vars, only: mu, n1, alpha1, jac1
   use input_params_mod
@@ -51,8 +51,8 @@ contains
 
     open(newunit = file_unit, file = file_path)
     do i = 1, size(eivals)
-      energy = real(eivals(i)) * autown
-      gamma = aimag(eivals(i)) * autown * (-2)
+      energy = real(eivals(i)) * au_to_wn
+      gamma = aimag(eivals(i)) * au_to_wn * (-2)
       write(file_unit, '(I5,2G25.15)') i, energy, gamma
     end do
     close(file_unit)

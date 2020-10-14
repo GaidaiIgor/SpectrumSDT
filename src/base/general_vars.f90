@@ -2,7 +2,7 @@
 ! Contains historically global variables shared by some other modules
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module general_vars
-  use constants, only: isomass
+  use constants, only: oxygen_masses
   use input_params_mod
   use iso_fortran_env, only: real64
   use path_utils
@@ -20,7 +20,7 @@ module general_vars
   real(real64) :: mu2         ! Reduced mass of m0 and m1
 
   ! Grids
-  integer :: n1, n2, n3 ! Problem dimensions
+  integer :: n1, n2, n3 ! Grid sizes
   real(real64), allocatable :: g1(:), g2(:), g3(:)
   real(real64), allocatable :: jac1(:), jac2(:), jac3(:)
   real(real64) :: alpha1, alpha2, alpha3
@@ -32,18 +32,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_masses(params)
     class(input_params), intent(in) :: params
-    integer :: mol, a1, a2, a3
 
-    mol = str2int(params % molecule)
-    ! Set masses: split the mass number into digits
-    a1 = mod(mol/100, 10)
-    a2 = mod(mol/10,  10)
-    a3 = mod(mol,     10)
-    if( a1<6.or.a1>8 .or. a2<6.or.a2>8 .or. a3<6.or.a3>8 ) stop 'Wrong molecule'
-
-    m1 = isomass(a1-5)
-    m0 = isomass(a2-5)
-    m2 = isomass(a3-5)
+    m1 = params % mass_terminal1
+    m0 = params % mass_central
+    m2 = params % mass_terminal2
     mtot = m0 + m1 + m2
     mu = sqrt(m0 * m1 * m2 / mtot)
     mu0 = m1 * m2 / (m1 + m2)

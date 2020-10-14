@@ -29,7 +29,9 @@ module input_params_mod
     real(real64) :: grid_phi_step
 
     ! System
-    character(:), allocatable :: molecule ! isotope composition, like 686
+    real(real64) :: mass_central
+    real(real64) :: mass_terminal1
+    real(real64) :: mass_terminal2
     integer :: J ! Total angular momentum quantum number
     integer :: K(2) ! Boundaries of K-range for use_rovib_coupling calculation. In symmetric top rotor both values should be the same
     integer :: parity ! 0(+) or 1(-)

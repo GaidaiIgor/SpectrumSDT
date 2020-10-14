@@ -40,7 +40,7 @@ contains
     real(real64) dM
     real(real64) xM
     ! Common
-    real(real64),parameter :: eabsmin = 1 / autown
+    real(real64),parameter :: eabsmin = 1 / au_to_wn
     real(real64) g(nr)     ! Grid
     real(real64) r         ! Running grid point
     real(real64) eabs      ! Absolute energy
@@ -54,7 +54,7 @@ contains
 
     ! Setup parameters for default CAP
     d0 = sqrt((m0/mu) * (1.0d0 - m0/mtot))
-    ac = (10d0 + dac) * 1000 / autown
+    ac = (10d0 + dac) * 1000 / au_to_wn
     wc = 6d0 * d0 + dwc
     rc = 7d0 * d0 + drc
 
@@ -123,7 +123,7 @@ contains
     dwc = 0
     drc = 0
     ndbw = 3
-    emin = 7 / autown
+    emin = 7 / au_to_wn
     capebar = 0
 
     call calc_cap(n1, g1)

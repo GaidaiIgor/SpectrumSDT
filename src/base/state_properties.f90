@@ -144,9 +144,9 @@ contains
     real(real64) :: phi_range(2), phi_borders(4)
     complex(real64) :: j_sums(params % basis_size_phi) ! j-sums for different ms
 
-    if (params % molecule == '686') then
+    if ((params % mass_terminal1 .aeq. oxygen_masses(1)) .and. (params % mass_central .aeq. oxygen_masses(3)) .and. (params % mass_terminal2 .aeq. oxygen_masses(1))) then
       phi_borders = [0d0, 60d0, 117.65d0, 180d0] / 180 * pi
-    else if (params % molecule == '868') then
+    else if ((params % mass_terminal1 .aeq. oxygen_masses(3)) .and. (params % mass_central .aeq. oxygen_masses(1)) .and. (params % mass_terminal2 .aeq. oxygen_masses(3))) then
       phi_borders = [0d0, 60d0, 122.35d0, 180d0] / 180 * pi
     else
       stop 'Error: Unknown molecule'
@@ -376,7 +376,7 @@ contains
     call print_parallel('Done calculating K-distributions')
 
     call print_parallel('Writing results...')
-    call write_state_properties(params, energies_3d, gammas * autown, region_probs, K_dists)
+    call write_state_properties(params, energies_3d, gammas * au_to_wn, region_probs, K_dists)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

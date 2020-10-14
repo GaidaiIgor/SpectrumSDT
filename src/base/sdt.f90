@@ -2,7 +2,7 @@
 ! Procedures related to calculation of basis for Hamiltonian and base overlaps
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module sdt
-  use constants, only: autown, pi
+  use constants, only: au_to_wn, pi
   use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_vars
   use input_params_mod
@@ -603,7 +603,7 @@ contains
       do i = 1, nvec2max
         write(file_unit, '(I10)', advance = 'no') i
         do j = 1, n1
-          write(file_unit, '(F25.17)', advance = 'no') val2all(i, j) * autown ! constants
+          write(file_unit, '(F25.17)', advance = 'no') val2all(i, j) * au_to_wn ! constants
         end do
         write(file_unit, *)
       end do
