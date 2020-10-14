@@ -219,6 +219,53 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Parses user-provded value of mass
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function parse_mass(mass_str) result(mass)
+    character(*), intent(in) :: mass_str
+    real(real64) :: mass
+
+    if (mass_str == 'o16') then
+      mass = oxygen_masses(1)
+    else if (mass_str == 'o17') then
+      mass = oxygen_masses(2)
+    else if (mass_str == 'o18') then
+      mass = oxygen_masses(3)
+    else
+      ! Plain value
+      mass = str2real(mass_str) * amu_to_aum
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Parses user-provided value of K
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function parse_K(K_str, J, parity) result(K)
+    character(*), intent(in) :: K_str
+    integer, intent(in) :: J, parity
+    integer :: pos
+    integer :: K(2)
+    type(string), allocatable :: tokens(:)
+    
+    if (K_str == 'all') then
+      K(1) = get_k_start(J, parity)
+      K(2) = J
+    else
+      pos = index(K_str, '..')
+      if (pos == 0) then
+        ! Single value of K
+        K(1) = str2int(K_str)
+        K(2) = K(1)
+      else
+        ! K range
+        tokens = strsplit(K_str, '..')
+        K(1) = str2int(tokens(1) % to_char_str())
+        K(2) = str2int(tokens(2) % to_char_str())
+      end if
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Interprets the values set by user in *config_dict* and fills out *config* structure. This procedure does not make assumptions about
 ! default values of not specified optional arguments.
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -227,12 +274,10 @@ contains
     type(input_params) :: config
     integer :: use_optimized_grid_rho, use_rovib_coupling, use_fix_basis_jk, grid_rho_npoints, grid_theta_npoints, grid_phi_npoints, J, parity, symmetry, basis_size_phi, basis_J, &
         basis_K, ncv, mpd, num_states, max_iterations, sequential, optimized_mult
-    integer :: pos
     integer :: K(2), enable_terms(2)
     real(real64) :: grid_rho_from, grid_rho_to, grid_rho_step, envelope_rho_max_energy, grid_theta_from, grid_theta_to, grid_theta_step, grid_phi_from, grid_phi_to, grid_phi_step, &
         mass_central, mass_terminal1, mass_terminal2, cutoff_energy
-    character(:), allocatable :: stage, envelope_rho_path, K_str, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
-    type(string), allocatable :: tokens(:)
+    character(:), allocatable :: stage, envelope_rho_path, basis_root_path, cap_type, grid_path, root_path, channels_root, enable_terms_str, debug_mode, test_mode, debug_param_1
 
     ! Extract parameters from dictionary. The default values here are only assigned to unused parameters or parameters with non-constant defaults
     stage = item_or_default(config_dict, 'stage', '-1')
@@ -258,28 +303,12 @@ contains
     grid_phi_npoints = str2int(item_or_default(config_dict, 'grid_phi_npoints', '-1'))
     grid_phi_step = str2real(item_or_default(config_dict, 'grid_phi_step', '-1'))
 
-    mass_central = str2real(item_or_default(config_dict, 'mass_central', '-1')) * amu_to_aum
-    mass_terminal1 = str2real(item_or_default(config_dict, 'mass_terminal1', '-1')) * amu_to_aum
-    mass_terminal2 = str2real(item_or_default(config_dict, 'mass_terminal2', '-1')) * amu_to_aum
+    mass_central = parse_mass(item_or_default(config_dict, 'mass_central', '-1'))
+    mass_terminal1 = parse_mass(item_or_default(config_dict, 'mass_terminal1', '-1'))
+    mass_terminal2 = parse_mass(item_or_default(config_dict, 'mass_terminal2', '-1'))
     J = str2int(item_or_default(config_dict, 'J', '-1'))
     parity = str2int(item_or_default(config_dict, 'parity', '-1'))
-    K_str = item_or_default(config_dict, 'K', '-1')
-    if (K_str == 'all') then
-      K(1) = get_k_start(J, parity)
-      K(2) = J
-    else
-      pos = index(K_str, '..')
-      if (pos == 0) then
-        ! Single value of K
-        K(1) = str2int(K_str)
-        K(2) = K(1)
-      else
-        ! K range
-        tokens = strsplit(K_str, '..')
-        K(1) = str2int(tokens(1) % to_char_str())
-        K(2) = str2int(tokens(2) % to_char_str())
-      end if
-    end if
+    K = parse_K(item_or_default(config_dict, 'K', '-1'), J, parity)
     symmetry = str2int(item_or_default(config_dict, 'symmetry', '-1'))
 
     basis_size_phi = str2int(item_or_default(config_dict, 'basis_size_phi', '-1'))
