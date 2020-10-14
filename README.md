@@ -16,7 +16,6 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     1. fdict
     ```
     cd ~/SpectrumSDT/libs/fdict
-    printf 'FC=gfortran\nFFLAGS = -g\n' > setup.make
     make
     ```
 
