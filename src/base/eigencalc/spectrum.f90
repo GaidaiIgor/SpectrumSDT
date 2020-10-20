@@ -72,7 +72,7 @@ contains
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')
     end if
 
-    if (params % use_optimized_grid_rho == 1) then
+    if (params % grid_rho % optimized == 1) then
       kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1, jac1)
     else
       kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1)

@@ -111,7 +111,7 @@ contains
       end if
     end if
 
-    if (params % sequential == 0) then
+    if (params % use_parallel == 1) then
       call MPI_Barrier(MPI_COMM_WORLD, ierr)
     end if
   end subroutine

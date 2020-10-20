@@ -31,7 +31,7 @@ contains
     real(real64) :: spline_deriv_left, spline_deriv_right
     real(real64), allocatable :: envelope_matrix(:, :)
 
-    envelope_matrix = read_matrix_real(params % envelope_rho_path)
+    envelope_matrix = read_matrix_real(params % grid_rho % envelope_path)
     env_grid = envelope_matrix(:, 1)
     env_values = envelope_matrix(:, 2)
 
@@ -339,39 +339,39 @@ contains
     real(real64), allocatable :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
 
-    env_emax = params % envelope_rho_max_energy / au_to_wn ! 414.4466
-    rho_step = params % grid_rho_step
-    theta_step = params % grid_theta_step
-    phi_step = params % grid_phi_step
+    env_emax = params % grid_rho % max_energy / au_to_wn
+    rho_step = params % grid_rho % step
+    theta_step = params % grid_theta % step
+    phi_step = params % grid_phi % step
 
-    if (params % use_optimized_grid_rho == 1) then
+    if (params % grid_rho % optimized == 1) then
       call input_envelopes(params)
       call find_parabola(env_grid, env_values, env_fit_param, env_fit_min_abs_energy, env_fit_min_x)
-      if (params % grid_rho_npoints == -1) then
-        call generate_optimized_grid_step(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_step, &
-            params % optimized_grid_solver_steps, optgrid_diff_rhs, grid_rho, jac_rho)
+      if (params % grid_rho % num_points == -1) then
+        call generate_optimized_grid_step(params % grid_rho % from, params % grid_rho % to, env_fit_min_x, params % grid_rho % step, &
+            params % grid_rho % solver_steps, optgrid_diff_rhs, grid_rho, jac_rho)
       else
-        call generate_optimized_grid_points(params % grid_rho_from, params % grid_rho_to, env_fit_min_x, params % grid_rho_npoints, &
-            params % optimized_grid_solver_steps, optgrid_diff_rhs, grid_rho, jac_rho, rho_step)
+        call generate_optimized_grid_points(params % grid_rho % from, params % grid_rho % to, env_fit_min_x, params % grid_rho % num_points, &
+            params % grid_rho % solver_steps, optgrid_diff_rhs, grid_rho, jac_rho, rho_step)
       end if
     else
-      if (params % grid_rho_npoints == -1) then
-        call generate_equidistant_grid_step(params % grid_rho_from, params % grid_rho_to, params % grid_rho_step, grid_rho, jac_rho)
+      if (params % grid_rho % num_points == -1) then
+        call generate_equidistant_grid_step(params % grid_rho % from, params % grid_rho % to, params % grid_rho % step, grid_rho, jac_rho)
       else
-        call generate_equidistant_grid_points(params % grid_rho_from, params % grid_rho_to, params % grid_rho_npoints, grid_rho, jac_rho, rho_step)
+        call generate_equidistant_grid_points(params % grid_rho % from, params % grid_rho % to, params % grid_rho % num_points, grid_rho, jac_rho, rho_step)
       end if
     end if
 
-    if (params % grid_theta_npoints == -1) then
-      call generate_equidistant_grid_step(params % grid_theta_from, params % grid_theta_to, params % grid_theta_step, grid_theta, jac_theta)
+    if (params % grid_theta % num_points == -1) then
+      call generate_equidistant_grid_step(params % grid_theta % from, params % grid_theta % to, params % grid_theta % step, grid_theta, jac_theta)
     else
-      call generate_equidistant_grid_points(params % grid_theta_from, params % grid_theta_to, params % grid_theta_npoints, grid_theta, jac_theta, theta_step)
+      call generate_equidistant_grid_points(params % grid_theta % from, params % grid_theta % to, params % grid_theta % num_points, grid_theta, jac_theta, theta_step)
     end if
 
-    if (params % grid_phi_npoints == -1) then
-      call generate_equidistant_grid_step(params % grid_phi_from, params % grid_phi_to, params % grid_phi_step, grid_phi, jac_phi)
+    if (params % grid_phi % num_points == -1) then
+      call generate_equidistant_grid_step(params % grid_phi % from, params % grid_phi % to, params % grid_phi % step, grid_phi, jac_phi)
     else
-      call generate_equidistant_grid_points(params % grid_phi_from, params % grid_phi_to, params % grid_phi_npoints, grid_phi, jac_phi, phi_step)
+      call generate_equidistant_grid_points(params % grid_phi % from, params % grid_phi % to, params % grid_phi % num_points, grid_phi, jac_phi, phi_step)
     end if
 
     call write_grid(grid_rho, jac_rho, rho_step, 'grid_rho.dat')
