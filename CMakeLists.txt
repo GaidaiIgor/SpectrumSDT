@@ -53,10 +53,10 @@ set(array_2d_real ${prefix}/src/utils/array_2d/array_2d_real.F90)
 set(array_2d_complex ${prefix}/src/utils/array_2d/array_2d_complex.F90)
 set(array_2d ${array_2d_real} ${array_2d_complex} ${prefix}/src/utils/array_2d/array_2d.F90)
 
-set(dict_integer ${prefix}/src/utils/dict/dict_integer.F90)
-set(dict_integer_array ${prefix}/src/utils/dict/dict_integer_array.F90)
-set(dict_char_str ${prefix}/src/utils/dict/dict_char_str.F90)
-set(dict_utils ${dict_integer} ${dict_integer_array} ${dict_char_str} ${string} ${vector_string} ${prefix}/src/utils/dict/dict.F90)
+set(dict_integer ${prefix}/src/interface/fdict/dict_integer.F90)
+set(dict_integer_array ${prefix}/src/interface/fdict/dict_integer_array.F90)
+set(dict_char_str ${prefix}/src/interface/fdict/dict_char_str.F90)
+set(dict_utils ${dict_integer} ${dict_integer_array} ${dict_char_str} ${string} ${vector_string} ${prefix}/src/interface/fdict/dict.F90)
 
 set(string_utils ${vector_string} ${prefix}/src/utils/string/string_utils.f90)
 
