@@ -19,22 +19,19 @@ set(numerical_recipies ${prefix}/src/base/numerical_recipies.f90)
 set(external_sources ${numerical_recipies})
 
 # Source file dependencies
-set(constants ${prefix}/src/base/constants.f90)
-set(input_params ${prefix}/src/base/input_params/input_params.f90)
-
 set(general_char_str ${prefix}/src/utils/general/general_char_str.F90)
 set(general_integer ${general_char_str} ${prefix}/src/utils/general/general_integer.F90)
 set(general_real ${general_char_str} ${prefix}/src/utils/general/general_real.F90)
 set(general_real_array ${prefix}/src/utils/general/general_real_array.F90)
 set(general_utils ${general_integer} ${general_real} ${general_real_array} ${general_char_str} ${prefix}/src/utils/general/general.F90)
 
-set(debug_tools ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
+set(constants ${prefix}/src/base/constants.f90)
+set(rovib_utils_base ${prefix}/src/utils/rovib_utils_base.f90)
+set(debug_tools_base ${prefix}/src/base/debug_tools_base.f90)
 set(fourier_transform ${constants} ${general_utils} ${prefix}/src/utils/fourier_transform.f90)
 set(formulas ${constants} ${general_utils} ${prefix}/src/base/formulas.f90)
-set(rovib_utils ${input_params} ${prefix}/src/utils/rovib_utils.f90)
 set(algorithms ${general_utils} ${prefix}/src/utils/algorithms.f90)
 set(parallel_utils ${algorithms} ${general_utils} ${prefix}/src/utils/parallel.f90)
-set(cap ${constants} ${general_vars} ${input_params} ${prefix}/src/base/cap.f90)
 set(string ${general_utils} ${prefix}/src/utils/string/string.f90)
 
 set(vector_integer ${general_utils} ${prefix}/src/utils/vector/vector_integer.F90)
@@ -61,7 +58,6 @@ set(dict_integer_array ${prefix}/src/utils/dict/dict_integer_array.F90)
 set(dict_char_str ${prefix}/src/utils/dict/dict_char_str.F90)
 set(dict_utils ${dict_integer} ${dict_integer_array} ${dict_char_str} ${string} ${vector_string} ${prefix}/src/utils/dict/dict.F90)
 
-set(stage_metadata ${dict_utils} ${string} ${prefix}/src/base/input_params/stage_metadata.f90)
 set(string_utils ${vector_string} ${prefix}/src/utils/string/string_utils.f90)
 
 set(io_base ${general_utils} ${prefix}/src/utils/io/io_base.f90)
@@ -71,9 +67,15 @@ set(io_complex ${io_base} ${string} ${string_utils} ${vector} ${prefix}/src/util
 set(io_utils ${io_base} ${io_integer} ${io_real} ${io_complex} ${prefix}/src/utils/io/io.f90)
 
 set(path_utils ${general_utils} ${prefix}/src/utils/path.f90)
+set(config ${dict_utils} ${general_utils} ${io_utils} ${parallel_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/config.f90)
+set(grid_params ${config} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/grid_params.f90)
+set(optgrid_params ${config} ${dict_utils} ${grid_params} ${string} ${prefix}/src/base/input_params/optgrid_params.f90)
+set(input_params ${constants} ${dict_utils} ${general_utils} ${grid_params} ${optgrid_params} ${rovib_utils_base} ${string} ${prefix}/src/base/input_params/input_params.f90)
+set(debug_tools ${debug_tools_base} ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
+set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/utils/rovib_utils.f90)
 set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${prefix}/src/base/spectrumsdt_paths.f90)
 set(general_vars ${constants} ${input_params} ${path_utils} ${spectrumsdt_paths} ${prefix}/src/base/general_vars.f90)
-set(config ${constants} ${dict_utils} ${general_utils} ${input_params} ${io_utils} ${parallel_utils} ${rovib_utils} ${string} ${stage_metadata} ${string_utils} ${prefix}/src/base/input_params/config.f90)
+set(cap ${constants} ${general_vars} ${input_params} ${prefix}/src/base/cap.f90)
 set(potential ${formulas} ${input_params} ${general_vars} ${spectrumsdt_paths} ${prefix}/src/base/potential.f90)
 
 set(block_borders ${prefix}/src/base/hamiltonian/block_borders.f90)
@@ -90,7 +92,7 @@ set(sdt ${constants} ${fourier_transform} ${general_vars} ${input_params} ${lapa
 set(spectrum ${cap} ${constants} ${general_utils} ${general_vars} ${input_params} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.f90)
 set(grids ${config} ${constants} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.f90)
 
-set(spectrumsdt ${cap} ${config} ${debug_tools} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
+set(spectrumsdt ${cap} ${config} ${debug_tools} ${dict_utils} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
 
 # Disable all warnings and standard conformation checks for external sources
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")
