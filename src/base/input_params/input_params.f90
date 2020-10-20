@@ -8,6 +8,7 @@ module input_params_mod
   use iso_fortran_env, only: real64
   use rovib_utils_base_mod
   use string_mod
+  use string_utils
   implicit none
 
   private
@@ -26,9 +27,7 @@ module input_params_mod
     type(grid_params) :: grid_phi
 
     ! System
-    real(real64) :: mass_central = -1
-    real(real64) :: mass_terminal1 = -1
-    real(real64) :: mass_terminal2 = -1
+    real(real64) :: mass(3) = -1
     integer :: J = -1 ! total angular momentum quantum number
     integer :: K(2) = -1 ! boundaries of K-range for use_rovib_coupling calculation. In symmetric top rotor both values should be the same
     integer :: parity = -1 ! 0(+) or 1(-)
@@ -75,21 +74,26 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_mass(mass_str) result(mass)
     character(*), intent(in) :: mass_str
-    real(real64) :: mass
+    real(real64) :: mass(3)
+    integer :: i
+    character(:), allocatable :: next_atom
+    type(string), allocatable :: tokens(:)
 
-    if (mass_str == '-1') then
-      ! Not specified
-      mass = -1
-    else if (mass_str == 'o16') then
-      mass = oxygen_masses(1)
-    else if (mass_str == 'o17') then
-      mass = oxygen_masses(2)
-    else if (mass_str == 'o18') then
-      mass = oxygen_masses(3)
-    else
-      ! Plain value
-      mass = str2real(mass_str) * amu_to_aum
-    end if
+    tokens = strsplit(mass_str, delim = ',')
+    call assert(size(tokens) == 3, 'Error: mass shoud specify 3 comma separated values')
+    do i = 1, size(mass)
+      next_atom = adjustl(trim(tokens(i) % to_char_str()))
+      select case (next_atom)
+        case ('o16')
+          mass(i) = oxygen_masses(1)
+        case ('o17')
+          mass(i) = oxygen_masses(2)
+        case ('o18')
+          mass(i) = oxygen_masses(3)
+        case default
+          mass(i) = str2real(next_atom) * amu_to_aum
+      end select
+    end do
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -164,12 +168,8 @@ contains
         case ('grid_phi')
           call associate(subdict, config_dict, next_key)
           call this % grid_phi % checked_init(subdict)
-        case ('mass_central')
-          this % mass_central = parse_mass(extract_string(config_dict, next_key))
-        case ('mass_terminal1')
-          this % mass_terminal1 = parse_mass(extract_string(config_dict, next_key))
-        case ('mass_terminal2')
-          this % mass_terminal2 = parse_mass(extract_string(config_dict, next_key))
+        case ('mass')
+          this % mass = parse_mass(extract_string(config_dict, next_key))
         case ('J')
           this % J = str2int(extract_string(config_dict, next_key))
         case ('K')
@@ -237,9 +237,7 @@ contains
 
     if (this % stage == 'grids' .and. this % grid_rho % optimized == 1 .or. this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. &
         this % stage == 'properties') then
-      call put_string(keys, 'mass_central')
-      call put_string(keys, 'mass_terminal1')
-      call put_string(keys, 'mass_terminal2')
+      call put_string(keys, 'mass')
     end if
 
     if (this % stage == 'basis' .or. this % stage == 'overlaps') then
@@ -333,9 +331,7 @@ contains
     call put_string(keys, 'grid_rho')
     call put_string(keys, 'grid_theta')
     call put_string(keys, 'grid_phi')
-    call put_string(keys, 'mass_central')
-    call put_string(keys, 'mass_terminal1')
-    call put_string(keys, 'mass_terminal2')
+    call put_string(keys, 'mass')
     call put_string(keys, 'J')
     call put_string(keys, 'K')
     call put_string(keys, 'parity')
@@ -374,9 +370,7 @@ contains
     call assert((this % grid_theta % to .aeq. -1d0) .or. this % grid_theta % to < pi, 'Error: grid_theta % to should be < pi')
     call assert((this % grid_phi % from .aeq. -1d0) .or. this % grid_phi % from < 2*pi, 'Error: grid_phi % from should be < 2*pi')
     call assert((this % grid_phi % to .aeq. -1d0) .or. (this % grid_phi % to .ale. 2*pi), 'Error: grid_phi % to should be <= 2*pi')
-    call assert((this % mass_central .aeq. -1d0) .or. this % mass_central > 0, 'Error: mass_central should be > 0')
-    call assert((this % mass_terminal1 .aeq. -1d0) .or. this % mass_terminal1 > 0, 'Error: mass_terminal1 should be > 0')
-    call assert((this % mass_terminal2 .aeq. -1d0) .or. this % mass_terminal2 > 0, 'Error: mass_terminal2 should be > 0')
+    call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
     call assert(this % J >= -1, 'Error: J should be >= 0')
     call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
     if (any(this % stage == [character(len = 100) :: 'eigencalc', 'properties']) .and. this % use_rovib_coupling == 1) then

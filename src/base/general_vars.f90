@@ -33,9 +33,9 @@ contains
   subroutine init_masses(params)
     class(input_params), intent(in) :: params
 
-    m1 = params % mass_terminal1
-    m0 = params % mass_central
-    m2 = params % mass_terminal2
+    m1 = params % mass(1)
+    m0 = params % mass(2)
+    m2 = params % mass(3)
     mtot = m0 + m1 + m2
     mu = sqrt(m0 * m1 * m2 / mtot)
     mu0 = m1 * m2 / (m1 + m2)

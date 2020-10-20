@@ -144,12 +144,14 @@ contains
     real(real64) :: phi_range(2), phi_borders(4)
     complex(real64) :: j_sums(params % basis_size_phi) ! j-sums for different ms
 
-    if ((params % mass_terminal1 .aeq. oxygen_masses(1)) .and. (params % mass_central .aeq. oxygen_masses(3)) .and. (params % mass_terminal2 .aeq. oxygen_masses(1))) then
+    if (all(params % mass .aeq. [oxygen_masses(1), oxygen_masses(3), oxygen_masses(1)])) then
+    ! if ((params % mass(1) .aeq. oxygen_masses(1)) .and. (params % mass(2) .aeq. oxygen_masses(3)) .and. (params % mass(3) .aeq. oxygen_masses(1))) then
       phi_borders = [0d0, 60d0, 117.65d0, 180d0] / 180 * pi
-    else if ((params % mass_terminal1 .aeq. oxygen_masses(3)) .and. (params % mass_central .aeq. oxygen_masses(1)) .and. (params % mass_terminal2 .aeq. oxygen_masses(3))) then
+    else if (all(params % mass .aeq. [oxygen_masses(3), oxygen_masses(1), oxygen_masses(3)])) then
+    ! else if ((params % mass_terminal1 .aeq. oxygen_masses(3)) .and. (params % mass_central .aeq. oxygen_masses(1)) .and. (params % mass_terminal2 .aeq. oxygen_masses(3))) then
       phi_borders = [0d0, 60d0, 122.35d0, 180d0] / 180 * pi
     else
-      stop 'Error: Unknown molecule'
+      stop 'Error: cannot determine integration area - unknown molecule'
     end if
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states)

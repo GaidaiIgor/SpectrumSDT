@@ -33,7 +33,7 @@ module general_real_mod
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Compares given reals with specified precision
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function compare_reals(a, b, comp_precision) result(res)
+  elemental function compare_reals(a, b, comp_precision) result(res)
     real(real64), intent(in) :: a, b
     real(real64), optional, intent(in) :: comp_precision
     integer :: res
@@ -53,7 +53,7 @@ module general_real_mod
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks if given reals are approximately equal to each other
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function approximately_equal(a, b) result(res)
+  elemental function approximately_equal(a, b) result(res)
     real(real64), intent(in) :: a, b
     logical :: res
     res = compare_reals(a, b) == 0
@@ -62,7 +62,7 @@ module general_real_mod
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks if a is approximately equal to b or less
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function approximately_less_equal(a, b) result(res)
+  elemental function approximately_less_equal(a, b) result(res)
     real(real64), intent(in) :: a, b
     logical :: res
     res = compare_reals(a, b) < 1
