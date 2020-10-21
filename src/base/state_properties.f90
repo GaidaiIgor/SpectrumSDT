@@ -36,7 +36,7 @@ contains
       Js_interp(1) = 52
       Js_interp(2) = 56
     else
-      Js_interp(1) = J / 4 * 4 ! integer division
+      Js_interp(1) = int(J / 4) * 4
       Js_interp(2) = Js_interp(1) + 4
     end if
   end subroutine
