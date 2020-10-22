@@ -24,7 +24,7 @@ class SpectrumSDTConfig:
 
     def __init__(self, config_path):
         self.config_path = config_path
-        with open(config_path, "r") as config_file:
+        with open(config_path) as config_file:
             config_lines = config_file.readlines()
         self.params, _ = self.read_inner_dict(config_lines, -1)
 
@@ -34,10 +34,13 @@ class SpectrumSDTConfig:
         else:
             return 0
 
-    def get_j(self) -> int:
+    def get_mass_str(self) -> str:
+        return self.params["mass"]
+
+    def get_J(self) -> int:
         return int(self.params["J"])
 
-    def get_ks(self) -> List[int]:
+    def get_Ks(self) -> List[int]:
         K_str = self.params["K"]
         if K_str == "all":
             J = self.get_j()
@@ -59,10 +62,10 @@ class SpectrumSDTConfig:
     def get_basis_root_path(self) -> str:
         return self.params["basis_root_path"]
 
-    def get_basis_j(self) -> int:
+    def get_basis_J(self) -> int:
         return int(self.params["basis_J"])
 
-    def get_basis_k(self) -> int:
+    def get_basis_K(self) -> int:
         return int(self.params["basis_K"])
 
     def get_number_of_states(self) -> int:

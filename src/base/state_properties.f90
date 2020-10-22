@@ -23,53 +23,6 @@ module state_properties_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Selects the values of *J_low* and *J_high* used to interpolate a given *J*
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine select_interpolating_Js(J, Js_interp)
-    integer, intent(in) :: J
-    integer, intent(out) :: Js_interp(2)
-
-    if (J < 4) then
-      Js_interp(1) = 4
-      Js_interp(2) = 8
-    else if (J > 56) then
-      Js_interp(1) = 52
-      Js_interp(2) = 56
-    else
-      Js_interp(1) = int(J / 4) * 4
-      Js_interp(2) = Js_interp(1) + 4
-    end if
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Finds n-indices corresponding to the border (inclusive) of well region in channels B, A and S as well as common border of vdw region
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine find_barriers_n_indices(params, rho_grid, vdw_max, cov_n_inds, vdw_n_ind)
-    class(input_params), intent(in) :: params
-    real(real64), intent(in) :: rho_grid(:)
-    real(real64), intent(in) :: vdw_max
-    integer, intent(out) :: cov_n_inds(3)
-    integer, intent(out) :: vdw_n_ind
-    integer :: i
-    integer :: Js_interp(2)
-    real(real64) :: positions_interp(3, 2), positions_estim(3) ! Barrier positions corresponding to low and high Js and estimation for current J
-    character(:), allocatable :: channels_file_path
-
-    call select_interpolating_Js(params % J, Js_interp)
-    ! Load interpolating Js barrier positions
-    do i = 1, 2
-      channels_file_path = get_channels_file_path(params % channels_root, Js_interp(i), 0, params % symmetry)
-      call load_lowest_barrier_info(channels_file_path, positions_interp(:, i))
-    end do
-    ! Interpolate for the current J
-    do i = 1, 3
-      call linear_estimation(Js_interp * 1d0, positions_interp(i, :), params % J * 1d0, positions_estim(i))
-      cov_n_inds(i) = minloc(abs(rho_grid - positions_estim(i)), 1)
-    end do
-    vdw_n_ind = minloc(abs(rho_grid - vdw_max), 1)
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Evaluates the value of phi integral in the range [a, b] (F~_Ks(m,m') = int(F_m1^+-(phi) * F_m2^+-(phi), a, b))
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calc_phi_integral(m1, m2, a, b, F_sym) result(integral_value)
@@ -241,12 +194,12 @@ contains
     integer, intent(in) :: vdw_n_ind ! rho-index that marks the border of vdw area (common for all regions)
     real(real64) :: region_probs(6)
 
-    region_probs(1) = sum(p_dist_k(:, 1:cov_n_inds(3), 3))
-    region_probs(2) = sum(p_dist_k(:, 1:cov_n_inds(2), 2)) + sum(p_dist_k(:, 1:cov_n_inds(1), 1))
-    region_probs(3) = sum(p_dist_k(:, cov_n_inds(3)+1:vdw_n_ind, 3))
-    region_probs(4) = sum(p_dist_k(:, cov_n_inds(2)+1:vdw_n_ind, 2))
-    region_probs(5) = sum(p_dist_k(:, cov_n_inds(1)+1:vdw_n_ind, 1))
-    region_probs(6) = sum(p_dist_k(:, vdw_n_ind+1:size(p_dist_k, 2), :)) ! Calculated explicitly to make sure probabilities add up properly
+    region_probs(1) = sum(p_dist_k(:, 1:cov_n_inds(3), 3)) ! Symmetric covalent
+    region_probs(2) = sum(p_dist_k(:, 1:cov_n_inds(2), 2)) + sum(p_dist_k(:, 1:cov_n_inds(1), 1)) ! Asymmetric covalent
+    region_probs(3) = sum(p_dist_k(:, cov_n_inds(3)+1:vdw_n_ind, 3)) ! VdW A Sym
+    region_probs(4) = sum(p_dist_k(:, cov_n_inds(2)+1:vdw_n_ind, 2)) ! VdW A Asym
+    region_probs(5) = sum(p_dist_k(:, cov_n_inds(1)+1:vdw_n_ind, 1)) ! VdW B
+    region_probs(6) = sum(p_dist_k(:, vdw_n_ind+1:size(p_dist_k, 2), :)) ! Infinity, calculated explicitly to make sure probabilities add up properly
     region_probs = region_probs * 2 ! Due to phi symmetry
   end function
 
@@ -340,6 +293,8 @@ contains
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
     type(array_2d_complex), allocatable :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
 
+    stop 'Barrier indexes are not implemented'
+
     ! Load energies
     sym_path = get_sym_path(params)
     spectrum_path = get_spectrum_path(sym_path)
@@ -366,11 +321,11 @@ contains
       call calculate_gamma_channels_all(params, p_dist, cap, gammas)
     else
       allocate(gammas(params % num_states, 2))
-      gammas = 0d0
+      gammas = 0
     end if
     call print_parallel('Done calculating channel-specific gammas')
 
-    call find_barriers_n_indices(params, rho_grid, vdw_max, cov_n_inds, vdw_n_ind)
+    ! call find_barriers_n_indices(params, rho_grid, vdw_max, cov_n_inds, vdw_n_ind)
     call calculate_pes_region_probabilities_all(params, p_dist, cov_n_inds, vdw_n_ind, region_probs)
     call print_parallel('Done calculating PES region probabilities')
 

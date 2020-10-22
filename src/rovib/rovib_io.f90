@@ -301,38 +301,6 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads positions and energies of lowest barrier tops in channels A, B and S from the specified channels file
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine load_lowest_barrier_info(channels_file_path, positions, energies)
-    character(*), intent(in) :: channels_file_path
-    real(real64), intent(out) :: positions(3)
-    real(real64), optional, intent(out) :: energies(3)
-    integer :: file_unit, barrier_ind, group_ind ! group_ind: 1 - B, 2 - A, 3 - S
-    integer :: found(3)
-    real(real64) :: position, energy
-
-    found = 0
-    open(newunit = file_unit, file = channels_file_path)
-    do
-      read(file_unit, *) barrier_ind, group_ind, position, energy
-      if (found(group_ind) == 1) then
-        cycle
-      end if
-
-      found(group_ind) = 1
-      positions(group_ind) = position
-      if (present(energies)) then
-        energies(group_ind) = energy
-      end if
-
-      if (sum(found) == 3) then
-        exit
-      end if
-    end do
-    close(file_unit)
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Writes results to file
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine write_state_properties(params, energies, gammas, region_probs, K_dists)

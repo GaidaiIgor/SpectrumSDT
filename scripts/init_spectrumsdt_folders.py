@@ -8,7 +8,7 @@ import shutil
 import os.path as path
 from typing import List
 
-from SpectrumConfig import SpectrumConfig
+from SpectrumSDTConfig import SpectrumSDTConfig
             
 
 def parse_command_line_args() -> argparse.Namespace:
@@ -63,16 +63,16 @@ def main():
     config_path = path.abspath(args.config)
     base_path = path.dirname(config_path)
 
-    config = SpectrumConfig(config_path)
-    J = config.get_j()
+    config = SpectrumSDTConfig(config_path)
+    J = config.get_J()
     num_states_base = int(config.params["num_states"])
     num_states_p0 = num_states_base * (J + 1 - J % 2)
     num_states_p1 = num_states_base * (J + 1 - (J + 1) % 2)
     ncv_mult = 1.5
     mpd_mult = 600 / 2500
 
-    basis_J = config.get_basis_j()
-    basis_K = config.get_basis_k()
+    basis_J = config.get_basis_J()
+    basis_K = config.get_basis_K()
     requested_K = int(args.K) if args.K != 'all' else -1
     overlaps_rovib = 1 if basis_J == J and basis_K == requested_K else 0 # enable rovibrational coupling for overlaps only if basis J/K coincide with the requested J/K
 
@@ -92,8 +92,8 @@ def main():
     if args.K is None:
         # Specific Ks are not provied, so generate all
         # Set up symmetric top folders
-        use_fix_basis_jk = int(config.params["use_fix_basis_jk"]) if "use_fix_basis_jk" in config.params else 0
-        if use_fix_basis_jk == 0:
+        use_fixed_basis_JK = int(config.params["use_fixed_basis_jk"]) if "use_fixed_basis_jk" in config.params else 0
+        if use_fixed_basis_JK == 0:
             K_range = range(J + 1)
         else:
             basis_K = int(config.params["basis_K"])
@@ -127,4 +127,5 @@ def main():
     set_config_params(config_paths, config_lines)
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -74,14 +74,14 @@ contains
     end if
   end function
 
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Estimates the value of *query_y* at *query_x* by building line equation from 2 points in *known_xs* and *known_ys*
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine linear_estimation(known_xs, known_ys, query_x, query_y)
-    real(real64), intent(in) :: known_xs(2), known_ys(2)
-    real(real64), intent(in) :: query_x
-    real(real64), intent(out) :: query_y
-    query_y = (known_ys(2) - known_ys(1)) / (known_xs(2) - known_xs(1)) * (query_x - known_xs(1)) + known_ys(1)
-  end subroutine
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+! ! Estimates the value of *query_y* at *query_x* by building line equation from 2 points in *known_xs* and *known_ys*
+! !-------------------------------------------------------------------------------------------------------------------------------------------
+!   subroutine linear_estimation(known_xs, known_ys, query_x, query_y)
+!     real(real64), intent(in) :: known_xs(2), known_ys(2)
+!     real(real64), intent(in) :: query_x
+!     real(real64), intent(out) :: query_y
+!     query_y = (known_ys(2) - known_ys(1)) / (known_xs(2) - known_xs(1)) * (query_x - known_xs(1)) + known_ys(1)
+!   end subroutine
 
 end module

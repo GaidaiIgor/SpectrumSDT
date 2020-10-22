@@ -49,7 +49,6 @@ module input_params_mod
     ! Misc paths
     character(:), allocatable :: grid_path ! path to folder with grid calculations
     character(:), allocatable :: root_path ! path to root folder for main calculations
-    character(:), allocatable :: channels_root ! path to folder with channels data
 
     ! Debug
     integer :: use_parallel = -1 ! parallel execution
@@ -200,8 +199,6 @@ contains
           this % grid_path = extract_string(config_dict, next_key)
         case ('root_path')
           this % root_path = extract_string(config_dict, next_key)
-        case ('channels_root')
-          this % channels_root = extract_string(config_dict, next_key)
         case ('use_parallel')
           this % use_parallel = str2int(extract_string(config_dict, next_key))
         case ('enable_terms')
@@ -280,10 +277,6 @@ contains
       call put_string(keys, 'basis_J')
       call put_string(keys, 'basis_K')
     end if
-
-    if (this % stage == 'properties') then
-      call put_string(keys, 'channels_root')
-    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -347,7 +340,6 @@ contains
     call put_string(keys, 'max_iterations')
     call put_string(keys, 'grid_path')
     call put_string(keys, 'root_path')
-    call put_string(keys, 'channels_root')
     call put_string(keys, 'use_parallel')
     call put_string(keys, 'enable_terms')
     call put_string(keys, 'optimized_mult')
