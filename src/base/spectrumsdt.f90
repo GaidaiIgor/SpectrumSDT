@@ -10,7 +10,7 @@ program spectrumsdt
   use overlaps_extra_mod, only: calculate_overlaps_extra
   use parallel_utils
   use potential_mod, only: init_potential
-  use sdt, only: init_sdt, init_output_directories, calc_basis, calc_overlap
+  use sdt, only: init_sdt, calc_basis, calc_overlap
   use spectrum_mod, only: calculate_states
   use state_properties_mod, only: calculate_state_properties
   implicit none
@@ -34,7 +34,6 @@ program spectrumsdt
   if (params % stage == 'eigencalc' .or. params % stage == 'properties') then
     call init_caps(params)
   end if
-  call init_output_directories(params)
   call process_stage(params)
 
   if (params % sequential == 0) then

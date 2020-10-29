@@ -20,7 +20,7 @@ module spectrumsdt_paths_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to rho grid
+! Generates path to rho grid.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_grid_rho_path(params) result(res)
     class(input_params), intent(in) :: params
@@ -29,7 +29,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to theta grid
+! Generates path to theta grid.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_grid_theta_path(params) result(res)
     class(input_params), intent(in) :: params
@@ -38,7 +38,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to phi grid
+! Generates path to phi grid.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_grid_phi_path(params) result(res)
     class(input_params), intent(in) :: params
@@ -47,7 +47,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with calculated PES
+! Generates path to file with calculated PES.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_pes_path(params) result(res)
     class(input_params), intent(in) :: params
@@ -56,7 +56,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for given Ks
+! Generates path to folder with calculation results for given Ks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_k_folder_path_root(root_path, K) result(res)
     character(*), intent(in) :: root_path
@@ -69,7 +69,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for given Ks
+! Generates path to folder with calculation results for given Ks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_k_folder_path_params(params) result(res)
     class(input_params), intent(in) :: params
@@ -81,7 +81,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for a given symmetry and Ks
+! Generates path to folder with calculation results for a given symmetry and Ks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_sym_path_str(k_path, sym_name, parity) result(res)
     character(*), intent(in) :: k_path, sym_name
@@ -98,8 +98,8 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for a given symmetry and Ks
-! Parity is relevant for coupled eigencalcs only
+! Generates path to folder with calculation results for a given symmetry and Ks.
+! Parity is relevant for coupled eigencalcs only.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_sym_path_int(k_path, sym_code, parity) result(res)
     character(*), intent(in) :: k_path
@@ -113,7 +113,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for a given symmetry and Ks
+! Generates path to folder with calculation results for a given symmetry and Ks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_sym_path_root(root_path, K, sym_code, parity) result(res)
     character(*), intent(in) :: root_path
@@ -127,7 +127,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for a given symmetry and Ks
+! Generates path to folder with calculation results for a given symmetry and Ks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_sym_path_params(params) result(res)
     class(input_params), intent(in) :: params
@@ -141,7 +141,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with basis calculations
+! Generates path to folder with basis calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_basis_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -150,7 +150,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with basis results calculations
+! Generates path to folder with basis results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_basis_results_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -162,7 +162,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to k-block info (overlap structure)
+! Generates path to k-block info (overlap structure).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_block_info_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -174,7 +174,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to the file with 2D energies from all slices
+! Generates path to the file with 2D energies from all slices.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_2d_energies_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -186,7 +186,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with 1D eigenvalues and eigenvectors from all theta slices in a specific rho slice
+! Generates path to file with 1D eigenvalues and eigenvectors from all theta slices in a specific rho slice.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_solutions_1d_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
@@ -200,7 +200,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with 2D eigenvalues and eigenvectors in a specific rho slice
+! Generates path to file with 2D eigenvalues and eigenvectors in a specific rho slice.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_solutions_2d_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
@@ -214,7 +214,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with overlaps calculations
+! Generates path to folder with overlaps calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_overlaps_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -223,7 +223,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with overlaps results calculations
+! Generates path to folder with overlaps results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_overlaps_results_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -235,7 +235,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with a regular overlap block
+! Generates path to file with a regular overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_regular_overlap_file_path(sym_path, slice_ind_1, slice_ind_2) result(res)
     character(*), intent(in) :: sym_path
@@ -249,7 +249,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with a symmetric overlap block
+! Generates path to file with a symmetric overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_symmetric_overlap_J_file_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
@@ -263,7 +263,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with a symmetric overlap block
+! Generates path to file with a symmetric overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_symmetric_overlap_K_file_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
@@ -277,7 +277,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with a coriolis overlap block
+! Generates path to file with a coriolis overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_coriolis_overlap_file_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
@@ -291,7 +291,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with an asymmetric overlap block. Negative values of slice_ind indicate K=1 block
+! Generates path to file with an asymmetric overlap block. Negative values of slice_ind indicate K=1 block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_asymmetric_overlap_file_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
@@ -305,7 +305,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with an asymmetric overlap block. Negative values of slice_ind indicate K=1 block
+! Generates path to file with an asymmetric overlap block. Negative values of slice_ind indicate K=1 block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_asymmetric_overlap_file_1_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
@@ -319,7 +319,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with eigenpairs calculations
+! Generates path to folder with eigenpairs calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_eigencalc_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -328,7 +328,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with eigenpairs results calculations
+! Generates path to folder with eigenpairs results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_eigencalc_results_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -340,33 +340,21 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with 3D expansion coefficients
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_expansion_coefficients_3d_path(sym_path) result(res)
-    character(*), intent(in) :: sym_path
-    character(:), allocatable :: res
-    character(:), allocatable :: eigencalc_results_path
-
-    eigencalc_results_path = get_eigencalc_results_path(sym_path)
-    res = append_path_tokens(eigencalc_results_path, 'exps')
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with 3D expansion coefficients for a given state number k
+! Generates path to file with 3D expansion coefficients for a given state number k.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_solution_3d_path(sym_path, k) result(res)
     character(*), intent(in) :: sym_path
     integer, intent(in) :: k ! solution index
     character(:), allocatable :: res
-    character(:), allocatable :: exp_coeffs_folder, file_name
+    character(:), allocatable :: eigencalc_results_folder, file_name
 
-    exp_coeffs_folder = get_expansion_coefficients_3d_path(sym_path)
+    eigencalc_results_folder = get_eigencalc_results_path(sym_path)
     file_name = 'exp.' // num2str(k, '(I0)') // '.bin.out'
-    res = append_path_tokens(exp_coeffs_folder, file_name)
+    res = append_path_tokens(eigencalc_results_folder, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to computed spectrum
+! Generates path to computed spectrum.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_spectrum_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -378,7 +366,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with properties calculations
+! Generates path to folder with properties calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_properties_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -387,7 +375,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with properties results calculation
+! Generates path to file with properties results calculation.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_properties_result_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
@@ -399,7 +387,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with 'chrecog' folder
+! Generates path to folder with 'chrecog' folder.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_channels_folder_parent_path(channels_root, J, K, sym) result(res)
     character(*), intent(in) :: channels_root
@@ -412,7 +400,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to channels file corresponding to given parameters
+! Generates path to channels file corresponding to given parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_channels_file_path(channels_root, J, K, sym) result(res)
     character(*), intent(in) :: channels_root

@@ -26,12 +26,10 @@ contains
     complex(real64), allocatable, intent(in) :: eivecs(:, :)
     integer :: proc_first_state, proc_states, file_unit, i, global_state_ind
     real(real64) :: energy, gamma
-    character(:), allocatable :: sym_path, file_folder, file_path
+    character(:), allocatable :: sym_path, file_path
 
     call get_proc_elem_range(size(eivals), proc_first_state, proc_states)
     sym_path = get_sym_path(params)
-    file_folder = get_expansion_coefficients_3d_path(sym_path)
-    call create_path(file_folder)
 
     ! Write each eigenvector in a separate binary file
     do i = 1, proc_states

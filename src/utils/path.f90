@@ -8,16 +8,8 @@ module path_utils
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Creates specified folder
+! Extracts last token from path.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine create_path(path)
-    character(*), intent(in) :: path
-    call execute_command_line('mkdir -p ' // path)
-  end subroutine
-
-!-----------------------------------------------------------------------
-! extracts last token from path
-!-----------------------------------------------------------------------
   function get_path_tail(path)
     character(*), intent(in) :: path
     character(:), allocatable :: get_path_tail

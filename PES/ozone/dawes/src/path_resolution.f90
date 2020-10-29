@@ -5,57 +5,38 @@ module path_resolution_mod
 contains 
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Executes specied shell command and returns command's output. Parallel version.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function execute_shell_command(command) result(output)
-    character(*), intent(in) :: command
-    character(:), allocatable :: output
-    integer :: proc_id, ierr, file_unit
-    character(512) :: proc_id_str, command_result
-    character(:), allocatable :: file_name, command_full
-
-    ! The only way to get command output is to read it from file...
-    call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
-    write(proc_id_str, '(I0)') proc_id
-    file_name = '.temp' // trim(proc_id_str)
-    command_full = command // ' > ' // file_name
-    call execute_command_line(command_full)
-
-    ! Read the results
-    open(newunit = file_unit, file = file_name)
-    read(file_unit, '(A)') command_result
-    close(file_unit, status = 'delete')
-    output = trim(command_result)
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Extracts everything before the last token in path.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_path_head(path) result(head)
-    character(*), intent(in) :: path
-    character(:), allocatable :: head
-    integer :: ind_slash
-
-    ind_slash = index(path, '/', .true.)
-    head = path(:ind_slash-1)
-  end function
-  
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Resolves a path relative to location of executable file.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function resolve_relative_exe_path(relative_exe_path) result(path)
     character(*), intent(in) :: relative_exe_path
     character(:), allocatable :: path
-    character(512) :: path_arg
+    integer :: proc_id, ierr, script_unit, result_unit
+    character(512) :: proc_id_str, program_name, command_result
+    character(:), allocatable :: script_name, result_name
 
-    call get_command_argument(0, path_arg)
-    path = execute_shell_command('readlink -f $(which ' // trim(path_arg) // ')')
-    path = get_path_head(path)
-    ! only if path is non-empty
-    if (len(path) > 0) then
-      path = path // '/'
-    end if
-    path = path // relative_exe_path
+    call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
+    write(proc_id_str, '(I0)') proc_id
+    script_name = '.temp_resolve_relative_exe_path_' // trim(proc_id_str) // '.py'
+    call get_command_argument(0, program_name)
+
+    open(newunit = script_unit, file = script_name)
+    write(script_unit, '(A)') 'import shutil'
+    write(script_unit, '(A)') 'from pathlib import Path'
+    write(script_unit, '(A)') 'symlink_path = shutil.which("' // trim(program_name) // '")'
+    write(script_unit, '(A)') 'target_path = Path(symlink_path).resolve().parent'
+    write(script_unit, '(A)') 'relative_exe_path = target_path / "' // relative_exe_path // '"'
+    write(script_unit, '(A)') 'print(relative_exe_path)'
+    flush(script_unit)
+
+    result_name = '.temp_resolve_relative_exe_path_result_' // trim(proc_id_str)
+    call execute_command_line('python3 ' // script_name // ' > ' // result_name)
+
+    open(newunit = result_unit, file = result_name)
+    read(result_unit, '(A)') command_result
+    path = trim(command_result)
+
+    close(result_unit, status = 'delete')
+    close(script_unit, status = 'delete')
   end function
   
 end module
