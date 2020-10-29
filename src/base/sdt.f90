@@ -92,30 +92,6 @@ contains
     nvec2max = 400
   end subroutine
 
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Creates output directories
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine init_output_directories(params)
-    class(input_params), intent(in) :: params
-    integer :: ierr
-
-    if (get_proc_id() == 0) then
-      if (params % stage == 'basis') then
-        call create_path(get_basis_results_path(get_sym_path(params)))
-      end if
-      if (params % stage == 'overlaps') then
-        call create_path(get_overlaps_results_path(get_sym_path(params)))
-      end if
-      if (params % stage == 'eigencalc') then
-        call create_path(get_eigencalc_results_path(get_sym_path(params)))
-      end if
-    end if
-
-    if (params % use_parallel == 1) then
-      call MPI_Barrier(MPI_COMM_WORLD, ierr)
-    end if
-  end subroutine
-
   !-----------------------------------------------------------------------
   !  Calculates FBR basis on the grid.
   !     Symmetry       Cos(nx)         Sin(nx)

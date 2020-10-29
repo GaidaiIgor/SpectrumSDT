@@ -6,6 +6,7 @@ import itertools
 import os
 import shutil
 import os.path as path
+from pathlib import Path
 from typing import List
 
 from SpectrumSDTConfig import SpectrumSDTConfig
@@ -38,8 +39,11 @@ def generate_config_lines(folder_params: List[List[str]]) -> List[str]:
 def create_paths(target_folders: List[str]):
     """ Creates all paths specified in target_folders """
     for folder in target_folders:
-        if not path.exists(folder):
-            os.makedirs(folder)
+        target_path = Path(folder)
+        if target_path.name == "basis" or target_path.name == "overlaps" or target_path.name == "eigencalc":
+            target_path = target_path / ("out_" + target_path.name)
+        if not path.exists(target_path):
+            os.makedirs(target_path)
 
 
 def multicopy_config(config_path: str, target_folders: List[str]) -> List[str]:

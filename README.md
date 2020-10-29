@@ -74,7 +74,7 @@ Before proceeding to the next stage, user should provide file `pes.out` with the
 ```
 cd ~/SpectrumSDT/PES/ozone/
 mkdir build && cd build
-bash ../compile_pesprint.sh
+../compile_pesprint.sh
 ```
 Now run:
 ```
