@@ -25,6 +25,7 @@ set(general_real ${general_char_str} ${prefix}/src/utils/general/general_real.F9
 set(general_real_array ${prefix}/src/utils/general/general_real_array.F90)
 set(general_utils ${general_integer} ${general_real} ${general_real_array} ${general_char_str} ${prefix}/src/utils/general/general.F90)
 
+set(path_utils ${general_utils} ${prefix}/src/utils/path.f90)
 set(constants ${prefix}/src/base/constants.f90)
 set(rovib_utils_base ${prefix}/src/utils/rovib_utils_base.f90)
 set(debug_tools_base ${prefix}/src/base/debug_tools_base.f90)
@@ -66,11 +67,12 @@ set(io_real ${io_base} ${string} ${string_utils} ${vector} ${prefix}/src/utils/i
 set(io_complex ${io_base} ${string} ${string_utils} ${vector} ${prefix}/src/utils/io/io_complex.F90)
 set(io_utils ${io_base} ${io_integer} ${io_real} ${io_complex} ${prefix}/src/utils/io/io.f90)
 
-set(path_utils ${general_utils} ${prefix}/src/utils/path.f90)
 set(config ${dict_utils} ${general_utils} ${io_utils} ${parallel_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/config.f90)
 set(grid_params ${config} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/grid_params.f90)
 set(optgrid_params ${config} ${dict_utils} ${grid_params} ${string} ${prefix}/src/base/input_params/optgrid_params.f90)
-set(input_params ${constants} ${dict_utils} ${general_utils} ${grid_params} ${optgrid_params} ${rovib_utils_base} ${string} ${string_utils} ${prefix}/src/base/input_params/input_params.f90)
+set(wf_section_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/wf_section_params.f90)
+set(input_params ${config} ${constants} ${dict_utils} ${general_utils} ${grid_params} ${optgrid_params} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
+
 set(debug_tools ${debug_tools_base} ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/utils/rovib_utils.f90)
 set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${prefix}/src/base/spectrumsdt_paths.f90)

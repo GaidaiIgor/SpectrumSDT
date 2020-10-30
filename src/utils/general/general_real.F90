@@ -7,7 +7,7 @@ module general_real_mod
 #include "general_template.F90"
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts real(real64) to string
+! Converts real(real64) to string.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function num2str_real(num, format) result(str)
     real(real64), intent(in) :: num
@@ -22,7 +22,7 @@ module general_real_mod
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string to real(real64)
+! Converts string to real(real64).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function str2real(str) result(real_num)
     character(*), intent(in) :: str
@@ -31,7 +31,7 @@ module general_real_mod
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Compares given reals with specified precision
+! Compares given reals with specified precision.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function compare_reals(a, b, comp_precision) result(res)
     real(real64), intent(in) :: a, b
@@ -51,7 +51,7 @@ module general_real_mod
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks if given reals are approximately equal to each other
+! Checks if given reals are approximately equal to each other.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function approximately_equal(a, b) result(res)
     real(real64), intent(in) :: a, b
@@ -60,12 +60,21 @@ module general_real_mod
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks if a is approximately equal to b or less
+! Checks if a is approximately equal to b or less.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function approximately_less_equal(a, b) result(res)
     real(real64), intent(in) :: a, b
     logical :: res
     res = compare_reals(a, b) < 1
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Checks if a is approximately equal to b or greater.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  elemental function approximately_greater_equal(a, b) result(res)
+    real(real64), intent(in) :: a, b
+    logical :: res
+    res = compare_reals(a, b) > -1
   end function
 
 end module

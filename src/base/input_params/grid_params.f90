@@ -7,6 +7,9 @@ module grid_params_mod
   use string_mod
   implicit none
 
+  private
+  public :: grid_params
+
   type :: grid_params
     real(real64) :: from = -1
     real(real64) :: to = -1
@@ -68,7 +71,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns a set of optional keys.
+! Returns a set of optional keys. A placeholder method for calls from optgrid_params and other derived classes.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_optional_keys_grid_params(this) result(keys)
     class(grid_params), intent(in) :: this

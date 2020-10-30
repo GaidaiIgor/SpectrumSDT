@@ -34,10 +34,14 @@ module general_utils
     module procedure :: approximately_less_equal
   end interface
 
+  interface operator (.age.)
+    module procedure :: approximately_greater_equal
+  end interface
+
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts real to integer, rounding up if within target accuracy of the next integer, otherwise down
+! Converts real to integer, rounding up if within target accuracy of the next integer, otherwise down.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function real2int(a, comp_precision) result(res)
     real(real64), intent(in) :: a
@@ -53,9 +57,9 @@ contains
     end if
   end function
 
-!-----------------------------------------------------------------------
-! generates real grid using specified step
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates real grid using specified step.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   function generate_real_range(start, end, step) result(grid)
     real(real64), intent(in) :: start, end, step
     real(real64), allocatable :: grid(:)
@@ -74,9 +78,9 @@ contains
     grid = [(start + i * step, i = 0, npoints)]
   end function
 
-!-----------------------------------------------------------------------
-! Generates equally spaced grid of points in the interval [start, end]
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates equally spaced grid of points in the interval [start, end].
+!-------------------------------------------------------------------------------------------------------------------------------------------
   function linspace(start, end, npoints) result(grid)
     real(real64), intent(in) :: start, end
     integer, intent(in) :: npoints
@@ -89,9 +93,9 @@ contains
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Prints progress %
-! progress: current progress of some process (a number from 0 to 1)
-! progress_step: controls how often progress should be reported (default is every 10%)
+! Prints progress %.
+! progress: current progress of some process (a number from 0 to 1).
+! progress_step: controls how often progress should be reported (default is every 10%).
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine track_progress(progress, progress_step, reset)
     real(real64), intent(in) :: progress
@@ -118,7 +122,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Prints stack trace and aborts the program
+! Prints stack trace and aborts the program.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine exit_abnormally()
     integer :: zero = 0
@@ -126,7 +130,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! A one-liner to check various constraints
+! A one-liner to check various constraints.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assert(logical_statemenet, error_message)
     logical :: logical_statemenet
@@ -139,7 +143,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks if a given strings starts with a given pattern
+! Checks if a given strings starts with a given pattern.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function str_starts_with(str, pattern) result(res)
     character(*), intent(in) :: str, pattern
@@ -148,7 +152,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Removes characters in *char_set* from the right end of *str* until first occurence of a character not from *char_set*
+! Removes characters in *char_set* from the right end of *str* until first occurence of a character not from *char_set*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function str_trim(str, char_set) result(res)
     character(*), intent(in) :: str
@@ -163,7 +167,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns identity matrix of specified size
+! Returns identity matrix of specified size.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function identity_matrix(size) result(matrix)
     integer, intent(in) :: size
@@ -178,7 +182,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Compares leading digits of given integers
+! Compares leading digits of given integers.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function compare_leading_digits(int1, int2) result(res)
     integer, intent(in) :: int1, int2
@@ -191,7 +195,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Evaluates logical consequence function
+! Evaluates logical consequence function.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function logical_consequence(a, b) result(res)
     logical, intent(in) :: a, b
@@ -200,7 +204,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Evaluates delta Kronecker function
+! Evaluates delta Kronecker function.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function delta(a, b) result(res)
     integer, intent(in) :: a, b
@@ -209,7 +213,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Find _row_ and _col_ index of maximum element in the _matrix_
+! Find *row* and *col* index of maximum element in the *matrix*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine find_max_loc_matrix(matrix, row, col)
     real(real64), intent(in) :: matrix(:, :)
@@ -222,4 +226,5 @@ contains
     col = maxloc(max_val_col, 1)
     row = max_loc_col(col)
   end subroutine
+
 end module

@@ -1,4 +1,5 @@
 module input_params_mod
+  use config_mod
   use constants
   use dictionary
   use dict_utils
@@ -9,6 +10,7 @@ module input_params_mod
   use rovib_utils_base_mod
   use string_mod
   use string_utils
+  use wf_section_params_mod
   implicit none
 
   private
@@ -45,6 +47,9 @@ module input_params_mod
     integer :: ncv = -1 ! number of vectors in arnoldi basis during eigencalc
     integer :: mpd = -1 ! maximum projected dimension, slepc only
     integer :: max_iterations = -1 ! maximum number of iterations during eigencalc
+
+    ! Properties
+    type(wf_section_params), allocatable :: wf_sections(:) ! wave function sections for integration on the properties stage
     
     ! Misc paths
     character(:), allocatable :: grid_path ! path to folder with grid calculations
@@ -124,6 +129,29 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Parses given *dict* into wf_sections. Any item in the *dict* has to be a dict representing an individual section.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function parse_wf_sections(dict) result(wf_sections)
+    class(dictionary_t) :: dict ! intent(in)
+    type(wf_section_params), allocatable :: wf_sections(:)
+    integer :: i
+    character(:), allocatable :: next_key
+    type(string), allocatable :: key_set(:)
+    type(dictionary_t) :: subdict
+
+    key_set = get_key_set(dict)
+    allocate(wf_sections(size(key_set)))
+    do i = 1, size(key_set)
+      next_key = key_set(i) % to_char_str()
+      call associate(subdict, dict, next_key)
+      call wf_sections(i) % checked_init(subdict)
+      if (wf_sections(i) % name == 'use_key_name') then
+        wf_sections(i) % name = next_key
+      end if
+    end do
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Parses user-provided value of `enable_terms`
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_enable_terms(enable_terms_str) result(enable_terms)
@@ -195,6 +223,9 @@ contains
           this % mpd = str2int(extract_string(config_dict, next_key))
         case ('max_iterations')
           this % max_iterations = str2int(extract_string(config_dict, next_key))
+        case ('wf_sections')
+          call associate(subdict, config_dict, next_key)
+          this % wf_sections = parse_wf_sections(subdict)
         case ('grid_path')
           this % grid_path = extract_string(config_dict, next_key)
         case ('root_path')
