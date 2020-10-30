@@ -308,6 +308,10 @@ contains
       call put_string(keys, 'basis_J')
       call put_string(keys, 'basis_K')
     end if
+
+    if (this % stage == 'properties') then
+      call put_string(keys, 'wf_sections')
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -369,6 +373,7 @@ contains
     call put_string(keys, 'ncv')
     call put_string(keys, 'mpd')
     call put_string(keys, 'max_iterations')
+    call put_string(keys, 'wf_sections')
     call put_string(keys, 'grid_path')
     call put_string(keys, 'root_path')
     call put_string(keys, 'use_parallel')
