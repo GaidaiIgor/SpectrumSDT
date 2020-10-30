@@ -25,6 +25,10 @@ module wf_section_params_mod
     procedure :: get_all_keys => get_all_keys_wf_section_params
     procedure :: check_values => check_values_wf_section_params
     procedure :: checked_init => checked_init_wf_section_params
+    procedure :: checked_resolve_Ks => checked_resolve_Ks_wf_section_params
+    procedure :: checked_resolve_rho_grid => checked_resolve_rho_grid_wf_section_params
+    procedure :: checked_resolve_theta_grid => checked_resolve_theta_grid_wf_section_params
+    procedure :: checked_resolve_phi_grid => checked_resolve_phi_grid_wf_section_params
   end type
 
 contains
@@ -144,6 +148,86 @@ contains
       call this % assign_dict(optional_nonset_keys)
     end if
     call this % check_values()
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Replaces -2 placeholders with given values of *K_min* and *K_max* and checks that set values are within limits.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  impure elemental subroutine checked_resolve_Ks_wf_section_params(this, K_min, K_max)
+    class(wf_section_params), intent(inout) :: this
+    integer, intent(in) :: K_min, K_max
+
+    if (this % K(1) == -2) then
+      this % K(1) = K_min
+    else
+      call assert(this % K(1) >= K_min, 'Error: K(1) should be >= K_min')
+    end if
+
+    if (this % K(2) == -2) then
+      this % K(2) = K_max
+    else
+      call assert(this % K(2) <= K_max, 'Error: K(2) should be <= K_max')
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Replaces -2 placeholders with given values of *rho_min* and *rho_max* and checks that set values are within limits.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  impure elemental subroutine checked_resolve_rho_grid_wf_section_params(this, rho_min, rho_max)
+    class(wf_section_params), intent(inout) :: this
+    real(real64), intent(in) :: rho_min, rho_max
+
+    if (this % rho(1) .aeq. -2d0) then
+      this % rho(1) = rho_min
+    else
+      call assert(this % rho(1) .age. rho_min, 'Error: rho(1) should be >= rho_min')
+    end if
+
+    if (this % rho(2) .aeq. -2d0) then
+      this % rho(2) = rho_max
+    else
+      call assert(this % rho(2) .ale. rho_max, 'Error: rho(2) should be <= rho_max')
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Replaces -2 placeholders with given values of *theta_min* and *theta_max* and checks that set values are within limits.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  impure elemental subroutine checked_resolve_theta_grid_wf_section_params(this, theta_min, theta_max)
+    class(wf_section_params), intent(inout) :: this
+    real(real64), intent(in) :: theta_min, theta_max
+
+    if (this % theta(1) .aeq. -2d0) then
+      this % theta(1) = theta_min
+    else
+      call assert(this % theta(1) .age. theta_min, 'Error: theta(1) should be >= theta_min')
+    end if
+
+    if (this % theta(2) .aeq. -2d0) then
+      this % theta(2) = theta_max
+    else
+      call assert(this % theta(2) .ale. theta_max, 'Error: theta(2) should be <= theta_max')
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Replaces -2 placeholders with given values of *phi_min* and *phi_max* and checks that set values are within limits.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  impure elemental subroutine checked_resolve_phi_grid_wf_section_params(this, phi_min, phi_max)
+    class(wf_section_params), intent(inout) :: this
+    real(real64), intent(in) :: phi_min, phi_max
+
+    if (this % phi(1) .aeq. -2d0) then
+      this % phi(1) = phi_min
+    else
+      call assert(this % phi(1) .age. phi_min, 'Error: phi(1) should be >= phi_min')
+    end if
+
+    if (this % phi(2) .aeq. -2d0) then
+      this % phi(2) = phi_max
+    else
+      call assert(this % phi(2) .ale. phi_max, 'Error: phi(2) should be <= phi_max')
+    end if
   end subroutine
 
 end module

@@ -152,7 +152,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Parses user-provided value of `enable_terms`
+! Parses user-provided value of `enable_terms`.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_enable_terms(enable_terms_str) result(enable_terms)
     character(*), intent(in) :: enable_terms_str
@@ -168,11 +168,13 @@ contains
   subroutine assign_dict_input_params(this, config_dict)
     class(input_params), intent(inout) :: this
     class(dictionary_t) :: config_dict ! intent(in)
+    logical :: wf_sections_provided
     integer :: i
     character(:), allocatable :: next_key, K_str
     type(string), allocatable :: key_set(:)
     type(dictionary_t) :: subdict
 
+    wf_sections_provided = .false.
     ! Iterate over the keys given by user
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
@@ -224,6 +226,7 @@ contains
         case ('max_iterations')
           this % max_iterations = str2int(extract_string(config_dict, next_key))
         case ('wf_sections')
+          wf_sections_provided = .true.
           call associate(subdict, config_dict, next_key)
           this % wf_sections = parse_wf_sections(subdict)
         case ('grid_path')
@@ -246,6 +249,9 @@ contains
     ! Values whose interpretation depends on other values are initialized after the main set loop
     if (allocated(K_str)) then
       this % K = parse_K(K_str, this % J, this % parity)
+    end if
+    if (wf_sections_provided) then
+      call this % wf_sections % checked_resolve_Ks(this % K(1), this % K(2))
     end if
   end subroutine
 
