@@ -8,16 +8,15 @@ module rovib_io_mod
   use parallel_utils
   use rovib_utils_mod
   use spectrumsdt_paths_mod
-  use string_mod
   implicit none
   
 contains 
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads 1D solutions
-! solutions_1d_path - path to the file with eigenvalues and eigenvectors of 1D solutions for specific n and K
-! theta_size - number of points on theta grid
-! basis_size_1d - number of 1D basis functions used to express 1D solutions
+! Loads 1D solutions.
+! solutions_1d_path - path to the file with eigenvalues and eigenvectors of 1D solutions for specific n and K.
+! theta_size - number of points on theta grid.
+! basis_size_1d - number of 1D basis functions used to express 1D solutions.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_solutions_1D(solutions_1d_path, theta_size, basis_size_1d, num_solutions_1d, energies_1d, exp_coeffs_1d)
     character(*), intent(in) :: solutions_1d_path
@@ -42,8 +41,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads 2D solutions
-! solutions_2d_path - path to the file with 2D solutions for specific K and n
+! Loads 2D solutions.
+! solutions_2d_path - path to the file with 2D solutions for specific K and n.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_solutions_2D(solutions_2d_path, energies_2d, exp_coeffs_2d)
     character(*), intent(in) :: solutions_2d_path
@@ -63,8 +62,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads 3D energies from spec-file
-! spec_path - path to the file with 3D energies
+! Loads 3D energies from spec-file.
+! spec_path - path to the file with 3D energies.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function load_energies_3D(spec_path) result(energies_3d)
     character(*), intent(in) :: spec_path
@@ -76,7 +75,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads a 3D solution
+! Loads a 3D solution.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_solution_3D(solution_3d_path, exp_coeffs_size, exp_coeffs_3d)
     character(*), intent(in) :: solution_3d_path ! a path to the file with expansion coefficients
@@ -91,8 +90,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads 1D expansion coefficients of a specific K and sym stored at *sym_path* into *K_ind* of *num_solutions_1d* and *As*
-! N, L, M - basis size in rho, theta and phi
+! Loads 1D expansion coefficients of a specific K and sym stored at *sym_path* into *K_ind* of *num_solutions_1d* and *As*.
+! N, L, M - basis size in rho, theta and phi.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, M, num_solutions_1d, As)
     character(*), intent(in) :: sym_path
@@ -114,7 +113,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 1D expansion coefficients
+! Loads and rearranges 1D expansion coefficients.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_1D_expansion_coefficients(params, N, L, As, num_solutions_1d)
     class(input_params), intent(in) :: params
@@ -138,7 +137,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 1D expansion coefficients for use_fixed_basis_jk = 1
+! Loads and rearranges 1D expansion coefficients for use_fixed_basis_jk = 1.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
     class(input_params), intent(in) :: params
@@ -157,8 +156,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 2D expansion coefficients for a given K at *sym_path* into *K_ind* of corresponding arrays
-! N, L - number of points along rho and theta
+! Loads and rearranges 2D expansion coefficients for a given K at *sym_path* into *K_ind* of corresponding arrays.
+! N, L - number of points along rho and theta.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_2D_expansion_coefficients_K(sym_path, K_ind, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
     character(*), intent(in) :: sym_path
@@ -195,7 +194,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 2D expansion coefficients
+! Loads and rearranges 2D expansion coefficients.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_2D_expansion_coefficients(params, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
     class(input_params), intent(in) :: params
@@ -226,7 +225,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 2D expansion coefficients when use_fixed_basis_jk = 1
+! Loads and rearranges 2D expansion coefficients when use_fixed_basis_jk = 1.
 ! Bs: Outer dimensions: 2 x N x L. Inner dimensions: S_Knl x S_Kn. All coeffs of a single 2D solution should be collected over different Ls.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
@@ -253,7 +252,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 3D expansion coefficients
+! Loads and rearranges 3D expansion coefficients.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_3D_expansion_coefficients(params, N, num_solutions_2d, Cs, Cs_plain)
     class(input_params), intent(in) :: params
@@ -301,45 +300,35 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Writes results to file
+! Writes state properties to file.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine write_state_properties(params, energies, gammas, region_probs, K_dists)
+  subroutine write_state_properties(params, energies, section_probs, gammas)
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: energies(:)
-    real(real64), intent(in) :: gammas(:, :), region_probs(:, :), K_dists(:, :)
-    integer :: file_unit, i, k, K_val, col_width, cols_bar_K, cols_total
+    real(real64), intent(in) :: section_probs(:, :), gammas(:, :)
+    integer :: file_unit, i, k, col_width, cols_total
     character(:), allocatable :: sym_path, properties_result_path
-    type(string), allocatable :: titles(:)
 
     ! Sequential print
     if (get_proc_id() /= 0) then
       return
     end if
 
-    call assert(size(region_probs, 1) == size(K_dists, 1) .and. size(region_probs, 1) == size(gammas, 1), 'Sizes of input arrays have to be the same')
+    call assert(size(energies) == size(section_probs, 1) .and. size(energies) == size(gammas, 1), 'Sizes of input arrays have to be the same')
+    call assert(size(params % wf_sections) == size(section_probs, 2), 'Error: sizes of wf_sections and section_probs are inconsistent')
     sym_path = get_sym_path(params)
     properties_result_path = get_properties_result_path(sym_path)
 
-    cols_bar_K = 1 + size(gammas, 2) + size(region_probs, 2)
-    cols_total = cols_bar_K + params % J + 1
-
-    allocate(titles(cols_total))
-    titles(1:cols_bar_K) = string([character(len = 100) :: 'Energy (cm-1)', 'Gamma A (cm-1)', 'Gamma B (cm-1)', 'Covalent Sym', 'Covalent Asym', 'VdW A Sym', 'VdW A Asym', &
-        'VdW B', 'Infinity'])
-    do K_val = 0, params % J
-      titles(cols_bar_K + K_val + 1) = string('K' // num2str(K_val))
-    end do
     col_width = 25
-
+    cols_total = 1 + size(section_probs, 2) + size(gammas, 2)
     open(newunit = file_unit, file = properties_result_path)
-    do i = 1, size(titles)
-      write(file_unit, '(A)', advance = 'no') align_center(titles(i) % to_char_str(), col_width)
+    write(file_unit, '(A)', advance = 'no') align_center('Energy (cm^-1)', col_width)
+    do i = 1, size(params % wf_sections)
+      write(file_unit, '(A)', advance = 'no') align_center(params % wf_sections(i) % name, col_width)
     end do
-    ! write(file_unit, '(' // num2str(cols_total) // 'A' // num2str(col_width) // ')', advance = 'no') titles(:)
     write(file_unit, *)
-    do k = 1, size(region_probs, 1)
-      write(file_unit, '(' // num2str(cols_total) // 'G' // num2str(col_width) // '.15)', advance = 'no') energies(k), gammas(k, :), region_probs(k, :), K_dists(k, :)
-      write(file_unit, *)
+    do k = 1, size(energies)
+      write(file_unit, '(' // num2str(cols_total) // 'G' // num2str(col_width) // '.15)') energies(k), section_probs(k, :), gammas(k, :)
     end do
     close(file_unit)
   end subroutine

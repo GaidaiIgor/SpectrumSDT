@@ -14,10 +14,10 @@ module wf_section_params_mod
 
   type :: wf_section_params
     character(:), allocatable :: name
+    integer :: K(2) = -1
     real(real64) :: rho(2) = -1
     real(real64) :: theta(2) = -1
     real(real64) :: phi(2) = -1
-    integer :: K(2) = -1
 
   contains
     procedure :: assign_dict => assign_dict_wf_section_params
@@ -41,7 +41,8 @@ contains
     type(string) :: tokens(2)
 
     tokens = strsplit(range_str, '..')
-    ! Transform keywords to placeholder values
+    call tokens % trim()
+    ! Transform keywords to placeholder values to be resolved later
     if (tokens(1) == 'start') then
       tokens(1) = '-2'
     end if
@@ -56,7 +57,7 @@ contains
   subroutine assign_dict_wf_section_params(this, config_dict)
     class(wf_section_params), intent(inout) :: this
     class(dictionary_t) :: config_dict ! intent(in)
-    integer :: i
+    integer :: i, j
     character(:), allocatable :: next_key, next_value
     type(string) :: range_tokens(2)
     type(string), allocatable :: key_set(:)
@@ -68,6 +69,10 @@ contains
       select case (next_key)
         case ('name')
           this % name = next_value
+        case ('K')
+          range_tokens = parse_range(next_value)
+          this % K(1) = str2int(range_tokens(1) % to_char_str())
+          this % K(2) = str2int(range_tokens(2) % to_char_str())
         case ('rho')
           range_tokens = parse_range(next_value)
           this % rho(1) = str2real(range_tokens(1) % to_char_str())
@@ -78,12 +83,12 @@ contains
           this % theta(2) = str2real(range_tokens(2) % to_char_str())
         case ('phi')
           range_tokens = parse_range(next_value)
-          this % phi(1) = str2real(range_tokens(1) % to_char_str())
-          this % phi(2) = str2real(range_tokens(2) % to_char_str())
-        case ('K')
-          range_tokens = parse_range(next_value)
-          this % K(1) = str2int(range_tokens(1) % to_char_str())
-          this % K(2) = str2int(range_tokens(2) % to_char_str())
+          do j = 1, 2
+            this % phi(j) = str2real(range_tokens(j) % to_char_str())
+            if (.not. (this % phi(j) .aeq. -2d0)) then
+              this % phi(j) = this % phi(j) / 180 * pi
+            end if
+          end do
       end select
     end do
   end subroutine
@@ -96,10 +101,10 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'name', 'use_key_name')
+    call put_string(keys, 'K', 'start .. end')
     call put_string(keys, 'rho', 'start .. end')
     call put_string(keys, 'theta', 'start .. end')
     call put_string(keys, 'phi', 'start .. end')
-    call put_string(keys, 'K', 'start .. end')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -110,10 +115,10 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'name')
+    call put_string(keys, 'K')
     call put_string(keys, 'rho')
     call put_string(keys, 'theta')
     call put_string(keys, 'phi')
-    call put_string(keys, 'K')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -122,10 +127,10 @@ contains
   subroutine check_values_wf_section_params(this) 
     class(wf_section_params), intent(in) :: this
     ! Check of individual boundaries are performed later, when grid and K information is available
-    call assert(this % rho(1) < this % rho(2), 'Error: rho(1) should be < rho(2)')
-    call assert(this % theta(1) < this % theta(2), 'Error: theta(1) should be < theta(2)')
-    call assert(this % phi(1) < this % phi(2), 'Error: phi(1) should be < phi(2)')
-    call assert(this % K(1) <= this % K(2), 'Error: K(1) should be <= K(2)')
+    call assert(any(this % K == -2) .or. this % K(1) <= this % K(2), 'Error: K(1) should be <= K(2)')
+    call assert(any(this % rho .aeq. -2d0) .or. this % rho(1) < this % rho(2), 'Error: rho(1) should be < rho(2)')
+    call assert(any(this % theta .aeq. -2d0) .or. this % theta(1) < this % theta(2), 'Error: theta(1) should be < theta(2)')
+    call assert(any(this % phi .aeq. -2d0) .or. this % phi(1) < this % phi(2), 'Error: phi(1) should be < phi(2)')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

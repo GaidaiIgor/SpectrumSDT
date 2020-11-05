@@ -27,12 +27,13 @@ module string_mod
     procedure :: to_complex
     procedure :: length
     procedure :: substr
+    procedure :: trim => trim_string
   end type
   
 contains
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes string
+! Writes string.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine write_string(this, unit, iotype, v_list, iostat, iomsg)
     class(string), intent(in) :: this
@@ -45,7 +46,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Compares with char str
+! Compares string with char str.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function compare_char_str(this, char_str) result(res)
     class(string), intent(in) :: this
@@ -55,7 +56,7 @@ contains
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Compares two strings
+! Compares two strings.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   elemental function compare_string(this, other) result(res)
     class(string), intent(in) :: this, other
@@ -64,7 +65,7 @@ contains
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string type to char string
+! Converts string type to char string.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   function to_char_str(this) result(char_str)
     class(string), intent(in) :: this
@@ -73,7 +74,7 @@ contains
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string to int
+! Converts string to integer.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function to_integer(this) result(res)
     class(string), intent(in) :: this
@@ -85,7 +86,7 @@ contains
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string to real
+! Converts string to real.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function to_real(this) result(res)
     class(string), intent(in) :: this
@@ -97,7 +98,7 @@ contains
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string to real
+! Converts string to complex.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental function to_complex(this) result(res)
     class(string), intent(in) :: this
@@ -109,7 +110,7 @@ contains
   end function
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Length of string
+! Returns length of string.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   elemental function length(this) result(res)
     class(string), intent(in) :: this
@@ -118,7 +119,7 @@ contains
   end function
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Substring
+! Takes substring.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   elemental function substr(this, start, end) result(res)
     class(string), intent(in) :: this
@@ -150,7 +151,7 @@ contains
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Asssigns a char string
+! Asssigns a char string.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   elemental subroutine assign_char_str(this, char_str)
     type(string), intent(inout) :: this
@@ -159,7 +160,7 @@ contains
   end subroutine
   
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Assigns a char string array
+! Assigns a char string array.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assign_char_str_array(array_lhs, array_rhs)
     type(string), allocatable, intent(out) :: array_lhs(:)
@@ -171,7 +172,7 @@ contains
   end subroutine
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Joins strings from a string array (arr) into a single (char_str). (join_str) specifies what string separates the strings in (arr)
+! Joins strings from a string array (arr) into a single (char_str). (join_str) specifies what string separates the strings in (arr).
 !---------------------------------------------------------------------------------------------------------------------------------------------
   function string_arr_to_char_str(arr, join_str) result(char_str)
     class(string), intent(in) :: arr(:)
@@ -186,5 +187,13 @@ contains
       char_str = char_str // join_str_act // arr(i) % to_char_str()
     end do
   end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Trims string, both left and right.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  elemental subroutine trim_string(this)
+    class(string), intent(inout) :: this
+    this % s = trim(adjustl(this % s))
+  end subroutine
 
 end module

@@ -52,7 +52,7 @@ module dict_char_str_mod
     integer :: str_len
     character(:), allocatable :: key_size
     type(dictionary_t) :: pair
-    
+
     call associate(pair, dict, key)
     key_size = get_key_size_name(key)
     call assign(str_len, pair, key_size)

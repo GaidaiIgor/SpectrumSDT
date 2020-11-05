@@ -1,10 +1,11 @@
 program spectrumsdt
   use cap_mod, only: init_caps, get_real_cap
   use config_mod, only: read_config_dict
+  use constants, only: pi
   use debug_tools
   use dict_utils, only: extract_string, item_or_default
   use dictionary
-  use general_vars, only: mu, g1, g2, g3, init_masses, init_grids
+  use general_vars, only: mu, g1, g2, init_masses, init_grids
   use input_params_mod, only: input_params
   use iso_fortran_env, only: real64
   use mpi
@@ -42,10 +43,10 @@ program spectrumsdt
   if (params % stage == 'eigencalc' .or. params % stage == 'properties') then
     call init_caps(params)
   end if
-  if (params % stage == 'propeties') then
+  if (params % stage == 'properties') then
     call params % wf_sections % checked_resolve_rho_grid(g1(1), g1(size(g1)))
     call params % wf_sections % checked_resolve_theta_grid(g2(1), g2(size(g2)))
-    call params % wf_sections % checked_resolve_phi_grid(g3(1), g3(size(g3)))
+    call params % wf_sections % checked_resolve_phi_grid(0d0, 2*pi)
   end if
   call process_stage(params)
 
@@ -80,9 +81,9 @@ contains
 
       case ('properties')
         if (params % cap_type /= 'none') then
-          call calculate_state_properties(params, g1, size(g2), get_real_cap())
+          call calculate_state_properties(params, g1, g2, get_real_cap())
         else
-          call calculate_state_properties(params, g1, size(g2))
+          call calculate_state_properties(params, g1, g2)
         end if
     end select
     call print_parallel('Done')

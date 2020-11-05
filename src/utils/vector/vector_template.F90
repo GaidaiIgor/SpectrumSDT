@@ -12,26 +12,27 @@ type CONCAT2(vector_,TEMPLATE_TYPE_NAME)
   TEMPLATE_TYPE_OUT, allocatable :: storage(:)
 
 contains
-  procedure, pass :: push => CONCAT2(push_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: push_all => CONCAT2(push_all_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: append_vector => CONCAT2(append_vector_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: clear => CONCAT2(clear_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: get => CONCAT2(get_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: set => CONCAT2(set_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: get_size => CONCAT2(get_size_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: reverse => CONCAT2(reverse_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: to_array => CONCAT2(to_array_,TEMPLATE_TYPE_NAME)
-  procedure, pass :: to_existing_array => CONCAT2(to_existing_array_,TEMPLATE_TYPE_NAME)
+  procedure :: push => CONCAT2(push_,TEMPLATE_TYPE_NAME)
+  procedure :: push_all => CONCAT2(push_all_,TEMPLATE_TYPE_NAME)
+  procedure :: append_vector => CONCAT2(append_vector_,TEMPLATE_TYPE_NAME)
+  procedure :: clear => CONCAT2(clear_,TEMPLATE_TYPE_NAME)
+  procedure :: get => CONCAT2(get_,TEMPLATE_TYPE_NAME)
+  procedure :: top => CONCAT2(top_,TEMPLATE_TYPE_NAME)
+  procedure :: set => CONCAT2(set_,TEMPLATE_TYPE_NAME)
+  procedure :: get_size => CONCAT2(get_size_,TEMPLATE_TYPE_NAME)
+  procedure :: reverse => CONCAT2(reverse_,TEMPLATE_TYPE_NAME)
+  procedure :: to_array => CONCAT2(to_array_,TEMPLATE_TYPE_NAME)
+  procedure :: to_existing_array => CONCAT2(to_existing_array_,TEMPLATE_TYPE_NAME)
   
-  procedure, pass :: write => CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)
+  procedure :: write => CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)
   generic :: write(formatted) => write
 end type
 
 contains
 
-!-----------------------------------------------------------------------
-! Init
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Initializes a new instance.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 elemental function CONCAT2(new_vector_,TEMPLATE_TYPE_NAME)(initial_capacity, resize_factor) result(new_instance)
   integer, optional, intent(in) :: initial_capacity, resize_factor
   integer :: initial_capacity_act, resize_factor_act
@@ -44,9 +45,9 @@ elemental function CONCAT2(new_vector_,TEMPLATE_TYPE_NAME)(initial_capacity, res
   allocate(new_instance % storage(initial_capacity_act))
 end function
 
-!-----------------------------------------------------------------------
-! Push a value
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Pushes a value to vector.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(push_,TEMPLATE_TYPE_NAME)(this, value)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE, intent(in) :: value
@@ -62,9 +63,9 @@ subroutine CONCAT2(push_,TEMPLATE_TYPE_NAME)(this, value)
   this % storage(this % size) = value
 end subroutine
 
-!-----------------------------------------------------------------------
-! Pushes all elements
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calls push for all elements of *array*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(push_all_,TEMPLATE_TYPE_NAME)(this, array)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE, intent(in) :: array(:)
@@ -75,9 +76,9 @@ subroutine CONCAT2(push_all_,TEMPLATE_TYPE_NAME)(this, array)
   end do
 end subroutine
 
-!-----------------------------------------------------------------------
-! Appends another vector
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Appends another vector.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(append_vector_,TEMPLATE_TYPE_NAME)(this, other)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this, other
   integer :: i
@@ -87,17 +88,17 @@ subroutine CONCAT2(append_vector_,TEMPLATE_TYPE_NAME)(this, other)
   end do
 end subroutine
 
-!-----------------------------------------------------------------------
-! Clears
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Clears vector.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(clear_,TEMPLATE_TYPE_NAME)(this)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)), intent(inout) :: this
   this % size = 0
 end subroutine
 
-!-----------------------------------------------------------------------
-! Get a value
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns a value at a given *index*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 function CONCAT2(get_,TEMPLATE_TYPE_NAME)(this, index) result(res)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   integer, intent(in) :: index
@@ -105,9 +106,18 @@ function CONCAT2(get_,TEMPLATE_TYPE_NAME)(this, index) result(res)
   res = this % storage(index)
 end function
 
-!-----------------------------------------------------------------------
-! Set an element equal to a value
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns the last added value.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+function CONCAT2(top_,TEMPLATE_TYPE_NAME)(this) result(res)
+  class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
+  TEMPLATE_TYPE_OUT :: res
+  res = this % storage(this % get_size())
+end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Sets a value at a given *index* to *value*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(set_,TEMPLATE_TYPE_NAME)(this, index, value)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   integer, intent(in) :: index
@@ -115,26 +125,26 @@ subroutine CONCAT2(set_,TEMPLATE_TYPE_NAME)(this, index, value)
   this % storage(index) = value
 end subroutine
 
-!-----------------------------------------------------------------------
-! Returns size
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns number of elements in this vector.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 function CONCAT2(get_size_,TEMPLATE_TYPE_NAME)(this) result(res)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   integer :: res
   res = this % size
 end function
 
-!-----------------------------------------------------------------------
-! Reverses the content of this vector
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Reverses the order of content of this vector.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(reverse_,TEMPLATE_TYPE_NAME)(this)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   this % storage(1:this % size) = this % storage(this % size:1:-1)
 end subroutine
 
-!-----------------------------------------------------------------------
-! Converts vector into plain array
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts vector into plain array.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 function CONCAT2(to_array_,TEMPLATE_TYPE_NAME)(this) result(array)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE_OUT, allocatable :: array(:)
@@ -143,9 +153,9 @@ function CONCAT2(to_array_,TEMPLATE_TYPE_NAME)(this) result(array)
   array = this % storage(1:this % get_size())
 end function
 
-!-----------------------------------------------------------------------
-! Moves vector content into an existing array
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Moves vector content into an existing *array*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(to_existing_array_,TEMPLATE_TYPE_NAME)(this, array)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this
   TEMPLATE_TYPE_OUT, allocatable, intent(inout) :: array(:)
@@ -157,7 +167,7 @@ subroutine CONCAT2(to_existing_array_,TEMPLATE_TYPE_NAME)(this, array)
 end subroutine
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes
+! Vector writing procedure.
 !---------------------------------------------------------------------------------------------------------------------------------------------
 subroutine CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list, iostat, iomsg)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)), intent(in) :: this
@@ -172,4 +182,4 @@ subroutine CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list,
     write(unit, *) this % get(i), ','
   end do
   write(unit, *) this % get(this % get_size())
-end
+end subroutine

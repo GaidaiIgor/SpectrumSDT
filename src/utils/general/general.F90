@@ -69,7 +69,7 @@ contains
     npointsf = (end - start) / step
     npoints = int(npointsf)
     ! If the last step is complete up to comparison accuracy
-    if (compare_reals(npointsf - npoints, 1.d0) == 0) then
+    if ((npointsf - npoints) .aeq. 1d0) then
       npoints = npoints + 1
     end if
 
@@ -112,10 +112,10 @@ contains
     end if
 
     progress_step_act = iff(present(progress_step), progress_step, 0.1d0)
-    if (compare_reals(progress, last_progress + progress_step_act) >= 0) then
+    if (progress .age. (last_progress + progress_step_act)) then
       last_progress = real2int(progress / progress_step_act) * progress_step_act
       write(*, '(A,1x,F6.2,A)', advance = 'no') carriage_return, last_progress * 100, '% done'
-      if (compare_reals(last_progress, 1d0) == 0) then
+      if (last_progress .aeq. 1d0) then
         print *
       end if
     end if

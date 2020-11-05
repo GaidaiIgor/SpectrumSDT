@@ -1,9 +1,10 @@
 #include "funcs.macro"
-implicit none
+  implicit none
+
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! returns arg if it's present, otherwise default
+! Returns arg if it's present, otherwise default.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   pure TEMPLATE_ELEMENTAL function CONCAT2(arg_or_default_,TEMPLATE_TYPE_NAME)(arg, default) result(res)
     TEMPLATE_TYPE, intent(in), optional :: arg
@@ -18,7 +19,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Swaps numbers
+! Swaps numbers.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(swap_,TEMPLATE_TYPE_NAME)(a, b)
     TEMPLATE_TYPE_OUT, intent(inout) :: a, b
@@ -30,7 +31,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Ternary if operator
+! Ternary if operator.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   pure function CONCAT2(iff_,TEMPLATE_TYPE_NAME)(condition, true_res, false_res) result(res)
     logical, intent(in) :: condition

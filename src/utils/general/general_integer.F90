@@ -2,7 +2,7 @@ module general_integer_mod
 #include "type_list.macro"
 #define TYPE_ID INTEGER_ID
 #include "type_attributes.macro"
-use general_char_str_mod
+  use general_char_str_mod
 #include "general_template.F90"
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

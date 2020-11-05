@@ -31,7 +31,6 @@ set(rovib_utils_base ${prefix}/src/utils/rovib_utils_base.f90)
 set(debug_tools_base ${prefix}/src/base/debug_tools_base.f90)
 set(fourier_transform ${constants} ${general_utils} ${prefix}/src/utils/fourier_transform.f90)
 set(formulas ${constants} ${general_utils} ${prefix}/src/base/formulas.f90)
-set(algorithms ${general_utils} ${prefix}/src/utils/algorithms.f90)
 set(parallel_utils ${algorithms} ${general_utils} ${prefix}/src/utils/parallel.f90)
 set(string ${general_utils} ${prefix}/src/utils/string/string.f90)
 
@@ -48,6 +47,10 @@ set(vector_array_1d_integer ${general_utils} ${array_1d_integer} ${prefix}/src/u
 set(vector_array_1d_real ${general_utils} ${array_1d_real} ${prefix}/src/utils/vector/vector_array_1d_real.F90)
 set(vector_array_1d_complex ${general_utils} ${array_1d_complex} ${prefix}/src/utils/vector/vector_array_1d_complex.F90)
 set(vector ${vector_integer} ${vector_real} ${vector_complex} ${vector_string} ${vector_vector_integer} ${vector_vector_real} ${vector_array_1d_integer} ${vector_array_1d_real} ${vector_array_1d_complex} ${prefix}/src/utils/vector/vector.f90)
+
+set(algorithms_integer ${general_utils} ${vector} ${prefix}/src/utils/algorithms/algorithms_integer.F90)
+set(algorithms_real ${general_utils} ${vector} ${prefix}/src/utils/algorithms/algorithms_real.F90)
+set(algorithms ${algorithms_integer} ${algorithms_real} ${prefix}/src/utils/algorithms/algorithms.f90)
 
 set(array_1d ${array_1d_real} ${array_1d_integer} ${array_1d_complex} ${prefix}/src/utils/array_1d/array_1d.F90)
 set(array_2d_real ${prefix}/src/utils/array_2d/array_2d_real.F90)
@@ -71,7 +74,7 @@ set(config ${dict_utils} ${general_utils} ${io_utils} ${parallel_utils} ${string
 set(grid_params ${config} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/grid_params.f90)
 set(optgrid_params ${config} ${dict_utils} ${grid_params} ${string} ${prefix}/src/base/input_params/optgrid_params.f90)
 set(wf_section_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/wf_section_params.f90)
-set(input_params ${config} ${constants} ${dict_utils} ${general_utils} ${grid_params} ${optgrid_params} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
+set(input_params ${algorithms} ${config} ${constants} ${dict_utils} ${general_utils} ${grid_params} ${optgrid_params} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
 
 set(debug_tools ${debug_tools_base} ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/utils/rovib_utils.f90)
@@ -83,18 +86,18 @@ set(potential ${formulas} ${input_params} ${general_vars} ${spectrumsdt_paths} $
 set(block_borders ${prefix}/src/base/hamiltonian/block_borders.f90)
 set(matrix_block_info ${block_borders} ${general_utils} ${prefix}/src/base/hamiltonian/matrix_block_info.f90)
 set(k_block_info ${algorithms} ${io_utils} ${matrix_block_info} ${prefix}/src/base/hamiltonian/k_block_info.f90)
-set(rovib_io ${array_1d} ${array_2d} ${constants} ${io_utils} ${input_params} ${parallel_utils} ${rovib_utils} ${spectrumsdt_paths} ${string} ${prefix}/src/rovib/rovib_io.f90)
+set(rovib_io ${array_1d} ${array_2d} ${constants} ${io_utils} ${input_params} ${parallel_utils} ${rovib_utils} ${spectrumsdt_paths} ${prefix}/src/rovib/rovib_io.f90)
 set(overlaps_extra ${array_1d} ${array_2d} ${formulas} ${input_params} ${k_block_info} ${path_utils} ${parallel_utils} ${rovib_io} ${prefix}/src/rovib/overlaps_extra.f90)
 set(distributed_rovib_hamiltonian ${block_borders} ${general_utils} ${formulas} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${rovib_utils} ${spectrumsdt_paths} ${prefix}/src/base/hamiltonian/distributed_rovib_hamiltonian.f90)
 set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_block_info} ${prefix}/src/base/eigencalc/matmul_operator.f90)
-set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${input_params} ${parallel_utils} ${path_utils} ${rovib_io} ${rovib_utils} ${prefix}/src/base/state_properties.f90)
+set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${input_params} ${parallel_utils} ${path_utils} ${rovib_io} ${rovib_utils} ${vector} ${prefix}/src/base/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${prefix}/src/base/eigencalc/slepc_solver.F90)
 set(lapack_interface ${general_utils} ${prefix}/src/interface/lapack.f90)
 set(sdt ${constants} ${fourier_transform} ${general_vars} ${input_params} ${lapack_interface} ${parallel_utils} ${potential} ${spectrumsdt_paths} ${prefix}/src/base/sdt.f90)
 set(spectrum ${cap} ${constants} ${general_utils} ${general_vars} ${input_params} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.f90)
 set(grids ${config} ${constants} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.f90)
 
-set(spectrumsdt ${cap} ${config} ${debug_tools} ${dict_utils} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
+set(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${dict_utils} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
 
 # Disable all warnings and standard conformation checks for external sources
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")

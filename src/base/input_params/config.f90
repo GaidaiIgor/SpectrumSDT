@@ -23,11 +23,12 @@ contains
     integer, intent(in) :: file_unit, recursion_level
     integer, intent(inout) :: line_num
     type(dictionary_t) :: dict
-    integer :: iostat
+    integer :: iostat, dict_count
     character(:), allocatable :: line, key, value
     type(string), allocatable :: line_tokens(:)
     type(dictionary_t) :: inner_dict
     
+    dict_count = 0
     do
       line_num = line_num + 1
       line = read_line(file_unit, iostat)
@@ -37,7 +38,8 @@ contains
       end if 
       
       line_tokens = strsplit(line, '!') ! separate inline comments
-      line = trim(line_tokens(1) % to_char_str())
+      line = trim(adjustl(line_tokens(1) % to_char_str()))
+
       if (line == '') then
         ! skip empty/commented lines
         cycle 
@@ -57,6 +59,11 @@ contains
       if (value == '{') then
         ! new inner dict
         inner_dict = read_inner_dict(file_unit, recursion_level + 1, line_num)
+        dict_count = dict_count + 1
+        if (recursion_level > 1) then
+          ! remember subdict order in config
+          call extend(inner_dict, ('dict_index' .kv. dict_count))
+        end if
         dict = dict // (key .kvp. inner_dict) ! add inner dict to outer dict
       else
         call put_string(dict, key, value)

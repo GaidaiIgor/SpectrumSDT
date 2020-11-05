@@ -2,7 +2,7 @@
 ! Procedures related to information about K-blocks
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module k_block_info
-  use algorithms
+  use algorithms_mod
   use io_utils
   use matrix_block_info_mod
   implicit none

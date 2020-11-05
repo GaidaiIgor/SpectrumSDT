@@ -1,4 +1,5 @@
 module input_params_mod
+  use algorithms_mod
   use config_mod
   use constants
   use dictionary
@@ -135,14 +136,25 @@ contains
     class(dictionary_t) :: dict ! intent(in)
     type(wf_section_params), allocatable :: wf_sections(:)
     integer :: i
+    integer, allocatable :: section_indices(:), key_order(:)
     character(:), allocatable :: next_key
     type(string), allocatable :: key_set(:)
     type(dictionary_t) :: subdict
 
     key_set = get_key_set(dict)
-    allocate(wf_sections(size(key_set)))
+    allocate(section_indices(size(key_set)))
+    ! We need to iterate the sections in order they were given.
+    ! Order of keys in dict can be arbitrary, so we need to use dict index stored from parsing.
     do i = 1, size(key_set)
-      next_key = key_set(i) % to_char_str()
+      call associate(subdict, dict, key_set(i) % to_char_str())
+      call assign(section_indices(i), subdict, 'dict_index')
+      call nullify(subdict, 'dict_index')
+    end do
+    section_indices = bubble_sort(section_indices, index_permutation = key_order)
+
+    allocate(wf_sections(size(key_set)))
+    do i = 1, size(key_order)
+      next_key = key_set(key_order(i)) % to_char_str()
       call associate(subdict, dict, next_key)
       call wf_sections(i) % checked_init(subdict)
       if (wf_sections(i) % name == 'use_key_name') then
@@ -210,7 +222,7 @@ contains
         case ('basis_size_phi')
           this % basis_size_phi = str2int(extract_string(config_dict, next_key))
         case ('cutoff_energy')
-          this % cutoff_energy = str2real(extract_string(config_dict, next_key))
+          this % cutoff_energy = str2real(extract_string(config_dict, next_key)) / au_to_wn
         case ('basis_root_path')
           this % basis_root_path = extract_string(config_dict, next_key)
         case ('basis_J')

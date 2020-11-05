@@ -1,5 +1,5 @@
 module parallel_utils
-  use algorithms
+  use algorithms_mod
   use general_utils
   use iso_fortran_env, only: real64
   use mpi
