@@ -14,6 +14,7 @@ module wf_section_params_mod
 
   type :: wf_section_params
     character(:), allocatable :: name
+    character(:), allocatable :: stat
     integer :: K(2) = -1
     real(real64) :: rho(2) = -1
     real(real64) :: theta(2) = -1
@@ -69,6 +70,8 @@ contains
       select case (next_key)
         case ('name')
           this % name = next_value
+        case ('stat')
+          this % stat = next_value
         case ('K')
           range_tokens = parse_range(next_value)
           this % K(1) = str2int(range_tokens(1) % to_char_str())
@@ -101,6 +104,7 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'name', 'use_key_name')
+    call put_string(keys, 'stat', 'probability')
     call put_string(keys, 'K', 'start .. end')
     call put_string(keys, 'rho', 'start .. end')
     call put_string(keys, 'theta', 'start .. end')
@@ -115,6 +119,7 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'name')
+    call put_string(keys, 'stat')
     call put_string(keys, 'K')
     call put_string(keys, 'rho')
     call put_string(keys, 'theta')
@@ -126,6 +131,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_wf_section_params(this) 
     class(wf_section_params), intent(in) :: this
+    call assert(any(this % stat == [character(100) :: 'probability', 'gamma']), 'Error: stat can be probability or gamma')
     ! Check of individual boundaries are performed later, when grid and K information is available
     call assert(any(this % K == -2) .or. this % K(1) <= this % K(2), 'Error: K(1) should be <= K(2)')
     call assert(any(this % rho .aeq. -2d0) .or. this % rho(1) < this % rho(2), 'Error: rho(1) should be < rho(2)')

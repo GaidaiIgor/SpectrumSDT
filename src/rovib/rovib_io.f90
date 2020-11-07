@@ -27,7 +27,7 @@ contains
     integer :: i, file_unit
 
     allocate(num_solutions_1d(theta_size), energies_1d(theta_size), exp_coeffs_1d(theta_size))
-    open(newunit=file_unit, file=solutions_1d_path, form='unformatted')
+    open(newunit = file_unit, file = solutions_1d_path, form = 'unformatted')
     read(file_unit) num_solutions_1d
     do i = 1, theta_size
       if (num_solutions_1d(i) == 0) then
@@ -50,7 +50,7 @@ contains
     real(real64), allocatable, intent(out) :: exp_coeffs_2d(:, :) ! 2D solutions expansion coefficients over 1D solutions
     integer :: file_unit, num_solutions, exp_size ! exp_size - number of coefficients in the basis expansion over 1D solutions
 
-    open(newunit=file_unit, file=solutions_2d_path, form='unformatted')
+    open(newunit = file_unit, file = solutions_2d_path, form = 'unformatted')
     read(file_unit) num_solutions, exp_size
     if (num_solutions == 0) then
       return ! Exit right away, if empty
@@ -62,19 +62,6 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads 3D energies from spec-file.
-! spec_path - path to the file with 3D energies.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_energies_3D(spec_path) result(energies_3d)
-    character(*), intent(in) :: spec_path
-    real(real64), allocatable :: energies_3d(:)
-    real(real64), allocatable :: file_content(:, :)
-
-    file_content = read_matrix_real(spec_path)
-    energies_3d = file_content(:, 2)
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads a 3D solution.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_solution_3D(solution_3d_path, exp_coeffs_size, exp_coeffs_3d)
@@ -84,7 +71,7 @@ contains
     integer :: file_unit
 
     allocate(exp_coeffs_3d(exp_coeffs_size))
-    open(newunit=file_unit, file=solution_3d_path, form='unformatted')
+    open(newunit = file_unit, file = solution_3d_path, form = 'unformatted')
     read(file_unit) exp_coeffs_3d
     close(file_unit)
   end subroutine
@@ -302,34 +289,48 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Writes state properties to file.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine write_state_properties(params, energies, section_probs, gammas)
+  subroutine write_state_properties(params, eigenvalues_3D, section_stats)
     class(input_params), intent(in) :: params
-    real(real64), intent(in) :: energies(:)
-    real(real64), intent(in) :: section_probs(:, :), gammas(:, :)
-    integer :: file_unit, i, k, col_width, cols_total
-    character(:), allocatable :: sym_path, properties_result_path
+    real(real64), intent(in) :: eigenvalues_3D(:, :), section_stats(:, :)
+    integer :: file_unit, i, j, col_width, num_digits
+    real(real64) :: next_output
+    character(:), allocatable :: sym_path, properties_result_path, format_string
 
     ! Sequential print
     if (get_proc_id() /= 0) then
       return
     end if
 
-    call assert(size(energies) == size(section_probs, 1) .and. size(energies) == size(gammas, 1), 'Sizes of input arrays have to be the same')
-    call assert(size(params % wf_sections) == size(section_probs, 2), 'Error: sizes of wf_sections and section_probs are inconsistent')
+    call assert(size(eigenvalues_3D, 1) == size(section_stats, 1), 'Error: sizes of input arrays have to be the same')
+    call assert(size(params % wf_sections) == size(section_stats, 2), 'Error: sizes of wf_sections and section_stats are inconsistent')
     sym_path = get_sym_path(params)
     properties_result_path = get_properties_result_path(sym_path)
 
     col_width = 25
-    cols_total = 1 + size(section_probs, 2) + size(gammas, 2)
+    num_digits = 15
+    format_string = 'G' // num2str(col_width) // '.' // num2str(num_digits)
     open(newunit = file_unit, file = properties_result_path)
-    write(file_unit, '(A)', advance = 'no') align_center('Energy (cm^-1)', col_width)
-    do i = 1, size(params % wf_sections)
-      write(file_unit, '(A)', advance = 'no') align_center(params % wf_sections(i) % name, col_width)
+
+    ! Write header
+    write(file_unit, '(2A)', advance = 'no') align_center('Energy (cm^-1)', col_width), align_center('Total Gamma (cm^-1)', col_width)
+    do j = 1, size(params % wf_sections)
+      write(file_unit, '(A)', advance = 'no') align_center(params % wf_sections(j) % name, col_width)
     end do
     write(file_unit, *)
-    do k = 1, size(energies)
-      write(file_unit, '(' // num2str(cols_total) // 'G' // num2str(col_width) // '.15)') energies(k), section_probs(k, :), gammas(k, :)
+
+    ! Write values
+    do i = 1, size(eigenvalues_3D, 1)
+      write(file_unit, '(2' // format_string // ')', advance = 'no') eigenvalues_3D(i, :)
+      do j = 1, size(params % wf_sections)
+        next_output = section_stats(i, j)
+        if (params % wf_sections(j) % stat == 'gamma') then
+          next_output = next_output * au_to_wn
+        end if
+        write(file_unit, '(' // format_string // ')', advance = 'no') next_output
+      end do
+      write(file_unit, *)
     end do
+
     close(file_unit)
   end subroutine
 

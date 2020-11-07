@@ -8,7 +8,7 @@ implicit none
 contains
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Reads matrix from file
+! Reads matrix from file.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(read_matrix_,TEMPLATE_TYPE_NAME)(file_path) result(matrix)
     character(*), intent(in) :: file_path
@@ -37,7 +37,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Writes *array* to *unit*
+! Writes *array* to *unit*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(write_array_unit_,TEMPLATE_TYPE_NAME)(array, unit, vertical)
     TEMPLATE_TYPE, intent(in) :: array(:)
@@ -54,7 +54,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Writes *array* to *file_name*, or screen if not specified
+! Writes *array* to *file_name*, or screen if not specified.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(write_array_,TEMPLATE_TYPE_NAME)(array, file_name, append, vertical)
     TEMPLATE_TYPE, intent(in) :: array(:)
@@ -70,8 +70,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Writes *matrix* to *file_name*, or screen if not specified
-! If *print_size* == 1 then size of the matrix is printed on the first line
+! Writes *matrix* to *file_name*, or screen if not specified.
+! If *print_size* == 1 then size of the matrix is printed on the first line.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(write_matrix_,TEMPLATE_TYPE_NAME)(matrix, file_name, append, print_size)
     TEMPLATE_TYPE, intent(in) :: matrix(:, :)
@@ -93,7 +93,7 @@ contains
   end subroutine
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes a matrix in binary form to the specified file
+! Writes a matrix in binary form to the specified file.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(read_binary_array_,TEMPLATE_TYPE_NAME)(file_path) result(matrix)
     character(*), intent(in) :: file_path
@@ -108,7 +108,7 @@ contains
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes a matrix in binary form to the specified file
+! Writes a matrix in binary form to the specified file.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(read_binary_matrix_,TEMPLATE_TYPE_NAME)(file_path) result(matrix)
     character(*), intent(in) :: file_path
@@ -123,7 +123,7 @@ contains
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes a matrix in binary form to the specified file
+! Writes a matrix in binary form to the specified file.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(write_binary_array_,TEMPLATE_TYPE_NAME)(matrix, file_path)
     TEMPLATE_TYPE, intent(in) :: matrix(:)
@@ -137,7 +137,7 @@ contains
   end subroutine
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes a matrix in binary form to the specified file
+! Writes a matrix in binary form to the specified file.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(write_binary_matrix_,TEMPLATE_TYPE_NAME)(matrix, file_path)
     TEMPLATE_TYPE, intent(in) :: matrix(:, :)

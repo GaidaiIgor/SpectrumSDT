@@ -195,85 +195,86 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates total probability of k-th state, for all specified wave function sections in *wf_sections_dist_ind*.
-! *p_dist_k* - probability of k-th state in each region defined by user borders.
-! *wf_sections_dist_ind* - processed wf_sections, where borders are mapped to p_dist indices.
+! Returns true if one of the sections requests gamma statistics.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_wf_section_probabilities(p_dist_k, wf_sections_dist_inds) result(section_probs)
-    real(real64), intent(in) :: p_dist_k(:, :, :, :)
-    integer, intent(in) :: wf_sections_dist_inds(:, :, :)
-    real(real64) :: section_probs(size(wf_sections_dist_inds, 1))
+  function is_gamma_requested(params) result(gamma_requested)
+    class(input_params), intent(in) :: params
+    integer :: gamma_requested
     integer :: i
 
-    associate(p => wf_sections_dist_inds)
-      do i = 1, size(section_probs)
-        section_probs(i) = sum(p_dist_k(p(i, 1, 1):p(i, 1, 2), p(i, 2, 1):p(i, 2, 2), p(i, 3, 1):p(i, 3, 2), p(i, 4, 1):p(i, 4, 2)))
+    gamma_requested = 0
+    do i = 1, size(params % wf_sections)
+      if (params % wf_sections(i) % stat == 'gamma') then
+        gamma_requested = 1
+        exit
+      end if
+    end do
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates all statistics of k-th state, for all specified wave function sections in *wf_sections_dist_ind*.
+! *p_dist_k* - probability of k-th state in each region defined by user borders.
+! *wf_sections_dist_ind* - processed wf_sections, where borders are mapped to p_dist indices.
+! *gamma_requested* - 1 if any of the sections request gamma statistics.
+! *cap* - CAP for calculation of gamma statistics.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function calculate_wf_sections_statistics(params, p_dist_k, wf_sections_dist_inds, gamma_requested, cap) result(section_stats)
+    class(input_params), intent(in) :: params
+    real(real64), target, intent(in) :: p_dist_k(:, :, :, :)
+    integer, intent(in) :: wf_sections_dist_inds(:, :, :)
+    integer, intent(in) :: gamma_requested
+    real(real64), optional, intent(in) :: cap(:)
+    real(real64) :: section_stats(size(params % wf_sections))
+    integer :: i
+    real(real64), allocatable, target :: p_dist_k_gamma(:, :, :, :)
+    real(real64), pointer :: p_dist_ptr(:, :, :, :)
+
+    ! We want to avoid computing an extra array if none of the sections actually needs it.
+    if (gamma_requested == 1) then
+      call assert(present(cap), 'Error: cap has to be provided for gamma calculations')
+      p_dist_k_gamma = p_dist_k
+      do i = 1, size(cap)
+        p_dist_k_gamma(:, i, :, :) = p_dist_k_gamma(:, i, :, :) * 2 * cap(i) ! *2 because of gamma definition
       end do
-    end associate
+    end if
+
+    do i = 1, size(params % wf_sections)
+      select case (params % wf_sections(i) % stat)
+        case ('probability')
+          p_dist_ptr => p_dist_k
+        case ('gamma')
+          p_dist_ptr => p_dist_k_gamma
+      end select
+
+      associate(w => wf_sections_dist_inds)
+        section_stats(i) = sum(p_dist_ptr(w(i, 1, 1):w(i, 1, 2), w(i, 2, 1):w(i, 2, 2), w(i, 3, 1):w(i, 3, 2), w(i, 4, 1):w(i, 4, 2)))
+      end associate
+    end do
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calls calculate_wf_section_probabilities for all states in parallel and gathers results.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_wf_section_probabilities_all(params, p_dist, wf_sections_dist_inds, section_probs)
+  subroutine calculate_wf_sections_statistics_all(params, p_dist, wf_sections_dist_inds, cap, section_probs)
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: p_dist(:, :, :, :, :) ! state x sizes of all sections in order K, rho, theta, phi
     integer, intent(in) :: wf_sections_dist_inds(:, :, :)
+    real(real64), optional, intent(in) :: cap(:)
     real(real64), allocatable, intent(out) :: section_probs(:, :)
-    integer :: proc_first_state, proc_states, proc_k
+    integer :: proc_first_state, proc_states, proc_k, gamma_requested
     integer, allocatable :: recv_counts(:), recv_shifts(:)
     real(real64), allocatable :: section_probs_chunk(:, :)
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
     ! Calculate local chunks
     allocate(section_probs_chunk(proc_states, size(params % wf_sections)))
+    gamma_requested = is_gamma_requested(params)
     do proc_k = 1, proc_states
-      section_probs_chunk(proc_k, :) = calculate_wf_section_probabilities(p_dist(proc_k, :, :, :, :), wf_sections_dist_inds)
+      section_probs_chunk(proc_k, :) = calculate_wf_sections_statistics(params, p_dist(proc_k, :, :, :, :), wf_sections_dist_inds, gamma_requested, cap)
     end do
     call gather_chunks(section_probs_chunk, recv_counts, recv_shifts, section_probs)
   end subroutine
 
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-! ! Calculates channel-specific values of gamma using probability distributions of a given state.
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-!   function calculate_gamma_channels(p_dist_k, cap) result(gammas)
-!     real(real64), intent(in) :: p_dist_k(:, :, :) ! K x n x 3
-!     real(real64), intent(in) :: cap(:)
-!     real(real64) :: gammas(2) ! 1 - channel A, 2 - channel B
-!     integer :: K_ind
-!
-!     call assert(size(cap) == size(p_dist_k, 2), 'Size of cap array does not match p_dist')
-!     gammas = 0
-!     do K_ind = 1, size(p_dist_k, 1)
-!       gammas(1) = gammas(1) + sum(p_dist_k(K_ind, :, 2) * cap)
-!       gammas(1) = gammas(1) + sum(p_dist_k(K_ind, :, 3) * cap)
-!       gammas(2) = gammas(2) + sum(p_dist_k(K_ind, :, 1) * cap)
-!     end do
-!     ! One factor of 2 is due to phi symmetry, another is due to gamma definition
-!     gammas = gammas * 2 * 2
-!   end function
-!
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-! ! Calculates channel-specific gammas for all states.
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-!   subroutine calculate_gamma_channels_all(params, p_dist, cap, gammas)
-!     class(input_params), intent(in) :: params
-!     real(real64), intent(in) :: p_dist(:, :, :, :)
-!     real(real64), intent(in) :: cap(:)
-!     real(real64), allocatable, intent(out) :: gammas(:, :)
-!     integer :: proc_first_state, proc_states, proc_k
-!     integer, allocatable :: recv_counts(:), recv_shifts(:)
-!     real(real64), allocatable :: gammas_chunk(:, :)
-!
-!     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
-!     ! Calculate proc chunks
-!     allocate(gammas_chunk(proc_states, 2))
-!     do proc_k = 1, proc_states
-!       gammas_chunk(proc_k, :) = calculate_gamma_channels(p_dist(proc_k, :, :, :), cap)
-!     end do
-!     call gather_chunks(gammas_chunk, recv_counts, recv_shifts, gammas)
-!   end subroutine
-!
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! The main procedure for calculation of states properties.
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -284,24 +285,25 @@ contains
     integer :: N, L
     integer, allocatable :: num_solutions_2d(:, :) ! K x n
     integer, allocatable :: num_solutions_1d(:, :, :), wf_sections_dist_inds(:, :, :)
-    real(real64), allocatable :: energies_3d(:), phi_borders(:)
-    real(real64), allocatable :: section_probs(:, :) ! num_states x size(wf_sections)
-    ! real(real64), allocatable :: K_dists(:, :) ! num_states x (J + 1)
-    real(real64), allocatable :: gammas(:, :) ! num_states x 2
+    real(real64), allocatable :: phi_borders(:)
+    real(real64), allocatable :: eigenvalues_3d(:, :), section_stats(:, :)
     real(real64), allocatable :: p_dist(:, :, :, :, :) ! num_states x each section in K, rho, theta, phi
     character(:), allocatable :: sym_path, spectrum_path
     ! Arrays of size 2 x N x L (or K x N x L if compressing is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
     type(array_2d_complex), allocatable :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
 
-    ! Load energies
+    ! Load energies and gammas
     sym_path = get_sym_path(params)
     spectrum_path = get_spectrum_path(sym_path)
-    energies_3d = load_energies_3D(spectrum_path)
+    eigenvalues_3d = read_matrix_real(spectrum_path)
+    eigenvalues_3d = eigenvalues_3d(:, 2:3)
 
     N = size(rho_grid)
     L = size(theta_grid)
+
     ! Load expansion coefficients
+    call print_parallel('Loading expansion coefficients...')
     if (params % use_fixed_basis_jk == 1) then
       call load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
       call load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
@@ -309,27 +311,17 @@ contains
       call load_1D_expansion_coefficients(params, N, L, As, num_solutions_1d)
       call load_2D_expansion_coefficients(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
     end if
-
     call load_3D_expansion_coefficients(params, N, num_solutions_2d, proc_Cs)
-    call print_parallel('Done loading expansion coefficients')
 
+    call print_parallel('Calculating probability distributions...')
     call process_wf_sections(params, rho_grid, theta_grid, phi_borders, wf_sections_dist_inds)
     p_dist = calculate_wf_integral_all_regions(params, As, Bs, proc_Cs, phi_borders)
-    call print_parallel('Done calculating probability distributions')
 
-    ! if (present(cap)) then
-    !   call calculate_gamma_channels_all(params, p_dist, cap, gammas)
-    ! else
-      allocate(gammas(params % num_states, 2))
-      gammas = 0
-    ! end if
-    ! call print_parallel('Done calculating channel-specific gammas')
-
-    call calculate_wf_section_probabilities_all(params, p_dist, wf_sections_dist_inds, section_probs)
-    call print_parallel('Done calculating wave functions section probabilities')
+    call print_parallel('Calculating statistics...')
+    call calculate_wf_sections_statistics_all(params, p_dist, wf_sections_dist_inds, cap, section_stats)
 
     call print_parallel('Writing results...')
-    call write_state_properties(params, energies_3d, section_probs, gammas * au_to_wn)
+    call write_state_properties(params, eigenvalues_3d, section_stats)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
