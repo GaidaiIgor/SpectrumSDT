@@ -97,7 +97,7 @@ cd K_0/even/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
 At the basis stage `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/grid_rho.dat` (16 in this example).  
-In `use_fix_basis_jk = 1` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
+In `use_fixed_basis_JK = 1` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
 ```
 cd ../../odd/basis
 mpiexec -n 16 spectrumsdt
