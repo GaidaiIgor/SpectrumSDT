@@ -96,7 +96,7 @@ Edit spectrumsdt.config and replace `username` in the paths. Then execute:
 cd K_0/even/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
-Here `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/grid_rho.dat` (16 in this example).  
+At the basis stage `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/grid_rho.dat` (16 in this example).  
 In `use_fix_basis_jk = 1` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
 ```
 cd ../../odd/basis
@@ -115,3 +115,9 @@ cd ../eigencalc
 mpiexec -n <n_procs> spectrumsdt
 ```
 Lowest 50 rovibrational energy levels of ozone-686 J=0 will be printed into `states.fwc` file.
+
+# References
+
+A. Teplukhin and D. Babikov, J. Chem. Phys. 145, 114106 (2016).
+I. Gayday, A. Teplukhin, B.K. Kendrick, and D. Babikov, J. Phys. Chem. A 124, 2808 (2020).
+I. Gayday, A. Teplukhin, B.K. Kendrick, and D. Babikov, J. Chem. Phys. 152, 144104 (2020).
