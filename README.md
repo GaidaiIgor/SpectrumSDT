@@ -119,5 +119,7 @@ Lowest 50 rovibrational energy levels of ozone-686 J=0 will be printed into `sta
 # References
 
 A. Teplukhin and D. Babikov, J. Chem. Phys. 145, 114106 (2016).
+
 I. Gayday, A. Teplukhin, B.K. Kendrick, and D. Babikov, J. Phys. Chem. A 124, 2808 (2020).
+
 I. Gayday, A. Teplukhin, B.K. Kendrick, and D. Babikov, J. Chem. Phys. 152, 144104 (2020).
