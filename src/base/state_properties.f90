@@ -303,7 +303,7 @@ contains
 
     ! Load expansion coefficients
     call print_parallel('Loading expansion coefficients...')
-    if (params % use_fixed_basis_jk == 1) then
+    if (params % use_fixed_basis_JK == 1) then
       call load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
       call load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
     else

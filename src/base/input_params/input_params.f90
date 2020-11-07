@@ -21,7 +21,7 @@ module input_params_mod
     ! Behavior control
     character(:), allocatable :: stage ! grids, basis, overlaps, eigencalc or properties
     integer :: use_rovib_coupling = -1 ! enables/disables use_rovib_coupling coupling
-    integer :: use_fixed_basis_jk = -1 ! use basis set with the same fixed values of J and K for all calculations
+    integer :: use_fixed_basis_JK = -1 ! use basis set with the same fixed values of J and K for all calculations
     character(:), allocatable :: cap_type ! type of Complex Absorbing Potential
 
     ! Grids
@@ -196,8 +196,8 @@ contains
           this % stage = extract_string(config_dict, next_key)
         case ('use_rovib_coupling')
           this % use_rovib_coupling = str2int(extract_string(config_dict, next_key))
-        case ('use_fixed_basis_jk')
-          this % use_fixed_basis_jk = str2int(extract_string(config_dict, next_key))
+        case ('use_fixed_basis_JK')
+          this % use_fixed_basis_JK = str2int(extract_string(config_dict, next_key))
         case ('cap_type')
           this % cap_type = extract_string(config_dict, next_key)
         case ('grid_rho')
@@ -310,7 +310,7 @@ contains
 
     if (this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
       call put_string(keys, 'use_rovib_coupling')
-      call put_string(keys, 'use_fixed_basis_jk')
+      call put_string(keys, 'use_fixed_basis_JK')
     end if
 
     if (this % stage == 'eigencalc' .or. this % stage == 'properties') then
@@ -321,7 +321,7 @@ contains
       call put_string(keys, 'parity')
     end if
 
-    if ((this % stage == 'eigencalc' .or. this % stage == 'properties') .and. this % use_fixed_basis_jk == 1) then
+    if ((this % stage == 'eigencalc' .or. this % stage == 'properties') .and. this % use_fixed_basis_JK == 1) then
       call put_string(keys, 'basis_root_path')
       call put_string(keys, 'basis_J')
       call put_string(keys, 'basis_K')
@@ -372,7 +372,7 @@ contains
 
     call put_string(keys, 'stage')
     call put_string(keys, 'use_rovib_coupling')
-    call put_string(keys, 'use_fixed_basis_jk')
+    call put_string(keys, 'use_fixed_basis_JK')
     call put_string(keys, 'cap_type')
     call put_string(keys, 'grid_rho')
     call put_string(keys, 'grid_theta')
@@ -408,7 +408,7 @@ contains
     class(input_params), intent(in) :: this
     call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigencalc', 'properties']), 'Error: stage can be "grids", "basis", "overlaps", "eigencalc" or "properties"')
     call assert(any(this % use_rovib_coupling == [-1, 0, 1]), 'Error: use_rovib_coupling can be 0 or 1')
-    call assert(any(this % use_fixed_basis_jk == [-1, 0, 1]), 'Error: use_fixed_basis_jk can be 0 or 1')
+    call assert(any(this % use_fixed_basis_JK == [-1, 0, 1]), 'Error: use_fixed_basis_JK can be 0 or 1')
     if (allocated(this % cap_type)) then
       call assert(any(this % cap_type == [character(100) :: 'none', 'Manolopoulos']), 'Error: cap_type can be "none" or "Manolopoulos"')
     end if

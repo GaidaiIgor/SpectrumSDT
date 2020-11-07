@@ -162,7 +162,7 @@ contains
 
     root_path = params % root_path
     K_row = params % K(1)
-    K_col = iff(params % use_fixed_basis_jk == 1, K_row, K_row + 1)
+    K_col = iff(params % use_fixed_basis_JK == 1, K_row, K_row + 1)
     sym_row = params % symmetry
     sym_col = 1 - sym_row ! opposite symmetry for column block
 
@@ -259,7 +259,7 @@ contains
     character(:), allocatable :: solutions_1d_path_row, solutions_1d_path_col, solutions_2d_path_row, solutions_2d_path_col
 
     call print_parallel('Calculating asym term')
-    call assert(K_row + 2 == K_col .or. K_row == 1 .and. K_col == 1 .or. params % use_fixed_basis_jk == 1 .and. K_row == K_col, 'Wrong combination of Ks for asym term')
+    call assert(K_row + 2 == K_col .or. K_row == 1 .and. K_col == 1 .or. params % use_fixed_basis_JK == 1 .and. K_row == K_col, 'Wrong combination of Ks for asym term')
     my_id = get_proc_id()
     n_procs = get_num_procs()
     n_basis = params % basis_size_phi
@@ -313,7 +313,7 @@ contains
 
       ! Save asym block
       ! Results are saved in the folder corresponding to K_row
-      if (K_row == 1 .and. K_col == 1 .and. params % use_fixed_basis_jk == 0) then
+      if (K_row == 1 .and. K_col == 1 .and. params % use_fixed_basis_JK == 0) then
         asym_block_path = get_asymmetric_overlap_file_1_path(sym_folder_row, n)
       else
         asym_block_path = get_asymmetric_overlap_file_path(sym_folder_row, n)
@@ -338,7 +338,7 @@ contains
     call assert(file_exists, 'Error: basis is not computed')
 
     ! the other symmetry is also required in this mode
-    if (params % use_fixed_basis_jk == 1) then
+    if (params % use_fixed_basis_JK == 1) then
       block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), 1 - params % symmetry))
       inquire(file = block_info_path, exist = file_exists)
       call assert(file_exists, 'Error: basis of both symmetries has to be computed in fixed_basis_jk mode')
@@ -354,7 +354,7 @@ contains
     real(real64), intent(in) :: rho_grid(:), theta_grid(:)
 
     call check_prerequisites(params)
-    if (params % use_fixed_basis_jk == 1) then
+    if (params % use_fixed_basis_JK == 1) then
       call calculate_sym_term(params, mu, rho_grid, theta_grid)
     end if
 
@@ -364,12 +364,12 @@ contains
     end if
 
     ! coriolis term
-    if (params % K(1) + 1 <= params % J .or. params % use_fixed_basis_jk == 1) then
+    if (params % K(1) + 1 <= params % J .or. params % use_fixed_basis_JK == 1) then
       call calculate_coriolis_term(params, mu, rho_grid, theta_grid)
     end if
 
     ! asym term for fixed basis
-    if (params % use_fixed_basis_jk == 1) then
+    if (params % use_fixed_basis_JK == 1) then
       call calculate_asym_term(params, params % K(1), params % K(1), mu, rho_grid, theta_grid)
       return
     end if
