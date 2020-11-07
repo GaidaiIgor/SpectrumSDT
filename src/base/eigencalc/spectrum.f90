@@ -7,6 +7,7 @@ module spectrum_mod
   use general_utils
   use general_vars, only: mu, n1, alpha1, jac1
   use input_params_mod
+  use io_utils
   use matmul_operator_mod, only: rovib_ham, init_matmul
   use parallel_utils
   use path_utils
@@ -24,7 +25,7 @@ contains
     class(input_params), intent(in) :: params
     complex(real64), allocatable, intent(in) :: eivals(:)
     complex(real64), allocatable, intent(in) :: eivecs(:, :)
-    integer :: proc_first_state, proc_states, file_unit, i, global_state_ind
+    integer :: proc_first_state, proc_states, file_unit, i, global_state_ind, col_width
     real(real64) :: energy, gamma
     character(:), allocatable :: sym_path, file_path
 
@@ -47,11 +48,13 @@ contains
     ! Write spectrum
     file_path = get_spectrum_path(sym_path)
 
+    col_width = 25
     open(newunit = file_unit, file = file_path)
+    write(file_unit, '(2A)') align_center('Energy (cm^-1)', col_width), align_center('Total Gamma (cm^-1)', col_width)
     do i = 1, size(eivals)
       energy = real(eivals(i)) * au_to_wn
       gamma = aimag(eivals(i)) * au_to_wn * (-2)
-      write(file_unit, '(I5,2G25.15)') i, energy, gamma
+      write(file_unit, '(2G' // num2str(col_width) // '.15)') energy, gamma
     end do
     close(file_unit)
   end subroutine

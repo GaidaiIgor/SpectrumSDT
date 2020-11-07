@@ -8,19 +8,27 @@ implicit none
 contains
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Reads matrix from file.
+! Reads matrix from file. Skips the first *skip_lines* (header).
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(read_matrix_,TEMPLATE_TYPE_NAME)(file_path) result(matrix)
+  function CONCAT2(read_matrix_,TEMPLATE_TYPE_NAME)(file_path, skip_lines) result(matrix)
     character(*), intent(in) :: file_path
+    integer, optional, intent(in) :: skip_lines
     TEMPLATE_TYPE_OUT, allocatable :: matrix(:, :)
     type(CONCAT2(vector_array_1d_,TEMPLATE_TYPE_NAME)) :: matrix_vector
-    integer :: file_unit
+    integer :: file_unit, i
     character(:), allocatable :: next_line
     type(string), allocatable :: line_tokens(:)
     TEMPLATE_TYPE_OUT, allocatable :: next_row(:)
 
     matrix_vector = CONCAT2(vector_array_1d_,TEMPLATE_TYPE_NAME)()
     open(newunit = file_unit, file = file_path)
+
+    if (present(skip_lines)) then
+      do i = 1, skip_lines
+        next_line = read_line(file_unit)
+      end do
+    end if
+
     do
       next_line = read_line(file_unit)
       if (next_line == '') then

@@ -296,8 +296,7 @@ contains
     ! Load energies and gammas
     sym_path = get_sym_path(params)
     spectrum_path = get_spectrum_path(sym_path)
-    eigenvalues_3d = read_matrix_real(spectrum_path)
-    eigenvalues_3d = eigenvalues_3d(:, 2:3)
+    eigenvalues_3d = read_matrix_real(spectrum_path, skip_lines = 1)
 
     N = size(rho_grid)
     L = size(theta_grid)
