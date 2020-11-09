@@ -75,6 +75,18 @@ module input_params_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts all fields in *params* from degrees to radians.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine convert_grid_params_deg_to_rad(params)
+    class(grid_params), intent(inout) :: params
+    params % from = params % from / rad_to_deg
+    params % to = params % to / rad_to_deg
+    if (.not. (params % step .aeq. -1d0)) then
+      params % step = params % step / rad_to_deg
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Parses user-provded value of mass
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_mass(mass_str) result(mass)
@@ -99,34 +111,6 @@ contains
           mass(i) = str2real(next_atom) * amu_to_aum
       end select
     end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Parses user-provided value of `K`
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function parse_K(K_str, J, parity) result(K)
-    character(*), intent(in) :: K_str
-    integer, intent(in) :: J, parity
-    integer :: K(2)
-    integer :: pos
-    type(string), allocatable :: tokens(:)
-    
-    if (K_str == 'all') then
-      K(1) = get_k_start(J, parity)
-      K(2) = J
-    else
-      pos = index(K_str, '..')
-      if (pos == 0) then
-        ! Single value of K
-        K(1) = str2int(K_str)
-        K(2) = K(1)
-      else
-        ! K range
-        tokens = strsplit(K_str, '..')
-        K(1) = str2int(tokens(1) % to_char_str())
-        K(2) = str2int(tokens(2) % to_char_str())
-      end if
-    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -175,6 +159,34 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Parses user-provided value of `K`.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function parse_K(K_str, J, parity) result(K)
+    character(*), intent(in) :: K_str
+    integer, intent(in) :: J, parity
+    integer :: K(2)
+    integer :: pos
+    type(string), allocatable :: tokens(:)
+
+    if (K_str == 'all') then
+      K(1) = get_k_start(J, parity)
+      K(2) = J
+    else
+      pos = index(K_str, '..')
+      if (pos == 0) then
+        ! Single value of K
+        K(1) = str2int(K_str)
+        K(2) = K(1)
+      else
+        ! K range
+        tokens = strsplit(K_str, '..')
+        K(1) = str2int(tokens(1) % to_char_str())
+        K(2) = str2int(tokens(2) % to_char_str())
+      end if
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of input_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assign_dict_input_params(this, config_dict)
@@ -206,9 +218,11 @@ contains
         case ('grid_theta')
           call associate(subdict, config_dict, next_key)
           call this % grid_theta % checked_init(subdict)
+          call convert_grid_params_deg_to_rad(this % grid_theta)
         case ('grid_phi')
           call associate(subdict, config_dict, next_key)
           call this % grid_phi % checked_init(subdict)
+          call convert_grid_params_deg_to_rad(this % grid_phi)
         case ('mass')
           this % mass = parse_mass(extract_string(config_dict, next_key))
         case ('J')
