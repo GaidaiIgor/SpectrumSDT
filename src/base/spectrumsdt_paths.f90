@@ -10,7 +10,7 @@ module spectrumsdt_paths_mod
   implicit none
 
   interface get_k_folder_path
-    module procedure :: get_k_folder_path_root, get_k_folder_path_params
+    module procedure :: get_k_folder_path_root, get_k_folder_path_root_range, get_k_folder_path_params
   end interface
 
   interface get_sym_path
@@ -56,28 +56,41 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for given Ks.
+! Generates path to folder with calculation results for given Ks. K range version.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_k_folder_path_root_range(root_path, K) result(res)
+    character(*), intent(in) :: root_path
+    integer, intent(in) :: K(2)
+    character(:), allocatable :: res
+    character(:), allocatable :: k_folder_name
+    
+    if (all(K == -1)) then
+      k_folder_name = 'K_all'
+    else if (K(1) == K(2)) then
+      k_folder_name = 'K_' // num2str(K(1))
+    else
+      k_folder_name = 'K_' // num2str(K(1)) // '_' // num2str(K(2))
+    end if
+    res = append_path_tokens(root_path, k_folder_name)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to folder with calculation results for given Ks. Single K version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_k_folder_path_root(root_path, K) result(res)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K
     character(:), allocatable :: res
-    character(:), allocatable :: k_folder_name
-    
-    k_folder_name = iff(K == -1, 'K_all', 'K_' // num2str(K))
-    res = append_path_tokens(root_path, k_folder_name)
+    res = get_k_folder_path_root_range(root_path, [K, K])
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for given Ks.
+! Generates path to folder with calculation results for given Ks, taken from input *params*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_k_folder_path_params(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    integer :: K
-
-    K = merge(-1, params % K(1), params % use_rovib_coupling == 1 .and. params % stage /= 'overlaps')
-    res = get_k_folder_path_root(params % root_path, K)
+    res = get_k_folder_path_root_range(params % root_path, params % K)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -135,8 +148,8 @@ contains
     integer :: parity
     character(:), allocatable :: k_path
 
-    k_path = get_k_folder_path_params(params)
-    parity = merge(params % parity, -1, params % use_rovib_coupling == 1 .and. params % stage /= 'overlaps')
+    k_path = get_k_folder_path(params)
+    parity = iff(params % use_rovib_coupling == 1 .and. params % stage /= 'overlaps', params % parity, -1)
     res = get_sym_path_int(k_path, params % symmetry, parity)
   end function
 
