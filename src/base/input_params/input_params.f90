@@ -67,6 +67,7 @@ module input_params_mod
     procedure :: assign_dict => assign_dict_input_params
     procedure :: get_mandatory_keys => get_mandatory_keys_input_params
     procedure :: get_optional_keys => get_optional_keys_input_params
+    procedure :: get_silent_keys => get_silent_keys_input_params
     procedure :: get_all_keys => get_all_keys_input_params
     procedure :: check_values => check_values_input_params
     procedure :: checked_init => checked_init_input_params
@@ -378,6 +379,17 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns a set of optional keys, whose defaults are not announced.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_silent_keys_input_params(this) result(keys)
+    class(input_params), intent(in) :: this
+    type(dictionary_t) :: keys
+
+    call put_string(keys, 'optimized_mult')
+    call put_string(keys, 'enable_terms')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_all_keys_input_params(this) result(keys)
@@ -461,7 +473,7 @@ contains
   subroutine checked_init_input_params(this, config_dict)
     class(input_params), intent(inout) :: this
     class(dictionary_t) :: config_dict ! intent(in)
-    type(dictionary_t) :: mandatory_keys, optional_keys, optional_nonset_keys, all_keys
+    type(dictionary_t) :: mandatory_keys, optional_keys, optional_nonset_keys, silent_keys, announceable_keys, all_keys
 
     call this % assign_dict(config_dict)
     mandatory_keys = this % get_mandatory_keys()
@@ -475,7 +487,9 @@ contains
     if (len(optional_keys) > 0) then
       optional_nonset_keys = set_difference(optional_keys, config_dict)
       call this % assign_dict(optional_nonset_keys)
-      call announce_defaults(optional_nonset_keys)
+      silent_keys = this % get_silent_keys()
+      announceable_keys = set_difference(optional_nonset_keys, silent_keys)
+      call announce_defaults(announceable_keys)
     end if
     call this % check_values()
   end subroutine

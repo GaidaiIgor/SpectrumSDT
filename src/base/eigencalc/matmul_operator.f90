@@ -44,7 +44,7 @@ contains
     if (params % optimized_mult == 1) then
       active_matmul_operator => ham_mult_compressed
     else
-      active_matmul_operator => ham_mult_old
+      active_matmul_operator => ham_mult_uncompressed
     end if
   end subroutine
 
@@ -120,7 +120,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Plain old version of matrix-vector multiplication. Deprecated.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine ham_mult_old(size_proc, v_proc_inp, v_proc_out)
+  subroutine ham_mult_uncompressed(size_proc, v_proc_inp, v_proc_out)
     integer :: size_proc ! number of elements assigned to this processor
     complex(real64) :: v_proc_inp(size_proc) ! This processor's chunk of the vector that we need to multiply with Hamiltonian
     complex(real64) :: v_proc_out(size_proc) ! This processor's chunk of the result of multiplication

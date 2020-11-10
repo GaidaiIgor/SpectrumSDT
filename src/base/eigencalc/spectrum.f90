@@ -68,7 +68,7 @@ contains
     complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
 
     call print_parallel('Using rovib coupling')
-    rovib_ham % compression = merge(1, 0, params % optimized_mult == 1) ! Global in matmul_operator_mod
+    rovib_ham % compression = ifF(params % optimized_mult == 0, 0, 1) ! Global in matmul_operator_mod
     if (rovib_ham % compression == 0) then
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')
     end if
