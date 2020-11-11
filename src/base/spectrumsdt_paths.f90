@@ -69,7 +69,7 @@ contains
     else if (K(1) == K(2)) then
       k_folder_name = 'K_' // num2str(K(1))
     else
-      k_folder_name = 'K_' // num2str(K(1)) // '_' // num2str(K(2))
+      k_folder_name = 'K_' // num2str(K(1)) // '..' // num2str(K(2))
     end if
     res = append_path_tokens(root_path, k_folder_name)
   end function

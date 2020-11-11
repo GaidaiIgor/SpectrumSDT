@@ -28,9 +28,9 @@ class SpectrumSDTConfig:
             config_lines = config_file.readlines()
         self.params, _ = self.read_inner_dict(config_lines, -1)
 
-    def get_fixed_basis_jk(self) -> int:
-        if "use_fixed_basis_jk" in self.params:
-            return int(self.params["use_fixed_basis_jk"])
+    def get_fixed_basis_JK(self) -> int:
+        if "use_fixed_basis_JK" in self.params:
+            return int(self.params["use_fixed_basis_JK"])
         else:
             return 0
 
