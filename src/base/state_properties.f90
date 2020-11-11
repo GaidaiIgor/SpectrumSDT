@@ -167,7 +167,12 @@ contains
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states)
     allocate(p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
     p_dist = 0
+
     do proc_state_ind = 1, size(p_dist, 1)
+      if (get_proc_id() == 0) then
+        call track_progress(proc_state_ind * 1d0 / size(p_dist, 1), 1d-2)
+      end if
+
       do K_val = params % K(1), params % K(2)
         call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
         do n = 1, size(As, 2)
