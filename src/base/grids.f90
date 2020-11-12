@@ -342,7 +342,6 @@ contains
     env_emax = params % grid_rho % max_energy / au_to_wn
     rho_step = params % grid_rho % step
     theta_step = params % grid_theta % step
-    phi_step = params % grid_phi % step
 
     if (params % grid_rho % optimized == 1) then
       call input_envelopes(params)
@@ -368,11 +367,7 @@ contains
       call generate_equidistant_grid_points(params % grid_theta % from, params % grid_theta % to, params % grid_theta % num_points, grid_theta, jac_theta, theta_step)
     end if
 
-    if (params % grid_phi % num_points == -1) then
-      call generate_equidistant_grid_step(params % grid_phi % from, params % grid_phi % to, params % grid_phi % step, grid_phi, jac_phi)
-    else
-      call generate_equidistant_grid_points(params % grid_phi % from, params % grid_phi % to, params % grid_phi % num_points, grid_phi, jac_phi, phi_step)
-    end if
+    call generate_equidistant_grid_points(0d0, 2*pi, params % num_points_phi, grid_phi, jac_phi, phi_step)
 
     call write_grid(grid_rho, jac_rho, rho_step, 'grid_rho.dat')
     call write_grid(grid_theta, jac_theta, theta_step, 'grid_theta.dat')

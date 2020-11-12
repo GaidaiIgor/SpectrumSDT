@@ -97,7 +97,7 @@ set(sdt ${constants} ${fourier_transform} ${general_vars} ${input_params} ${lapa
 set(spectrum ${cap} ${constants} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.f90)
 set(grids ${config} ${constants} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.f90)
 
-set(spectrumsdt ${cap} ${config} ${constants} ${debug_tools} ${dict_utils} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
+set(spectrumsdt ${cap} ${config} ${debug_tools} ${dict_utils} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
 
 # Disable all warnings and standard conformation checks for external sources
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")

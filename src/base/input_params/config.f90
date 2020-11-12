@@ -165,17 +165,26 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Announces default values of unset keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine announce_defaults(optional_nonset_keys)
-    class(dictionary_t) :: optional_nonset_keys ! intent(in)
+  subroutine announce_defaults(optional_nonset_keys, messages)
+    class(dictionary_t), intent(in) :: optional_nonset_keys
+    class(dictionary_t), optional, intent(in) :: messages
     integer :: i
-    character(:), allocatable :: next_key, default_value
+    character(:), allocatable :: next_key, message
     type(string), allocatable :: keys(:)
 
     keys = get_key_set(optional_nonset_keys)
     do i = 1, size(keys)
       next_key = keys(i) % to_char_str()
-      default_value = extract_string(optional_nonset_keys, next_key)
-      call print_parallel('Info: ' // next_key // ' was not specified. Assuming default value = ' // default_value)
+      message = 'Assuming default = ' // extract_string(optional_nonset_keys, next_key)
+      if (present(messages)) then
+        if (next_key .in. messages) then
+          message = extract_string(messages, next_key)
+          if (message == '') then
+            cycle
+          end if
+        end if
+      end if
+      call print_parallel('Info: ' // next_key // ' was not specified. ' // message)
     end do
   end subroutine
 

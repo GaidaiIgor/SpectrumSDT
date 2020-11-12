@@ -1,11 +1,10 @@
 program spectrumsdt
   use cap_mod, only: init_caps, get_real_cap
   use config_mod, only: read_config_dict
-  use constants, only: pi
   use debug_tools
   use dict_utils, only: extract_string, item_or_default
   use dictionary
-  use general_vars, only: mu, g1, g2, init_masses, init_grids
+  use general_vars, only: mu, g1, g2, g3, init_masses, init_grids
   use input_params_mod, only: input_params
   use iso_fortran_env, only: real64
   use mpi
@@ -29,25 +28,7 @@ program spectrumsdt
   end if
   call params % checked_init(config_dict)
 
-  call init_debug(params)
-  call init_masses(params)
-  if (params % stage /= 'grids') then
-    call init_grids(params)
-  end if
-  if (params % stage == 'basis') then
-    call init_potential(params)
-  end if
-  if (params % stage /= 'grids') then
-    call init_sdt(params)
-  end if
-  if (params % stage == 'eigencalc' .or. params % stage == 'properties') then
-    call init_caps(params)
-  end if
-  if (params % stage == 'properties') then
-    call params % wf_sections % checked_resolve_rho_grid(g1(1), g1(size(g1)))
-    call params % wf_sections % checked_resolve_theta_grid(g2(1), g2(size(g2)))
-    call params % wf_sections % checked_resolve_phi_grid(0d0, 2*pi)
-  end if
+  call init_all(params)
   call process_stage(params)
 
   if (params % use_parallel == 1) then
@@ -57,7 +38,29 @@ program spectrumsdt
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Selects appropriate procedures for the current stage
+! Inits all necessary information.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine init_all(params)
+    class(input_params), intent(inout) :: params
+    call init_debug(params)
+    call init_masses(params)
+    if (params % stage == 'basis' .or. params % stage == 'overlaps' .or. params % stage == 'eigencalc' .or. params % stage == 'properties') then
+      call init_grids(params)
+      call params % check_resolve_grids(g1, g2, g3)
+    end if
+    if (params % stage == 'basis' .or. params % stage == 'overlaps') then
+      call init_sdt(params)
+    end if
+    if (params % stage == 'basis') then
+      call init_potential(params)
+    end if
+    if (params % stage == 'eigencalc' .or. params % stage == 'properties') then
+      call init_caps(params)
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Selects appropriate procedures for the current stage.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine process_stage(params)
     type(input_params), intent(in) :: params

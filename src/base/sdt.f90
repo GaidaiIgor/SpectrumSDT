@@ -53,9 +53,9 @@ module sdt
 
 contains
 
-!-----------------------------------------------------------------------
-!  Initilialization.
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Initilializes sdt. Grids have to be initialized.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_sdt(params)
     type(input_params), intent(in) :: params
 
@@ -267,7 +267,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes kinetic energy matrix for a particle with given reduced *mass* in DVR basis described by the remaining arguments
+! Computes kinetic energy matrix for a particle with given reduced *mass* in DVR basis described by the remaining arguments.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function compute_kinetic_energy_dvr(mass, num_points, period, jac) result(matrix)
     real(real64), intent(in) :: mass

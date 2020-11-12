@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Contains historically global variables shared by some other modules
+! Contains historically global variables shared by some other modules.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module general_vars
   use constants, only: oxygen_masses
@@ -28,7 +28,7 @@ module general_vars
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Initializes masses
+! Initializes masses.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_masses(params)
     class(input_params), intent(in) :: params
@@ -44,7 +44,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads grids, jacobians, alphas (steps)
+! Loads grids, jacobians, alphas (steps).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_grids(params)
     class(input_params), intent(in) :: params

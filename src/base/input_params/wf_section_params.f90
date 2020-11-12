@@ -27,9 +27,9 @@ module wf_section_params_mod
     procedure :: check_values => check_values_wf_section_params
     procedure :: checked_init => checked_init_wf_section_params
     procedure :: checked_resolve_Ks => checked_resolve_Ks_wf_section_params
-    procedure :: checked_resolve_rho_grid => checked_resolve_rho_grid_wf_section_params
-    procedure :: checked_resolve_theta_grid => checked_resolve_theta_grid_wf_section_params
-    procedure :: checked_resolve_phi_grid => checked_resolve_phi_grid_wf_section_params
+    procedure :: checked_resolve_rho_bounds => checked_resolve_rho_bounds_wf_section_params
+    procedure :: checked_resolve_theta_bounds => checked_resolve_theta_bounds_wf_section_params
+    procedure :: checked_resolve_phi_bounds => checked_resolve_phi_bounds_wf_section_params
   end type
 
 contains
@@ -184,7 +184,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Replaces -2 placeholders with given values of *rho_min* and *rho_max* and checks that set values are within limits.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  impure elemental subroutine checked_resolve_rho_grid_wf_section_params(this, rho_min, rho_max)
+  impure elemental subroutine checked_resolve_rho_bounds_wf_section_params(this, rho_min, rho_max)
     class(wf_section_params), intent(inout) :: this
     real(real64), intent(in) :: rho_min, rho_max
 
@@ -204,7 +204,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Replaces -2 placeholders with given values of *theta_min* and *theta_max* and checks that set values are within limits.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  impure elemental subroutine checked_resolve_theta_grid_wf_section_params(this, theta_min, theta_max)
+  impure elemental subroutine checked_resolve_theta_bounds_wf_section_params(this, theta_min, theta_max)
     class(wf_section_params), intent(inout) :: this
     real(real64), intent(in) :: theta_min, theta_max
 
@@ -224,7 +224,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Replaces -2 placeholders with given values of *phi_min* and *phi_max* and checks that set values are within limits.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  impure elemental subroutine checked_resolve_phi_grid_wf_section_params(this, phi_min, phi_max)
+  impure elemental subroutine checked_resolve_phi_bounds_wf_section_params(this, phi_min, phi_max)
     class(wf_section_params), intent(inout) :: this
     real(real64), intent(in) :: phi_min, phi_max
 

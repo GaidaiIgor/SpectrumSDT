@@ -27,7 +27,7 @@ module input_params_mod
     ! Grids
     type(optgrid_params) :: grid_rho
     type(grid_params) :: grid_theta
-    type(grid_params) :: grid_phi
+    integer :: num_points_phi = -1
 
     ! System
     real(real64) :: mass(3) = -1
@@ -67,10 +67,10 @@ module input_params_mod
     procedure :: assign_dict => assign_dict_input_params
     procedure :: get_mandatory_keys => get_mandatory_keys_input_params
     procedure :: get_optional_keys => get_optional_keys_input_params
-    procedure :: get_silent_keys => get_silent_keys_input_params
     procedure :: get_all_keys => get_all_keys_input_params
     procedure :: check_values => check_values_input_params
     procedure :: checked_init => checked_init_input_params
+    procedure :: check_resolve_grids => check_resolve_grids_input_params
   end type
 
 contains
@@ -220,10 +220,8 @@ contains
           call associate(subdict, config_dict, next_key)
           call this % grid_theta % checked_init(subdict)
           call convert_grid_params_deg_to_rad(this % grid_theta)
-        case ('grid_phi')
-          call associate(subdict, config_dict, next_key)
-          call this % grid_phi % checked_init(subdict)
-          call convert_grid_params_deg_to_rad(this % grid_phi)
+        case ('num_points_phi')
+          this % num_points_phi = str2int(extract_string(config_dict, next_key))
         case ('mass')
           this % mass = parse_mass(extract_string(config_dict, next_key))
         case ('J')
@@ -293,7 +291,12 @@ contains
     if (this % stage == 'grids') then
       call put_string(keys, 'grid_rho')
       call put_string(keys, 'grid_theta')
-      call put_string(keys, 'grid_phi')
+      if (this % basis_size_phi == -1) then
+        call put_string(keys, 'num_points_phi')
+      end if
+      if (this % basis_size_phi /= -1 .and. this % num_points_phi == -1) then
+        call put_string(keys, 'basis_size_phi')
+      end if
     end if
 
     if (this % stage == 'grids' .and. this % grid_rho % optimized == 1 .or. this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. &
@@ -348,25 +351,35 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns a set of optional keys.
+! Returns a set of optional keys and custom messages for default announcements.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_optional_keys_input_params(this) result(keys)
+  subroutine get_optional_keys_input_params(this, keys, messages)
     class(input_params), intent(in) :: this
-    type(dictionary_t) :: keys
+    type(dictionary_t), intent(out) :: keys, messages
+
+    if (this % stage == 'grids') then
+      call put_string(keys, 'num_points_phi', num2str(2 * this % basis_size_phi))
+      call put_string(messages, 'num_points_phi', 'Assuming default = 2 * basis_size_phi')
+    end if
 
     if (this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
       call put_string(keys, 'use_parallel', '1')
+      call put_string(messages, 'use_parallel', '')
     end if
 
     if (this % stage == 'eigencalc') then
       call put_string(keys, 'ncv', '-1')
+      call put_string(messages, 'ncv', 'Its value will be determined by SLEPc')
       call put_string(keys, 'mpd', '-1')
+      call put_string(messages, 'mpd', 'Its value will be determined by SLEPc')
       call put_string(keys, 'max_iterations', '10000')
     end if
 
     if (this % stage == 'eigencalc' .and. this % use_rovib_coupling == 1) then
       call put_string(keys, 'enable_terms', '11')
+      call put_string(messages, 'enable_terms', '')
       call put_string(keys, 'optimized_mult', '1')
+      call put_string(messages, 'optimized_mult', '')
     end if
 
     if (this % stage == 'eigencalc' .or. this % stage == 'properties') then
@@ -376,18 +389,7 @@ contains
     if ((this % stage == 'eigencalc' .or. this % stage == 'properties') .and. this % use_rovib_coupling == 1) then
       call put_string(keys, 'K', 'all')
     end if
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns a set of optional keys, whose defaults are not announced.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_silent_keys_input_params(this) result(keys)
-    class(input_params), intent(in) :: this
-    type(dictionary_t) :: keys
-
-    call put_string(keys, 'optimized_mult')
-    call put_string(keys, 'enable_terms')
-  end function
+end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
@@ -402,7 +404,7 @@ contains
     call put_string(keys, 'cap_type')
     call put_string(keys, 'grid_rho')
     call put_string(keys, 'grid_theta')
-    call put_string(keys, 'grid_phi')
+    call put_string(keys, 'num_points_phi')
     call put_string(keys, 'mass')
     call put_string(keys, 'J')
     call put_string(keys, 'K')
@@ -440,8 +442,7 @@ contains
     end if
     call assert((this % grid_theta % from .aeq. -1d0) .or. this % grid_theta % from < pi, 'Error: grid_theta % from should be < pi')
     call assert((this % grid_theta % to .aeq. -1d0) .or. this % grid_theta % to < pi, 'Error: grid_theta % to should be < pi')
-    call assert((this % grid_phi % from .aeq. -1d0) .or. this % grid_phi % from < 2*pi, 'Error: grid_phi % from should be < 2*pi')
-    call assert((this % grid_phi % to .aeq. -1d0) .or. (this % grid_phi % to .ale. 2*pi), 'Error: grid_phi % to should be <= 2*pi')
+    call assert(this % num_points_phi == -1 .or. this % num_points_phi > 1, 'Error: num_points_phi should be > 1')
     call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
     call assert(this % J >= -1, 'Error: J should be >= 0')
     call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
@@ -473,7 +474,7 @@ contains
   subroutine checked_init_input_params(this, config_dict)
     class(input_params), intent(inout) :: this
     class(dictionary_t) :: config_dict ! intent(in)
-    type(dictionary_t) :: mandatory_keys, optional_keys, optional_nonset_keys, silent_keys, announceable_keys, all_keys
+    type(dictionary_t) :: mandatory_keys, optional_keys, messages, optional_nonset_keys, all_keys
 
     call this % assign_dict(config_dict)
     mandatory_keys = this % get_mandatory_keys()
@@ -481,17 +482,32 @@ contains
 
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys)
-    optional_keys = this % get_optional_keys()
+    call this % get_optional_keys(optional_keys, messages)
     call check_unused_keys(config_dict, mandatory_keys, optional_keys)
 
     if (len(optional_keys) > 0) then
       optional_nonset_keys = set_difference(optional_keys, config_dict)
-      call this % assign_dict(optional_nonset_keys)
-      silent_keys = this % get_silent_keys()
-      announceable_keys = set_difference(optional_nonset_keys, silent_keys)
-      call announce_defaults(announceable_keys)
+      if (len(optional_nonset_keys) > 0) then
+        call this % assign_dict(optional_nonset_keys)
+        call announce_defaults(optional_nonset_keys, messages)
+      end if
     end if
     call this % check_values()
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Resolves parameters that require grid information and performs grid related checks.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_resolve_grids_input_params(this, grid_rho, grid_theta, grid_phi)
+    class(input_params), intent(inout) :: this
+    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+
+    call assert(this % basis_size_phi == -1 .or. this % basis_size_phi <= size(grid_phi) / 2, 'Error: basis_size_phi should be <= size(grid_phi) / 2')
+    if (this % stage == 'properties') then
+      call this % wf_sections % checked_resolve_rho_bounds(grid_rho(1), grid_rho(size(grid_rho)))
+      call this % wf_sections % checked_resolve_theta_bounds(grid_theta(1), grid_theta(size(grid_theta)))
+      call this % wf_sections % checked_resolve_phi_bounds(0d0, 2*pi)
+    end if
   end subroutine
 
 end module
