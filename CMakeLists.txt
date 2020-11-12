@@ -11,9 +11,9 @@ project(SpectrumSDT)
 enable_language(Fortran)
 
 # Specify where to look for external module files (-I option)
-include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict ${prefix}/libs/ftl/build/include/ftl ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
+include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
 # Specify where to look for libraries (-L option)
-link_directories(${prefix}/libs/fdict ${prefix}/libs/ftl/build/lib ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
+link_directories(${prefix}/libs/fdict ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
 
 set(numerical_recipies ${prefix}/src/base/numerical_recipies.f90)
 set(external_sources ${numerical_recipies})
@@ -103,4 +103,4 @@ set(spectrumsdt ${cap} ${config} ${debug_tools} ${dict_utils} ${general_vars} ${
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")
 
 add_executable(spectrumsdt ${spectrumsdt})
-target_link_libraries(spectrumsdt fdict ftl blas lapack petsc slepc)
+target_link_libraries(spectrumsdt fdict blas lapack petsc slepc)
