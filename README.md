@@ -19,14 +19,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     make
     ```
 
-    2. FTL
-    ```
-    cd ~/SpectrumSDT/libs/ftl
-    make
-    PREFIX=build make install
-    ```
-
-    3. PETSc
+    2. PETSc
     ```
     cd ~/SpectrumSDT/libs/petsc
     export PETSC_DIR=$PWD
@@ -35,7 +28,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     make all
     ```
 
-    4. SLEPc
+    3. SLEPc
     ```
     cd ~/SpectrumSDT/libs/slepc
     export SLEPC_DIR=$PWD
