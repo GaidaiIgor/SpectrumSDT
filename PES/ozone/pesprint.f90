@@ -3,10 +3,6 @@ module pesprint_constants
   implicit none
 
   real(real64), parameter :: pi = acos(-1d0)
-  real(real64), parameter :: amu_to_kg = 1.660538921d-27 ! kg / amu (kilograms per atomic mass unit)
-  real(real64), parameter :: aum_to_kg = 9.10938291d-31 ! kg / aum (kilogram per electron (atomic unit of mass))
-  real(real64), parameter :: amu_to_aum = amu_to_kg / aum_to_kg ! aum / amu
-  real(real64), parameter :: ozone_isotope_masses(3) = [15.99491461956d0, 16.99913170d0, 17.9991596129d0] * amu_to_aum ! aum; masses of isotopes of oxygen 16, 17 and 18 respectively
   real(real64), parameter :: au_to_wn = 219474.6313708d0 ! cm^-1 / Eh (wavenumbers per Hartree)
 
   ! As computed by program zpeO2
@@ -29,14 +25,13 @@ program pesprint
 
   integer :: ierr, proc_id
   real(real64) :: shift
-  real(real64) :: mass(3)
   real(real64), allocatable :: coords(:, :)
   real(real64), allocatable :: pes(:)
 
   call MPI_Init(ierr)
-  call init_parameters(mass, shift)
+  call init_parameters(shift)
   coords = load_coords('pes.in')
-  call calc_pes(coords, mass, shift, pes)
+  call calc_pes(coords, shift, pes)
 
   call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
   if (proc_id == 0) then
@@ -50,10 +45,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes masses and shifts. Isotopic composition of ozone has to be supplied via command line argument.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine init_parameters(mass, shift)
-    real(real64), intent(out) :: mass(3)
+  subroutine init_parameters(shift)
     real(real64), intent(out) :: shift
-    integer :: i, atom_code
     character(3) :: ozone_isotopes
 
     ! Read command line arguments
@@ -61,14 +54,6 @@ contains
     if (len(trim(ozone_isotopes)) == 0) then
       stop 'Isotopic composition has to be specified'
     end if
-
-    do i = 1, 3
-      read(ozone_isotopes(i:i), *) atom_code
-      mass(i) = ozone_isotope_masses(atom_code - 5)
-    end do
-    
-    ! mass(1) is the central atom; mass(2) and mass(3) are terminal atoms
-    mass = cshift(mass, 1)
 
     ! select corresponding ZPE
     if (ozone_isotopes == '666') then
@@ -194,37 +179,31 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates potential at a given *aph_point*.
+! Calculates ozone potential at a configuration given by lengths of all bonds in order: 
+! bond12, bond13, bond23 (1 - terminal1, 2 - central, 3 - terminal2).
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_potential_point_aph(aph_point, mass, shift) result(potential)
-    real(real64), intent(in) :: aph_point(3)
-    real(real64), intent(in) :: mass(3)
+  function calc_potential_point(all_bonds, shift) result(potential)
+    real(real64), intent(in) :: all_bonds(3)
     real(real64), intent(in) :: shift
     real(real64) :: potential
-    real(real64) :: r(3), r2(3), mass_copy(3)
-    real(real64) :: cart(9)
-    external :: INT_Cart, Cart_INT, IMLS ! Dawes' procedures
+    real(real64) :: internal(3)
+    external :: IMLS ! Dawes' PES procedure
 
-    r2 = aph_point
-    mass_copy = mass
-    call INT_Cart(r2, cart, mass_copy, 4) ! APH to Cartesian
-    call Cart_INT(r2, cart, mass_copy, 2) ! Cartesian to bond-angle
+    ! convert all bonds to internal coordinates expected by IMLS
+    internal(1) = min(all_bonds(1), all_bonds(2))
+    internal(2) = max(all_bonds(1), all_bonds(2))
+    internal(3) = acos((all_bonds(1)**2 + all_bonds(2)**2 - all_bonds(3)**2) / (2 * all_bonds(1) * all_bonds(2))) * 180 / pi
 
-    r(1) = min(r2(1), r2(2))
-    r(2) = max(r2(1), r2(2))
-    r(3) = 180*acos(r2(3)) / pi
-
-    call IMLS(r, potential, 1)
+    call IMLS(internal, potential, 1)
     potential = potential / au_to_wn - De + shift
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates potential energy surface for each combination of points in *grids*. Result is defined on 0th processor only. Parallel version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_pes(coords, mass, shift, pes)
+  subroutine calc_pes(coords, shift, pes)
     real(real64), intent(in) :: coords(:, :)
     real(real64), allocatable, intent(out) :: pes(:)
-    real(real64) :: mass(3) ! intent(in)
     real(real64), intent(in) :: shift
     integer :: proc_id, ierr, first_k, proc_points, proc_k, k
     integer, allocatable :: proc_counts(:), proc_shifts(:)
@@ -241,7 +220,7 @@ contains
         call track_progress(proc_k * 1d0 / proc_points, 0.01d0)
       end if
       k = first_k + proc_k - 1
-      proc_pes(proc_k) = calc_potential_point_aph(coords(:, k), mass, shift)
+      proc_pes(proc_k) = calc_potential_point(coords(:, k), shift)
     end do
 
     ! Allocate global storage on 0th proc

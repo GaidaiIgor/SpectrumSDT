@@ -1,4 +1,5 @@
 subroutine IMLS(jac3,V,SO_flag)  
+  ! jac3 - internal (valence) coordinates
   use dynamic_parameters
   use splin
   use path_resolution_mod
@@ -640,19 +641,23 @@ subroutine INT_Cart(internal_temp,cart,mass,lab)
      mu=sqrt(mass(1)*mass(2)*mass(3)/M)
      
      d = sqrt((mass(1)/mu)*(1d0-mass(1)/M))
-     hyper1=(internal(1)/sqrt(2d0))*sqrt(1d0+dsin(internal(2))*dcos(internal(3)))
-     hyper2=(internal(1)/sqrt(2d0))*sqrt(1d0-dsin(internal(2))*dcos(internal(3)))
-     hyper3=dsin(internal(2))*dsin(internal(3))/sqrt(1d0-dsin(internal(2))**2*dcos(internal(3))**2)
-     
-     internal(1)=d*hyper2
-     internal(2)=(1d0/d)*hyper1
-     internal(3)=dacos(hyper3)
+     ! APH to scaled jacobi
+     hyper1=(internal(1)/sqrt(2d0))*sqrt(1d0+dsin(internal(2))*dcos(internal(3))) ! S
+     hyper2=(internal(1)/sqrt(2d0))*sqrt(1d0-dsin(internal(2))*dcos(internal(3))) ! s
+     hyper3=dsin(internal(2))*dsin(internal(3))/sqrt(1d0-dsin(internal(2))**2*dcos(internal(3))**2) ! cos(Theta)
+
+     ! scaled jacobi to jacobi
+     internal(1)=d*hyper2 ! r
+     internal(2)=(1d0/d)*hyper1 ! R
+     internal(3)=dacos(hyper3) ! Theta
+
      cm=mass(3)*internal(1)/(mass(2)+mass(3))
      !     theta=dacos(internal(3))
      
-     cart(7)=internal(1)
-     cart(1)=cm-dcos(internal(3))*internal(2)!cm-internal(3)*internal(2)
-     cart(2)=dsin(internal(3))*internal(2)
+     ! jacobi to cartesian
+     cart(7)=internal(1) ! x3
+     cart(1)=cm-dcos(internal(3))*internal(2)!cm-internal(3)*internal(2) ! x1 (central)
+     cart(2)=dsin(internal(3))*internal(2) ! y1 (central)
   endif
   return
 end subroutine INT_Cart
@@ -695,25 +700,26 @@ subroutine Cart_INT(internal,cart,mass,lab)
   else
      !!!!hyperspherical
 !!! start with scaled Jacobi
-     internal(1)=sqrt((cart(4)-cart(7))**2+(cart(5)-cart(8))**2+(cart(6)-cart(9))**2)
+     internal(1)=sqrt((cart(4)-cart(7))**2+(cart(5)-cart(8))**2+(cart(6)-cart(9))**2) ! dist between atoms 2 and 3
      dist=0d0
      do i=1,3
-        vec(i)=cart(3+i)-cart(6+i)
-        cm(i)=(cart(3+i)*mass(2)+cart(6+i)*mass(3))/(mass(2)+mass(3))
-        vec2(i)=cart(i)-cm(i)
-        dist=dist+vec(i)*vec2(i)
+        vec(i)=cart(3+i)-cart(6+i) ! vec from 3 to 2
+        cm(i)=(cart(3+i)*mass(2)+cart(6+i)*mass(3))/(mass(2)+mass(3)) ! x,y,z of cm between 2 and 3
+        vec2(i)=cart(i)-cm(i) ! vec from cm to 1
+        dist=dist+vec(i)*vec2(i) ! dot product: s .dot. S
      enddo
      internal(2)=sqrt( (cart(1)-cm(1))**2+(cart(2)-cm(2))**2+(cart(3)-cm(3))**2)
 
      M=mass(1)+mass(2)+mass(3)
      mu=sqrt(mass(1)*mass(2)*mass(3)/M)
      d= sqrt((mass(1)/mu)*(1d0-mass(1)/M))
-     internal(1)=(1d0/d)*internal(1)
-     internal(2)=d*internal(2)
-     internal(3)=dacos(dist/(internal(1)*internal(2)))
+     internal(1)=(1d0/d)*internal(1) ! s
+     internal(2)=d*internal(2) ! S
+     internal(3)=dacos(dist/(internal(1)*internal(2))) ! Theta
      !! start hyper
      hyper1=sqrt(internal(1)**2+internal(2)**2)
      hyper2=datan(sqrt((internal(2)**2-internal(1)**2)**2+(2d0*dist)**2)/(2d0*internal(1)*internal(2)*dsin(internal(3))))
+
      y=2d0*dist/sqrt((internal(2)**2-internal(1)**2)**2+(2d0*dist)**2)
      x=(internal(2)**2-internal(1)**2)/sqrt((internal(2)**2-internal(1)**2)**2+(2d0*dist)**2)
      hyper3=datan2(y,x)

@@ -28,6 +28,7 @@ module input_params_mod
     type(optgrid_params) :: grid_rho
     type(grid_params) :: grid_theta
     integer :: num_points_phi = -1
+    character(:), allocatable :: output_coordinate_system
 
     ! System
     real(real64) :: mass(3) = -1
@@ -222,6 +223,8 @@ contains
           call convert_grid_params_deg_to_rad(this % grid_theta)
         case ('num_points_phi')
           this % num_points_phi = str2int(extract_string(config_dict, next_key))
+        case ('output_coordinate_system')
+          this % output_coordinate_system = extract_string(config_dict, next_key)
         case ('mass')
           this % mass = parse_mass(extract_string(config_dict, next_key))
         case ('J')
@@ -294,13 +297,10 @@ contains
       if (this % basis_size_phi == -1) then
         call put_string(keys, 'num_points_phi')
       end if
-      if (this % basis_size_phi /= -1 .and. this % num_points_phi == -1) then
-        call put_string(keys, 'basis_size_phi')
-      end if
     end if
 
-    if (this % stage == 'grids' .and. this % grid_rho % optimized == 1 .or. this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. &
-        this % stage == 'properties') then
+    if (this % stage == 'grids' .and. (this % grid_rho % optimized == 1 .or. any(this % output_coordinate_system == [character(100) :: 'jacobi', 'cartesian', 'all bonds', 'internal'])) .or. &
+        this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
       call put_string(keys, 'mass')
     end if
 
@@ -318,7 +318,8 @@ contains
       call put_string(keys, 'K')
     end if
 
-    if (this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'properties') then
+    if (this % stage == 'grids' .and. this % basis_size_phi /= -1 .and. this % num_points_phi == -1 .or. &
+        this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'properties') then
       call put_string(keys, 'basis_size_phi')
     end if
 
@@ -360,6 +361,7 @@ contains
     if (this % stage == 'grids') then
       call put_string(keys, 'num_points_phi', num2str(2 * this % basis_size_phi))
       call put_string(messages, 'num_points_phi', 'Assuming default = 2 * basis_size_phi')
+      call put_string(keys, 'output_coordinate_system', 'aph')
     end if
 
     if (this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
@@ -405,6 +407,7 @@ end subroutine
     call put_string(keys, 'grid_rho')
     call put_string(keys, 'grid_theta')
     call put_string(keys, 'num_points_phi')
+    call put_string(keys, 'output_coordinate_system')
     call put_string(keys, 'mass')
     call put_string(keys, 'J')
     call put_string(keys, 'K')
@@ -443,6 +446,8 @@ end subroutine
     call assert((this % grid_theta % from .aeq. -1d0) .or. this % grid_theta % from < pi, 'Error: grid_theta % from should be < pi')
     call assert((this % grid_theta % to .aeq. -1d0) .or. this % grid_theta % to < pi, 'Error: grid_theta % to should be < pi')
     call assert(this % num_points_phi == -1 .or. this % num_points_phi > 1, 'Error: num_points_phi should be > 1')
+    call assert(any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
+        'Error: output_coordinate_system can be "aph", "mass jacobi", "jacobi", "cartesian", "all bonds" or "internal"')
     call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
     call assert(this % J >= -1, 'Error: J should be >= 0')
     call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')

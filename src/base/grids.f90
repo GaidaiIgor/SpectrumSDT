@@ -4,6 +4,7 @@
 module grids_mod
   use config_mod
   use constants
+  use coordinate_coversion_mod
   use general_utils
   use general_vars, only: mu
   use input_params_mod
@@ -295,43 +296,83 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Prints a file specified by *file_name* with APH coordinates at which the values of PES are requested.
+! Forms a list where each row is a combination of elements from the given arrays.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine write_pes_request_aph(grid_rho, grid_theta, grid_phi, file_name)
-    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
-    character(*), intent(in) :: file_name
-    integer, parameter :: col_width = 25
-    integer :: file_unit, i1, i2, i3
+  function product_list(array1, array2, array3) result(list)
+    real(real64), intent(in) :: array1(:), array2(:), array3(:)
+    real(real64) :: list(3, size(array1) * size(array2) * size(array3))
+    integer :: i1, i2, i3, j
 
-    open(newunit = file_unit, file = file_name)
-    write(file_unit, *) size(grid_rho) * size(grid_theta) * size(grid_phi)
-    write(file_unit, '(3A' // num2str(col_width) // ')') align_center('rho (Bohr)', col_width), align_center('theta (rad)', col_width), align_center('phi (rad)', col_width)
-    do i1 = 1, size(grid_rho)
-      do i2 = 1, size(grid_theta)
-        do i3 = 1, size(grid_phi)
-          write(file_unit, '(3G' // num2str(col_width) // '.15)') grid_rho(i1), grid_theta(i2), grid_phi(i3)
+    j = 1
+    do i1 = 1, size(array1)
+      do i2 = 1, size(array2)
+        do i3 = 1, size(array3)
+          list(1, j) = array1(i1)
+          list(2, j) = array2(i2)
+          list(3, j) = array3(i3)
+          j = j + 1
         end do
       end do
     end do
-    close(file_unit)
-  end subroutine
+  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints a file specified by *file_name* with coordinates at which the values of PES are requested.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine write_pes_request(grid_rho, grid_theta, grid_phi, file_name, coordinates)
+  subroutine write_pes_request(grid_rho, grid_theta, grid_phi, file_name, coord_system, mass)
     real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
-    character(*), intent(in) :: file_name, coordinates
+    character(*), intent(in) :: file_name, coord_system
+    real(real64), optional, intent(in) :: mass(:)
+    integer, parameter :: col_width = 25
+    integer :: file_unit
+    real(real64), allocatable :: coord_list(:, :)
+    character(:), allocatable :: col1_header, col2_header, col3_header
 
-    if (coordinates == 'aph') then
-      call write_pes_request_aph(grid_rho, grid_theta, grid_phi, file_name)
-    else
-      stop 'Error: unknown coordinates'
-    end if
+    call assert(any(coord_system == [character(100) :: 'jacobi', 'cartesian', 'all bonds', 'internal']) .means. present(mass), 'Error: mass has to be given for this coordinate system')
+    coord_list = product_list(grid_rho, grid_theta, grid_phi)
+    select case (coord_system)
+      case ('aph')
+        col1_header = 'rho (Bohr)'
+        col2_header = 'theta (rad)'
+        col3_header = 'phi (rad)'
+      case ('mass jacobi')
+        col1_header = 's (Bohr)'
+        col2_header = 'S (Bohr)'
+        col3_header = 'Theta (rad)'
+        coord_list = convert_aph_to_mass_jacobi(coord_list)
+      case ('jacobi')
+        col1_header = 'r (Bohr)'
+        col2_header = 'R (Bohr)'
+        col3_header = 'Theta (rad)'
+        coord_list = convert_aph_to_jacobi(coord_list, mass)
+      case ('cartesian')
+        col1_header = 'x2 (Bohr)'
+        col2_header = 'y2 (Bohr)'
+        col3_header = 'x3 (Bohr)'
+        coord_list = convert_aph_to_cartesian(coord_list, mass)
+      case ('all bonds')
+        col1_header = 'bond12 (Bohr)'
+        col2_header = 'bond13 (Bohr)'
+        col3_header = 'bond23 (Bohr)'
+        coord_list = convert_aph_to_all_bonds(coord_list, mass)
+      case ('internal')
+        col1_header = 'bond12 (Bohr)'
+        col2_header = 'bond23 (Bohr)'
+        col3_header = 'angle123 (rad)'
+        coord_list = convert_aph_to_internal(coord_list, mass)
+      case default
+        call assert(.false., 'Error: unknown coordinate system')
+    end select
+
+    open(newunit = file_unit, file = file_name)
+    write(file_unit, *) size(coord_list, 2)
+    write(file_unit, '(3A' // num2str(col_width) // ')') align_center(col1_header, col_width), align_center(col2_header, col_width), align_center(col3_header, col_width)
+    write(file_unit, '(3G' // num2str(col_width) // '.15)') coord_list
+    close(file_unit)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Top level procedure for grids generation
+! Top level procedure for grids generation.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine generate_grids(params)
     class(input_params), intent(in) :: params
@@ -373,7 +414,7 @@ contains
     call write_grid(grid_theta, jac_theta, theta_step, 'grid_theta.dat')
     call write_grid(grid_phi, jac_phi, phi_step, 'grid_phi.dat')
 
-    call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', 'aph')
+    call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % mass)
   end subroutine
 
 end module
