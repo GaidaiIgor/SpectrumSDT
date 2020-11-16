@@ -18,7 +18,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     ```
     cd ~/SpectrumSDT/libs/fdict
     ```
-    Edit `setup.make` to change compiler options.
+    Edit `setup.make` to change compiler options if necessary (default should work).
     ```
     make
     ```
