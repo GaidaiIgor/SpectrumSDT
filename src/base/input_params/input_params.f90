@@ -446,7 +446,8 @@ end subroutine
     call assert((this % grid_theta % from .aeq. -1d0) .or. this % grid_theta % from < pi, 'Error: grid_theta % from should be < pi')
     call assert((this % grid_theta % to .aeq. -1d0) .or. this % grid_theta % to < pi, 'Error: grid_theta % to should be < pi')
     call assert(this % num_points_phi == -1 .or. this % num_points_phi > 1, 'Error: num_points_phi should be > 1')
-    call assert(any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
+    call assert(.not. allocated(this % output_coordinate_system) .or. &
+        any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
         'Error: output_coordinate_system can be "aph", "mass jacobi", "jacobi", "cartesian", "all bonds" or "internal"')
     call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
     call assert(this % J >= -1, 'Error: J should be >= 0')

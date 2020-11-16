@@ -190,8 +190,8 @@ contains
     external :: IMLS ! Dawes' PES procedure
 
     ! convert all bonds to internal coordinates expected by IMLS
-    internal(1) = min(all_bonds(1), all_bonds(2))
-    internal(2) = max(all_bonds(1), all_bonds(2))
+    internal(1) = all_bonds(1)
+    internal(2) = all_bonds(2)
     internal(3) = acos((all_bonds(1)**2 + all_bonds(2)**2 - all_bonds(3)**2) / (2 * all_bonds(1) * all_bonds(2))) * 180 / pi
 
     call IMLS(internal, potential, 1)
