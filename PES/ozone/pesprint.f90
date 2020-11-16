@@ -84,7 +84,7 @@ contains
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes exclusive prefix sum, i.e. res(i) = sum( [array(1)..array(i - 1)] )
+! Computes exclusive prefix sum, i.e. res(i) = sum( [array(1)..array(i - 1)] ).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function prefix_sum_exclusive(array) result(res)
     integer, intent(in) :: array(:)
@@ -125,7 +125,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Compares given reals with specified precision
+! Compares given reals with specified precision.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function compare_reals(a, b, comp_precision) result(res)
     real(real64), intent(in) :: a, b
@@ -144,7 +144,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts real to integer, rounding up if within target accuracy of the next integer, otherwise down
+! Converts real to integer, rounding up if within target accuracy of the next integer, otherwise down.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function real2int(a, comp_precision) result(res)
     real(real64), intent(in) :: a
@@ -160,8 +160,8 @@ contains
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints progress % at specified points.
-! progress: current progress of some process (a number from 0 to 1)
-! progress_step: controls how often progress should be reported
+! progress: current progress of some process (a number from 0 to 1).
+! progress_step: controls how often progress should be reported.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine track_progress(progress, progress_step)
     real(real64), intent(in) :: progress

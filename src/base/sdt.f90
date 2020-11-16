@@ -2,6 +2,8 @@
 ! Procedures related to calculation of basis for Hamiltonian and base overlaps
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module sdt
+  use array_1d_mod, only: array_1d_real
+  use array_2d_mod, only: array_2d_real
   use constants, only: au_to_wn, pi
   use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_vars
@@ -13,15 +15,6 @@ module sdt
   use potential_mod, only: pottot
   use spectrumsdt_paths_mod
   implicit none
-
-  ! Data types for arrays of variable size
-  type array1d
-    real(real64),allocatable :: a(:)
-  endtype array1d
-
-  type array2d
-    real(real64),allocatable :: a(:,:)
-  endtype array2d
 
   ! Mode constants
   integer,parameter::MODE_BASIS         = 1
@@ -177,13 +170,48 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
+  !  Frees 1D solution.
+  !-----------------------------------------------------------------------
+  subroutine free_1d(nvec,val,vec)
+    type(array_1d_real),allocatable::val(:) ! 1D values  for each thread
+    type(array_2d_real),allocatable::vec(:) ! 1D vectors for each thread
+    integer,allocatable::nvec(:)      ! Num of 1D vecs
+    integer i
+    if (allocated(nvec)) deallocate(nvec)
+    if (allocated(val)) then
+      do i = 1, n2
+        if (allocated(val(i) % p)) deallocate(val(i) % p)
+      end do
+      deallocate(val)
+    end if
+    if (allocated(vec)) then
+      do i = 1, n2
+        if (allocated(vec(i) % p)) deallocate(vec(i) % p)
+      end do
+      deallocate(vec)
+    end if
+  end subroutine
+
+  !-----------------------------------------------------------------------
+  !  Frees 2D solution.
+  !-----------------------------------------------------------------------
+  subroutine free_2d(nvec,val,vec)
+    real(real64),allocatable::vec(:,:)      ! 2D vectors in basis
+    real(real64),allocatable::val(:)        ! 2D values
+    integer nvec                      ! Num of 2D vecs
+    nvec = 0
+    if (allocated(val)) deallocate(val)
+    if (allocated(vec)) deallocate(vec)
+  end subroutine
+
+  !-----------------------------------------------------------------------
   !  Solves 1D problems for each thread in the slice.
   !  Serial solution.
   !-----------------------------------------------------------------------
   subroutine calc_1d(params, val, vec, nvec, nb2, i1)
     class(input_params), intent(in) :: params
-    type(array1d),allocatable::val(:) ! 1D values  for each thread
-    type(array2d),allocatable::vec(:) ! 1D vectors for each thread
+    type(array_1d_real),allocatable::val(:) ! 1D values  for each thread
+    type(array_2d_real),allocatable::vec(:) ! 1D vectors for each thread
     integer,allocatable::nvec(:)      ! Num of 1D vecs in each thread
     integer,allocatable::nbr(:)       ! Nums of good vecs in vecraw
     integer nb2                       ! Size of 2D vector in basis
@@ -242,11 +270,11 @@ contains
 
       ! Save good vectors
       if (ivec/=0) then
-        allocate(val(i2)%a(ivec))
-        allocate(vec(i2)%a(n3b,ivec))
+        allocate(val(i2) % p(ivec))
+        allocate(vec(i2) % p(n3b,ivec))
         do i3=1,ivec
-          val(i2)%a(i3)   = valraw(nbr(i3))
-          vec(i2)%a(:,i3) = vecrawb(:,nbr(i3))
+          val(i2) % p(i3)   = valraw(nbr(i3))
+          vec(i2) % p(:,i3) = vecrawb(:,nbr(i3))
         end do
       end if
       nvec(i2) = ivec
@@ -259,8 +287,8 @@ contains
     write(file_unit) nvec
     do i2 = 1, n2
       if (nvec(i2) /= 0) then
-        write(file_unit) val(i2) % a
-        write(file_unit) vec(i2) % a
+        write(file_unit) val(i2) % p
+        write(file_unit) vec(i2) % p
       end if
     end do
     close(file_unit)
@@ -342,8 +370,8 @@ contains
   !-----------------------------------------------------------------------
   subroutine calc_2d(params, val2, vec2, sym2, nvec2, i1, val1, vec1, nvec1)
     class(input_params), intent(in) :: params
-    type(array1d),allocatable::val1(:) ! 1D values  for each thread
-    type(array2d),allocatable::vec1(:) ! 1D vectors for each thread
+    type(array_1d_real),allocatable::val1(:) ! 1D values  for each thread
+    type(array_2d_real),allocatable::vec1(:) ! 1D vectors for each thread
     real(real64),allocatable::vec2(:,:)      ! 2D vectors in basis
     real(real64),allocatable::val2(:)        ! 2D values
     real(real64),allocatable::sym2(:)        ! 2D symmetries
@@ -406,14 +434,14 @@ contains
             ham1(i,i) = 1d0
           end do
         else
-          ham1 = matmul(transpose(vec1(ir) % a), vec1(ic) % a)
+          ham1 = matmul(transpose(vec1(ir) % p), vec1(ic) % p)
         end if
 
         ! Calculate block
         ham1 = ham1 * kin(ir,ic)
         if (ic==ir) then
           do i=1,nvec1c
-            ham1(i,i) = ham1(i,i) + val1(ic) % a(i)
+            ham1(i,i) = ham1(i,i) + val1(ic) % p(i)
           end do
         end if
 
@@ -509,8 +537,8 @@ contains
   subroutine calc_basis(params)
     class(input_params), intent(in) :: params
     ! Variables for one slice
-    type(array1d),allocatable::val1(:) ! 1D values
-    type(array2d),allocatable::vec1(:) ! 1D vectors
+    type(array_1d_real),allocatable::val1(:) ! 1D values
+    type(array_2d_real),allocatable::vec1(:) ! 1D vectors
     real(real64),allocatable::val2(:)        ! 2D values
     real(real64),allocatable::vec2(:,:)      ! 2D vectors in basis
     real(real64),allocatable::sym2(:)        ! 2D symmeties
@@ -591,41 +619,6 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------
-  !  Frees 1D solution.
-  !-----------------------------------------------------------------------
-  subroutine free_1d(nvec,val,vec)
-    type(array1d),allocatable::val(:) ! 1D values  for each thread
-    type(array2d),allocatable::vec(:) ! 1D vectors for each thread
-    integer,allocatable::nvec(:)      ! Num of 1D vecs
-    integer i
-    if (allocated(nvec))deallocate(nvec)
-    if (allocated(val)) then
-      do i=1,n2
-        if (allocated(val(i)%a))deallocate(val(i)%a)
-      end do
-      deallocate(val)
-    end if
-    if (allocated(vec)) then
-      do i=1,n2
-        if (allocated(vec(i)%a))deallocate(vec(i)%a)
-      end do
-      deallocate(vec)
-    end if
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Frees 2D solution.
-  !-----------------------------------------------------------------------
-  subroutine free_2d(nvec,val,vec)
-    real(real64),allocatable::vec(:,:)      ! 2D vectors in basis
-    real(real64),allocatable::val(:)        ! 2D values
-    integer nvec                      ! Num of 2D vecs
-    nvec = 0
-    if (allocated(val)) deallocate(val)
-    if (allocated(vec)) deallocate(vec)
-  end subroutine
-
-  !-----------------------------------------------------------------------
   !  Loads number of 2D states only.
   !-----------------------------------------------------------------------
   subroutine load_nvec2(sym_path, nvec2)
@@ -646,8 +639,8 @@ contains
   !-----------------------------------------------------------------------
   subroutine load_eibasis(sym_path, isl, nvec1, val1, vec1, val2, vec2)
     character(*), intent(in) :: sym_path
-    type(array1d),allocatable::val1(:) ! 1D solutions eigenvalues for each thread
-    type(array2d),allocatable::vec1(:) ! 1D solutions expansion coefficients (over sin/cos) for each thread
+    type(array_1d_real),allocatable::val1(:) ! 1D solutions eigenvalues for each thread
+    type(array_2d_real),allocatable::vec1(:) ! 1D solutions expansion coefficients (over sin/cos) for each thread
     real(real64),allocatable::vec2(:,:)      ! 2D solutions expansion coefficients (over 1D solutions)
     real(real64),allocatable::val2(:)        ! 2D eigenvalues
     integer,allocatable::nvec1(:)      ! Num of 1D solutions in each thread
@@ -675,9 +668,9 @@ contains
     read(file_unit) nvec1
     do i = 1, n2
       if (nvec1(i) == 0) cycle
-      allocate(val1(i)%a(nvec1(i)),vec1(i)%a(n3b,nvec1(i)))
-      read(file_unit) val1(i) % a
-      read(file_unit) vec1(i) % a
+      allocate(val1(i) % p(nvec1(i)),vec1(i) % p(n3b,nvec1(i)))
+      read(file_unit) val1(i) % p
+      read(file_unit) vec1(i) % p
     end do
     close(file_unit)
   end subroutine
@@ -689,7 +682,7 @@ contains
   !  Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2e and is fixed within this subroutine)
   !-----------------------------------------------------------------------
   subroutine trans_eibas_bas(vec1,nvec1,vec2e,vec2b)
-    type(array2d) vec1(:)    ! i-th element is a 2D array of 1D solutions in the i-th thread given as expansion coefficients over sin/cos basis
+    type(array_2d_real) vec1(:)    ! i-th element is a 2D array of 1D solutions in the i-th thread given as expansion coefficients over sin/cos basis
     real(real64)        vec2b(:)   ! 2D vector in basis
     real(real64)        vec2e(:)   ! expansion coefficients over 1D solutions
     integer nvec1(n2)        ! Number of 1D vectors in each thread
@@ -698,7 +691,7 @@ contains
     i = 0
     do is=1,n2
       j = (is-1) * n3b
-      vec2b(j+1 : j+n3b) = matmul(vec1(is) % a, vec2e(i+1 : i+nvec1(is)))
+      vec2b(j+1 : j+n3b) = matmul(vec1(is) % p, vec2e(i+1 : i+nvec1(is)))
       i = i + nvec1(is)
     end do
   end subroutine
@@ -710,10 +703,10 @@ contains
   subroutine calc_overlap(params)
     class(input_params), intent(in) :: params
     ! Arrays for 1D and 2D eigenstates
-    type(array1d),allocatable::val1c(:)   ! 1D values for ic
-    type(array1d),allocatable::val1r(:)   ! 1D values for ir
-    type(array2d),allocatable::vec1c(:)   ! 1D vecs for ic
-    type(array2d),allocatable::vec1r(:)   ! 1D vecs for ir
+    type(array_1d_real),allocatable::val1c(:)   ! 1D values for ic
+    type(array_1d_real),allocatable::val1r(:)   ! 1D values for ir
+    type(array_2d_real),allocatable::vec1c(:)   ! 1D vecs for ic
+    type(array_2d_real),allocatable::vec1r(:)   ! 1D vecs for ir
     real(real64),allocatable::vec2c(:,:)        ! 2D vecs in basis for ic
     real(real64),allocatable::vec2r(:,:)        ! 2D vecs in basis for ir
     real(real64),allocatable::val2c(:)          ! 2D eivalues for ic slice
