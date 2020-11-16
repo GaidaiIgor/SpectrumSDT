@@ -14,8 +14,12 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
 2. Build the libraries
 
     1. fdict
+    
     ```
     cd ~/SpectrumSDT/libs/fdict
+    ```
+    Edit `setup.make` to change compiler options.
+    ```
     make
     ```
 
