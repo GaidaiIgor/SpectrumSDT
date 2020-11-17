@@ -118,7 +118,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Recursively computes sizes of all offdiagonal subblocks of a given _offdiagonal_ block located at the intersection of the two parental 
+! Recursively computes sizes of all offdiagonal subblocks of a given _offdiagonal_ block located at the intersection of the two parental
 ! blocks. Rows are taken from parent1, columns are taken from parent2.
 ! Parents must be blocks of the same level (i.e. having the same number of levels of subblocks)
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -222,6 +222,7 @@ contains
     integer, intent(in) :: row
     integer :: j, last_non_empty_row
     type(matrix_block_info), pointer :: new_subblocks(:, :)
+    logical, allocatable :: temp(:)
 
     ! If this block is unaffected by cutting then do nothing
     if (this % borders % bottom <= row) then
@@ -238,7 +239,11 @@ contains
     end if
 
     ! Find last not completely eliminated block row index
-    last_non_empty_row = findloc(this % subblocks(:, 1) % borders % top <= row, .true., 1, back = .true.)
+    ! Plugging in temp directly with back = true causes ifort to crash... so use temp variable as a workaround.
+    temp = this % subblocks(:, 1) % borders % top <= row
+    ! last_non_empty_row = findloc(temp(size(temp):1:-1), .true., 1, back = .true.)
+    last_non_empty_row = findloc(temp, .true., 1, back = .true.)
+
     ! If all subblocks are eliminated
     if (last_non_empty_row == 0) then
       call this % deallocate_recursive()
