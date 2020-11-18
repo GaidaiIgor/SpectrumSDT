@@ -222,7 +222,6 @@ contains
     integer, intent(in) :: row
     integer :: j, last_non_empty_row
     type(matrix_block_info), pointer :: new_subblocks(:, :)
-    logical, allocatable :: temp(:)
 
     ! If this block is unaffected by cutting then do nothing
     if (this % borders % bottom <= row) then
@@ -239,11 +238,7 @@ contains
     end if
 
     ! Find last not completely eliminated block row index
-    ! Plugging in temp directly with back = true causes ifort to crash... so use temp variable as a workaround.
-    temp = this % subblocks(:, 1) % borders % top <= row
-    ! last_non_empty_row = findloc(temp(size(temp):1:-1), .true., 1, back = .true.)
-    last_non_empty_row = findloc(temp, .true., 1, back = .true.)
-
+    last_non_empty_row = findloc(this % subblocks(:, 1) % borders % top <= row, .true., 1, back = .true.)
     ! If all subblocks are eliminated
     if (last_non_empty_row == 0) then
       call this % deallocate_recursive()
