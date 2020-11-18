@@ -330,6 +330,7 @@ contains
 
     call assert(any(coord_system == [character(100) :: 'jacobi', 'cartesian', 'all bonds', 'internal']) .means. present(mass), 'Error: mass has to be given for this coordinate system')
     coord_list = product_list(grid_rho, grid_theta, grid_phi)
+    print *, 'Converting coordinates...'
     select case (coord_system)
       case ('aph')
         col1_header = 'rho (Bohr)'

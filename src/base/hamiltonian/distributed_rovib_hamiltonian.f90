@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Distributed Hamiltonian class
+! Distributed Hamiltonian class.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module distributed_rovib_hamiltonian_mod
   use block_borders_mod
@@ -46,7 +46,7 @@ module distributed_rovib_hamiltonian_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Destructor
+! Destructor.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine finalize_distributed_rovib_hamiltonian(this)
     type(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -55,7 +55,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads K block sizes on the main diagonal of hamiltonian (based on number of solutions)
+! Loads K block sizes on the main diagonal of hamiltonian (based on number of solutions).
 ! Offdiagonal blocks are ignored. Blocks' positions and borders are ignored, only sizes are initialized here.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_block_sizes_diag(params, ham_info)
@@ -87,7 +87,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads blocks information for the whole rovib-enabled hamiltonian matrix
+! Loads blocks information for the whole rovib-enabled hamiltonian matrix.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_rovib_hamiltonian_info(params, ham_info)
     class(input_params), intent(in) :: params
@@ -100,7 +100,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Transforms K-block info to correspond to compressed offdiagonal K-block representation
+! Transforms K-block info to correspond to compressed offdiagonal K-block representation.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine compress_offdiag_K_block(global_K_block_info, compressed_info)
     type(matrix_block_info), intent(in) :: global_K_block_info
@@ -117,7 +117,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Transforms chunk info to correspond to compressed matrix representation
+! Transforms chunk info to correspond to compressed matrix representation.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine compress_chunk_info(global_chunk_info)
     type(matrix_block_info), pointer, intent(inout) :: global_chunk_info
@@ -190,8 +190,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads an overlap block for given values of Ks and slice indexes
-! overlap_type: 0 - regular, 10 - symmetric J, 11 - symmetric K, 2 - coriolis, 3 - asymmetric
+! Loads an overlap block for given values of Ks and slice indexes.
+! overlap_type: 0 - regular, 10 - symmetric J, 11 - symmetric K, 2 - coriolis, 3 - asymmetric.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function load_overlap_block(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns) result(block)
     character(*), intent(in) :: root_path
@@ -248,7 +248,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads regular overlaps for a diagonal K-block from disk. The block is described by the given block infos
+! Loads regular overlaps for a diagonal K-block from disk. The block is described by the given block infos.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_k_block_overlaps(this, params, local_k_block_info, global_k_block_info, full_ham_k_block_info)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -291,7 +291,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads overlaps for this processor's chunk of hamiltonian
+! Loads overlaps for this processor's chunk of hamiltonian.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_chunk_overlaps(this, params, ham_info)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -315,7 +315,7 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Multiplies this processor's chunk with kinetic energy matrix elements
+! Multiplies this processor's chunk with kinetic energy matrix elements.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine include_kinetic_energy(this, kinetic)
     class(distributed_rovib_hamiltonian), target, intent(inout) :: this
@@ -357,7 +357,7 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads 2d eigenvalues from file for given K, symmetry and slice index
+! Loads 2d eigenvalues from file for given K, symmetry and slice index.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function load_eivals_2d(root_path, K, K_sym, slice_ind) result(eivals)
     character(*), intent(in) :: root_path
@@ -377,7 +377,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Adds 2d energies to the portion of main diagonal belonging to this process's chunk
+! Adds 2d energies to the portion of main diagonal belonging to this process's chunk.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_k_block_eivals_2d(this, params, local_k_block_info, global_k_block_info, full_ham_k_block_info)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -427,7 +427,7 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Adds 2d energies to the portion of main diagonal belonging to this process's chunk
+! Adds 2d energies to the portion of main diagonal belonging to this process's chunk.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_chunk_eivals_2d(this, params, ham_info)
     class(distributed_rovib_hamiltonian), target, intent(inout) :: this
@@ -455,7 +455,7 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Adds complex absorbing potential to the portion of main diagonal belonging to this process's chunk
+! Adds complex absorbing potential to the portion of main diagonal belonging to this process's chunk.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine include_cap(this, cap, ham_info)
     class(distributed_rovib_hamiltonian), target, intent(inout) :: this
@@ -568,7 +568,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads sym term overlaps for this processor's chunk of hamiltonian
+! Loads sym term overlaps for this processor's chunk of hamiltonian.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_chunk_sym_term(this, params, ham_info)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -659,7 +659,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads coriolis overlaps for this processor's chunk of hamiltonian
+! Loads coriolis overlaps for this processor's chunk of hamiltonian.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_chunk_coriolis_term(this, params, ham_info)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -749,7 +749,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads asym term overlaps for this processor's chunk of hamiltonian
+! Loads asym term overlaps for this processor's chunk of hamiltonian.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_chunk_asym_term(this, params, ham_info)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -775,7 +775,7 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Builds a Hamiltonian matrix with rovib coupling enabled
+! Builds a Hamiltonian matrix.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine build(this, params, kinetic, cap)
     class(distributed_rovib_hamiltonian), intent(inout) :: this
@@ -823,4 +823,5 @@ contains
       call print_parallel('Asymmetric term is loaded')
     end if
   end subroutine
+
 end module

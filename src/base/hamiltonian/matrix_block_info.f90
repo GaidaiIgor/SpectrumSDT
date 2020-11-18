@@ -40,7 +40,7 @@ module matrix_block_info_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Constructor
+! Constructor.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function construct_matrix_block_info(first_row, first_col, rows, columns) result(instance)
     integer, intent(in) :: first_row, first_col, rows, columns
@@ -73,7 +73,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Moves upper left corner of a block to given row and col position i.e. shifts all borders positions for the block and all its subblocks
+! Moves upper left corner of a block to given row and col position i.e. shifts all borders positions for the block and all its subblocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine shift_to_matrix_block_info(this, row, col)
     class(matrix_block_info), intent(inout) :: this
@@ -98,7 +98,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Recursively updates indexes of all nested blocks
+! Recursively updates indexes of all nested blocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine update_block_indexes_matrix_block_info(this)
     class(matrix_block_info), intent(inout) :: this
@@ -120,7 +120,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Recursively computes sizes of all offdiagonal subblocks of a given _offdiagonal_ block located at the intersection of the two parental
 ! blocks. Rows are taken from parent1, columns are taken from parent2.
-! Parents must be blocks of the same level (i.e. having the same number of levels of subblocks)
+! Parents must be blocks of the same level (i.e. having the same number of levels of subblocks).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine compute_offdiag_subblock_sizes_offdiag(parent1, parent2, block)
     class(matrix_block_info), intent(in) :: parent1, parent2
@@ -141,8 +141,8 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Recursively calculates sizes of all offdiagonal subblocks of a given _diagonal_ block based on known sizes of diagonal subblocks
-! The starting block must be diagonal
+! Recursively calculates sizes of all offdiagonal subblocks of a given _diagonal_ block based on known sizes of diagonal subblocks.
+! The starting block must be diagonal.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine compute_offdiag_subblock_sizes_diag_matrix_block_info(this)
     class(matrix_block_info), intent(inout) :: this
@@ -170,7 +170,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Provides block information for matrix where rows above the specified row are removed
+! Provides block information for matrix where rows above the specified row are removed.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine remove_above_row_matrix_block_info(this, row)
     class(matrix_block_info), intent(inout) :: this
@@ -215,7 +215,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Provides block information for matrix where rows below the specified row are removed
+! Provides block information for matrix where rows below the specified row are removed.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine remove_below_row_matrix_block_info(this, row)
     class(matrix_block_info), intent(inout) :: this
@@ -249,6 +249,7 @@ contains
       call this % deallocate_recursive()
       return
     end if
+
     ! Allocate new version of this layer and copy relevant data from old version
     allocate(new_subblocks, source = this % subblocks(:last_non_empty_row, :))
     ! Deallocate cutted blocks recursively
@@ -265,7 +266,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Cuts block section between specified rows
+! Cuts block section between specified rows.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine cut_rows_between_matrix_block_info(this, first_row, last_row)
     class(matrix_block_info), intent(inout) :: this
@@ -276,7 +277,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Transposes a given block and its subblocks
+! Transposes a given block and its subblocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine transpose_matrix_block_info(this)
     class(matrix_block_info), intent(inout) :: this
@@ -304,7 +305,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns a pointer to the part of the given matrix corresponding to this block
+! Returns a pointer to the part of the given matrix corresponding to this block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function extract_from_matrix_matrix_block_info(this, matrix) result(block)
     class(matrix_block_info), intent(in) :: this
@@ -316,7 +317,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns part of the given matrix corresponding to this block
+! Returns part of the given matrix corresponding to this block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function is_empty_matrix_block_info(this) result(res)
     class(matrix_block_info), intent(in) :: this
@@ -325,7 +326,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates actual number of columns in local blocks after compression
+! Calculates actual number of columns in local blocks after compression.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine calculate_compressed_columns_matrix_block_info(this)
     class(matrix_block_info), intent(inout) :: this
@@ -350,7 +351,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Makes a shallow copy of block_info structure without copying subblocks
+! Makes a shallow copy of block_info structure without copying subblocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine copy_without_subblocks_matrix_block_info(this, other)
     class(matrix_block_info), intent(out) :: this
@@ -364,7 +365,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Makes a deep copy
+! Makes a deep copy.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine copy_matrix_block_info(this, other)
     class(matrix_block_info), intent(out) :: this
@@ -385,7 +386,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! prints info about this block
+! Prints info about this block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine print_matrix_block_info(this)
     class(matrix_block_info), intent(in) :: this
@@ -396,7 +397,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! prints info about this block and all its subblocks
+! Prints info about this block and all its subblocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   recursive subroutine print_all_matrix_block_info(this)
     class(matrix_block_info), intent(in) :: this

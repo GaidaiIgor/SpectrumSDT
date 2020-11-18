@@ -19,7 +19,7 @@ module spectrum_mod
 contains
    
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Prints spectrum
+! Prints spectrum.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine print_spectrum(params, eivals, eivecs)
     class(input_params), intent(in) :: params
@@ -60,15 +60,14 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Sets up rovib_ham and computes (rotational-)vibrational states
+! Sets up rovib_ham and computes (rotational-)vibrational states.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_states(params)
     type(input_params), intent(in) :: params
     complex(real64), allocatable :: eivals(:), cap(:)
     complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
 
-    call print_parallel('Using rovib coupling')
-    rovib_ham % compression = ifF(params % optimized_mult == 0, 0, 1) ! Global in matmul_operator_mod
+    rovib_ham % compression = iff(params % optimized_mult == 0, 0, 1) ! Global in matmul_operator_mod
     if (rovib_ham % compression == 0) then
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')
     end if
