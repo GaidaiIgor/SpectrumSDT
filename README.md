@@ -3,8 +3,7 @@ A parallel Fortran program for calculation of ro-vibrational energy levels and l
 # Building
 
 0. Prerequisites
-    1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake`, `gfortran`, `mpich`, `libblas-dev`, `liblapack-dev`.  
-    Tested with `gfortran 9.3.0` and `mpich 3.3.2`.
+    1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake` (3.5+), `gfortran` (9.3.0+), `mpich`, `libblas-dev`, `liblapack-dev`.  
     2. Make sure you machine has at least 2GB of RAM (for compilation)
 
 1. Clone the repo
@@ -43,10 +42,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
 3. Build the main program  
 `cd ~/SpectrumSDT`
 
-    1. Specify custom compiler options (optional)  
-    Default compiler options are specified in `compiler_options_default.cmake`.  
-    You can create a file named `compiler_options.cmake` to specify your custom compile options instead of the default ones.  
-    A few presets for different compilers can be found in the `compiler_options_alternative` folder.
+    1. Edit CMakeLists.txt to specify custom compiler options (optional)  
 
     2. Build the executable  
     Note: do not move the executable to another folder since some paths are resolved relative to its location.  
