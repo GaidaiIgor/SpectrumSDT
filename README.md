@@ -65,14 +65,14 @@ Before proceeding to the next stage, user should provide file `pes.out` with the
 
 2. Calculate the values of PES. Here we will use an example program that reads `pes.in` and uses the PES of ozone calculated by Dawes et al. to generate `pes.out`. First, compile the program:
 ```
-cd ~/SpectrumSDT/PES/ozone/
+cd ~/SpectrumSDT/PES_examples/ozone/
 mkdir build && cd build
 ../compile_pesprint.sh
 ```
 Now run:
 ```
 cd ~/SpectrumSDT_runs
-mpiexec -n <n_procs> ~/SpectrumSDT/PES/ozone/build/pesprint 686
+mpiexec -n <n_procs> ~/SpectrumSDT/PES_examples/ozone/build/pesprint 686
 ```
 Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pes.out` is generated and we can proceed to the main calculations.
 
