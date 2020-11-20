@@ -11,7 +11,7 @@ enable_language(Fortran)
 
 set(prefix ${CMAKE_CURRENT_LIST_DIR})
 # Specify where to look for external module files (-I option)
-include_directories(${prefix}/include ${prefix}/src/include ${prefix}/libs/fdict ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
+include_directories(${prefix}/src/include ${prefix}/libs/fdict ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
 # Specify where to look for libraries (-L option)
 link_directories(${prefix}/libs/fdict ${prefix}/libs/petsc/debug_64/lib ${prefix}/libs/slepc/debug_64/lib)
 include(${prefix}/source_dependencies.cmake)
