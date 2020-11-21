@@ -2,17 +2,18 @@ set(numerical_recipies ${prefix}/src/base/numerical_recipies.f90)
 set(external_sources ${numerical_recipies})
 
 # Source file dependencies
+set(constants ${prefix}/src/base/constants.f90)
+set(coordinate_conversion ${prefix}/src/base/coordinate_conversion.f90)
+set(rovib_utils_base ${prefix}/src/utils/rovib_utils_base.f90)
+set(debug_tools_base ${prefix}/src/base/debug_tools_base.f90)
+
 set(general_char_str ${prefix}/src/utils/general/general_char_str.F90)
 set(general_integer ${general_char_str} ${prefix}/src/utils/general/general_integer.F90)
 set(general_real ${general_char_str} ${prefix}/src/utils/general/general_real.F90)
 set(general_real_array ${prefix}/src/utils/general/general_real_array.F90)
 set(general_utils ${general_integer} ${general_real} ${general_real_array} ${general_char_str} ${prefix}/src/utils/general/general.F90)
 
-set(coordinate_conversion ${general_utils} ${prefix}/src/base/coordinate_conversion.f90)
 set(path_utils ${general_utils} ${prefix}/src/utils/path.f90)
-set(constants ${prefix}/src/base/constants.f90)
-set(rovib_utils_base ${prefix}/src/utils/rovib_utils_base.f90)
-set(debug_tools_base ${prefix}/src/base/debug_tools_base.f90)
 set(fourier_transform ${constants} ${general_utils} ${prefix}/src/utils/fourier_transform.f90)
 set(formulas ${constants} ${general_utils} ${prefix}/src/base/formulas.f90)
 set(parallel_utils ${algorithms} ${general_utils} ${prefix}/src/utils/parallel.f90)

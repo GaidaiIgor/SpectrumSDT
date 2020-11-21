@@ -1,5 +1,5 @@
 module coordinate_coversion_mod
-  use general_utils
+  use iso_fortran_env, only: real64
   implicit none
 
 contains
@@ -24,7 +24,6 @@ contains
     real(real64) :: new_coord_list(size(coord_list, 1), size(coord_list, 2))
     integer :: i
 
-    call assert(size(coord_list, 1) == 3, 'Wrong size of coord_list')
     do i = 1, size(coord_list, 2)
       new_coord_list(1, i) = coord_list(1, i) / sqrt(2d0) * sqrt(1 - sin(coord_list(2, i)) * cos(coord_list(3, i)))
       new_coord_list(2, i) = coord_list(1, i) / sqrt(2d0) * sqrt(1 + sin(coord_list(2, i)) * cos(coord_list(3, i)))
@@ -51,8 +50,6 @@ contains
     integer :: i
     real(real64) :: M, mu, d
 
-    call assert(size(coord_list, 1) == 3, 'Wrong size of coord_list')
-    call assert(size(mass) == 3, 'Wrong size of mass')
     M = sum(mass)
     mu = sqrt(product(mass) / M)
     d = sqrt(mass(2) / mu * (1 - mass(2) / M))
@@ -81,8 +78,6 @@ contains
     integer :: i
     real(real64) :: mass_center_13_x ! x coordinate of center of mass between atoms 1 and 3 (terminal atoms)
 
-    call assert(size(coord_list, 1) == 3, 'Wrong size of coord_list')
-    call assert(size(mass) == 3, 'Wrong size of mass')
     do i = 1, size(coord_list, 2)
       mass_center_13_x = mass(3) / (mass(1) + mass(3)) * coord_list(1, i)
       new_coord_list(1, i) = mass_center_13_x - coord_list(2, i) * cos(coord_list(3, i))
@@ -104,7 +99,6 @@ contains
     real(real64) :: new_coord_list(size(coord_list, 1), size(coord_list, 2))
     integer :: i
 
-    call assert(size(coord_list, 1) == 3, 'Wrong size of coord_list')
     do i = 1, size(coord_list, 2)
       new_coord_list(1, i) = sqrt(coord_list(1, i)**2 + coord_list(2, i)**2)
       new_coord_list(2, i) = coord_list(3, i)
@@ -124,7 +118,6 @@ contains
     real(real64) :: new_coord_list(size(coord_list, 1), size(coord_list, 2))
     integer :: i
 
-    call assert(size(coord_list, 1) == 3, 'Wrong size of coord_list')
     do i = 1, size(coord_list, 2)
       new_coord_list(1, i) = coord_list(1, i)
       new_coord_list(2, i) = coord_list(3, i)

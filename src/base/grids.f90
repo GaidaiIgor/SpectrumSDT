@@ -365,7 +365,7 @@ contains
         call assert(.false., 'Error: unknown coordinate system')
     end select
 
-    print *, 'Writing file...'
+    print *, 'Writing coordinates file...'
     open(newunit = file_unit, file = file_name)
     write(file_unit, *) size(coord_list, 2)
     write(file_unit, '(3A' // num2str(col_width) // ')') align_center(col1_header, col_width), align_center(col2_header, col_width), align_center(col3_header, col_width)
@@ -416,7 +416,9 @@ contains
     call write_grid(grid_theta, jac_theta, theta_step, 'grid_theta.dat')
     call write_grid(grid_phi, jac_phi, phi_step, 'grid_phi.dat')
 
-    call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % mass)
+    if (params % output_coordinate_system /= 'aph') then
+      call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % mass)
+    end if
   end subroutine
 
 end module

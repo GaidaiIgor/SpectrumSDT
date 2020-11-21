@@ -4,6 +4,10 @@ module pesprint_constants
 
   real(real64), parameter :: pi = acos(-1d0)
   real(real64), parameter :: au_to_wn = 219474.6313708d0 ! cm^-1 / Eh (wavenumbers per Hartree)
+  real(real64), parameter :: amu_to_kg = 1.660538921d-27 ! kg / amu (kilograms per atomic mass unit)
+  real(real64), parameter :: aum_to_kg = 9.10938291d-31 ! kg / aum (kilogram per electron (atomic unit of mass))
+  real(real64), parameter :: amu_to_aum = amu_to_kg / aum_to_kg ! aum / amu
+  real(real64), parameter :: ozone_isotope_masses(3) = [15.99491461956d0, 16.99913170d0, 17.9991596129d0] * amu_to_aum ! aum; masses of isotopes of oxygen 16, 17 and 18 respectively
 
   ! As computed by program zpeO2
   real(real64), parameter :: zpe_66 = 791.6373314827983d0 / au_to_wn ! J = 0
@@ -21,40 +25,36 @@ program pesprint
   use iso_fortran_env, only: real64
   use mpi
   use pesprint_constants
+  use coordinate_coversion_mod
   implicit none
 
   integer :: ierr, proc_id
   real(real64) :: shift
-  real(real64), allocatable :: coords(:, :)
-  real(real64), allocatable :: pes(:)
+  real(real64) :: mass(3)
+  real(real64), allocatable :: grid_rho(:), grid_theta(:), grid_phi(:), proc_pes(:)
+  character(100) :: proc_id_str
 
   call MPI_Init(ierr)
   call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
-  call init_parameters(shift)
+  call init_parameters(mass, shift)
 
-  if (proc_id == 0) then
-    print *, 'Reading coordinates...'
-  end if
-  coords = load_coords('pes.in')
+  call load_grids(grid_rho, grid_theta, grid_phi)
+  proc_pes = calc_pes(grid_rho, grid_theta, grid_phi, mass, shift)
 
-  if (proc_id == 0) then
-    print *, 'Calculating PES...'
-  end if
-  call calc_pes(coords, shift, pes)
-
-  if (proc_id == 0) then
-    call print_pes(pes, 'pes.out')
-    print *, 'Done'
-  end if
+  write(proc_id_str, '(I0)') proc_id
+  call print_pes(proc_pes, 'pes.out.' // trim(adjustl(proc_id_str)))
+  print *, 'Proc', proc_id_str, ' is done'
   call MPI_Finalize(ierr)
 
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Initializes masses and shifts. Isotopic composition of ozone has to be supplied via command line argument.
+! Initializes masses and shifts. Isotopic composition of ozone has to be supplied via command line argument to determine appropriate shift.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine init_parameters(shift)
+  subroutine init_parameters(mass, shift)
+    real(real64), intent(out) :: mass(3)
     real(real64), intent(out) :: shift
+    integer :: i, atom_code
     character(3) :: ozone_isotopes
 
     ! Read command line arguments
@@ -62,6 +62,11 @@ contains
     if (len(trim(ozone_isotopes)) == 0) then
       stop 'Isotopic composition has to be specified'
     end if
+
+    do i = 1, 3
+      read(ozone_isotopes(i:i), *) atom_code
+      mass(i) = ozone_isotope_masses(atom_code - 5)
+    end do
 
     ! select corresponding ZPE
     if (ozone_isotopes == '666') then
@@ -78,18 +83,34 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads requested coordinates.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_coords(file_name) result(coords) 
-    character(*), intent(in) :: file_name
-    real(real64), allocatable :: coords(:, :)
-    integer :: file_unit, num_points
+  subroutine load_grids(grid_rho, grid_theta, grid_phi)
+    real(real64), allocatable, intent(out) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    integer :: file_unit, num_points, i
 
-    open(newunit = file_unit, file = file_name)
+    open(newunit = file_unit, file = 'grid_rho.dat')
     read(file_unit, *) num_points
-    allocate(coords(3, num_points))
-    read(file_unit, *) ! Skip header
-    read(file_unit, *) coords
+    allocate(grid_rho(num_points))
+    do i = 1, num_points
+      read(file_unit, *) grid_rho(i)
+    end do
     close(file_unit)
-  end function
+
+    open(newunit = file_unit, file = 'grid_theta.dat')
+    read(file_unit, *) num_points
+    allocate(grid_theta(num_points))
+    do i = 1, num_points
+      read(file_unit, *) grid_theta(i)
+    end do
+    close(file_unit)
+
+    open(newunit = file_unit, file = 'grid_phi.dat')
+    read(file_unit, *) num_points
+    allocate(grid_phi(num_points))
+    do i = 1, num_points
+      read(file_unit, *) grid_phi(i)
+    end do
+    close(file_unit)
+  end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Computes exclusive prefix sum, i.e. res(i) = sum( [array(1)..array(i - 1)] ).
@@ -179,7 +200,7 @@ contains
 
     if (compare_reals(progress, last_progress + progress_step, 1d-10) >= 0) then
       last_progress = real2int(progress / progress_step, 1d-10) * progress_step
-      write(*, '(A,1x,F6.2,A)', advance = 'no') carriage_return, last_progress * 100, '% done'
+      write(*, '(A,1x,F5.1,A)', advance = 'no') carriage_return, last_progress * 100, '% done'
       if (compare_reals(last_progress, 1d0, 1d-10) == 0) then
         print *
       end if
@@ -187,20 +208,43 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates ozone potential at a configuration given by lengths of all bonds in order: 
-! bond12, bond13, bond23 (1 - terminal1, 2 - central, 3 - terminal2).
+! Converts a 1D index of 1D-representation into 3 indexes corresponding to it in 3D representation.
+! Assumes the 3D array was flattened using the following order of dimenisions: 3, 2, 1 (3rd coordinate is changing most frequently).
+! n1, n2, n3 - sizes of the 3D array.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_potential_point(all_bonds, shift) result(potential)
-    real(real64), intent(in) :: all_bonds(3)
+  subroutine convert_1d_ind_to_3d(ind_1d, n1, n2, n3, i1_3d, i2_3d, i3_3d)
+    integer, intent(in) :: ind_1d, n1, n2, n3
+    integer, intent(out) :: i1_3d, i2_3d, i3_3d
+    integer :: ind_1d_0, i1_3d_0, i2_3d_0, i3_3d_0
+
+    ! Convert using 0-based indexing
+    ind_1d_0 = ind_1d - 1
+    i1_3d_0 = ind_1d_0 / (n2 * n3)
+    i2_3d_0 = (ind_1d_0 - i1_3d_0 * n2 * n3) / n3
+    i3_3d_0 = ind_1d_0 - i1_3d_0 * n2 * n3 - i2_3d_0 * n3
+
+    ! Shift back to 1-based indexing
+    i1_3d = i1_3d_0 + 1
+    i2_3d = i2_3d_0 + 1
+    i3_3d = i3_3d_0 + 1
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates ozone potential at given *APH coordinates*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function calc_potential_point(aph, mass, shift) result(potential)
+    real(real64), intent(in) :: aph(3), mass(3)
     real(real64), intent(in) :: shift
     real(real64) :: potential
     real(real64) :: internal(3)
-    external :: IMLS ! Dawes' PES procedure
+    real(real64) :: all_bonds(3, 1)
+    external :: IMLS ! external PES procedure
 
+    all_bonds = convert_aph_to_all_bonds(reshape(aph, [3, 1]), mass)
     ! convert all bonds to internal coordinates expected by IMLS
-    internal(1) = all_bonds(1)
-    internal(2) = all_bonds(2)
-    internal(3) = acos((all_bonds(1)**2 + all_bonds(2)**2 - all_bonds(3)**2) / (2 * all_bonds(1) * all_bonds(2))) * 180 / pi
+    internal(1) = all_bonds(1, 1)
+    internal(2) = all_bonds(2, 1)
+    internal(3) = acos((all_bonds(1, 1)**2 + all_bonds(2, 1)**2 - all_bonds(3, 1)**2) / (2 * all_bonds(1, 1) * all_bonds(2, 1))) * 180 / pi ! 866 angle
 
     call IMLS(internal, potential, 1)
     potential = potential / au_to_wn - De + shift
@@ -209,17 +253,18 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates potential energy surface for each combination of points in *grids*. Result is defined on 0th processor only. Parallel version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_pes(coords, shift, pes)
-    real(real64), intent(in) :: coords(:, :)
-    real(real64), allocatable, intent(out) :: pes(:)
+  function calc_pes(grid_rho, grid_theta, grid_phi, mass, shift) result(proc_pes)
+    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    real(real64), intent(in) :: mass(3)
     real(real64), intent(in) :: shift
-    integer :: proc_id, ierr, first_k, proc_points, proc_k, k
-    integer, allocatable :: proc_counts(:), proc_shifts(:)
     real(real64), allocatable :: proc_pes(:)
+    integer :: total_points, proc_id, ierr, first_k, proc_points, proc_k, k, ind_rho, ind_theta, ind_phi
+    integer, allocatable :: proc_counts(:), proc_shifts(:)
 
+    total_points = size(grid_rho) * size(grid_theta) * size(grid_phi)
     call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
     ! Split all points between available processors
-    call get_proc_elem_range(size(coords, 2), first_k, proc_points, proc_counts, proc_shifts)
+    call get_proc_elem_range(total_points, first_k, proc_points, proc_counts, proc_shifts)
     allocate(proc_pes(proc_points))
 
     ! Calculate this proc's share
@@ -228,16 +273,10 @@ contains
         call track_progress(proc_k * 1d0 / proc_points, 0.01d0)
       end if
       k = first_k + proc_k - 1
-      proc_pes(proc_k) = calc_potential_point(coords(:, k), shift)
+      call convert_1d_ind_to_3d(k, size(grid_rho), size(grid_theta), size(grid_phi), ind_rho, ind_theta, ind_phi)
+      proc_pes(proc_k) = calc_potential_point([grid_rho(ind_rho), grid_theta(ind_theta), grid_phi(ind_phi)], mass, shift)
     end do
-
-    ! Allocate global storage on 0th proc
-    if (proc_id == 0) then
-      allocate(pes(size(coords, 2)))
-      print *, 'Exchanging data...'
-    end if
-    call MPI_Gatherv(proc_pes, size(proc_pes), MPI_DOUBLE_PRECISION, pes, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-  end subroutine
+  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints PES to file.
@@ -245,12 +284,10 @@ contains
   subroutine print_pes(pes, file_name)
     real(real64), intent(in) :: pes(:)
     character(*), intent(in) :: file_name
-    integer :: i, file_unit
+    integer :: file_unit
 
     open(newunit = file_unit, file = file_name)
-    do i = 1, size(pes)
-      write(file_unit, '(G23.15)') pes(i)
-    end do
+    write(file_unit, '(G23.15)') pes
     close(file_unit)
   end subroutine
 
