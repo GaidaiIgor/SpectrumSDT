@@ -60,21 +60,23 @@ mkdir ~/SpectrumSDT_runs && cd ~/SpectrumSDT_runs
 cp ~/SpectrumSDT/config_examples/grids.config spectrumsdt.config
 ~/SpectrumSDT/build/spectrumsdt
 ```
-After this, `pes.in` file should be generated. This file specifies a total number of points and a list of APH coordinates where the value of electronic potential is required.
-Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at the requested coordinates in atomic units of energy (Hartree).
+Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combination of points in the generated grid files in atomic units of energy (Hartree).
 
-2. Calculate the values of PES. Here we will use an example program that reads `pes.in` and uses the PES of ozone calculated by Dawes et al. to generate `pes.out`. First, compile the program:
+2. Calculate the values of PES. Here we will use an example program that reads grid files and uses the PES of ozone calculated by Dawes et al. to generate a set of `pes.out.x` files. Each of them contains a chunk of the overall PES calculated by processor x. First, compile the program:
 ```
 cd ~/SpectrumSDT/PES_examples/ozone/
 mkdir build && cd build
-../compile_pesprint.sh
+../compile.sh
 ```
 Now run:
 ```
 cd ~/SpectrumSDT_runs
-mpiexec -n <n_procs> ~/SpectrumSDT/PES_examples/ozone/build/pesprint 686
+mpiexec -n <n_procs> ~/SpectrumSDT/PES_examples/ozone/build/ozone_pes 686
 ```
-Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pes.out` is generated and we can proceed to the main calculations.
+Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pes.out` can be obtained as concatenation of the outputs from individual processors via:  
+```
+cat pes* > pes.out
+```
 
 3. Setup SpectrumSDT directory structure
 ```
