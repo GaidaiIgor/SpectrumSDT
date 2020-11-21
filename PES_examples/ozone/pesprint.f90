@@ -29,11 +29,19 @@ program pesprint
   real(real64), allocatable :: pes(:)
 
   call MPI_Init(ierr)
+  call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
   call init_parameters(shift)
+
+  if (proc_id == 0) then
+    print *, 'Reading coordinates...'
+  end if
   coords = load_coords('pes.in')
+
+  if (proc_id == 0) then
+    print *, 'Calculating PES...'
+  end if
   call calc_pes(coords, shift, pes)
 
-  call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
   if (proc_id == 0) then
     call print_pes(pes, 'pes.out')
     print *, 'Done'

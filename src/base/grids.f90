@@ -365,6 +365,7 @@ contains
         call assert(.false., 'Error: unknown coordinate system')
     end select
 
+    print *, 'Writing file...'
     open(newunit = file_unit, file = file_name)
     write(file_unit, *) size(coord_list, 2)
     write(file_unit, '(3A' // num2str(col_width) // ')') align_center(col1_header, col_width), align_center(col2_header, col_width), align_center(col3_header, col_width)

@@ -196,6 +196,7 @@ contains
         case ('Ar40')
           mass(i) = argon_masses(3)
         case default
+          call print_parallel('Info: treating mass as a number')
           mass(i) = str2real(next_atom) * amu_to_aum
       end select
     end do
