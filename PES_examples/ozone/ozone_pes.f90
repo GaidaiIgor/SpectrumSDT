@@ -31,19 +31,18 @@ program pesprint
   integer :: ierr, proc_id
   real(real64) :: shift
   real(real64) :: mass(3)
-  real(real64), allocatable :: grid_rho(:), grid_theta(:), grid_phi(:), proc_pes(:)
-  character(100) :: proc_id_str
+  real(real64), allocatable :: grid_rho(:), grid_theta(:), grid_phi(:), pes(:)
 
   call MPI_Init(ierr)
   call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
   call init_parameters(mass, shift)
 
   call load_grids(grid_rho, grid_theta, grid_phi)
-  proc_pes = calc_pes(grid_rho, grid_theta, grid_phi, mass, shift)
+  call calc_pes(grid_rho, grid_theta, grid_phi, mass, shift, pes)
 
-  write(proc_id_str, '(I0)') proc_id
-  call print_pes(proc_pes, 'pes.out.' // trim(adjustl(proc_id_str)))
-  print *, 'Proc', proc_id_str, ' is done'
+  if (proc_id == 0) then
+    call print_pes(pes, 'pes.out')
+  end if
   call MPI_Finalize(ierr)
 
 contains
@@ -187,26 +186,6 @@ contains
     end if
   end function
 
-!---------------------------------------------------------------------------------------------------------------------------------------------
-! Prints progress % at specified points.
-! progress: current progress of some process (a number from 0 to 1).
-! progress_step: controls how often progress should be reported.
-!---------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine track_progress(progress, progress_step)
-    real(real64), intent(in) :: progress
-    real(real64), intent(in) :: progress_step
-    character, parameter :: carriage_return = achar(13)
-    real(real64), save :: last_progress = 0
-
-    if (compare_reals(progress, last_progress + progress_step, 1d-10) >= 0) then
-      last_progress = real2int(progress / progress_step, 1d-10) * progress_step
-      write(*, '(A,1x,F5.1,A)', advance = 'no') carriage_return, last_progress * 100, '% done'
-      if (compare_reals(last_progress, 1d0, 1d-10) == 0) then
-        print *
-      end if
-    end if
-  end subroutine
-
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts a 1D index of 1D-representation into 3 indexes corresponding to it in 3D representation.
 ! Assumes the 3D array was flattened using the following order of dimenisions: 3, 2, 1 (3rd coordinate is changing most frequently).
@@ -253,10 +232,11 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates potential energy surface for each combination of points in *grids*. Result is defined on 0th processor only. Parallel version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_pes(grid_rho, grid_theta, grid_phi, mass, shift) result(proc_pes)
+  subroutine calc_pes(grid_rho, grid_theta, grid_phi, mass, shift, pes)
     real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), intent(in) :: mass(3)
     real(real64), intent(in) :: shift
+    real(real64), allocatable, intent(out) :: pes(:)
     real(real64), allocatable :: proc_pes(:)
     integer :: total_points, proc_id, ierr, first_k, proc_points, proc_k, k, ind_rho, ind_theta, ind_phi
     integer, allocatable :: proc_counts(:), proc_shifts(:)
@@ -269,14 +249,18 @@ contains
 
     ! Calculate this proc's share
     do proc_k = 1, proc_points
-      if (proc_id == 0) then
-        call track_progress(proc_k * 1d0 / proc_points, 0.01d0)
-      end if
       k = first_k + proc_k - 1
       call convert_1d_ind_to_3d(k, size(grid_rho), size(grid_theta), size(grid_phi), ind_rho, ind_theta, ind_phi)
       proc_pes(proc_k) = calc_potential_point([grid_rho(ind_rho), grid_theta(ind_theta), grid_phi(ind_phi)], mass, shift)
     end do
-  end function
+
+    ! Allocate global storage on 0th proc
+    if (proc_id == 0) then
+      allocate(pes(total_points))
+    end if
+    print *, 'Proc', proc_id, 'is done'
+    call MPI_Gatherv(proc_pes, size(proc_pes), MPI_DOUBLE_PRECISION, pes, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints PES to file.

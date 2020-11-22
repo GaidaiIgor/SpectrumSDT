@@ -73,10 +73,7 @@ Now run:
 cd ~/SpectrumSDT_runs
 mpiexec -n <n_procs> ~/SpectrumSDT/PES_examples/ozone/build/ozone_pes 686
 ```
-Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pes.out` can be obtained as concatenation of the outputs from individual processors via:  
-```
-cat pes* > pes.out
-```
+Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pes.out` file with the values of PES at all grid points will be written.
 
 3. Setup SpectrumSDT directory structure
 ```
