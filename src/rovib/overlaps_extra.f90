@@ -17,7 +17,7 @@ module overlaps_extra_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Transforms expansion coefficients of 2D functions over 1D functions to expansion coefficients over sin/cos functions
+! Transforms expansion coefficients of 2D functions over 1D functions to expansion coefficients over sin/cos functions.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function expansion_1D_to_primitive(num_solutions_1d, exp_coeffs_1d, exp_coeffs_2d) result(exp_coeffs_2d_prim)
     integer, intent(in) :: num_solutions_1d(:) ! number of 1D vectors in each theta slice
@@ -41,7 +41,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates symmetric term overlaps
+! Calculates symmetric term overlaps.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_sym_term(params, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
@@ -129,7 +129,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates coriolis term overlaps for upper diagonal blocks
+! Calculates coriolis term overlaps for upper diagonal blocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_coriolis_term(params, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
@@ -233,7 +233,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates asymmetric term overlaps
+! Calculates asymmetric term overlaps.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_asym_term(params, K_row, K_col, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
@@ -326,7 +326,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks that all required files exist
+! Checks that all required files exist.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_prerequisites(params)
     type(input_params), intent(in) :: params
@@ -346,7 +346,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! The main subroutine that initiates calculation of both types of extra overlaps
+! The main subroutine that initiates calculation of both types of extra overlaps.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_overlaps_extra(params, mu, rho_grid, theta_grid)
     type(input_params), intent(in) :: params

@@ -63,7 +63,7 @@ set(input_params ${algorithms} ${config} ${constants} ${dict_utils} ${general_ut
 
 set(debug_tools ${debug_tools_base} ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/utils/rovib_utils.f90)
-set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${prefix}/src/base/spectrumsdt_paths.f90)
+set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils_base} ${prefix}/src/base/spectrumsdt_paths.f90)
 set(general_vars ${constants} ${input_params} ${path_utils} ${spectrumsdt_paths} ${prefix}/src/base/general_vars.f90)
 set(cap ${constants} ${general_vars} ${input_params} ${prefix}/src/base/cap.f90)
 set(potential ${formulas} ${input_params} ${general_vars} ${spectrumsdt_paths} ${prefix}/src/base/potential.f90)
