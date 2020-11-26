@@ -173,4 +173,27 @@ contains
     new_coord_list = convert_all_bonds_to_internal(new_coord_list)
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts Cartesian position of a point on PES plot in aph coordinates to corresponding value of aph coordinates.
+! *coord_list* is a 3 x n array, where each column represents xyz coordinate (in this order) in aph plot (cylindrical representation).
+! *new_coords_list* is a 3 x n array, where each column is the corresponding aph value in order: rho, theta, phi.
+! rho is aligned with z. theta = 0 corresponds to (x, y) = (0, 0). phi = 0 and theta = pi/2 corresponds to (x, y) = (theta_length, 0).
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function convert_aphxyz_to_aph(coord_list) result(new_coord_list)
+    real(real64), intent(in) :: coord_list(:, :)
+    real(real64) :: new_coord_list(size(coord_list, 1), size(coord_list, 2))
+    integer :: i
+    real(real64), parameter :: theta_length = 5d0 ! length of theta axis in aph plot in Bohr (arbitrary scaling factor).
+    real(real64), parameter :: pi = acos(-1d0)
+
+    do i = 1, size(coord_list, 2)
+      new_coord_list(1, i) = coord_list(3, i)
+      new_coord_list(2, i) = sqrt(coord_list(1, i)**2 + coord_list(2, i)**2) / theta_length * pi / 2
+      new_coord_list(3, i) = atan2(coord_list(2, i), coord_list(1, i))
+      if (new_coord_list(3, i) < 0) then
+        new_coord_list(3, i) = new_coord_list(3, i) + 2 * pi
+      end if
+    end do
+  end function
+
 end module

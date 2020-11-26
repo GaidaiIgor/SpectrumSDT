@@ -96,7 +96,6 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_grid_params(this) 
     class(grid_params), intent(in) :: this
-    call assert(this % from >= 0, 'Error: from should be >= 0')
     call assert(this % to > 0, 'Error: to should be > 0')
     call assert(this % from < this % to, 'Error: from should be < to')
     call assert(this % num_points == -1 .or. this % num_points > 0, 'Error: npoints should be > 0')

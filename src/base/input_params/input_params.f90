@@ -61,6 +61,7 @@ module input_params_mod
     integer :: use_parallel = -1 ! parallel execution
     integer :: enable_terms(2) = -1 ! 1st digit - coriolis, 2nd - asymmetric
     integer :: optimized_mult = -1 ! disables matrix-vector multiplication optimizations
+    integer :: treat_tp_as_xy = -1 ! treats theta and phi grids as x and y grids for aph plots
     character(:), allocatable :: debug_mode
     character(:), allocatable :: debug_param_1
 
@@ -354,6 +355,8 @@ contains
           this % enable_terms = parse_enable_terms(extract_string(config_dict, next_key))
         case ('optimized_mult')
           this % optimized_mult = str2int(extract_string(config_dict, next_key))
+        case ('treat_tp_as_xy')
+          this % treat_tp_as_xy = str2int(extract_string(config_dict, next_key))
         case ('debug_mode')
           this % debug_mode = extract_string(config_dict, next_key)
         case ('debug_param_1')
@@ -449,6 +452,8 @@ contains
       call put_string(keys, 'num_points_phi', num2str(2 * this % basis_size_phi))
       call put_string(messages, 'num_points_phi', 'Assuming default = 2 * basis_size_phi')
       call put_string(keys, 'output_coordinate_system', 'aph')
+      call put_string(keys, 'treat_tp_as_xy', '0')
+      call put_string(messages, 'treat_tp_as_xy', '')
     end if
 
     if (this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
@@ -515,6 +520,7 @@ end subroutine
     call put_string(keys, 'use_parallel')
     call put_string(keys, 'enable_terms')
     call put_string(keys, 'optimized_mult')
+    call put_string(keys, 'treat_tp_as_xy')
     call put_string(keys, 'debug_mode')
     call put_string(keys, 'debug_param_1')
   end function
@@ -530,8 +536,12 @@ end subroutine
     if (allocated(this % cap_type)) then
       call assert(any(this % cap_type == [character(100) :: 'none', 'Manolopoulos']), 'Error: cap_type can be "none" or "Manolopoulos"')
     end if
-    call assert((this % grid_theta % from .aeq. -1d0) .or. this % grid_theta % from < pi, 'Error: grid_theta % from should be < pi')
-    call assert((this % grid_theta % to .aeq. -1d0) .or. this % grid_theta % to < pi, 'Error: grid_theta % to should be < pi')
+    call assert((this % grid_rho % from .aeq. -1d0) .or. (this % grid_rho % from .age. 0d0), 'Error: grid_rho % from should be >= 0')
+    if (this % treat_tp_as_xy /= 1) then
+      call assert((this % grid_theta % from .aeq. -1d0) .or. (this % grid_theta % from .age. 0d0), 'Error: grid_theta % from should be >= 0')
+      call assert((this % grid_theta % from .aeq. -1d0) .or. this % grid_theta % from < pi, 'Error: grid_theta % from should be < pi')
+      call assert((this % grid_theta % to .aeq. -1d0) .or. this % grid_theta % to < pi, 'Error: grid_theta % to should be < pi')
+    end if
     call assert(this % num_points_phi == -1 .or. this % num_points_phi > 1, 'Error: num_points_phi should be > 1')
     call assert(.not. allocated(this % output_coordinate_system) .or. &
         any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
@@ -558,6 +568,7 @@ end subroutine
     call assert(any(this % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
     call assert(any(this % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) can be 0 or 1')
     call assert(any(this % optimized_mult == [-1, 0, 1]), 'Error: optimized_mult can be 0 or 1')
+    call assert(any(this % treat_tp_as_xy == [-1, 0, 1]), 'Error: treat_tp_as_xy can be 0 or 1')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

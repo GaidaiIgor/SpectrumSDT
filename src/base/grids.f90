@@ -319,9 +319,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints a file specified by *file_name* with coordinates at which the values of PES are requested.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine write_pes_request(grid_rho, grid_theta, grid_phi, file_name, coord_system, mass)
+  subroutine write_pes_request(grid_rho, grid_theta, grid_phi, file_name, coord_system, treat_tp_as_xy, mass)
     real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
     character(*), intent(in) :: file_name, coord_system
+    integer, intent(in) :: treat_tp_as_xy
     real(real64), optional, intent(in) :: mass(:)
     integer, parameter :: col_width = 25
     integer :: file_unit
@@ -329,8 +330,14 @@ contains
     character(:), allocatable :: col1_header, col2_header, col3_header
 
     call assert(any(coord_system == [character(100) :: 'jacobi', 'cartesian', 'all bonds', 'internal']) .means. present(mass), 'Error: mass has to be given for this coordinate system')
-    coord_list = product_list(grid_rho, grid_theta, grid_phi)
     print *, 'Converting coordinates...'
+    if (treat_tp_as_xy == 1) then
+      coord_list = product_list(grid_theta, grid_theta, grid_rho)
+      coord_list = convert_aphxyz_to_aph(coord_list)
+    else
+      coord_list = product_list(grid_rho, grid_theta, grid_phi)
+    end if
+
     select case (coord_system)
       case ('aph')
         col1_header = 'rho (Bohr)'
@@ -417,7 +424,7 @@ contains
     call write_grid(grid_phi, jac_phi, phi_step, 'grid_phi.dat')
 
     if (params % output_coordinate_system /= 'aph') then
-      call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % mass)
+      call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % treat_tp_as_xy, params % mass)
     end if
   end subroutine
 
