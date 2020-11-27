@@ -6,14 +6,18 @@ program water_pes
   integer :: ierr, proc_id
   real(real64), allocatable :: coords(:, :)
   real(real64), allocatable :: pes(:)
+  character(100) :: arg_buf
+  character(:), allocatable :: pes_name
 
-  ! ! debug
-  ! print *, calc_potential_point_shirin([2d0, 1.85d0, 1.82d0]) * 2.194746311955955d05
-  ! stop 'debug'
+  call get_command_argument(1, arg_buf)
+  pes_name = trim(adjustl(arg_buf))
+  if (.not. any(pes_name == [character(100) :: 'shirin', 'partridge'])) then
+    stop 'Unknown PES name'
+  end if
 
   call MPI_Init(ierr)
   coords = load_coords('pes.in')
-  call calc_pes(coords, pes)
+  call calc_pes(coords, pes_name, pes)
 
   call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
   if (proc_id == 0) then
@@ -136,10 +140,10 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates potential at a configuration given by internal coordinates:
+! Calculates potential of Partridge et al. at a configuration given by internal coordinates:
 ! bond H1-O (Bohr), bond O-H2 (Bohr), H1-O-H2 angle (rad).
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_potential_point(coords) result(potential)
+  function calc_potential_point_partridge(coords) result(potential)
     real(real64), intent(in) :: coords(3)
     real(real64) :: potential
     real(real64) :: target_coords(1, 3)
@@ -150,7 +154,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates potential at a configuration given by internal coordinates:
+! Calculates potential of Shirin et al. at a configuration given by internal coordinates:
 ! bond H1-O (Bohr), bond O-H2 (Bohr), H1-O-H2 angle (rad).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calc_potential_point_shirin(coords) result(potential)
@@ -168,8 +172,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates potential energy surface for each combination of points in *grids*. Result is defined on 0th processor only. Parallel version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_pes(coords, pes)
+  subroutine calc_pes(coords, pes_name, pes)
     real(real64), intent(in) :: coords(:, :)
+    character(*), intent(in) :: pes_name
     real(real64), allocatable, intent(out) :: pes(:)
     integer :: proc_id, ierr, first_k, proc_points, proc_k, k
     integer, allocatable :: proc_counts(:), proc_shifts(:)
@@ -186,7 +191,15 @@ contains
         call track_progress(proc_k * 1d0 / proc_points, 0.01d0)
       end if
       k = first_k + proc_k - 1
-      proc_pes(proc_k) = calc_potential_point_shirin(coords(:, k))
+
+      select case (pes_name)
+        case ('shirin')
+          proc_pes(proc_k) = calc_potential_point_shirin(coords(:, k))
+        case ('partridge')
+          proc_pes(proc_k) = calc_potential_point_partridge(coords(:, k))
+        case default
+          stop 'Unknown PES name'
+      end select
     end do
 
     ! Allocate global storage on 0th proc
