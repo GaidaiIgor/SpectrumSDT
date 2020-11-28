@@ -28,6 +28,9 @@ class SpectrumSDTConfig:
             config_lines = config_file.readlines()
         self.params, _ = self.read_inner_dict(config_lines, -1)
 
+    def get_stage(self) -> str:
+        return self.params["stage"]
+
     def get_fixed_basis_JK(self) -> int:
         if "use_fixed_basis_JK" in self.params:
             return int(self.params["use_fixed_basis_JK"])
@@ -43,7 +46,7 @@ class SpectrumSDTConfig:
     def get_Ks(self) -> List[int]:
         K_str = self.params["K"]
         if K_str == "all":
-            J = self.get_j()
+            J = self.get_J()
             k_start = (J + self.get_parity()) % 2
             return [k_start, J]
 
