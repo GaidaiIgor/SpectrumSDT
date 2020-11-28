@@ -302,10 +302,10 @@ contains
     sym_path = get_sym_path(params)
     spectrum_path = get_spectrum_path(sym_path)
     eigenvalues_3d = read_matrix_real(spectrum_path, skip_lines = 1)
+    call assert(size(eigenvalues_3d, 1) >= params % num_states, 'Error: not enough eigenstates computed')
 
     N = size(rho_grid)
     L = size(theta_grid)
-
     ! Load expansion coefficients
     call print_parallel('Loading expansion coefficients...')
     if (params % use_fixed_basis_JK == 1) then
@@ -325,7 +325,7 @@ contains
     call calculate_wf_sections_statistics_all(params, p_dist, wf_sections_dist_inds, cap, section_stats)
 
     call print_parallel('Writing results...')
-    call write_state_properties(params, eigenvalues_3d, section_stats)
+    call write_state_properties(params, eigenvalues_3d(1:params % num_states, :), section_stats)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
