@@ -14,7 +14,7 @@ module slepc_solver_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Finds eigenpairs of a matrix currently set in matmul_operator_mod using SLEPc eigensolver
+! Finds eigenpairs of a matrix currently set in matmul_operator_mod using SLEPc eigensolver.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine find_eigenpairs_slepc(n_eigs, ncv, mpd, eivals, eivecs)
     integer, intent(in) :: n_eigs
@@ -92,7 +92,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! A wrapper around ham_mult_compressed
+! A SLEPc wrapper around matrix multiplication operator.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine slepc_mult(A, x, y, ierr)
     Mat :: A ! intent(in)

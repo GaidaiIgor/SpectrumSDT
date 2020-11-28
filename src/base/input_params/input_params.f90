@@ -467,9 +467,6 @@ contains
       call put_string(keys, 'mpd', '-1')
       call put_string(messages, 'mpd', 'Its value will be determined by SLEPc')
       call put_string(keys, 'max_iterations', '10000')
-    end if
-
-    if (this % stage == 'eigencalc' .and. this % use_rovib_coupling == 1) then
       call put_string(keys, 'enable_terms', '11')
       call put_string(messages, 'enable_terms', '')
       call put_string(keys, 'optimized_mult', '1')

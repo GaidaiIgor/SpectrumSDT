@@ -1,6 +1,6 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Contains matmul operators and global variables necessary to evaluate them
-! Operator signatures are restricted, so they cannot be made local
+! Contains matmul operators and global variables necessary to evaluate them.
+! Operator signatures are restricted, so they cannot be made local.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module matmul_operator_mod
   use distributed_rovib_hamiltonian_mod
@@ -34,7 +34,7 @@ module matmul_operator_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Sets module variables
+! Sets module variables.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_matmul(params)
     class(input_params), intent(in) :: params
@@ -49,7 +49,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Multiplies a single n-block of compressed hamiltonian with a given vector v
+! Multiplies a single n-block of compressed hamiltonian with a given vector v.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine ham_mult_block_compressed(ham, v, local_block_info, v_start, v_proc_out)
     complex(real64), intent(in) :: ham(:, :)
@@ -73,7 +73,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Multiplies compressed Hamiltonian by a given vector parallelly
+! Multiplies compressed Hamiltonian by a given vector parallelly.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine ham_mult_compressed(size_proc, v_proc_inp, v_proc_out)
     integer :: size_proc ! number of elements assigned to this processor
