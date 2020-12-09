@@ -6,8 +6,8 @@ V_VENDOR = intel
 V_CC = icc
 V_CXX = icpc
 V_FC = ifort
-V_CPP = cpp -E -P -x c
-V_FPP = ifort -E -P -xc
+V_CPP = -E -P
+V_FPP = -E -P
 
 V_MPICC = mpicc
 V_MPICXX = mpic++
