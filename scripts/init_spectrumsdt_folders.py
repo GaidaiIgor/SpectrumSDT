@@ -70,25 +70,12 @@ def main():
     folder_names = [["K_" + args.K], ["even", "odd"], ["eigencalc", "properties"]]
     folder_params = [["K = " + args.K], ["symmetry = 0", "symmetry = 1"], ["stage = eigencalc", "stage = properties"]]
 
-    # enable rovib coupling if k is not a single value
-    for i in range(len(folder_params[2])):
-        folder_params[2][i] += "\nuse_rovib_coupling = " + str(int(not args.K.isdigit()))
-
     if args.K.isdigit():
         # add extra stages if K is a single number
         folder_names[2].insert(0, "basis")
         folder_params[2].insert(0, "stage = basis")
         folder_names[2].insert(1, "overlaps")
         folder_params[2].insert(1, "stage = overlaps")
-        overlaps_rovib = 0
-        if config.get_fixed_basis_JK() == 1:
-            J = config.get_J()
-            K = int(args.K)
-            basis_J = config.get_basis_J()
-            basis_K = config.get_basis_K()
-            if basis_J == J and basis_K == K:
-                overlaps_rovib = 1
-        folder_params[2][1] += "\nuse_rovib_coupling = " + str(overlaps_rovib)
     else:
         # add parity if K is a range
         folder_names.insert(1, ["parity_0", "parity_1"])

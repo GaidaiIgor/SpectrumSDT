@@ -82,7 +82,7 @@ contains
     ! Set ranges of basis sizes
     nvec1min = 3
     nvec1max = n3
-    nvec2max = 400
+    nvec2max = 10000
   end subroutine
 
   !-----------------------------------------------------------------------

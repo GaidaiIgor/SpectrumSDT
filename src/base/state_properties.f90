@@ -325,7 +325,7 @@ contains
     call calculate_wf_sections_statistics_all(params, p_dist, wf_sections_dist_inds, cap, section_stats)
 
     call print_parallel('Writing results...')
-    call write_state_properties(params, eigenvalues_3d(1:params % num_states, :), section_stats)
+    call write_state_properties(params, eigenvalues_3d(1:size(section_stats, 1), :), section_stats)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
