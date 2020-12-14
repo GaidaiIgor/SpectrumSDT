@@ -8,7 +8,7 @@ module parallel_utils
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Wraps MPI_Initialized into a function
+! Wraps MPI_Initialized into a function.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function is_mpi_enabled() result(mpi_enabled)
     logical :: mpi_enabled
@@ -17,7 +17,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns current process id
+! Returns current process id.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_proc_id() result(proc_id)
     integer :: proc_id
@@ -31,7 +31,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns number of processors
+! Returns number of processors.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_num_procs() result(num_procs)
     integer :: num_procs
@@ -45,7 +45,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes range of elements to process by this processor
+! Computes range of elements to process by this processor.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine get_proc_elem_range(n_elems, first_elem, proc_elems, all_counts, all_shifts)
     integer, intent(in) :: n_elems ! total number of elements to be processed in parallel
@@ -81,7 +81,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Prints using only 0th process
+! Prints using only 0th process.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine print_parallel(printable)
     class(*), intent(in) :: printable
@@ -94,7 +94,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Gathers local chunks on 0th processor
+! Gathers local chunks on 0th processor.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine gather_chunks(chunk, counts, shifts, global)
     real(real64), intent(in) :: chunk(:, :)

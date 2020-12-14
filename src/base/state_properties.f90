@@ -45,8 +45,8 @@ contains
     real(real64), intent(in) :: grid(:)
     integer :: inds(2)
 
-    inds(1) = findloc(borders(1) .ale. grid, .true., dim = 1)
-    inds(2) = findloc(borders(2) .age. grid, .true., dim = 1, back = .true.)
+    inds(1) = minloc(abs(borders(1) - grid), dim = 1)
+    inds(2) = minloc(abs(borders(2) - grid), dim = 1)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -73,19 +73,101 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Processes wf_sections described in the *params* to generate a border array for phi and map wf_sections to `p_dist` indices.
-! *phi_borders* - array of phi values corresponding to integration borders.
-! See `get_wf_sections_dist_inds` for details of *wf_sections_dist_inds*.
+! Returns weight of the border points in `p_dist`.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine process_wf_sections(params, rho_grid, theta_grid, phi_borders, wf_sections_dist_inds)
+  function get_border_weights(borders, grid, grid_ends) result(weights)
+    real(real64), intent(in) :: borders(2)
+    real(real64), intent(in) :: grid(:)
+    real(real64), intent(in) :: grid_ends(2)
+    real(real64) :: weights(2)
+    integer :: i
+    integer :: border_inds(2)
+    real(real64) :: closest_points(2), edges_left(2), edges_right(2), refs(2), dists(2)
+    real(real64), allocatable :: grid_ext(:)
+
+    ! Extend grid with virtual points so that midpoints coincide with grid ends. Makes handling special cases with grid ends less tedious.
+    grid_ext = [grid(1) - 2*(grid(1) - grid_ends(1)), grid, grid(size(grid)) + 2*(grid_ends(2) - grid(size(grid)))]
+    border_inds = map_borders_to_point_indices(borders, grid_ext)
+    closest_points = grid_ext(border_inds)
+    edges_left = (closest_points + grid_ext(border_inds - 1)) / 2
+    edges_right = (closest_points + grid_ext(border_inds + 1)) / 2
+    refs = [(iff(borders(i) < closest_points(i), edges_left(i), edges_right(i)), i = 1, 2)]
+
+    if (border_inds(1) == border_inds(2)) then
+      ! If on borders are on the same side from the grid point
+      if ((closest_points(1) - borders(1)) * (closest_points(1) - borders(2)) > 0) then
+        ! sqrt since they are going to multiply the same point in p_dist
+        weights = sqrt((borders(2) - borders(1)) / abs(closest_points(1) - refs(1)) / 2)
+      ! Borders are on different sides from the grid point
+      else
+        weights(1) = (closest_points(1) - borders(1)) / (closest_points(1) - refs(1)) / 2
+        weights(2) = (borders(2) - closest_points(2)) / (refs(2) - closest_points(2)) / 2
+        weights = sqrt(sum(weights))
+      end if
+    else
+      dists(1) = iff(borders(1) < closest_points(1), closest_points(1) - borders(1), refs(1) - borders(1))
+      dists(2) = iff(borders(2) > closest_points(2), borders(2) - closest_points(2), borders(2) - refs(2))
+      weights(1) = iff(borders(1) < closest_points(1), 0.5d0, 0d0)
+      weights(2) = iff(borders(2) > closest_points(2), 0.5d0, 0d0)
+      weights = weights + dists / abs(closest_points - refs) / 2
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns masks corresponding to wave function sections. The masks defines weights for each element of `p_dist` (and has the same size).
+! The first dimension of section_masks corresponds to different sections. 
+! The remaining 4 have the same meaning as dimensions 2-5 of `p_dist`.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function generate_wf_sections_dist_mask(params, rho_grid, theta_grid, phi_borders, cap) result(wf_sections_dist_mask)
+    class(input_params), intent(in) :: params
+    real(real64), intent(in) :: rho_grid(:), theta_grid(:), phi_borders(:)
+    real(real64), optional, intent(in) :: cap(:)
+    real(real64), allocatable :: wf_sections_dist_mask(:, :, :, :, :)
+    integer :: i, j
+    integer, allocatable :: section_inds(:, :, :)
+    real(real64) :: weights_rho(2), weights_theta(2)
+
+    allocate(wf_sections_dist_mask(size(params % wf_sections), params % K(2) - params % K(1) + 1, size(rho_grid), size(theta_grid), size(phi_borders) - 1))
+    wf_sections_dist_mask = 0
+    section_inds = get_wf_sections_dist_inds(params, rho_grid, theta_grid, phi_borders)
+    associate(si => section_inds)
+      do i = 1, size(wf_sections_dist_mask, 1)
+        wf_sections_dist_mask(i, si(i, 1, 1):si(i, 1, 2), si(i, 2, 1):si(i, 2, 2), si(i, 3, 1):si(i, 3, 2), si(i, 4, 1):si(i, 4, 2)) = 1
+
+        weights_rho = get_border_weights(params % wf_sections(i) % rho, rho_grid, [params % grid_rho % from, params % grid_rho % to])
+        wf_sections_dist_mask(i, :, si(i, 2, 1), :, :) = wf_sections_dist_mask(i, :, si(i, 2, 1), :, :) * weights_rho(1)
+        wf_sections_dist_mask(i, :, si(i, 2, 2), :, :) = wf_sections_dist_mask(i, :, si(i, 2, 2), :, :) * weights_rho(2)
+
+        weights_theta = get_border_weights(params % wf_sections(i) % theta, theta_grid, [params % grid_theta % from, params % grid_theta % to])
+        wf_sections_dist_mask(i, :, :, si(i, 3, 1), :) = wf_sections_dist_mask(i, :, :, si(i, 3, 1), :) * weights_theta(1)
+        wf_sections_dist_mask(i, :, :, si(i, 3, 2), :) = wf_sections_dist_mask(i, :, :, si(i, 3, 2), :) * weights_theta(2)
+
+        if (params % wf_sections(i) % stat == 'gamma') then
+          call assert(present(cap), 'Error: cap has to be given for gamma statistics')
+          call assert(size(cap) == size(rho_grid))
+          do j = 1, size(wf_sections_dist_mask, 3)
+            wf_sections_dist_mask(i, :, j, :, :) = wf_sections_dist_mask(i, :, j, :, :) * 2 * cap(j) ! 2 due to definition of gamma
+          end do
+        end if
+      end do
+    end associate
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Processes wf_sections described in the *params* to generate a border array for phi and `p_dist` masks for each requested wf property.
+! *phi_borders* - array of phi values corresponding to integration borders.
+! See `generate_wf_sections_dist_mask` for details of *wf_sections_dist_mask*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine process_wf_sections(params, rho_grid, theta_grid, cap, phi_borders, wf_sections_dist_mask)
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: rho_grid(:), theta_grid(:)
+    real(real64), optional, intent(in) :: cap(:)
     real(real64), allocatable, intent(out) :: phi_borders(:)
-    integer, allocatable, intent(out) :: wf_sections_dist_inds(:, :, :)
+    real(real64), allocatable, intent(out) :: wf_sections_dist_mask(:, :, :, :, :)
 
     phi_borders = pack_phi_borders(params)
     phi_borders = get_unique(phi_borders)
-    wf_sections_dist_inds = get_wf_sections_dist_inds(params, rho_grid, theta_grid, phi_borders)
+    wf_sections_dist_mask = generate_wf_sections_dist_mask(params, rho_grid, theta_grid, phi_borders, cap)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -152,25 +234,25 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates <Psi|Psi> expressions in all regions, for all proc states.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_wf_integral_all_regions(params, As, Bs, proc_Cs, phi_borders) result(p_dist)
+  function calculate_wf_integral_all_regions(params, As, Bs, proc_Cs, phi_borders) result(proc_p_dist)
     class(input_params), intent(in) :: params
     ! Arrays of size 2 x N x L (or K x N x L if compression is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
     class(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :) 
     class(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
     real(real64), intent(in) :: phi_borders(:)
-    real(real64), allocatable :: p_dist(:, :, :, :, :)
+    real(real64), allocatable :: proc_p_dist(:, :, :, :, :)
     integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, phi_group_ind, m_ind, j
     real(real64) :: i_sum
     real(real64) :: phi_range(2)
     complex(real64) :: j_sums(params % basis_size_phi) ! j-sums for different ms
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states)
-    allocate(p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
-    p_dist = 0
+    allocate(proc_p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
+    proc_p_dist = 0
 
-    do proc_state_ind = 1, size(p_dist, 1)
+    do proc_state_ind = 1, size(proc_p_dist, 1)
       if (get_proc_id() == 0) then
-        call track_progress(proc_state_ind * 1d0 / size(p_dist, 1), 1d-2)
+        call track_progress(proc_state_ind * 1d0 / size(proc_p_dist, 1), 1d-2)
       end if
 
       do K_val = params % K(1), params % K(2)
@@ -182,7 +264,7 @@ contains
           end if
 
           do l = 1, size(As, 3)
-            do phi_group_ind = 1, size(p_dist, 5)
+            do phi_group_ind = 1, size(proc_p_dist, 5)
               phi_range = phi_borders(phi_group_ind : phi_group_ind + 1)
               j_sums = 0
               do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
@@ -191,7 +273,7 @@ contains
                   j_sums(m_ind) = j_sums(m_ind) + proc_Cs(K_ind, n) % p(j, proc_state_ind) * i_sum
                 end do
               end do
-              p_dist(proc_state_ind, K_ind, n, l, phi_group_ind) = p_dist(proc_state_ind, K_ind, n, l, phi_group_ind) + calc_m_sum(params, As, K_val, n, l, phi_range, j_sums)
+              proc_p_dist(proc_state_ind, K_ind, n, l, phi_group_ind) = proc_p_dist(proc_state_ind, K_ind, n, l, phi_group_ind) + calc_m_sum(params, As, K_val, n, l, phi_range, j_sums)
             end do
           end do
         end do
@@ -200,84 +282,26 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns true if one of the sections requests gamma statistics.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function is_gamma_requested(params) result(gamma_requested)
-    class(input_params), intent(in) :: params
-    integer :: gamma_requested
-    integer :: i
-
-    gamma_requested = 0
-    do i = 1, size(params % wf_sections)
-      if (params % wf_sections(i) % stat == 'gamma') then
-        gamma_requested = 1
-        exit
-      end if
-    end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates all statistics of k-th state, for all specified wave function sections in *wf_sections_dist_ind*.
-! *p_dist_k* - probability of k-th state in each region defined by user borders.
-! *wf_sections_dist_ind* - processed wf_sections, where borders are mapped to p_dist indices.
-! *gamma_requested* - 1 if any of the sections request gamma statistics.
-! *cap* - CAP for calculation of gamma statistics.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_wf_sections_statistics(params, p_dist_k, wf_sections_dist_inds, gamma_requested, cap) result(section_stats)
-    class(input_params), intent(in) :: params
-    real(real64), target, intent(in) :: p_dist_k(:, :, :, :)
-    integer, intent(in) :: wf_sections_dist_inds(:, :, :)
-    integer, intent(in) :: gamma_requested
-    real(real64), optional, intent(in) :: cap(:)
-    real(real64) :: section_stats(size(params % wf_sections))
-    integer :: i
-    real(real64), allocatable, target :: p_dist_k_gamma(:, :, :, :)
-    real(real64), pointer :: p_dist_ptr(:, :, :, :)
-
-    ! We want to avoid computing an extra array if none of the sections actually needs it.
-    if (gamma_requested == 1) then
-      call assert(present(cap), 'Error: cap has to be provided for gamma calculations')
-      p_dist_k_gamma = p_dist_k
-      do i = 1, size(cap)
-        p_dist_k_gamma(:, i, :, :) = p_dist_k_gamma(:, i, :, :) * 2 * cap(i) ! *2 because of gamma definition
-      end do
-    end if
-
-    do i = 1, size(params % wf_sections)
-      select case (params % wf_sections(i) % stat)
-        case ('probability')
-          p_dist_ptr => p_dist_k
-        case ('gamma')
-          p_dist_ptr => p_dist_k_gamma
-      end select
-
-      associate(w => wf_sections_dist_inds)
-        section_stats(i) = sum(p_dist_ptr(w(i, 1, 1):w(i, 1, 2), w(i, 2, 1):w(i, 2, 2), w(i, 3, 1):w(i, 3, 2), w(i, 4, 1):w(i, 4, 2)))
-      end associate
-    end do
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calls calculate_wf_section_probabilities for all states in parallel and gathers results.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_wf_sections_statistics_all(params, p_dist, wf_sections_dist_inds, cap, section_probs)
+  subroutine calculate_wf_sections_statistics_all(params, wf_sections_dist_mask, proc_p_dist, section_stats)
     class(input_params), intent(in) :: params
-    real(real64), intent(in) :: p_dist(:, :, :, :, :) ! state x sizes of all sections in order K, rho, theta, phi
-    integer, intent(in) :: wf_sections_dist_inds(:, :, :)
-    real(real64), optional, intent(in) :: cap(:)
-    real(real64), allocatable, intent(out) :: section_probs(:, :)
-    integer :: proc_first_state, proc_states, proc_k, gamma_requested
+    real(real64), intent(in) :: wf_sections_dist_mask(:, :, :, :, :), proc_p_dist(:, :, :, :, :) ! wf_section/state x sizes of all sections in order K, rho, theta, phi
+    real(real64), allocatable, intent(out) :: section_stats(:, :)
+    integer :: proc_first_state, proc_states, i, j
     integer, allocatable :: recv_counts(:), recv_shifts(:)
-    real(real64), allocatable :: section_probs_chunk(:, :)
+    real(real64), allocatable :: proc_section_stats(:, :)
 
     call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
+    call assert(size(proc_p_dist, 1) == proc_states, 'Error: wrong size of proc_p_dist')
     ! Calculate local chunks
-    allocate(section_probs_chunk(proc_states, size(params % wf_sections)))
-    gamma_requested = is_gamma_requested(params)
-    do proc_k = 1, proc_states
-      section_probs_chunk(proc_k, :) = calculate_wf_sections_statistics(params, p_dist(proc_k, :, :, :, :), wf_sections_dist_inds, gamma_requested, cap)
+    allocate(proc_section_stats(proc_states, size(params % wf_sections)))
+    do j = 1, size(proc_section_stats, 2)
+      do i = 1, size(proc_section_stats, 1)
+        proc_section_stats(i, j) = sum(wf_sections_dist_mask(j, :, :, :, :) * proc_p_dist(i, :, :, :, :))
+      end do
     end do
-    call gather_chunks(section_probs_chunk, recv_counts, recv_shifts, section_probs)
+    call gather_chunks(proc_section_stats, recv_counts, recv_shifts, section_stats)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -289,10 +313,10 @@ contains
     real(real64), optional, intent(in) :: cap(:)
     integer :: N, L
     integer, allocatable :: num_solutions_2d(:, :) ! K x n
-    integer, allocatable :: num_solutions_1d(:, :, :), wf_sections_dist_inds(:, :, :)
+    integer, allocatable :: num_solutions_1d(:, :, :)
     real(real64), allocatable :: phi_borders(:)
     real(real64), allocatable :: eigenvalues_3d(:, :), section_stats(:, :)
-    real(real64), allocatable :: p_dist(:, :, :, :, :) ! num_states x each section in K, rho, theta, phi
+    real(real64), allocatable :: wf_sections_dist_mask(:, :, :, :, :), proc_p_dist(:, :, :, :, :) ! wf_sections/num_states x stat in each in K, rho, theta, phi
     character(:), allocatable :: sym_path, spectrum_path
     ! Arrays of size 2 x N x L (or K x N x L if compressing is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(array_2d_real), allocatable :: As(:, :, :), Bs(:, :, :)
@@ -318,11 +342,11 @@ contains
     call load_3D_expansion_coefficients(params, N, num_solutions_2d, proc_Cs)
 
     call print_parallel('Calculating probability distributions...')
-    call process_wf_sections(params, rho_grid, theta_grid, phi_borders, wf_sections_dist_inds)
-    p_dist = calculate_wf_integral_all_regions(params, As, Bs, proc_Cs, phi_borders)
+    call process_wf_sections(params, rho_grid, theta_grid, cap, phi_borders, wf_sections_dist_mask)
+    proc_p_dist = calculate_wf_integral_all_regions(params, As, Bs, proc_Cs, phi_borders)
 
     call print_parallel('Calculating statistics...')
-    call calculate_wf_sections_statistics_all(params, p_dist, wf_sections_dist_inds, cap, section_stats)
+    call calculate_wf_sections_statistics_all(params, wf_sections_dist_mask, proc_p_dist, section_stats)
 
     call print_parallel('Writing results...')
     call write_state_properties(params, eigenvalues_3d(1:size(section_stats, 1), :), section_stats)

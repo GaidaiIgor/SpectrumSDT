@@ -133,11 +133,15 @@ contains
 ! A one-liner to check various constraints.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assert(logical_statemenet, error_message)
-    logical :: logical_statemenet
-    character(*) :: error_message
+    logical, intent(in) :: logical_statemenet
+    character(*), optional, intent(in) :: error_message
 
     if (.not. logical_statemenet) then
-      print *, error_message
+      if (present(error_message)) then
+        print *, error_message
+      else
+        print *, 'Assertion error'
+      end if
       call exit_abnormally()
     end if
   end subroutine

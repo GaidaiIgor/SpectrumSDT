@@ -85,9 +85,10 @@ contains
   subroutine load_grids(grid_rho, grid_theta, grid_phi)
     real(real64), allocatable, intent(out) :: grid_rho(:), grid_theta(:), grid_phi(:)
     integer :: file_unit, num_points, i
+    real(real64) :: skip
 
     open(newunit = file_unit, file = 'grid_rho.dat')
-    read(file_unit, *) num_points
+    read(file_unit, *) skip, skip, skip, num_points
     allocate(grid_rho(num_points))
     do i = 1, num_points
       read(file_unit, *) grid_rho(i)
@@ -95,7 +96,7 @@ contains
     close(file_unit)
 
     open(newunit = file_unit, file = 'grid_theta.dat')
-    read(file_unit, *) num_points
+    read(file_unit, *) skip, skip, skip, num_points
     allocate(grid_theta(num_points))
     do i = 1, num_points
       read(file_unit, *) grid_theta(i)
@@ -103,7 +104,7 @@ contains
     close(file_unit)
 
     open(newunit = file_unit, file = 'grid_phi.dat')
-    read(file_unit, *) num_points
+    read(file_unit, *) skip, skip, skip, num_points
     allocate(grid_phi(num_points))
     do i = 1, num_points
       read(file_unit, *) grid_phi(i)

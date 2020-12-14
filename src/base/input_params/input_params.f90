@@ -605,8 +605,8 @@ end subroutine
 
     call assert(this % basis_size_phi == -1 .or. this % basis_size_phi <= size(grid_phi) / 2, 'Error: basis_size_phi should be <= size(grid_phi) / 2')
     if (this % stage == 'properties') then
-      call this % wf_sections % checked_resolve_rho_bounds(grid_rho(1), grid_rho(size(grid_rho)))
-      call this % wf_sections % checked_resolve_theta_bounds(grid_theta(1), grid_theta(size(grid_theta)))
+      call this % wf_sections % checked_resolve_rho_bounds(this % grid_rho % from, this % grid_rho % to)
+      call this % wf_sections % checked_resolve_theta_bounds(this % grid_theta % from, this % grid_theta % to)
       call this % wf_sections % checked_resolve_phi_bounds(0d0, 2*pi)
     end if
   end subroutine

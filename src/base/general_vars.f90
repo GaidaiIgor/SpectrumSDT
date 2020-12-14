@@ -44,14 +44,17 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads grids, jacobians, alphas (steps).
+! Loads grids, jacobians, alphas (steps). Inits corresponding parameters in *params*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_grids(params)
-    class(input_params), intent(in) :: params
+    class(input_params), intent(inout) :: params
     integer :: i, file_unit
+    real(real64) :: skip
     
     open(newunit = file_unit, file = get_grid_rho_path(params))
-    read(file_unit, *) n1, alpha1
+    read(file_unit, *) params % grid_rho % from, params % grid_rho % to, params % grid_rho % step, params % grid_rho % num_points
+    n1 = params % grid_rho % num_points
+    alpha1 = params % grid_rho % step
     allocate(g1(n1), jac1(n1))
     do i = 1, n1
       read(file_unit, *) g1(i), jac1(i)
@@ -59,7 +62,9 @@ contains
     close(file_unit)
     
     open(newunit = file_unit, file = get_grid_theta_path(params))
-    read(file_unit, *) n2, alpha2
+    read(file_unit, *) params % grid_theta % from, params % grid_theta % to, params % grid_theta % step, params % grid_theta % num_points
+    n2 = params % grid_theta % num_points
+    alpha2 = params % grid_theta % step
     allocate(g2(n2), jac2(n2))
     do i = 1, n2
       read(file_unit, *) g2(i), jac2(i)
@@ -67,7 +72,8 @@ contains
     close(file_unit)
     
     open(newunit = file_unit, file = get_grid_phi_path(params))
-    read(file_unit, *) n3, alpha3
+    read(file_unit, *) skip, skip, alpha3, params % num_points_phi
+    n3 = params % num_points_phi
     allocate(g3(n3), jac3(n3))
     do i = 1, n3
       read(file_unit, *) g3(i), jac3(i)
