@@ -67,7 +67,7 @@ def main():
     base_path = path.dirname(config_path)
     config = SpectrumSDTConfig(config_path)
 
-    folder_names = [["K_" + args.K], ["even", "odd"], ["eigencalc", "properties"]]
+    folder_names = [["K_" + args.K], ["sym_0", "sym_1"], ["eigencalc", "properties"]]
     folder_params = [["K = " + args.K], ["symmetry = 0", "symmetry = 1"], ["stage = eigencalc", "stage = properties"]]
 
     if args.K.isdigit():
