@@ -280,19 +280,24 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints grid, its ends, step and Jacobian to a file.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine write_grid(grid, jac, grid_ends, step, file_name)
-    real(real64), intent(in) :: grid(:), jac(:)
+  subroutine write_grid(grid, grid_ends, step, file_name, jac)
+    real(real64), intent(in) :: grid(:)
     real(real64), intent(in) :: grid_ends(2)
     real(real64), intent(in) :: step
     character(*), intent(in) :: file_name
+    real(real64), optional, intent(in) :: jac(:)
     integer :: i, file_unit
     
-    call assert(size(grid) == size(jac), 'Error: grid and jac have to have the same size')
     open(newunit = file_unit, file = file_name)
     write(file_unit, '(3G23.15,1x,I0)') grid_ends, step, size(grid)
-    do i = 1, size(grid)
-      write(file_unit, '(2G23.15)') grid(i), jac(i)
-    enddo
+    if (present(jac)) then
+      call assert(size(grid) == size(jac), 'Error: grid and jac have to have the same size')
+      do i = 1, size(grid)
+        write(file_unit, '(2G23.15)') grid(i), jac(i)
+      end do
+    else
+      write(file_unit, '(G23.15)') grid
+    end if
     close(file_unit)
   end subroutine
 
@@ -420,9 +425,9 @@ contains
 
     call generate_equidistant_grid_points(0d0, 2*pi, params % num_points_phi, grid_phi, jac_phi, phi_step)
 
-    call write_grid(grid_rho, jac_rho, [params % grid_rho % from, params % grid_rho % to], rho_step, 'grid_rho.dat')
-    call write_grid(grid_theta, jac_theta, [params % grid_theta % from, params % grid_theta % to], theta_step, 'grid_theta.dat')
-    call write_grid(grid_phi, jac_phi, [0d0, 2*pi], phi_step, 'grid_phi.dat')
+    call write_grid(grid_rho, [params % grid_rho % from, params % grid_rho % to], rho_step, 'grid_rho.dat', jac = jac_rho)
+    call write_grid(grid_theta, [params % grid_theta % from, params % grid_theta % to], theta_step, 'grid_theta.dat')
+    call write_grid(grid_phi, [0d0, 2*pi], phi_step, 'grid_phi.dat')
 
     if (params % output_coordinate_system /= 'aph') then
       call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % treat_tp_as_xy, params % mass)
