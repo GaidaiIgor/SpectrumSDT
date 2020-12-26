@@ -83,7 +83,7 @@ contains
         call calculate_states(params)
 
       case ('properties')
-        if (params % cap_type /= 'none') then
+        if (params % cap % type /= 'none') then
           call calculate_state_properties(params, g1, g2, get_real_cap())
         else
           call calculate_state_properties(params, g1, g2)

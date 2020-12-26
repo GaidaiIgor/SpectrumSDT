@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Data and procedures related to complex absorbing potential (CAP)
+! Data and procedures related to complex absorbing potential (CAP).
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module cap_mod
   use constants
@@ -20,12 +20,9 @@ module cap_mod
 
 contains
 
-  !-----------------------------------------------------------------------
-  !  Calculates CAP on a given grid for rho
-  !  Three types: 1. Adopted from dimentionally reduced
-  !               2. Balint-Kurti
-  !               3. Manolopoulos
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates CAP on a given grid for rho.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calc_cap(nr,g)
     integer ir,nr
     ! CAP #1
@@ -86,7 +83,7 @@ contains
 
     ! Setup parameters for Manolopoulos CAP
     eabs = emin
-    if(eabs < eabsmin)then
+    if (eabs < eabsmin) then
       eabs = eabsmin
     end if
     dM   = cM / (4 * pi)
@@ -96,42 +93,43 @@ contains
     ! Fill in Manolopoulos CAP
     do ir=1,nr
       r = g(ir)
-      if(r > rc)then
+      if (r > rc) then
         xM = 2 * dM * sqrt(2 * mu * eabs) * (r - rc)
         all_caps(ir,3) = eabs * (aM * xM - bM * xM**3 + 4/(cM-xM)**2 - 4/(cM+xM)**2 )
-        if(r > rc + damplen)then
+        if (r > rc + damplen) then
           all_caps(ir,3) = all_caps(ir-1,3)
         end if
       end if
     end do
   end subroutine
 
-  !-----------------------------------------------------------------------
-  ! Initializes CAPs (complex absorbing potential)
-  !-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Initializes CAPs (complex absorbing potential).
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_caps(params)
     class(input_params), intent(in) :: params
 
-    if (params % cap_type == 'none') then
+    if (params % cap % type == 'none') then
       capid = 0
-    else if (params % cap_type == 'Manolopoulos') then
+      return
+    else if (params % cap % type == 'Manolopoulos') then
       capid = 3
     end if
 
-    ! CAP params are hardcoded for now
+    ! some of CAP params are hardcoded for now
     dac = 0
     dwc = 0
-    drc = 0
     ndbw = 3
-    emin = 7 / au_to_wn
     capebar = 0
+    drc = 0
+    emin = params % cap % emin / au_to_wn
 
     call calc_cap(n1, g1)
   end subroutine
 
-!-----------------------------------------------------------------------
-! Writes active (as specified by global capid) CAP/-i into *p*
-!-----------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Writes active (as specified by global capid) CAP/-i into *p*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine get_cap(p)
     real(real64) :: p(n1)
     call assert(capid /= 0, 'Error: cap type is not specified')
@@ -139,7 +137,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns active (as specified by global capid) CAP/-i as real(real64)
+! Returns active (as specified by global capid) CAP/-i as real(real64).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_real_cap() result(cap)
     real(real64), allocatable :: cap(:)
@@ -149,7 +147,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns active (as specified by global capid) CAP as complex(real64)
+! Returns active (as specified by global capid) CAP as complex(real64).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_complex_cap() result(cap)
     complex(real64), allocatable :: cap(:)

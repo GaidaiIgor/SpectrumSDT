@@ -94,12 +94,12 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks validity of provided values
+! Checks validity of provided values.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_values_optgrid_params(this) 
+  subroutine check_values_optgrid_params(this)
     class(optgrid_params), intent(in) :: this
-    call assert(any(this % optimized == [-1, 0, 1]), 'Error: optimized should be 0 or 1')
-    call assert(this % solver_steps == -1 .or. this % solver_steps > 0, 'Error: solver_steps should be > 0')
+    call assert(any(this % optimized == [-1, 0, 1]), 'Error: ' // this % prefix // 'optimized should be 0 or 1')
+    call assert(this % solver_steps == -1 .or. this % solver_steps > 0, 'Error: ' // this % prefix // 'solver_steps should be > 0')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -116,20 +116,20 @@ contains
     call this % grid_params % checked_init(config_dict, check_extra = 0) ! First, check init parental type
     call this % assign_dict(config_dict) ! Init type as is to ease branching in getting keys
     mandatory_keys = this % get_mandatory_keys() ! Save mandatory keys because we will reuse them later for unused key check
-    call check_mandatory_keys(config_dict, mandatory_keys) ! Make sure mandatory keys are set to ease checking values
+    call check_mandatory_keys(config_dict, mandatory_keys, this % prefix) ! Make sure mandatory keys are set to ease checking values
 
     check_extra_act = arg_or_default(check_extra, 1)
     if (check_extra_act == 1) then
       all_keys = this % get_all_keys() ! Generally optional part comes last
-      call check_extra_keys(config_dict, all_keys) ! Checks that unknown keys were not specified
+      call check_extra_keys(config_dict, all_keys, this % prefix) ! Checks that unknown keys were not specified
       optional_keys = this % get_optional_keys()
-      call check_unused_keys(config_dict, mandatory_keys, optional_keys) ! Prints info if one of the known keys will not be used with current settings
+      call check_unused_keys(config_dict, mandatory_keys, optional_keys, this % prefix) ! Prints info if one of the known keys will not be used with current settings
     end if
 
     if (len(optional_keys) > 0) then
       optional_nonset_keys = set_difference(optional_keys, config_dict)
       call this % assign_dict(optional_nonset_keys)
-      call announce_defaults(optional_nonset_keys)
+      call announce_defaults(optional_nonset_keys, prefix = this % prefix)
     end if
     call this % check_values() ! Make sure the settings have valid values
   end subroutine

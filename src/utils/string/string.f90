@@ -17,9 +17,12 @@ module string_mod
     procedure :: write => write_string
     generic :: write(formatted) => write
 
-    procedure :: compare_char_str
-    procedure :: compare_string
-    generic :: operator(==) => compare_char_str, compare_string
+    procedure :: equals_char_str
+    procedure :: equals_string
+    generic :: operator(==) => equals_char_str, equals_string
+    procedure :: not_equals_char_str
+    procedure :: not_equals_string
+    generic :: operator(/=) => not_equals_char_str, not_equals_string
     
     procedure :: to_char_str
     procedure :: to_integer
@@ -48,7 +51,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Compares string with char str.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  elemental function compare_char_str(this, char_str) result(res)
+  elemental function equals_char_str(this, char_str) result(res)
     class(string), intent(in) :: this
     character(*), intent(in) :: char_str
     logical :: res
@@ -58,10 +61,29 @@ contains
 !---------------------------------------------------------------------------------------------------------------------------------------------
 ! Compares two strings.
 !---------------------------------------------------------------------------------------------------------------------------------------------
-  elemental function compare_string(this, other) result(res)
+  elemental function equals_string(this, other) result(res)
     class(string), intent(in) :: this, other
     logical :: res
     res = this % s == other % s
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Compares string with char str.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  elemental function not_equals_char_str(this, char_str) result(res)
+    class(string), intent(in) :: this
+    character(*), intent(in) :: char_str
+    logical :: res
+    res = this % s /= char_str
+  end function
+
+!---------------------------------------------------------------------------------------------------------------------------------------------
+! Compares two strings.
+!---------------------------------------------------------------------------------------------------------------------------------------------
+  elemental function not_equals_string(this, other) result(res)
+    class(string), intent(in) :: this, other
+    logical :: res
+    res = this % s /= other % s
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------

@@ -78,7 +78,7 @@ contains
       kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1)
     end if
 
-    if (params % cap_type /= 'none') then
+    if (params % cap % type /= 'none') then
       cap = get_complex_cap()
       call rovib_ham % build(params, kinetic, cap)
     else

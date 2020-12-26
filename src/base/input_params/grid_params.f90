@@ -11,6 +11,7 @@ module grid_params_mod
   public :: grid_params
 
   type :: grid_params
+    character(:), allocatable :: prefix
     real(real64) :: from = -1
     real(real64) :: to = -1
     real(real64) :: step = -1
@@ -42,6 +43,8 @@ contains
       next_key = key_set(i) % to_char_str()
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
+        case ('prefix')
+          this % prefix = next_value
         case ('from')
           this % from = str2real(next_value)
         case ('to')
@@ -61,6 +64,7 @@ contains
     class(grid_params), intent(in) :: this
     type(dictionary_t) :: keys
 
+    call put_string(keys, 'prefix')
     call put_string(keys, 'from')
     call put_string(keys, 'to')
     if (this % num_points == -1) then
@@ -85,6 +89,7 @@ contains
     class(grid_params), intent(in) :: this
     type(dictionary_t) :: keys
 
+    call put_string(keys, 'prefix')
     call put_string(keys, 'from')
     call put_string(keys, 'to')
     call put_string(keys, 'step')
@@ -94,12 +99,12 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_values_grid_params(this) 
+  subroutine check_values_grid_params(this)
     class(grid_params), intent(in) :: this
-    call assert(this % to > 0, 'Error: to should be > 0')
-    call assert(this % from < this % to, 'Error: from should be < to')
-    call assert(this % num_points == -1 .or. this % num_points > 0, 'Error: npoints should be > 0')
-    call assert((this % step .aeq. -1d0) .or. this % step > 0, 'Error: step should be > 0')
+    call assert(this % to > 0, 'Error: ' // this % prefix // 'to should be > 0')
+    call assert(this % from < this % to, 'Error: ' // this % prefix // 'from should be < to')
+    call assert(this % num_points == -1 .or. this % num_points > 0, 'Error: ' // this % prefix // 'npoints should be > 0')
+    call assert((this % step .aeq. -1d0) .or. this % step > 0, 'Error: '// this % prefix // 'step should be > 0')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -113,19 +118,19 @@ contains
     integer :: check_extra_act
     type(dictionary_t) :: mandatory_keys, all_keys
 
+    call this % assign_dict(config_dict)
     ! These two can never be set together, so it's an error if they are
     ! Has to be checked before mandatory keys since error message is more specific
-    call check_only_one_set(config_dict, string([character(100) :: 'step', 'num_points'])) 
-    call this % assign_dict(config_dict)
+    call check_only_one_set(config_dict, string([character(100) :: 'step', 'num_points']), this % prefix)
     mandatory_keys = this % get_mandatory_keys()
-    call check_mandatory_keys(config_dict, mandatory_keys)
+    call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
     call this % check_values()
 
     ! Skippable to enable calls from derived types since their parameters will be erroneously considered unknown here
     check_extra_act = arg_or_default(check_extra, 1)
     if (check_extra_act == 1) then
       all_keys = this % get_all_keys()
-      call check_extra_keys(config_dict, all_keys)
+      call check_extra_keys(config_dict, all_keys, this % prefix)
     end if
   end subroutine
 

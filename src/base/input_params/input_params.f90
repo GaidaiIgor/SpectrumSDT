@@ -1,5 +1,6 @@
 module input_params_mod
   use algorithms_mod
+  use cap_params_mod
   use config_mod
   use constants
   use dictionary
@@ -18,11 +19,13 @@ module input_params_mod
   public :: input_params
 
   type :: input_params
+    character(:), allocatable :: prefix
+
     ! Behavior control
     character(:), allocatable :: stage ! grids, basis, overlaps, eigencalc or properties
     integer :: use_rovib_coupling = -1 ! enables/disables use_rovib_coupling coupling
     integer :: use_fixed_basis_JK = -1 ! use basis set with the same fixed values of J and K for all calculations
-    character(:), allocatable :: cap_type ! type of Complex Absorbing Potential
+    type(cap_params) :: cap ! Complex Absorbin Potential parameters
 
     ! Grids
     type(optgrid_params) :: grid_rho
@@ -207,33 +210,41 @@ contains
 ! Parses given *dict* into wf_sections. Any item in the *dict* has to be a dict representing an individual section.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_wf_sections(dict) result(wf_sections)
-    class(dictionary_t) :: dict ! intent(in)
+    class(dictionary_t) :: dict
     type(wf_section_params), allocatable :: wf_sections(:)
     integer :: i
     integer, allocatable :: section_indices(:), key_order(:)
     character(:), allocatable :: next_key
-    type(string), allocatable :: key_set(:)
+    type(string), allocatable :: key_set(:), wf_section_keys(:)
     type(dictionary_t) :: subdict
 
     key_set = get_key_set(dict)
-    allocate(section_indices(size(key_set)))
+    wf_section_keys = pack(key_set, key_set /= 'prefix')
+
+    allocate(section_indices(size(wf_section_keys)))
     ! We need to iterate the sections in order they were given.
     ! Order of keys in dict can be arbitrary, so we need to use dict index stored from parsing.
-    do i = 1, size(key_set)
-      call associate(subdict, dict, key_set(i) % to_char_str())
+    do i = 1, size(wf_section_keys)
+      call associate(subdict, dict, wf_section_keys(i) % to_char_str())
       call assign(section_indices(i), subdict, 'dict_index')
       call nullify(subdict, 'dict_index')
     end do
     section_indices = bubble_sort(section_indices, index_permutation = key_order)
 
-    allocate(wf_sections(size(key_set)))
+    allocate(wf_sections(size(wf_section_keys)))
     do i = 1, size(key_order)
-      next_key = key_set(key_order(i)) % to_char_str()
+      next_key = wf_section_keys(key_order(i)) % to_char_str()
       call associate(subdict, dict, next_key)
-      call wf_sections(i) % checked_init(subdict)
-      if (wf_sections(i) % name == 'use_key_name') then
-        wf_sections(i) % name = next_key
+
+      ! use key name if name attribute is not provided
+      if (.not. ('name' .in. subdict)) then
+        call put_string(subdict, 'name', next_key)
       end if
+      call wf_sections(i) % checked_init(subdict)
+
+      ! if (wf_sections(i) % name == 'use_key_name') then
+      !   wf_sections(i) % name = next_key
+      ! end if
     end do
   end function
 
@@ -294,14 +305,17 @@ contains
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
       select case (next_key)
+        case ('prefix')
+          this % prefix = extract_string(config_dict, next_key)
         case ('stage')
           this % stage = extract_string(config_dict, next_key)
         case ('use_rovib_coupling')
           this % use_rovib_coupling = str2int(extract_string(config_dict, next_key))
         case ('use_fixed_basis_JK')
           this % use_fixed_basis_JK = str2int(extract_string(config_dict, next_key))
-        case ('cap_type')
-          this % cap_type = extract_string(config_dict, next_key)
+        case ('cap')
+          call associate(subdict, config_dict, next_key)
+          call this % cap % checked_init(subdict)
         case ('grid_rho')
           call associate(subdict, config_dict, next_key)
           call this % grid_rho % checked_init(subdict)
@@ -380,6 +394,7 @@ contains
     class(input_params), intent(in) :: this
     type(dictionary_t) :: keys
 
+    call put_string(keys, 'prefix')
     call put_string(keys, 'stage')
     if (this % stage == 'grids') then
       call put_string(keys, 'grid_rho')
@@ -447,6 +462,10 @@ contains
   subroutine get_optional_keys_input_params(this, keys, messages)
     class(input_params), intent(in) :: this
     type(dictionary_t), intent(out) :: keys, messages
+    type(dictionary_t) :: cap_default
+
+    call put_string(cap_default, 'prefix', 'cap % ')
+    call put_string(cap_default, 'type', 'none')
 
     if (this % stage == 'grids') then
       call put_string(keys, 'num_points_phi', num2str(2 * this % basis_size_phi))
@@ -474,7 +493,7 @@ contains
     end if
 
     if (this % stage == 'eigencalc' .or. this % stage == 'properties') then
-      call put_string(keys, 'cap_type', 'none')
+      call extend(keys, 'cap' .kvp. cap_default)
     end if
 
     if ((this % stage == 'eigencalc' .or. this % stage == 'properties') .and. this % use_rovib_coupling == 1) then
@@ -489,10 +508,11 @@ end subroutine
     class(input_params), intent(in) :: this
     type(dictionary_t) :: keys
 
+    call put_string(keys, 'prefix')
     call put_string(keys, 'stage')
     call put_string(keys, 'use_rovib_coupling')
     call put_string(keys, 'use_fixed_basis_JK')
-    call put_string(keys, 'cap_type')
+    call put_string(keys, 'cap')
     call put_string(keys, 'grid_rho')
     call put_string(keys, 'grid_theta')
     call put_string(keys, 'num_points_phi')
@@ -530,9 +550,6 @@ end subroutine
     call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigencalc', 'properties']), 'Error: stage can be "grids", "basis", "overlaps", "eigencalc" or "properties"')
     call assert(any(this % use_rovib_coupling == [-1, 0, 1]), 'Error: use_rovib_coupling can be 0 or 1')
     call assert(any(this % use_fixed_basis_JK == [-1, 0, 1]), 'Error: use_fixed_basis_JK can be 0 or 1')
-    if (allocated(this % cap_type)) then
-      call assert(any(this % cap_type == [character(100) :: 'none', 'Manolopoulos']), 'Error: cap_type can be "none" or "Manolopoulos"')
-    end if
     call assert((this % grid_rho % from .aeq. -1d0) .or. (this % grid_rho % from .age. 0d0), 'Error: grid_rho % from should be >= 0')
     if (this % treat_tp_as_xy /= 1) then
       call assert((this % grid_theta % from .aeq. -1d0) .or. (this % grid_theta % from .age. 0d0), 'Error: grid_theta % from should be >= 0')

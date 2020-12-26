@@ -13,6 +13,7 @@ module wf_section_params_mod
   public :: wf_section_params
 
   type :: wf_section_params
+    character(:), allocatable :: prefix
     character(:), allocatable :: name
     character(:), allocatable :: stat
     integer :: K(2) = -1
@@ -22,6 +23,7 @@ module wf_section_params_mod
 
   contains
     procedure :: assign_dict => assign_dict_wf_section_params
+    procedure :: get_mandatory_keys => get_mandatory_keys_wf_section_params
     procedure :: get_optional_keys => get_optional_keys_wf_section_params
     procedure :: get_all_keys => get_all_keys_wf_section_params
     procedure :: check_values => check_values_wf_section_params
@@ -68,6 +70,8 @@ contains
       next_key = key_set(i) % to_char_str()
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
+        case ('prefix')
+          this % prefix = next_value
         case ('name')
           this % name = next_value
         case ('stat')
@@ -97,13 +101,23 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns a set of mandatory keys.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_mandatory_keys_wf_section_params(this) result(keys)
+    class(wf_section_params), intent(in) :: this
+    type(dictionary_t) :: keys
+
+    call put_string(keys, 'prefix')
+    call put_string(keys, 'name')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of optional keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_optional_keys_wf_section_params(this) result(keys)
     class(wf_section_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'name', 'use_key_name')
     call put_string(keys, 'stat', 'probability')
     call put_string(keys, 'K', 'start .. end')
     call put_string(keys, 'rho', 'start .. end')
@@ -118,6 +132,7 @@ contains
     class(wf_section_params), intent(in) :: this
     type(dictionary_t) :: keys
 
+    call put_string(keys, 'prefix')
     call put_string(keys, 'name')
     call put_string(keys, 'stat')
     call put_string(keys, 'K')
@@ -129,14 +144,14 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values. 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_values_wf_section_params(this) 
+  subroutine check_values_wf_section_params(this)
     class(wf_section_params), intent(in) :: this
-    call assert(any(this % stat == [character(100) :: 'probability', 'gamma']), 'Error: stat can be probability or gamma')
+    call assert(any(this % stat == [character(100) :: 'probability', 'gamma']), 'Error: ' // this % prefix // 'stat can be probability or gamma')
     ! Check of individual boundaries are performed later, when grid and K information is available
-    call assert(any(this % K == -2) .or. this % K(1) <= this % K(2), 'Error: K(1) should be <= K(2)')
-    call assert(any(this % rho .aeq. -2d0) .or. this % rho(1) < this % rho(2), 'Error: rho(1) should be < rho(2)')
-    call assert(any(this % theta .aeq. -2d0) .or. this % theta(1) < this % theta(2), 'Error: theta(1) should be < theta(2)')
-    call assert(any(this % phi .aeq. -2d0) .or. this % phi(1) < this % phi(2), 'Error: phi(1) should be < phi(2)')
+    call assert(any(this % K == -2) .or. this % K(1) <= this % K(2), 'Error: ' // this % prefix // 'K(1) should be <= K(2)')
+    call assert(any(this % rho .aeq. -2d0) .or. this % rho(1) < this % rho(2), 'Error: ' // this % prefix // 'rho(1) should be < rho(2)')
+    call assert(any(this % theta .aeq. -2d0) .or. this % theta(1) < this % theta(2), 'Error: ' // this % prefix // 'theta(1) should be < theta(2)')
+    call assert(any(this % phi .aeq. -2d0) .or. this % phi(1) < this % phi(2), 'Error: ' // this % prefix // 'phi(1) should be < phi(2)')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -149,10 +164,13 @@ contains
     type(dictionary_t) :: mandatory_keys, optional_keys, optional_nonset_keys, all_keys
 
     call this % assign_dict(config_dict)
+    mandatory_keys = this % get_mandatory_keys()
+    call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
+
     all_keys = this % get_all_keys()
-    call check_extra_keys(config_dict, all_keys)
+    call check_extra_keys(config_dict, all_keys, this % prefix)
     optional_keys = this % get_optional_keys()
-    call check_unused_keys(config_dict, mandatory_keys, optional_keys)
+    call check_unused_keys(config_dict, mandatory_keys, optional_keys, this % prefix)
 
     if (len(optional_keys) > 0) then
       optional_nonset_keys = set_difference(optional_keys, config_dict)
@@ -171,13 +189,13 @@ contains
     if (this % K(1) == -2) then
       this % K(1) = K_min
     else
-      call assert(this % K(1) >= K_min, 'Error: K(1) should be >= K_min')
+      call assert(this % K(1) >= K_min, 'Error: ' // this % prefix // 'K(1) should be >= K_min')
     end if
 
     if (this % K(2) == -2) then
       this % K(2) = K_max
     else
-      call assert(this % K(2) <= K_max, 'Error: K(2) should be <= K_max')
+      call assert(this % K(2) <= K_max, 'Error: ' // this % prefix // 'K(2) should be <= K_max')
     end if
   end subroutine
 
@@ -191,13 +209,13 @@ contains
     if (this % rho(1) .aeq. -2d0) then
       this % rho(1) = rho_min
     else
-      call assert(this % rho(1) .age. rho_min, 'Error: rho(1) should be >= rho_min')
+      call assert(this % rho(1) .age. rho_min, 'Error: ' // this % prefix // 'rho(1) should be >= rho_min')
     end if
 
     if (this % rho(2) .aeq. -2d0) then
       this % rho(2) = rho_max
     else
-      call assert(this % rho(2) .ale. rho_max, 'Error: rho(2) should be <= rho_max')
+      call assert(this % rho(2) .ale. rho_max, 'Error: ' // this % prefix // 'rho(2) should be <= rho_max')
     end if
   end subroutine
 
@@ -211,13 +229,13 @@ contains
     if (this % theta(1) .aeq. -2d0) then
       this % theta(1) = theta_min
     else
-      call assert(this % theta(1) .age. theta_min, 'Error: theta(1) should be >= theta_min')
+      call assert(this % theta(1) .age. theta_min, 'Error: ' // this % prefix // 'theta(1) should be >= theta_min')
     end if
 
     if (this % theta(2) .aeq. -2d0) then
       this % theta(2) = theta_max
     else
-      call assert(this % theta(2) .ale. theta_max, 'Error: theta(2) should be <= theta_max')
+      call assert(this % theta(2) .ale. theta_max, 'Error: ' // this % prefix // 'theta(2) should be <= theta_max')
     end if
   end subroutine
 
@@ -231,13 +249,13 @@ contains
     if (this % phi(1) .aeq. -2d0) then
       this % phi(1) = phi_min
     else
-      call assert(this % phi(1) .age. phi_min, 'Error: phi(1) should be >= phi_min')
+      call assert(this % phi(1) .age. phi_min, 'Error: ' // this % prefix // 'phi(1) should be >= phi_min')
     end if
 
     if (this % phi(2) .aeq. -2d0) then
       this % phi(2) = phi_max
     else
-      call assert(this % phi(2) .ale. phi_max, 'Error: phi(2) should be <= phi_max')
+      call assert(this % phi(2) .ale. phi_max, 'Error: ' // this % prefix // 'phi(2) should be <= phi_max')
     end if
   end subroutine
 
