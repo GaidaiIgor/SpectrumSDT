@@ -1,5 +1,6 @@
 module cap_params_mod
   use config_mod
+  use constants
   use dictionary
   use dict_utils
   use general_utils
@@ -43,10 +44,9 @@ contains
       select case (next_key)
         case ('prefix')
           this % prefix = next_value
-        case ('type')
-          this % type = next_value
         case ('emin')
-          this % emin = str2real(next_value)
+          this % emin = str2real(next_value) / au_to_wn
+          this % type = 'Manolopoulos'
       end select
     end do
   end subroutine
@@ -59,9 +59,7 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'prefix')
-    if (this % type == 'Manolopoulos') then
-      call put_string(keys, 'emin')
-    end if
+    call put_string(keys, 'emin')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -70,7 +68,6 @@ contains
   function get_optional_keys_cap_params(this) result(keys)
     class(cap_params), intent(in) :: this
     type(dictionary_t) :: keys
-    call put_string(keys, 'type', 'none')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -81,7 +78,6 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'prefix')
-    call put_string(keys, 'type')
     call put_string(keys, 'emin')
   end function
 
@@ -90,7 +86,6 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_cap_params(this) 
     class(cap_params), intent(in) :: this
-    call assert(any(this % type == [character(100) :: 'none', 'Manolopoulos']), 'Error: ' // this % prefix // 'type can be "none" or "Manolopoulos"')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -99,7 +94,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine checked_init_cap_params(this, config_dict)
     class(cap_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t), intent(in) :: config_dict
     type(dictionary_t) :: mandatory_keys, optional_keys, optional_nonset_keys, all_keys
 
     call this % assign_dict(config_dict)

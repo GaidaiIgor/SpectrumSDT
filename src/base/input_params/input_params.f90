@@ -93,7 +93,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Parses user-provded value of mass
+! Parses user-provded value of mass.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_mass(mass_str) result(mass)
     character(*), intent(in) :: mass_str
@@ -241,10 +241,6 @@ contains
         call put_string(subdict, 'name', next_key)
       end if
       call wf_sections(i) % checked_init(subdict)
-
-      ! if (wf_sections(i) % name == 'use_key_name') then
-      !   wf_sections(i) % name = next_key
-      ! end if
     end do
   end function
 
@@ -315,7 +311,11 @@ contains
           this % use_fixed_basis_JK = str2int(extract_string(config_dict, next_key))
         case ('cap')
           call associate(subdict, config_dict, next_key)
-          call this % cap % checked_init(subdict)
+          if ('default' .in. subdict) then
+            this % cap % type = 'none'
+          else
+            call this % cap % checked_init(subdict)
+          end if
         case ('grid_rho')
           call associate(subdict, config_dict, next_key)
           call this % grid_rho % checked_init(subdict)
@@ -464,8 +464,7 @@ contains
     type(dictionary_t), intent(out) :: keys, messages
     type(dictionary_t) :: cap_default
 
-    call put_string(cap_default, 'prefix', 'cap % ')
-    call put_string(cap_default, 'type', 'none')
+    call put_string(cap_default, 'default')
 
     if (this % stage == 'grids') then
       call put_string(keys, 'num_points_phi', num2str(2 * this % basis_size_phi))
