@@ -312,7 +312,7 @@ contains
         case ('cap')
           call associate(subdict, config_dict, next_key)
           if ('default' .in. subdict) then
-            this % cap % type = 'none'
+            call this % cap % init_default()
           else
             call this % cap % checked_init(subdict)
           end if
@@ -471,12 +471,12 @@ contains
       call put_string(messages, 'num_points_phi', 'Assuming default = 2 * basis_size_phi')
       call put_string(keys, 'output_coordinate_system', 'aph')
       call put_string(keys, 'treat_tp_as_xy', '0')
-      call put_string(messages, 'treat_tp_as_xy', '')
+      call put_string(messages, 'treat_tp_as_xy')
     end if
 
     if (this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
       call put_string(keys, 'use_parallel', '1')
-      call put_string(messages, 'use_parallel', '')
+      call put_string(messages, 'use_parallel')
     end if
 
     if (this % stage == 'eigencalc') then
@@ -486,9 +486,9 @@ contains
       call put_string(messages, 'mpd', 'Its value will be determined by SLEPc')
       call put_string(keys, 'max_iterations', '10000')
       call put_string(keys, 'enable_terms', '11')
-      call put_string(messages, 'enable_terms', '')
+      call put_string(messages, 'enable_terms')
       call put_string(keys, 'optimized_mult', '1')
-      call put_string(messages, 'optimized_mult', '')
+      call put_string(messages, 'optimized_mult')
     end if
 
     if (this % stage == 'eigencalc' .or. this % stage == 'properties') then
@@ -602,13 +602,9 @@ end subroutine
     call this % get_optional_keys(optional_keys, messages)
     call check_unused_keys(config_dict, mandatory_keys, optional_keys)
 
-    if (len(optional_keys) > 0) then
-      optional_nonset_keys = set_difference(optional_keys, config_dict)
-      if (len(optional_nonset_keys) > 0) then
-        call this % assign_dict(optional_nonset_keys)
-        call announce_defaults(optional_nonset_keys, messages)
-      end if
-    end if
+    optional_nonset_keys = set_difference(optional_keys, config_dict)
+    call this % assign_dict(optional_nonset_keys)
+    call announce_defaults(optional_nonset_keys, messages)
     call this % check_values()
   end subroutine
 

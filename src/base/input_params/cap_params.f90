@@ -14,9 +14,10 @@ module cap_params_mod
   type :: cap_params
     character(:), allocatable :: prefix
     character(:), allocatable :: type
-    real(real64) :: emin = -1
+    real(real64) :: min_absorbed_energy = -1
 
   contains
+    procedure :: init_default => init_default_cap_params
     procedure :: assign_dict => assign_dict_cap_params
     procedure :: get_mandatory_keys => get_mandatory_keys_cap_params
     procedure :: get_optional_keys => get_optional_keys_cap_params
@@ -28,6 +29,15 @@ module cap_params_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Inits default values that cannot be statically initialized.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine init_default_cap_params(this)
+    class(cap_params), intent(inout) :: this
+    this % prefix = ''
+    this % type = 'none'
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of cap_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assign_dict_cap_params(this, config_dict)
@@ -37,6 +47,7 @@ contains
     character(:), allocatable :: next_key, next_value
     type(string), allocatable :: key_set(:)
 
+    this % type = 'Manolopoulos'
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
@@ -44,9 +55,8 @@ contains
       select case (next_key)
         case ('prefix')
           this % prefix = next_value
-        case ('emin')
-          this % emin = str2real(next_value) / au_to_wn
-          this % type = 'Manolopoulos'
+        case ('min_absorbed_energy')
+          this % min_absorbed_energy = str2real(next_value) / au_to_wn
       end select
     end do
   end subroutine
@@ -59,16 +69,16 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'prefix')
-    call put_string(keys, 'emin')
+    call put_string(keys, 'min_absorbed_energy')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of optional keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_optional_keys_cap_params(this) result(keys)
+  subroutine get_optional_keys_cap_params(this, keys, messages)
     class(cap_params), intent(in) :: this
-    type(dictionary_t) :: keys
-  end function
+    type(dictionary_t), intent(out) :: keys, messages
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
@@ -78,7 +88,7 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'prefix')
-    call put_string(keys, 'emin')
+    call put_string(keys, 'min_absorbed_energy')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -86,6 +96,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_cap_params(this) 
     class(cap_params), intent(in) :: this
+    call assert(this % min_absorbed_energy > 0, 'Error: ' // this % prefix // 'min_absorbed_energy should be > 0')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -94,8 +105,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine checked_init_cap_params(this, config_dict)
     class(cap_params), intent(inout) :: this
-    class(dictionary_t), intent(in) :: config_dict
-    type(dictionary_t) :: mandatory_keys, optional_keys, optional_nonset_keys, all_keys
+    class(dictionary_t) :: config_dict ! intent(in)
+    type(dictionary_t) :: mandatory_keys, optional_keys, messages, optional_nonset_keys, all_keys
 
     call this % assign_dict(config_dict)
     mandatory_keys = this % get_mandatory_keys()
@@ -103,16 +114,12 @@ contains
 
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys, this % prefix)
-    optional_keys = this % get_optional_keys()
+    call this % get_optional_keys(optional_keys, messages)
     call check_unused_keys(config_dict, mandatory_keys, optional_keys, this % prefix)
 
-    if (len(optional_keys) > 0) then
-      optional_nonset_keys = set_difference(optional_keys, config_dict)
-      if (len(optional_nonset_keys) > 0) then
-        call this % assign_dict(optional_nonset_keys)
-        call announce_defaults(optional_nonset_keys, prefix = this % prefix)
-      end if
-    end if
+    optional_nonset_keys = set_difference(optional_keys, config_dict)
+    call this % assign_dict(optional_nonset_keys)
+    call announce_defaults(optional_nonset_keys, messages, this % prefix)
     call this % check_values()
   end subroutine
 

@@ -126,11 +126,9 @@ contains
       call check_unused_keys(config_dict, mandatory_keys, optional_keys, this % prefix) ! Prints info if one of the known keys will not be used with current settings
     end if
 
-    if (len(optional_keys) > 0) then
-      optional_nonset_keys = set_difference(optional_keys, config_dict)
-      call this % assign_dict(optional_nonset_keys)
-      call announce_defaults(optional_nonset_keys, prefix = this % prefix)
-    end if
+    optional_nonset_keys = set_difference(optional_keys, config_dict)
+    call this % assign_dict(optional_nonset_keys)
+    call announce_defaults(optional_nonset_keys, prefix = this % prefix)
     call this % check_values() ! Make sure the settings have valid values
   end subroutine
 

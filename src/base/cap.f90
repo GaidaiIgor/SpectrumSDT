@@ -14,35 +14,34 @@ module cap_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates CAP on a given grid for rho.
+! Calculates Manolopoulos CAP on a given *grid_rho*.
+! See D.E. Manolopoulos, J. Chem. Phys. 117, 9552 (2002) for more details.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calc_cap(params, grid_rho)
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: grid_rho(:)
     integer :: i
-    real(real64), parameter :: aM = 0.112449d0
-    real(real64), parameter :: bM = 0.00828735d0
-    real(real64), parameter :: cM = 2.62206d0
-    real(real64) :: rc, dM, xM, rho, damp_len
+    real(real64), parameter :: a = 0.112449d0
+    real(real64), parameter :: b = 0.00828735d0
+    real(real64), parameter :: c = 2.62206d0
+    real(real64) :: delta, kmin, absorbing_width, r1, rho, x
 
     ! Allocate array
     allocate(cap(size(grid_rho)))
     cap = 0
 
     ! Setup parameters for Manolopoulos CAP
-    dM = cM / (4 * pi)
-    damp_len = cM / (2 * dM * sqrt(2 * mu * params % cap % emin))
-    rc = params % grid_rho % to - damp_len
+    delta = c / (4 * pi)
+    kmin = sqrt(2 * mu * params % cap % min_absorbed_energy)
+    absorbing_width = c / (2 * delta * kmin)
+    r1 = params % grid_rho % to - absorbing_width
 
     ! Fill in Manolopoulos CAP
     do i = 1, size(grid_rho)
       rho = grid_rho(i)
-      if (rho > rc) then
-        xM = 2 * dM * sqrt(2 * mu * params % cap % emin) * (rho - rc)
-        cap(i) = params % cap % emin * (aM * xM - bM * xM**3 + 4/(cM-xM)**2 - 4/(cM+xM)**2 )
-        if (rho > rc + damp_len) then
-          cap(i) = cap(i - 1)
-        end if
+      if (rho > r1) then
+        x = 2 * delta * kmin * (rho - r1)
+        cap(i) = params % cap % min_absorbed_energy * (a*x - b*x**3 + 4/(c-x)**2 - 4/(c+x)**2)
       end if
     end do
   end subroutine

@@ -91,7 +91,7 @@ contains
 ! Checks that only one of the keys in the specified group is set.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_only_one_set(config_dict, group, prefix)
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t), intent(in) :: config_dict
     class(string), intent(in) :: group(:)
     character(*), optional, intent(in) :: prefix
     logical :: is_set
@@ -121,7 +121,7 @@ contains
 ! Checks whether all mandatory keys of this stage are specified in config.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_mandatory_keys(config_dict, mandatory_keys, prefix)
-    class(dictionary_t) :: config_dict, mandatory_keys ! intent(in)
+    class(dictionary_t), intent(in) :: config_dict, mandatory_keys
     character(*), optional, intent(in) :: prefix
     logical :: all_set
     integer :: i
@@ -148,7 +148,7 @@ contains
 ! Checks whether some of the specified keys will be unused.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_extra_keys(config_dict, all_keys, prefix)
-    class(dictionary_t) :: config_dict, all_keys ! intent(in)
+    class(dictionary_t), intent(in) :: config_dict, all_keys
     character(*), optional, intent(in) :: prefix
     integer :: i
     character(:), allocatable :: next_key, next_key_repr
@@ -169,7 +169,7 @@ contains
 ! Checks whether some of the specified keys will be unused.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_unused_keys(config_dict, mandatory_keys, optional_keys, prefix)
-    class(dictionary_t) :: config_dict, mandatory_keys, optional_keys ! intent(in)
+    class(dictionary_t), intent(in) :: config_dict, mandatory_keys, optional_keys
     character(*), optional, intent(in) :: prefix
     integer :: i
     character(:), allocatable :: next_key, next_key_repr

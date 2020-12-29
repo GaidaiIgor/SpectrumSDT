@@ -172,10 +172,8 @@ contains
     optional_keys = this % get_optional_keys()
     call check_unused_keys(config_dict, mandatory_keys, optional_keys, this % prefix)
 
-    if (len(optional_keys) > 0) then
-      optional_nonset_keys = set_difference(optional_keys, config_dict)
-      call this % assign_dict(optional_nonset_keys)
-    end if
+    optional_nonset_keys = set_difference(optional_keys, config_dict)
+    call this % assign_dict(optional_nonset_keys)
     call this % check_values()
   end subroutine
 
