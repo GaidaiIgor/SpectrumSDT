@@ -124,7 +124,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 1D expansion coefficients for use_fixed_basis_JK = 1.
+! Loads and rearranges 1D expansion coefficients for fixed_basis is enabled
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
     class(input_params), intent(in) :: params
@@ -137,7 +137,7 @@ contains
     allocate(As(2, N, L), num_solutions_1d(2, N, L))
     do K_sym = 0, 1
       K_ind = K_sym + 1
-      sym_path = get_sym_path_root(params % basis_root_path, params % basis_K, K_sym)
+      sym_path = get_sym_path_root(params % fixed_basis % root_path, params % fixed_basis % K, K_sym)
       call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis_size_phi, num_solutions_1d, As)
     end do
   end subroutine
@@ -212,7 +212,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 2D expansion coefficients when use_fixed_basis_JK = 1.
+! Loads and rearranges 2D expansion coefficients when fixed_basis is enabled.
 ! Bs: Outer dimensions: 2 x N x L. Inner dimensions: S_Knl x S_Kn. All coeffs of a single 2D solution should be collected over different Ls.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
@@ -233,7 +233,7 @@ contains
 
     do K_sym = 0, 1
       K_ind = K_sym + 1
-      sym_path = get_sym_path_root(params % basis_root_path, params % basis_K, K_sym)
+      sym_path = get_sym_path_root(params % fixed_basis % root_path, params % fixed_basis % K, K_sym)
       call load_2D_expansion_coefficients_K(sym_path, K_ind, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
     end do
   end subroutine

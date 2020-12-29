@@ -5,6 +5,7 @@ module input_params_mod
   use constants
   use dictionary
   use dict_utils
+  use fixed_basis_params_mod
   use general_utils
   use grid_params_mod
   use optgrid_params_mod
@@ -24,7 +25,6 @@ module input_params_mod
     ! Behavior control
     character(:), allocatable :: stage ! grids, basis, overlaps, eigencalc or properties
     integer :: use_rovib_coupling = -1 ! enables/disables use_rovib_coupling coupling
-    integer :: use_fixed_basis_JK = -1 ! use basis set with the same fixed values of J and K for all calculations
     type(cap_params) :: cap ! Complex Absorbin Potential parameters
 
     ! Grids
@@ -43,9 +43,7 @@ module input_params_mod
     ! Basis
     integer :: basis_size_phi = -1 ! number of sines or cosines for 1D step
     real(real64) :: cutoff_energy = -1 ! solutions with energies higher than this are discarded from basis
-    character(:), allocatable :: basis_root_path ! path to root folder for basis calculations
-    integer :: basis_J = -1 ! J of basis set
-    integer :: basis_K = -1 ! K of basis set
+    type(fixed_basis_params) :: fixed_basis
 
     ! Eigencalc
     integer :: num_states = -1 ! desired number of eigenstates from eigencalc
@@ -69,6 +67,7 @@ module input_params_mod
     character(:), allocatable :: debug_param_1
 
   contains
+    procedure :: init_default => init_default_input_params
     procedure :: assign_dict => assign_dict_input_params
     procedure :: get_mandatory_keys => get_mandatory_keys_input_params
     procedure :: get_optional_keys => get_optional_keys_input_params
@@ -79,6 +78,14 @@ module input_params_mod
   end type
 
 contains
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Inits default state of subobjects.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine init_default_input_params(this)
+    class(input_params), intent(inout) :: this
+    call this % cap % init_default()
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts all fields in *params* from degrees to radians.
@@ -307,15 +314,9 @@ contains
           this % stage = extract_string(config_dict, next_key)
         case ('use_rovib_coupling')
           this % use_rovib_coupling = str2int(extract_string(config_dict, next_key))
-        case ('use_fixed_basis_JK')
-          this % use_fixed_basis_JK = str2int(extract_string(config_dict, next_key))
         case ('cap')
           call associate(subdict, config_dict, next_key)
-          if ('default' .in. subdict) then
-            call this % cap % init_default()
-          else
-            call this % cap % checked_init(subdict)
-          end if
+          call this % cap % checked_init(subdict)
         case ('grid_rho')
           call associate(subdict, config_dict, next_key)
           call this % grid_rho % checked_init(subdict)
@@ -341,12 +342,9 @@ contains
           this % basis_size_phi = str2int(extract_string(config_dict, next_key))
         case ('cutoff_energy')
           this % cutoff_energy = str2real(extract_string(config_dict, next_key)) / au_to_wn
-        case ('basis_root_path')
-          this % basis_root_path = extract_string(config_dict, next_key)
-        case ('basis_J')
-          this % basis_J = str2int(extract_string(config_dict, next_key))
-        case ('basis_K')
-          this % basis_K = str2int(extract_string(config_dict, next_key))
+        case ('fixed_basis')
+          call associate(subdict, config_dict, next_key)
+          call this % fixed_basis % checked_init(subdict)
         case ('num_states')
           this % num_states = str2int(extract_string(config_dict, next_key))
         case ('ncv')
@@ -434,7 +432,7 @@ contains
 
     if (this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
       call put_string(keys, 'use_rovib_coupling')
-      call put_string(keys, 'use_fixed_basis_JK')
+      call put_string(keys, 'fixed_basis')
     end if
 
     if (this % stage == 'eigencalc' .or. this % stage == 'properties') then
@@ -445,12 +443,6 @@ contains
       call put_string(keys, 'parity')
     end if
 
-    if ((this % stage == 'eigencalc' .or. this % stage == 'properties') .and. this % use_fixed_basis_JK == 1) then
-      call put_string(keys, 'basis_root_path')
-      call put_string(keys, 'basis_J')
-      call put_string(keys, 'basis_K')
-    end if
-
     if (this % stage == 'properties') then
       call put_string(keys, 'wf_sections')
     end if
@@ -458,13 +450,11 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of optional keys and custom messages for default announcements.
+! exclude_default contains keys that are optional but do not require default setting since its the default state of their objects.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine get_optional_keys_input_params(this, keys, messages)
+  subroutine get_optional_keys_input_params(this, keys, messages, no_default)
     class(input_params), intent(in) :: this
-    type(dictionary_t), intent(out) :: keys, messages
-    type(dictionary_t) :: cap_default
-
-    call put_string(cap_default, 'default')
+    type(dictionary_t), intent(out) :: keys, messages, no_default
 
     if (this % stage == 'grids') then
       call put_string(keys, 'num_points_phi', num2str(2 * this % basis_size_phi))
@@ -492,13 +482,18 @@ contains
     end if
 
     if (this % stage == 'eigencalc' .or. this % stage == 'properties') then
-      call extend(keys, 'cap' .kvp. cap_default)
+      call put_string(keys, 'cap')
+      call put_string(messages, 'cap', 'Assuming no cap')
+      call put_string(no_default, 'cap')
+      call put_string(keys, 'fixed_basis')
+      call put_string(messages, 'Assuming adiabatic basis')
+      call put_string(no_default, 'fixed_basis')
     end if
 
     if ((this % stage == 'eigencalc' .or. this % stage == 'properties') .and. this % use_rovib_coupling == 1) then
       call put_string(keys, 'K', 'all')
     end if
-end subroutine
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
@@ -510,8 +505,8 @@ end subroutine
     call put_string(keys, 'prefix')
     call put_string(keys, 'stage')
     call put_string(keys, 'use_rovib_coupling')
-    call put_string(keys, 'use_fixed_basis_JK')
     call put_string(keys, 'cap')
+    call put_string(keys, 'fixed_basis')
     call put_string(keys, 'grid_rho')
     call put_string(keys, 'grid_theta')
     call put_string(keys, 'num_points_phi')
@@ -523,9 +518,6 @@ end subroutine
     call put_string(keys, 'symmetry')
     call put_string(keys, 'basis_size_phi')
     call put_string(keys, 'cutoff_energy')
-    call put_string(keys, 'basis_root_path')
-    call put_string(keys, 'basis_J')
-    call put_string(keys, 'basis_K')
     call put_string(keys, 'num_states')
     call put_string(keys, 'ncv')
     call put_string(keys, 'mpd')
@@ -548,7 +540,6 @@ end subroutine
     class(input_params), intent(in) :: this
     call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigencalc', 'properties']), 'Error: stage can be "grids", "basis", "overlaps", "eigencalc" or "properties"')
     call assert(any(this % use_rovib_coupling == [-1, 0, 1]), 'Error: use_rovib_coupling can be 0 or 1')
-    call assert(any(this % use_fixed_basis_JK == [-1, 0, 1]), 'Error: use_fixed_basis_JK can be 0 or 1')
     call assert((this % grid_rho % from .aeq. -1d0) .or. (this % grid_rho % from .age. 0d0), 'Error: grid_rho % from should be >= 0')
     if (this % treat_tp_as_xy /= 1) then
       call assert((this % grid_theta % from .aeq. -1d0) .or. (this % grid_theta % from .age. 0d0), 'Error: grid_theta % from should be >= 0')
@@ -570,9 +561,6 @@ end subroutine
     call assert(all(this % K <= this % J), 'Error: K should be <= J')
     call assert(any(this % symmetry == [-1, 0, 1]), 'Error: symmery value can be 0 or 1')
     call assert(this % basis_size_phi == -1 .or. this % basis_size_phi > 0, 'Error: basis_size_phi should be > 0')
-    call assert(this % basis_J >= -1, 'Error: basis_J should be >= 0')
-    call assert(this % basis_K >= -1, 'Error: basis_K should be >= 0')
-    call assert(this % basis_K <= this % basis_J, 'Error: basis_K should be <= basis_J')
     call assert(this % num_states == -1 .or. this % num_states > 0, 'Error: num_states should be > 0')
     call assert(this % ncv == -1 .or. this % ncv > this % num_states, 'Error: ncv should be > num_states')
     call assert(this % mpd == -1 .or. this % mpd > 1, 'Error: mpd should be > 1')
@@ -591,20 +579,22 @@ end subroutine
   subroutine checked_init_input_params(this, config_dict)
     class(input_params), intent(inout) :: this
     class(dictionary_t) :: config_dict ! intent(in)
-    type(dictionary_t) :: mandatory_keys, optional_keys, messages, optional_nonset_keys, all_keys
+    type(dictionary_t) :: mandatory_keys, optional_keys, messages, optional_no_default_keys, optional_unset_keys, optional_settable_keys, all_keys
 
+    call this % init_default()
     call this % assign_dict(config_dict)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys)
 
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys)
-    call this % get_optional_keys(optional_keys, messages)
+    call this % get_optional_keys(optional_keys, messages, optional_no_default_keys)
     call check_unused_keys(config_dict, mandatory_keys, optional_keys)
 
-    optional_nonset_keys = set_difference(optional_keys, config_dict)
-    call this % assign_dict(optional_nonset_keys)
-    call announce_defaults(optional_nonset_keys, messages)
+    optional_unset_keys = set_difference(optional_keys, config_dict)
+    optional_settable_keys = set_difference(optional_unset_keys, optional_no_default_keys)
+    call this % assign_dict(optional_settable_keys)
+    call announce_defaults(optional_unset_keys, messages)
     call this % check_values()
   end subroutine
 

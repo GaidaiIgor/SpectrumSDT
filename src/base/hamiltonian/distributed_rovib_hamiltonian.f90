@@ -72,8 +72,8 @@ contains
     K_ind = 1
 
     do K = params % K(1), params % K(2)
-      K_load = merge(params % basis_K, K, params % use_fixed_basis_JK == 1)
-      root_path = iff(params % use_fixed_basis_JK == 1, params % basis_root_path, params % root_path)
+      K_load = merge(params % fixed_basis % K, K, params % fixed_basis % enabled == 1)
+      root_path = iff(params % fixed_basis % enabled == 1, params % fixed_basis % root_path, params % root_path)
       sym_folder = get_sym_path_root(root_path, K_load, next_sym)
       block_info_path = get_block_info_path(sym_folder)
       call load_k_subblock_sizes_diag(block_info_path, k_blocks_info(K_ind, K_ind))
@@ -277,8 +277,8 @@ contains
 
         rows = full_ham_overlap_info % rows
         columns = full_ham_overlap_info % columns
-        K_load = merge(params % basis_K, K, params % use_fixed_basis_JK == 1)
-        root_path = iff(params % use_fixed_basis_JK == 1, params % basis_root_path, params % root_path)
+        K_load = merge(params % fixed_basis % K, K, params % fixed_basis % enabled == 1)
+        root_path = iff(params % fixed_basis % enabled == 1, params % fixed_basis % root_path, params % root_path)
         overlap_block = load_overlap_block(root_path, K_load, K_load, 0, K_sym, slice_ind_row, slice_ind_col, rows, columns)
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
@@ -414,8 +414,8 @@ contains
         ! First column of the main diagonal may not be first in this process chunk, so we need to make corresponding adjustments
         col_shift = global_overlap_block_info % borders % top - full_ham_overlap_block_info % borders % top
 
-        K_load = merge(params % basis_K, K, params % use_fixed_basis_JK == 1)
-        root_path = iff(params % use_fixed_basis_JK == 1, params % basis_root_path, params % root_path)
+        K_load = merge(params % fixed_basis % K, K, params % fixed_basis % enabled == 1)
+        root_path = iff(params % fixed_basis % enabled == 1, params % fixed_basis % root_path, params % root_path)
         eivals = load_eivals_2d(root_path, K_load, K_sym, slice_ind_row)
         overlap_block => local_overlap_block_info % extract_from_matrix(this % proc_chunk)
         do row = 1, size(overlap_block, 1)
@@ -545,8 +545,8 @@ contains
         call assert(full_ham_overlap_info % rows == full_ham_overlap_info % columns, 'Assertion error: diagonal n-block is not square')
         rows = full_ham_overlap_info % rows
 
-        K_load = merge(params % basis_K, K, params % use_fixed_basis_JK == 1)
-        root_path = iff(params % use_fixed_basis_JK == 1, params % basis_root_path, params % root_path)
+        K_load = merge(params % fixed_basis % K, K, params % fixed_basis % enabled == 1)
+        root_path = iff(params % fixed_basis % enabled == 1, params % fixed_basis % root_path, params % root_path)
         overlap_block_J = load_overlap_block(root_path, K_load, K_load, 10, K_sym, slice_row_ind, slice_col_ind, rows, rows)
         overlap_block_K = load_overlap_block(root_path, K_load, K_load, 11, K_sym, slice_row_ind, slice_col_ind, rows, rows)
 
@@ -554,8 +554,8 @@ contains
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
         last_row = size(overlap_block_J, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
         ! Slice and combine the blocks
-        J_shift = merge(params % basis_J, 0, params % use_fixed_basis_JK == 1)
-        K_shift = merge(params % basis_K, 0, params % use_fixed_basis_JK == 1)
+        J_shift = merge(params % fixed_basis % J, 0, params % fixed_basis % enabled == 1)
+        K_shift = merge(params % fixed_basis % K, 0, params % fixed_basis % enabled == 1)
         J_factor = (params % J * (params % J + 1) - J_shift * (J_shift + 1)) / 2
         K_factor = K ** 2 - K_shift ** 2
         overlap_block_slice = J_factor * overlap_block_J(first_row : last_row, :) + K_factor * overlap_block_K(first_row : last_row, :)
@@ -611,12 +611,12 @@ contains
     K_col = k_ind_to_k(K_col_ind, params % K(1))
     K_row_sym = get_k_symmetry(K_row, params % symmetry)
 
-    if (params % use_fixed_basis_JK == 1) then
+    if (params % fixed_basis % enabled == 1) then
       ! All K-blocks are the same, so we only need to keep K_row_load different from K_col_load for the correct block transposition 
       ! (alghough even that should not matter since offdiagonal n-blocks are 0)
-      K_row_load = merge(params % basis_K, params % basis_K + 1, K_row < K_col) ! +1 even if basis_K == basis_J, since only lower value is used for loading
-      K_col_load = merge(params % basis_K + 1, params % basis_K, K_row < K_col)
-      root_path = params % basis_root_path
+      K_row_load = merge(params % fixed_basis % K, params % fixed_basis % K + 1, K_row < K_col) ! +1 even if fixed_basis % K == fixed_basis % J, since only lower value is used for loading
+      K_col_load = merge(params % fixed_basis % K + 1, params % fixed_basis % K, K_row < K_col)
+      root_path = params % fixed_basis % root_path
     else
       K_row_load = K_row
       K_col_load = K_col
@@ -702,10 +702,10 @@ contains
     K_col = k_ind_to_k(K_col_ind, params % K(1))
     K_row_sym = get_k_symmetry(K_row, params % symmetry)
 
-    if (params % use_fixed_basis_JK == 1) then
-      K_row_load = merge(params % basis_K, params % basis_K + 2, K_row <= K_col)
-      K_col_load = merge(params % basis_K + 2, params % basis_K, K_row <= K_col)
-      root_path = params % basis_root_path
+    if (params % fixed_basis % enabled == 1) then
+      K_row_load = merge(params % fixed_basis % K, params % fixed_basis % K + 2, K_row <= K_col)
+      K_col_load = merge(params % fixed_basis % K + 2, params % fixed_basis % K, K_row <= K_col)
+      root_path = params % fixed_basis % root_path
     else
       K_row_load = K_row
       K_col_load = K_col
@@ -800,7 +800,7 @@ contains
       call this % include_cap(cap, ham_info)
     end if
 
-    if (params % use_fixed_basis_JK == 1) then
+    if (params % fixed_basis % enabled == 1) then
       call this % load_chunk_sym_term(params, ham_info)
       call print_parallel('Sym term is loaded')
     end if

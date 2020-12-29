@@ -555,7 +555,7 @@ contains
     integer,allocatable::nvec1all(:,:) ! Number of 1D vectors
     integer,allocatable::nvec2all(:)   ! Number of 2D vectors
 
-    call assert(get_num_procs() == n1, 'Error: number of processes has to be equal to number of points in grid_rho.dat')
+    call assert(get_num_procs() == n1, 'Error: number of processes has to be equal to number of points in grid_rho.dat (' // num2str(n1) // ')')
     ! Set slice number
     proc_id = get_proc_id()
     mysl = proc_id + 1
