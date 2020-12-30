@@ -87,7 +87,7 @@ contains
 
     ! Extend grid with virtual points so that midpoints coincide with grid ends. Makes handling special cases with grid ends less tedious.
     grid_ext = [grid(1) - 2*(grid(1) - grid_ends(1)), grid, grid(size(grid)) + 2*(grid_ends(2) - grid(size(grid)))]
-    border_inds = map_borders_to_point_indices(borders, grid_ext)
+    border_inds = map_borders_to_point_indices(borders, grid) + 1 ! Find on old grid and shift to avoid finding virtual points
     closest_points = grid_ext(border_inds)
     edges_left = (closest_points + grid_ext(border_inds - 1)) / 2
     edges_right = (closest_points + grid_ext(border_inds + 1)) / 2
@@ -130,6 +130,7 @@ contains
     allocate(wf_sections_dist_mask(size(params % wf_sections), params % K(2) - params % K(1) + 1, size(rho_grid), size(theta_grid), size(phi_borders) - 1))
     wf_sections_dist_mask = 0
     section_inds = get_wf_sections_dist_inds(params, rho_grid, theta_grid, phi_borders)
+
     associate(si => section_inds)
       do i = 1, size(wf_sections_dist_mask, 1)
         wf_sections_dist_mask(i, si(i, 1, 1):si(i, 1, 2), si(i, 2, 1):si(i, 2, 2), si(i, 3, 1):si(i, 3, 2), si(i, 4, 1):si(i, 4, 2)) = 1
