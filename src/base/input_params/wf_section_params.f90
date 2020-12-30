@@ -16,16 +16,16 @@ module wf_section_params_mod
     character(:), allocatable :: prefix
     character(:), allocatable :: name
     character(:), allocatable :: stat
-    integer :: K(2) = -1
-    real(real64) :: rho(2) = -1
-    real(real64) :: theta(2) = -1
-    real(real64) :: phi(2) = -1
+    integer :: K(2) = -2
+    real(real64) :: rho(2) = -2
+    real(real64) :: theta(2) = -2
+    real(real64) :: phi(2) = -2
 
   contains
     procedure :: assign_dict => assign_dict_wf_section_params
     procedure :: get_mandatory_keys => get_mandatory_keys_wf_section_params
-    procedure :: get_optional_keys => get_optional_keys_wf_section_params
     procedure :: get_all_keys => get_all_keys_wf_section_params
+    procedure :: set_defaults => set_defaults_wf_section_params
     procedure :: check_values => check_values_wf_section_params
     procedure :: checked_init => checked_init_wf_section_params
     procedure :: checked_resolve_Ks => checked_resolve_Ks_wf_section_params
@@ -112,20 +112,6 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns a set of optional keys.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_optional_keys_wf_section_params(this) result(keys)
-    class(wf_section_params), intent(in) :: this
-    type(dictionary_t) :: keys
-
-    call put_string(keys, 'stat', 'probability')
-    call put_string(keys, 'K', 'start .. end')
-    call put_string(keys, 'rho', 'start .. end')
-    call put_string(keys, 'theta', 'start .. end')
-    call put_string(keys, 'phi', 'start .. end')
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_all_keys_wf_section_params(this) result(keys)
@@ -140,6 +126,18 @@ contains
     call put_string(keys, 'theta')
     call put_string(keys, 'phi')
   end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Sets defaults.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine set_defaults_wf_section_params(this, config_dict)
+    class(wf_section_params), intent(inout) :: this
+    class(dictionary_t), intent(in) :: config_dict
+
+    if (.not. ('stat' .in. config_dict)) then
+      this % stat = 'probability'
+    end if
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values. 
@@ -161,7 +159,7 @@ contains
   subroutine checked_init_wf_section_params(this, config_dict)
     class(wf_section_params), intent(inout) :: this
     class(dictionary_t) :: config_dict ! intent(in)
-    type(dictionary_t) :: mandatory_keys, optional_keys, optional_nonset_keys, all_keys
+    type(dictionary_t) :: mandatory_keys, all_keys
 
     call this % assign_dict(config_dict)
     mandatory_keys = this % get_mandatory_keys()
@@ -169,11 +167,7 @@ contains
 
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys, this % prefix)
-    optional_keys = this % get_optional_keys()
-    call check_unused_keys(config_dict, mandatory_keys, optional_keys, this % prefix)
-
-    optional_nonset_keys = set_difference(optional_keys, config_dict)
-    call this % assign_dict(optional_nonset_keys)
+    call this % set_defaults(config_dict)
     call this % check_values()
   end subroutine
 

@@ -166,29 +166,6 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Checks whether some of the specified keys will be unused.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_unused_keys(config_dict, mandatory_keys, optional_keys, prefix)
-    class(dictionary_t), intent(in) :: config_dict, mandatory_keys, optional_keys
-    character(*), optional, intent(in) :: prefix
-    integer :: i
-    character(:), allocatable :: next_key, next_key_repr
-    type(string), allocatable :: config_keys(:)
-
-    config_keys = get_key_set(config_dict)
-    do i = 1, size(config_keys)
-      next_key = config_keys(i) % to_char_str()
-      next_key_repr = next_key
-      if (present(prefix)) then
-        next_key_repr = prefix // next_key_repr
-      end if
-      if (.not. ((next_key .in. mandatory_keys) .or. (next_key .in. optional_keys))) then
-        call print_parallel('Info: the following key is not used: ' // next_key_repr)
-      end if
-    end do
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Announces default values of unset keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine announce_defaults(optional_nonset_keys, messages, prefix)

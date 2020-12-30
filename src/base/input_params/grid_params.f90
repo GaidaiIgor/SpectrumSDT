@@ -20,8 +20,8 @@ module grid_params_mod
   contains
     procedure :: assign_dict => assign_dict_grid_params
     procedure :: get_mandatory_keys => get_mandatory_keys_grid_params
-    procedure :: get_optional_keys => get_optional_keys_grid_params
     procedure :: get_all_keys => get_all_keys_grid_params
+    procedure :: set_defaults => set_defaults_grid_params
     procedure :: check_values => check_values_grid_params
     procedure :: checked_init => checked_init_grid_params
   end type
@@ -75,14 +75,6 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns a set of optional keys. A placeholder method for calls from optgrid_params and other derived classes.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_optional_keys_grid_params(this) result(keys)
-    class(grid_params), intent(in) :: this
-    type(dictionary_t) :: keys
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_all_keys_grid_params(this) result(keys)
@@ -97,10 +89,19 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Sets defaults.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine set_defaults_grid_params(this, config_dict)
+    class(grid_params), intent(inout) :: this
+    class(dictionary_t), intent(in) :: config_dict
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_grid_params(this)
     class(grid_params), intent(in) :: this
+    call assert(this % from .age. 0d0, 'Error: ' // this % prefix // 'from should be >= 0')
     call assert(this % to > 0, 'Error: ' // this % prefix // 'to should be > 0')
     call assert(this % from < this % to, 'Error: ' // this % prefix // 'from should be < to')
     call assert(this % num_points == -1 .or. this % num_points > 0, 'Error: ' // this % prefix // 'npoints should be > 0')
@@ -124,9 +125,10 @@ contains
     call check_only_one_set(config_dict, string([character(100) :: 'step', 'num_points']), this % prefix)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
+    call this % set_defaults(config_dict)
     call this % check_values()
 
-    ! Skippable to enable calls from derived types since their parameters will be erroneously considered unknown here
+    ! Skippable to enable calls from derived types since their parameters will be unknown here
     check_extra_act = arg_or_default(check_extra, 1)
     if (check_extra_act == 1) then
       all_keys = this % get_all_keys()

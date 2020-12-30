@@ -20,7 +20,6 @@ module cap_params_mod
     procedure :: init_default => init_default_cap_params
     procedure :: assign_dict => assign_dict_cap_params
     procedure :: get_mandatory_keys => get_mandatory_keys_cap_params
-    procedure :: get_optional_keys => get_optional_keys_cap_params
     procedure :: get_all_keys => get_all_keys_cap_params
     procedure :: check_values => check_values_cap_params
     procedure :: checked_init => checked_init_cap_params
@@ -73,14 +72,6 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns a set of optional keys.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine get_optional_keys_cap_params(this, keys, messages)
-    class(cap_params), intent(in) :: this
-    type(dictionary_t), intent(out) :: keys, messages
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_all_keys_cap_params(this) result(keys)
@@ -106,7 +97,7 @@ contains
   subroutine checked_init_cap_params(this, config_dict)
     class(cap_params), intent(inout) :: this
     class(dictionary_t) :: config_dict ! intent(in)
-    type(dictionary_t) :: mandatory_keys, optional_keys, messages, optional_nonset_keys, all_keys
+    type(dictionary_t) :: mandatory_keys, all_keys
 
     call this % assign_dict(config_dict)
     mandatory_keys = this % get_mandatory_keys()
@@ -114,12 +105,6 @@ contains
 
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys, this % prefix)
-    call this % get_optional_keys(optional_keys, messages)
-    call check_unused_keys(config_dict, mandatory_keys, optional_keys, this % prefix)
-
-    optional_nonset_keys = set_difference(optional_keys, config_dict)
-    call this % assign_dict(optional_nonset_keys)
-    call announce_defaults(optional_nonset_keys, messages, this % prefix)
     call this % check_values()
   end subroutine
 
