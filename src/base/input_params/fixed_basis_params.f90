@@ -31,21 +31,20 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of fixed_basis_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_fixed_basis_params(this, config_dict)
+  subroutine assign_dict_fixed_basis_params(this, config_dict, auxiliary_info)
     class(fixed_basis_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
     character(:), allocatable :: next_key, next_value
     type(string), allocatable :: key_set(:)
 
+    this % prefix = extract_string(auxiliary_info, 'prefix')
     this % enabled = 1
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
-        case ('prefix')
-          this % prefix = next_value
         case ('J')
           this % J = str2int(next_value)
         case ('K')
@@ -63,7 +62,6 @@ contains
     class(fixed_basis_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'prefix')
     call put_string(keys, 'J')
     call put_string(keys, 'K')
     call put_string(keys, 'root_path')
@@ -76,7 +74,6 @@ contains
     class(fixed_basis_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'prefix')
     call put_string(keys, 'J')
     call put_string(keys, 'K')
     call put_string(keys, 'root_path')
@@ -96,12 +93,13 @@ contains
 ! Initializes an instance of fixed_basis_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_fixed_basis_params(this, config_dict)
+  subroutine checked_init_fixed_basis_params(this, config_dict, auxiliary_info)
     class(fixed_basis_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     type(dictionary_t) :: mandatory_keys, all_keys
 
-    call this % assign_dict(config_dict)
+    call check_key_types(config_dict, auxiliary_info, 'string')
+    call this % assign_dict(config_dict, auxiliary_info)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
 

@@ -39,11 +39,12 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Parses range string into tokens.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function parse_range(range_str) result(tokens)
-    character(*), intent(in) :: range_str
-    type(string) :: tokens(2)
+  function parse_range(range_str, key_name) result(tokens)
+    character(*), intent(in) :: range_str, key_name
+    type(string), allocatable :: tokens(:)
 
     tokens = strsplit(range_str, '..')
+    call assert(size(tokens) == 2, 'Error: ' // key_name // ' should be a range')
     call tokens % trim()
     ! Transform keywords to placeholder values to be resolved later
     if (tokens(1) == 'start') then
@@ -57,39 +58,39 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Copies whatever settings it can recognize from the given dict. No checks other than parsing errors.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_wf_section_params(this, config_dict)
+  subroutine assign_dict_wf_section_params(this, config_dict, auxiliary_info)
     class(wf_section_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i, j
-    character(:), allocatable :: next_key, next_value
+    character(:), allocatable :: next_key, full_key, next_value
     type(string) :: range_tokens(2)
     type(string), allocatable :: key_set(:)
 
+    this % prefix = extract_string(auxiliary_info, 'prefix')
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
+      full_key = this % prefix // next_key
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
-        case ('prefix')
-          this % prefix = next_value
         case ('name')
           this % name = next_value
         case ('stat')
           this % stat = next_value
         case ('K')
-          range_tokens = parse_range(next_value)
+          range_tokens = parse_range(next_value, full_key)
           this % K(1) = str2int(range_tokens(1) % to_char_str())
           this % K(2) = str2int(range_tokens(2) % to_char_str())
         case ('rho')
-          range_tokens = parse_range(next_value)
+          range_tokens = parse_range(next_value, full_key)
           this % rho(1) = str2real(range_tokens(1) % to_char_str())
           this % rho(2) = str2real(range_tokens(2) % to_char_str())
         case ('theta')
-          range_tokens = parse_range(next_value)
+          range_tokens = parse_range(next_value, full_key)
           this % theta(1) = str2real(range_tokens(1) % to_char_str())
           this % theta(2) = str2real(range_tokens(2) % to_char_str())
         case ('phi')
-          range_tokens = parse_range(next_value)
+          range_tokens = parse_range(next_value, full_key)
           do j = 1, 2
             this % phi(j) = str2real(range_tokens(j) % to_char_str())
             if (.not. (this % phi(j) .aeq. -2d0)) then
@@ -106,8 +107,6 @@ contains
   function get_mandatory_keys_wf_section_params(this) result(keys)
     class(wf_section_params), intent(in) :: this
     type(dictionary_t) :: keys
-
-    call put_string(keys, 'prefix')
     call put_string(keys, 'name')
   end function
 
@@ -118,7 +117,6 @@ contains
     class(wf_section_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'prefix')
     call put_string(keys, 'name')
     call put_string(keys, 'stat')
     call put_string(keys, 'K')
@@ -156,12 +154,13 @@ contains
 ! Initializes an instance of wf_section_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_wf_section_params(this, config_dict)
+  subroutine checked_init_wf_section_params(this, config_dict, auxiliary_info)
     class(wf_section_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     type(dictionary_t) :: mandatory_keys, all_keys
 
-    call this % assign_dict(config_dict)
+    call check_key_types(config_dict, auxiliary_info, 'string')
+    call this % assign_dict(config_dict, auxiliary_info)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
 

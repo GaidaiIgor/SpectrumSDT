@@ -31,20 +31,19 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_grid_params(this, config_dict)
+  subroutine assign_dict_grid_params(this, config_dict, auxiliary_info)
     class(grid_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
     character(:), allocatable :: next_key, next_value
     type(string), allocatable :: key_set(:)
 
+    this % prefix = extract_string(auxiliary_info, 'prefix')
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
-        case ('prefix')
-          this % prefix = next_value
         case ('from')
           this % from = str2real(next_value)
         case ('to')
@@ -64,7 +63,6 @@ contains
     class(grid_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'prefix')
     call put_string(keys, 'from')
     call put_string(keys, 'to')
     if (this % num_points == -1) then
@@ -81,7 +79,6 @@ contains
     class(grid_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'prefix')
     call put_string(keys, 'from')
     call put_string(keys, 'to')
     call put_string(keys, 'step')
@@ -112,14 +109,15 @@ contains
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_grid_params(this, config_dict, check_extra)
+  subroutine checked_init_grid_params(this, config_dict, auxiliary_info, check_extra)
     class(grid_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer, optional, intent(in) :: check_extra
     integer :: check_extra_act
     type(dictionary_t) :: mandatory_keys, all_keys
 
-    call this % assign_dict(config_dict)
+    call check_key_types(config_dict, auxiliary_info, 'string')
+    call this % assign_dict(config_dict, auxiliary_info)
     ! These two can never be set together, so it's an error if they are
     ! Has to be checked before mandatory keys since error message is more specific
     call check_only_one_set(config_dict, string([character(100) :: 'step', 'num_points']), this % prefix)

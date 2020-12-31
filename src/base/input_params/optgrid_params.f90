@@ -28,9 +28,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_optgrid_params(this, config_dict)
+  subroutine assign_dict_optgrid_params(this, config_dict, auxiliary_info)
     class(optgrid_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
     character(:), allocatable :: next_key, next_value
     type(string), allocatable :: key_set(:)
@@ -106,14 +106,15 @@ contains
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_optgrid_params(this, config_dict, check_extra)
+  subroutine checked_init_optgrid_params(this, config_dict, auxiliary_info, check_extra)
     class(optgrid_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer, optional, intent(in) :: check_extra ! have to keep the same signature in child
     type(dictionary_t) :: mandatory_keys, all_keys
 
-    call this % grid_params % checked_init(config_dict, check_extra = 0) ! First, check init parental type
-    call this % assign_dict(config_dict) ! Init type as is to ease branching in getting keys
+    call check_key_types(config_dict, auxiliary_info, 'string')
+    call this % grid_params % checked_init(config_dict, auxiliary_info, check_extra = 0) ! First, check init parental type
+    call this % assign_dict(config_dict, auxiliary_info) ! Init type as is to ease branching in getting keys
     mandatory_keys = this % get_mandatory_keys() ! Save mandatory keys because we will reuse them later for unused key check
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix) ! Make sure mandatory keys are set to ease checking values
 

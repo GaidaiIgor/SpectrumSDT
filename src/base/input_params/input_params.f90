@@ -68,6 +68,7 @@ module input_params_mod
     character(:), allocatable :: debug_param_1
 
   contains
+    procedure, nopass :: check_key_types_input_params
     procedure :: assign_dict => assign_dict_input_params
     procedure :: get_mandatory_keys => get_mandatory_keys_input_params
     procedure :: get_all_keys => get_all_keys_input_params
@@ -78,6 +79,21 @@ module input_params_mod
   end type
 
 contains
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Makes sure all keys have correct types.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_key_types_input_params(config_dict, auxiliary_info)
+    class(dictionary_t), intent(in) :: config_dict, auxiliary_info
+    type(dictionary_t) :: dict_types
+
+    call put_string(dict_types, 'grid_rho', 'dict')
+    call put_string(dict_types, 'grid_theta', 'dict')
+    call put_string(dict_types, 'fixed_basis', 'dict')
+    call put_string(dict_types, 'cap', 'dict')
+    call put_string(dict_types, 'wf_sections', 'dict')
+    call check_key_types(config_dict, auxiliary_info, 'string', dict_types)
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts all fields in *params* from degrees to radians.
@@ -208,38 +224,37 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Parses given *dict* into wf_sections. Any item in the *dict* has to be a dict representing an individual section.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function parse_wf_sections(dict) result(wf_sections)
-    class(dictionary_t) :: dict
+  function parse_wf_sections(dict, auxiliary_info) result(wf_sections)
+    class(dictionary_t) :: dict, auxiliary_info ! intent(in)
     type(wf_section_params), allocatable :: wf_sections(:)
     integer :: i
     integer, allocatable :: section_indices(:), key_order(:)
     character(:), allocatable :: next_key
-    type(string), allocatable :: key_set(:), wf_section_keys(:)
-    type(dictionary_t) :: subdict
+    type(string), allocatable :: key_set(:)
+    type(dictionary_t) :: subdict, auxiliary_subdict
 
+    call check_key_types(dict, auxiliary_info, 'dict')
     key_set = get_key_set(dict)
-    wf_section_keys = pack(key_set, key_set /= 'prefix')
-
-    allocate(section_indices(size(wf_section_keys)))
+    allocate(section_indices(size(key_set)))
     ! We need to iterate the sections in order they were given.
     ! Order of keys in dict can be arbitrary, so we need to use dict index stored from parsing.
-    do i = 1, size(wf_section_keys)
-      call associate(subdict, dict, wf_section_keys(i) % to_char_str())
-      call assign(section_indices(i), subdict, 'dict_index')
-      call nullify(subdict, 'dict_index')
+    do i = 1, size(key_set)
+      call associate(auxiliary_subdict, auxiliary_info, key_set(i) % to_char_str())
+      call assign(section_indices(i), auxiliary_subdict, 'dict_index')
     end do
     section_indices = bubble_sort(section_indices, index_permutation = key_order)
 
-    allocate(wf_sections(size(wf_section_keys)))
+    allocate(wf_sections(size(key_set)))
     do i = 1, size(key_order)
-      next_key = wf_section_keys(key_order(i)) % to_char_str()
+      next_key = key_set(key_order(i)) % to_char_str()
       call associate(subdict, dict, next_key)
 
       ! use key name if name attribute is not provided
       if (.not. ('name' .in. subdict)) then
         call put_string(subdict, 'name', next_key)
+        call put_string(auxiliary_subdict, 'name_type', 'string')
       end if
-      call wf_sections(i) % checked_init(subdict)
+      call wf_sections(i) % checked_init(subdict, auxiliary_subdict)
     end do
   end function
 
@@ -285,36 +300,43 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of input_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_input_params(this, config_dict)
+  subroutine assign_dict_input_params(this, config_dict, auxiliary_info)
     class(input_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     logical :: wf_sections_provided
     integer :: i
-    character(:), allocatable :: next_key, K_str
+    character(:), allocatable :: next_key, key_type, next_value, K_str
     type(string), allocatable :: key_set(:)
-    type(dictionary_t) :: subdict
+    type(dictionary_t) :: subdict, auxiliary_subdict
 
     wf_sections_provided = .false.
+    this % prefix = extract_string(auxiliary_info, 'prefix')
     ! Iterate over the keys given by user
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
+      key_type = extract_string(auxiliary_info, next_key // '_type')
+
+      if (key_type == 'string') then
+        next_value = extract_string(config_dict, next_key)
+      else if (key_type == 'dict') then
+        call associate(subdict, config_dict, next_key)
+        call associate(auxiliary_subdict, auxiliary_info, next_key)
+      else
+        stop 'Error: wrong key type'
+      end if
+
       select case (next_key)
-        case ('prefix')
-          this % prefix = extract_string(config_dict, next_key)
         case ('stage')
           this % stage = extract_string(config_dict, next_key)
         case ('use_rovib_coupling')
           this % use_rovib_coupling = str2int(extract_string(config_dict, next_key))
         case ('cap')
-          call associate(subdict, config_dict, next_key)
-          call this % cap % checked_init(subdict)
+          call this % cap % checked_init(subdict, auxiliary_subdict)
         case ('grid_rho')
-          call associate(subdict, config_dict, next_key)
-          call this % grid_rho % checked_init(subdict)
+          call this % grid_rho % checked_init(subdict, auxiliary_subdict)
         case ('grid_theta')
-          call associate(subdict, config_dict, next_key)
-          call this % grid_theta % checked_init(subdict)
+          call this % grid_theta % checked_init(subdict, auxiliary_subdict)
           call convert_grid_params_deg_to_rad(this % grid_theta)
         case ('num_points_phi')
           this % num_points_phi = str2int(extract_string(config_dict, next_key))
@@ -335,8 +357,7 @@ contains
         case ('cutoff_energy')
           this % cutoff_energy = str2real(extract_string(config_dict, next_key)) / au_to_wn
         case ('fixed_basis')
-          call associate(subdict, config_dict, next_key)
-          call this % fixed_basis % checked_init(subdict)
+          call this % fixed_basis % checked_init(subdict, auxiliary_subdict)
         case ('num_states')
           this % num_states = str2int(extract_string(config_dict, next_key))
         case ('ncv')
@@ -347,8 +368,7 @@ contains
           this % max_iterations = str2int(extract_string(config_dict, next_key))
         case ('wf_sections')
           wf_sections_provided = .true.
-          call associate(subdict, config_dict, next_key)
-          this % wf_sections = parse_wf_sections(subdict)
+          this % wf_sections = parse_wf_sections(subdict, auxiliary_subdict)
         case ('grid_path')
           this % grid_path = extract_string(config_dict, next_key)
         case ('root_path')
@@ -384,7 +404,6 @@ contains
     class(input_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'prefix')
     call put_string(keys, 'stage')
     if (this % stage == 'grids') then
       call put_string(keys, 'grid_rho')
@@ -425,7 +444,6 @@ contains
     class(input_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'prefix')
     call put_string(keys, 'stage')
     call put_string(keys, 'use_rovib_coupling')
     call put_string(keys, 'grid_rho')
@@ -540,12 +558,13 @@ contains
 ! Initializes an instance of input_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_input_params(this, config_dict)
+  subroutine checked_init_input_params(this, config_dict, auxiliary_info)
     class(input_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict ! intent(in)
+    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     type(dictionary_t) :: mandatory_keys, all_keys
 
-    call this % assign_dict(config_dict)
+    call check_key_types_input_params(config_dict, auxiliary_info)
+    call this % assign_dict(config_dict, auxiliary_info)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys)
 

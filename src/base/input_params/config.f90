@@ -19,17 +19,17 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Parses inner dictionary.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  recursive function read_inner_dict(file_unit, recursion_level, line_num, prefix) result(dict)
+  recursive subroutine read_inner_dict(file_unit, recursion_level, line_num, prefix, user_info, auxiliary_info)
     integer, intent(in) :: file_unit, recursion_level
     integer, intent(inout) :: line_num
     character(*), intent(in) :: prefix
-    type(dictionary_t) :: dict
+    type(dictionary_t), intent(out) :: user_info, auxiliary_info
     integer :: iostat, dict_count
     character(:), allocatable :: line, key, value
     type(string), allocatable :: line_tokens(:)
-    type(dictionary_t) :: inner_dict
+    type(dictionary_t) :: inner_user_info, inner_auxiliary_info
     
-    call put_string(dict, 'prefix', prefix)
+    call put_string(auxiliary_info, 'prefix', prefix)
     dict_count = 0
     do
       line_num = line_num + 1
@@ -56,36 +56,63 @@ contains
       call assert(size(line_tokens) == 2, 'Config error at line ' // num2str(line_num) // '. Number of assignments is not equal to 1.')
       
       key = trim(adjustl(line_tokens(1) % to_char_str()))
-      call assert(.not. (key .in. dict), 'Config error at line ' // num2str(line_num) // '. This key has already been specified.')
+      call assert(.not. (key .in. user_info), 'Config error at line ' // num2str(line_num) // '. This key has already been specified.')
       value = trim(adjustl(line_tokens(2) % to_char_str()))
       if (value == '{') then
         ! new inner dict
-        inner_dict = read_inner_dict(file_unit, recursion_level + 1, line_num, prefix // key // ' % ')
+        call read_inner_dict(file_unit, recursion_level + 1, line_num, prefix // key // ' % ', inner_user_info, inner_auxiliary_info)
+        call extend(user_info, key .kvp. inner_user_info)
         dict_count = dict_count + 1
-        if (recursion_level > 1) then
-          ! remember subdict order in config
-          call extend(inner_dict, 'dict_index' .kv. dict_count)
-        end if
-        call extend(dict, key .kvp. inner_dict)
+        call extend(inner_auxiliary_info, 'dict_index' .kv. dict_count)
+        call extend(auxiliary_info, key .kvp. inner_auxiliary_info)
+        call put_string(auxiliary_info, key // '_type', 'dict')
       else
-        call put_string(dict, key, value)
+        call put_string(user_info, key, value)
+        call put_string(auxiliary_info, key // '_type', 'string')
       end if
     end do
-  end function
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Reads config file.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function read_config_dict(config_path) result(config)
+  subroutine read_config_dict(config_path, config, auxiliary_info)
     character(*), intent(in) :: config_path
-    type(dictionary_t) :: config
+    type(dictionary_t), intent(out) :: config, auxiliary_info
     integer :: file_unit, line_num
     
     open(newunit = file_unit, file = config_path)
     line_num = 0
-    config = read_inner_dict(file_unit, 1, line_num, '')
+    call read_inner_dict(file_unit, 1, line_num, '', config, auxiliary_info)
     close(file_unit)
-  end function
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Makes sure all keys have the types specified in *types* or *default_type* otherwise.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine check_key_types(config_dict, auxiliary_info, default_type, types)
+    class(dictionary_t), intent(in) :: config_dict, auxiliary_info
+    character(*), intent(in) :: default_type
+    class(dictionary_t), optional, intent(in) :: types
+    integer :: i
+    character(:), allocatable :: prefix, type_description, next_key, key_type, target_type
+    type(string), allocatable :: key_set(:)
+
+    prefix = extract_string(auxiliary_info, 'prefix')
+    key_set = get_key_set(config_dict)
+    do i = 1, size(key_set)
+      next_key = key_set(i) % to_char_str()
+      key_type = extract_string(auxiliary_info, next_key // '_type')
+      target_type = default_type
+      if (present(types)) then
+        if (next_key .in. types) then
+          target_type = extract_string(types, next_key)
+        end if
+      end if
+      type_description = iff(target_type == 'string', 'a single parameter', 'a parameter group')
+      call assert(key_type == target_type, 'Error: ' // prefix // next_key // ' should be ' // type_description)
+    end do
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks that only one of the keys in the specified group is set.
