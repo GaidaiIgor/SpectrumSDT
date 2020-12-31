@@ -5,6 +5,7 @@ module input_params_mod
   use constants
   use dictionary
   use dict_utils
+  use eigencalc_params_mod
   use fixed_basis_params_mod
   use general_utils
   use grid_params_mod
@@ -46,10 +47,7 @@ module input_params_mod
     type(fixed_basis_params) :: fixed_basis
 
     ! Eigencalc
-    integer :: num_states = -1 ! desired number of eigenstates from eigencalc
-    integer :: ncv = -1 ! number of vectors in arnoldi basis during eigencalc
-    integer :: mpd = -1 ! maximum projected dimension, slepc only
-    integer :: max_iterations = 10000 ! maximum number of iterations during eigencalc
+    type(eigencalc_params) :: eigencalc ! Eigencalc solver parameters
     type(cap_params) :: cap ! Complex Absorbin Potential parameters
 
     ! Properties
@@ -90,6 +88,7 @@ contains
     call put_string(dict_types, 'grid_rho', 'dict')
     call put_string(dict_types, 'grid_theta', 'dict')
     call put_string(dict_types, 'fixed_basis', 'dict')
+    call put_string(dict_types, 'eigencalc', 'dict')
     call put_string(dict_types, 'cap', 'dict')
     call put_string(dict_types, 'wf_sections', 'dict')
     call check_key_types(config_dict, auxiliary_info, 'string', dict_types)
@@ -331,8 +330,6 @@ contains
           this % stage = next_value
         case ('use_rovib_coupling')
           this % use_rovib_coupling = str2int_config(next_value, next_key)
-        case ('cap')
-          call this % cap % checked_init(subdict, auxiliary_subdict)
         case ('grid_rho')
           call this % grid_rho % checked_init(subdict, auxiliary_subdict)
         case ('grid_theta')
@@ -358,14 +355,10 @@ contains
           this % cutoff_energy = str2real_config(next_value, next_key) / au_to_wn
         case ('fixed_basis')
           call this % fixed_basis % checked_init(subdict, auxiliary_subdict)
-        case ('num_states')
-          this % num_states = str2int_config(next_value, next_key)
-        case ('ncv')
-          this % ncv = str2int_config(next_value, next_key)
-        case ('mpd')
-          this % mpd = str2int_config(next_value, next_key)
-        case ('max_iterations')
-          this % max_iterations = str2int(next_value)
+        case ('eigencalc')
+          call this % eigencalc % checked_init(subdict, auxiliary_subdict)
+        case ('cap')
+          call this % cap % checked_init(subdict, auxiliary_subdict)
         case ('wf_sections')
           wf_sections_provided = .true.
           this % wf_sections = parse_wf_sections(subdict, auxiliary_subdict)
@@ -429,7 +422,10 @@ contains
       call put_string(keys, 'basis_size_phi')
       call put_string(keys, 'grid_path')
       call put_string(keys, 'root_path')
-      call put_string(keys, 'num_states')
+    end if
+
+    if (any(this % stage == [character(100) :: 'eigencalc', 'properties'])) then
+      call put_string(keys, 'eigencalc')
     end if
 
     if (this % stage == 'properties') then
@@ -458,10 +454,7 @@ contains
     call put_string(keys, 'basis_size_phi')
     call put_string(keys, 'cutoff_energy')
     call put_string(keys, 'fixed_basis')
-    call put_string(keys, 'num_states')
-    call put_string(keys, 'ncv')
-    call put_string(keys, 'mpd')
-    call put_string(keys, 'max_iterations')
+    call put_string(keys, 'eigencalc')
     call put_string(keys, 'cap')
     call put_string(keys, 'wf_sections')
     call put_string(keys, 'grid_path')
@@ -490,18 +483,6 @@ contains
 
     if (.not. ('use_parallel' .in. config_dict)) then
       this % use_parallel = iff(this % stage == 'grids', 0, 1)
-    end if
-
-    if (.not. ('ncv' .in. config_dict)) then
-      if (this % stage == 'eigencalc') then
-        call print_parallel('ncv is not specified, its value will be determined by SLEPc')
-      end if
-    end if
-
-    if (.not. ('mpd' .in. config_dict)) then
-      if (this % stage == 'eigencalc') then
-        call print_parallel('mpd is not specified, its value will be determined by SLEPc')
-      end if
     end if
 
     if (.not. ('cap' .in. config_dict)) then
@@ -543,10 +524,6 @@ contains
     call assert(all(this % K <= this % J), 'Error: K should be <= J')
     call assert(any(this % symmetry == [-1, 0, 1]), 'Error: symmery value can be 0 or 1')
     call assert(this % basis_size_phi == -1 .or. this % basis_size_phi > 0, 'Error: basis_size_phi should be > 0')
-    call assert(this % num_states == -1 .or. this % num_states > 0, 'Error: num_states should be > 0')
-    call assert(this % ncv == -1 .or. this % ncv > this % num_states, 'Error: ncv should be > num_states')
-    call assert(this % mpd == -1 .or. this % mpd > 1, 'Error: mpd should be > 1')
-    call assert(this % max_iterations == -1 .or. this % max_iterations > 0, 'Error: max_iterations should be > 0')
     call assert(any(this % use_parallel == [-1, 0, 1]), 'Error: use_parallel can be 0 or 1')
     call assert(any(this % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
     call assert(any(this % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) can be 0 or 1')

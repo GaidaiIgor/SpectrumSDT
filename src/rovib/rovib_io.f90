@@ -260,7 +260,7 @@ contains
     end do
 
     ! Load raw matrix
-    call get_proc_elem_range(params % num_states, first_elem, proc_elems)
+    call get_proc_elem_range(params % eigencalc % num_states, first_elem, proc_elems)
     allocate(Cs_raw(total_solutions_2d, proc_elems))
     sym_path = get_sym_path(params)
     do sln_ind = first_elem, first_elem + proc_elems - 1

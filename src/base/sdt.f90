@@ -52,7 +52,7 @@ contains
   subroutine init_sdt(params)
     type(input_params), intent(in) :: params
 
-    nstate = params % num_states
+    nstate = params % eigencalc % num_states
     n3b = params % basis_size_phi
     trecut = params % cutoff_energy
 
