@@ -24,10 +24,16 @@ module general_real_mod
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts string to real(real64).
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  elemental function str2real(str) result(real_num)
+  impure elemental function str2real(str, iostat) result(real_num)
     character(*), intent(in) :: str
+    integer, optional, intent(inout) :: iostat
     real(real64) :: real_num
-    read(str, *) real_num
+
+    if (present(iostat)) then
+      read(str, *, iostat = iostat) real_num
+    else
+      read(str, *) real_num
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

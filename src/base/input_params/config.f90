@@ -145,6 +145,30 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Tries to convert *str* to integer for *key* and prints error otherwise.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function str2int_config(str, key) result(int)
+    character(*), intent(in) :: str, key
+    integer :: int
+    integer :: iostat
+
+    int = str2int(str, iostat)
+    call assert(iostat == 0, 'Error: ' // key // ' has failed to convert to integer')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Tries to convert *str* to real for *key* and prints error otherwise.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function str2real_config(str, key) result(real)
+    character(*), intent(in) :: str, key
+    real(real64) :: real
+    integer :: iostat
+
+    real = str2real(str, iostat)
+    call assert(iostat == 0, 'Error: ' // key // ' has failed to convert to real')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks whether all mandatory keys of this stage are specified in config.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_mandatory_keys(config_dict, mandatory_keys, prefix)

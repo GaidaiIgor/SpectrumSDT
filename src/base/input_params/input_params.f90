@@ -216,7 +216,7 @@ contains
           mass(i) = argon_masses(3)
         case default
           call print_parallel('Info: treating mass as a number')
-          mass(i) = str2real(next_atom) * amu_to_aum
+          mass(i) = str2real_config(next_atom, 'mass' // '(' // num2str(i) // ')') * amu_to_aum
       end select
     end do
   end function
@@ -265,8 +265,8 @@ contains
     character(*), intent(in) :: enable_terms_str
     integer :: enable_terms(2)
     
-    enable_terms(1) = str2int(enable_terms_str(1:1))
-    enable_terms(2) = str2int(enable_terms_str(2:2))
+    enable_terms(1) = str2int_config(enable_terms_str(1:1), 'enable_terms(1)')
+    enable_terms(2) = str2int_config(enable_terms_str(2:2), 'enable_terms(2)')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -286,13 +286,13 @@ contains
       pos = index(K_str, '..')
       if (pos == 0) then
         ! Single value of K
-        K(1) = str2int(K_str)
+        K(1) = str2int_config(K_str, 'K')
         K(2) = K(1)
       else
         ! K range
         tokens = strsplit(K_str, '..')
-        K(1) = str2int(tokens(1) % to_char_str())
-        K(2) = str2int(tokens(2) % to_char_str())
+        K(1) = str2int_config(tokens(1) % to_char_str(), 'K(1)')
+        K(2) = str2int_config(tokens(2) % to_char_str(), 'K(2)')
       end if
     end if
   end function
@@ -328,9 +328,9 @@ contains
 
       select case (next_key)
         case ('stage')
-          this % stage = extract_string(config_dict, next_key)
+          this % stage = next_value
         case ('use_rovib_coupling')
-          this % use_rovib_coupling = str2int(extract_string(config_dict, next_key))
+          this % use_rovib_coupling = str2int_config(next_value, next_key)
         case ('cap')
           call this % cap % checked_init(subdict, auxiliary_subdict)
         case ('grid_rho')
@@ -339,52 +339,52 @@ contains
           call this % grid_theta % checked_init(subdict, auxiliary_subdict)
           call convert_grid_params_deg_to_rad(this % grid_theta)
         case ('num_points_phi')
-          this % num_points_phi = str2int(extract_string(config_dict, next_key))
+          this % num_points_phi = str2int_config(next_value, next_key)
         case ('output_coordinate_system')
-          this % output_coordinate_system = extract_string(config_dict, next_key)
+          this % output_coordinate_system = next_value
         case ('mass')
-          this % mass = parse_mass(extract_string(config_dict, next_key))
+          this % mass = parse_mass(next_value)
         case ('J')
-          this % J = str2int(extract_string(config_dict, next_key))
+          this % J = str2int_config(next_value, next_key)
         case ('K')
-          K_str = extract_string(config_dict, next_key)
+          K_str = next_value
         case ('parity')
-          this % parity = str2int(extract_string(config_dict, next_key))
+          this % parity = str2int_config(next_value, next_key)
         case ('symmetry')
-          this % symmetry = str2int(extract_string(config_dict, next_key))
+          this % symmetry = str2int_config(next_value, next_key)
         case ('basis_size_phi')
-          this % basis_size_phi = str2int(extract_string(config_dict, next_key))
+          this % basis_size_phi = str2int_config(next_value, next_key)
         case ('cutoff_energy')
-          this % cutoff_energy = str2real(extract_string(config_dict, next_key)) / au_to_wn
+          this % cutoff_energy = str2real_config(next_value, next_key) / au_to_wn
         case ('fixed_basis')
           call this % fixed_basis % checked_init(subdict, auxiliary_subdict)
         case ('num_states')
-          this % num_states = str2int(extract_string(config_dict, next_key))
+          this % num_states = str2int_config(next_value, next_key)
         case ('ncv')
-          this % ncv = str2int(extract_string(config_dict, next_key))
+          this % ncv = str2int_config(next_value, next_key)
         case ('mpd')
-          this % mpd = str2int(extract_string(config_dict, next_key))
+          this % mpd = str2int_config(next_value, next_key)
         case ('max_iterations')
-          this % max_iterations = str2int(extract_string(config_dict, next_key))
+          this % max_iterations = str2int(next_value)
         case ('wf_sections')
           wf_sections_provided = .true.
           this % wf_sections = parse_wf_sections(subdict, auxiliary_subdict)
         case ('grid_path')
-          this % grid_path = extract_string(config_dict, next_key)
+          this % grid_path = next_value
         case ('root_path')
-          this % root_path = extract_string(config_dict, next_key)
+          this % root_path = next_value
         case ('use_parallel')
-          this % use_parallel = str2int(extract_string(config_dict, next_key))
+          this % use_parallel = str2int_config(next_value, next_key)
         case ('enable_terms')
-          this % enable_terms = parse_enable_terms(extract_string(config_dict, next_key))
+          this % enable_terms = parse_enable_terms(next_value)
         case ('optimized_mult')
-          this % optimized_mult = str2int(extract_string(config_dict, next_key))
+          this % optimized_mult = str2int_config(next_value, next_key)
         case ('treat_tp_as_xy')
-          this % treat_tp_as_xy = str2int(extract_string(config_dict, next_key))
+          this % treat_tp_as_xy = str2int_config(next_value, next_key)
         case ('debug_mode')
-          this % debug_mode = extract_string(config_dict, next_key)
+          this % debug_mode = next_value
         case ('debug_param_1')
-          this % debug_param_1 = extract_string(config_dict, next_key)
+          this % debug_param_1 = next_value
       end select
     end do
 

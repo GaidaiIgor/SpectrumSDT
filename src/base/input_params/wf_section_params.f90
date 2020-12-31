@@ -79,20 +79,20 @@ contains
           this % stat = next_value
         case ('K')
           range_tokens = parse_range(next_value, full_key)
-          this % K(1) = str2int(range_tokens(1) % to_char_str())
-          this % K(2) = str2int(range_tokens(2) % to_char_str())
+          this % K(1) = str2int_config(range_tokens(1) % to_char_str(), full_key // '(1)')
+          this % K(2) = str2int_config(range_tokens(2) % to_char_str(), full_key // '(2)')
         case ('rho')
           range_tokens = parse_range(next_value, full_key)
-          this % rho(1) = str2real(range_tokens(1) % to_char_str())
-          this % rho(2) = str2real(range_tokens(2) % to_char_str())
+          this % rho(1) = str2real_config(range_tokens(1) % to_char_str(), full_key // '(1)')
+          this % rho(2) = str2real_config(range_tokens(2) % to_char_str(), full_key // '(2)')
         case ('theta')
           range_tokens = parse_range(next_value, full_key)
-          this % theta(1) = str2real(range_tokens(1) % to_char_str())
-          this % theta(2) = str2real(range_tokens(2) % to_char_str())
+          this % theta(1) = str2real_config(range_tokens(1) % to_char_str(), full_key // '(1)')
+          this % theta(2) = str2real_config(range_tokens(2) % to_char_str(), full_key // '(2)')
         case ('phi')
           range_tokens = parse_range(next_value, full_key)
           do j = 1, 2
-            this % phi(j) = str2real(range_tokens(j) % to_char_str())
+            this % phi(j) = str2real_config(range_tokens(j) % to_char_str(), full_key // '(' // num2str(j) // ')')
             if (.not. (this % phi(j) .aeq. -2d0)) then
               this % phi(j) = this % phi(j) / 180 * pi
             end if

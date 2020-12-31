@@ -32,22 +32,23 @@ contains
     class(optgrid_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
-    character(:), allocatable :: next_key, next_value
+    character(:), allocatable :: next_key, full_key, next_value
     type(string), allocatable :: key_set(:)
 
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
+      full_key = this % prefix // next_key
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
         case ('optimized')
-          this % optimized = str2int(next_value)
+          this % optimized = str2int_config(next_value, full_key)
         case ('envelope_path')
           this % envelope_path = next_value
         case ('max_energy')
-          this % max_energy = str2real(next_value)
+          this % max_energy = str2real_config(next_value, full_key)
         case ('solver_steps')
-          this % solver_steps = str2int(next_value)
+          this % solver_steps = str2int_config(next_value, full_key)
       end select
     end do
   end subroutine

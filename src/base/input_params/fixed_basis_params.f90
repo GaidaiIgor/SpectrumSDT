@@ -35,7 +35,7 @@ contains
     class(fixed_basis_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
-    character(:), allocatable :: next_key, next_value
+    character(:), allocatable :: next_key, full_key, next_value
     type(string), allocatable :: key_set(:)
 
     this % prefix = extract_string(auxiliary_info, 'prefix')
@@ -43,12 +43,13 @@ contains
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
+      full_key = this % prefix // next_key
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
         case ('J')
-          this % J = str2int(next_value)
+          this % J = str2int_config(next_value, full_key)
         case ('K')
-          this % K = str2int(next_value)
+          this % K = str2int_config(next_value, full_key)
         case ('root_path')
           this % root_path = next_value
       end select

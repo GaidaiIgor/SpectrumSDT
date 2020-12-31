@@ -42,7 +42,7 @@ contains
     class(cap_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
-    character(:), allocatable :: next_key, next_value
+    character(:), allocatable :: next_key, full_key, next_value
     type(string), allocatable :: key_set(:)
 
     this % prefix = extract_string(auxiliary_info, 'prefix')
@@ -50,10 +50,11 @@ contains
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
+      full_key = this % prefix // next_key
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
         case ('min_absorbed_energy')
-          this % min_absorbed_energy = str2real(next_value) / au_to_wn
+          this % min_absorbed_energy = str2real_config(next_value, full_key) / au_to_wn
       end select
     end do
   end subroutine

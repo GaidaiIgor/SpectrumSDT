@@ -6,7 +6,7 @@ module general_integer_mod
 #include "general_template.F90"
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts integer to string
+! Converts integer to string.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function num2str_integer(num, format) result(str)
     integer, intent(in) :: num
@@ -21,12 +21,18 @@ module general_integer_mod
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts string to integer
+! Converts string to integer.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  elemental function str2int(str) result(int)
+  impure elemental function str2int(str, iostat) result(int)
     character(*), intent(in) :: str
+    integer, optional, intent(inout) :: iostat
     integer :: int
-    read(str, *) int
+
+    if (present(iostat)) then
+      read(str, *, iostat = iostat) int
+    else
+      read(str, *) int
+    end if
   end function
 
 end module

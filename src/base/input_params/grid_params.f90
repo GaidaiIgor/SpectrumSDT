@@ -35,23 +35,24 @@ contains
     class(grid_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
-    character(:), allocatable :: next_key, next_value
+    character(:), allocatable :: next_key, full_key, next_value
     type(string), allocatable :: key_set(:)
 
     this % prefix = extract_string(auxiliary_info, 'prefix')
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
+      full_key = this % prefix // next_key
       next_value = extract_string(config_dict, next_key)
       select case (next_key)
         case ('from')
-          this % from = str2real(next_value)
+          this % from = str2real_config(next_value, full_key)
         case ('to')
-          this % to = str2real(next_value)
+          this % to = str2real_config(next_value, full_key)
         case ('step')
-          this % step = str2real(next_value)
+          this % step = str2real_config(next_value, full_key)
         case ('num_points')
-          this % num_points = str2int(next_value)
+          this % num_points = str2int_config(next_value, full_key)
       end select
     end do
   end subroutine
