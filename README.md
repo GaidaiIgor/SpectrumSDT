@@ -56,8 +56,8 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
 
 1. Generate the grids
 ```
-mkdir ~/SpectrumSDT_runs && cd ~/SpectrumSDT_runs
-cp ~/SpectrumSDT/config_examples/grids.config spectrumsdt.config
+mkdir -p ~/SpectrumSDT_runs/o3/ && cd ~/SpectrumSDT_runs/o3/
+cp ~/SpectrumSDT/config_examples/o3/grids.config spectrumsdt.config
 ~/SpectrumSDT/build/spectrumsdt
 ```
 Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combination of points in the generated grid files in atomic units of energy (Hartree).
@@ -70,7 +70,7 @@ mkdir build && cd build
 ```
 Now run:
 ```
-cd ~/SpectrumSDT_runs
+cd ~/SpectrumSDT_runs/o3/
 mpiexec -n <n_procs> ~/SpectrumSDT/PES_examples/ozone/build/ozone_pes 686
 ```
 Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pes.out` file with the values of PES at all grid points will be written.
@@ -85,19 +85,14 @@ Edit spectrumsdt.config and replace `username` in the paths. Then execute:
 
 4. Calculate basis
 ```
-cd K_0/even/basis
+cd K_0/sym_0/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
-At the basis stage `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/grid_rho.dat` (16 in this example).  
-In `use_fixed_basis_JK = 1` mode (enabled in this example), basis of the other symmetry has to be computed as well.  
-```
-cd ../../odd/basis
-mpiexec -n 16 spectrumsdt
-```
+At the basis stage `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/o3/grid_rho.dat` (16 in this example).  
 
 5. Calculate basis cross terms (overlaps)
 ```
-cd ../../even/overlaps
+cd ../overlaps
 mpiexec -n <n_procs> spectrumsdt
 ```
 
