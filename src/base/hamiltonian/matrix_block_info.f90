@@ -222,6 +222,8 @@ contains
     integer, intent(in) :: row
     integer :: j, last_non_empty_row
     type(matrix_block_info), pointer :: new_subblocks(:, :)
+    ! Workaround for intel bug
+    logical, allocatable :: temp(:)
 
     ! If this block is unaffected by cutting then do nothing
     if (this % borders % bottom <= row) then
@@ -238,7 +240,8 @@ contains
     end if
 
     ! Find last not completely eliminated block row index
-    last_non_empty_row = findloc(this % subblocks(:, 1) % borders % top <= row, .true., 1, back = .true.)
+    temp = this % subblocks(:, 1) % borders % top <= row ! Workaround for intel bug
+    last_non_empty_row = findloc(temp, .true., 1, back = .true.)
     ! If all subblocks are eliminated
     if (last_non_empty_row == 0) then
       call this % deallocate_recursive()
