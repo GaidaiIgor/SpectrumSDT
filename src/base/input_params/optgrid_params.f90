@@ -113,14 +113,13 @@ contains
     integer, optional, intent(in) :: check_extra ! have to keep the same signature in child
     type(dictionary_t) :: mandatory_keys, all_keys
 
+    all_keys = this % get_all_keys()
+    call check_extra_keys(config_dict, all_keys, this % prefix) ! Checks that unknown keys were not specified
     call check_key_types(config_dict, auxiliary_info, 'string')
     call this % grid_params % checked_init(config_dict, auxiliary_info, check_extra = 0) ! First, check init parental type
     call this % assign_dict(config_dict, auxiliary_info) ! Init type as is to ease branching in getting keys
     mandatory_keys = this % get_mandatory_keys() ! Save mandatory keys because we will reuse them later for unused key check
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix) ! Make sure mandatory keys are set to ease checking values
-
-    all_keys = this % get_all_keys() ! Generally optional part comes last
-    call check_extra_keys(config_dict, all_keys, this % prefix) ! Checks that unknown keys were not specified
     call this % set_defaults(config_dict)
     call this % check_values() ! Make sure the settings have valid values
   end subroutine

@@ -540,13 +540,12 @@ contains
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     type(dictionary_t) :: mandatory_keys, all_keys
 
+    all_keys = this % get_all_keys()
+    call check_extra_keys(config_dict, all_keys)
     call check_key_types_input_params(config_dict, auxiliary_info)
     call this % assign_dict(config_dict, auxiliary_info)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys)
-
-    all_keys = this % get_all_keys()
-    call check_extra_keys(config_dict, all_keys)
     call this % set_defaults(config_dict)
     call this % check_values()
   end subroutine

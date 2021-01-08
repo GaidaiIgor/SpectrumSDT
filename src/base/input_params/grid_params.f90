@@ -117,6 +117,13 @@ contains
     integer :: check_extra_act
     type(dictionary_t) :: mandatory_keys, all_keys
 
+    ! Skippable to enable calls from derived types since their parameters will be unknown here
+    check_extra_act = arg_or_default(check_extra, 1)
+    if (check_extra_act == 1) then
+      all_keys = this % get_all_keys()
+      call check_extra_keys(config_dict, all_keys, this % prefix)
+    end if
+
     call check_key_types(config_dict, auxiliary_info, 'string')
     call this % assign_dict(config_dict, auxiliary_info)
     ! These two can never be set together, so it's an error if they are
@@ -126,13 +133,6 @@ contains
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
     call this % set_defaults(config_dict)
     call this % check_values()
-
-    ! Skippable to enable calls from derived types since their parameters will be unknown here
-    check_extra_act = arg_or_default(check_extra, 1)
-    if (check_extra_act == 1) then
-      all_keys = this % get_all_keys()
-      call check_extra_keys(config_dict, all_keys, this % prefix)
-    end if
   end subroutine
 
 end module
