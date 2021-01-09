@@ -57,9 +57,12 @@ set(io_utils ${io_base} ${io_integer} ${io_real} ${io_complex} ${prefix}/src/uti
 
 set(config ${dict_utils} ${general_utils} ${io_utils} ${parallel_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/config.f90)
 set(grid_params ${config} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/grid_params.f90)
-set(optgrid_params ${config} ${dict_utils} ${grid_params} ${string} ${prefix}/src/base/input_params/optgrid_params.f90)
+set(optgrid_params ${config} ${dict_utils} ${grid_params} ${parallel_utils} ${string} ${prefix}/src/base/input_params/optgrid_params.f90)
 set(wf_section_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/wf_section_params.f90)
-set(input_params ${algorithms} ${config} ${constants} ${dict_utils} ${general_utils} ${grid_params} ${optgrid_params} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
+set(cap_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/cap_params.f90)
+set(eigencalc_params ${config} ${constants} ${dict_utils} ${general_utils} ${parallel_utils} ${string} ${prefix}/src/base/input_params/eigencalc_params.f90)
+set(fixed_basis_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/fixed_basis_params.f90)
+set(input_params ${algorithms} ${cap_params} ${config} ${constants} ${dict_utils} ${eigencalc_params} ${fixed_basis_params} ${general_utils} ${grid_params} ${optgrid_params} ${parallel_utils} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
 
 set(debug_tools ${debug_tools_base} ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/utils/rovib_utils.f90)

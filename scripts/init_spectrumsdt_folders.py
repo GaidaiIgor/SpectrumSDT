@@ -13,9 +13,9 @@ from SpectrumSDTConfig import SpectrumSDTConfig
             
 
 def parse_command_line_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Creates a folder structure for calculations with a given config")
-    parser.add_argument("-c", "--config", default="spectrumsdt.config", help="Path to configuration file")
-    parser.add_argument("-K", required=True, help="Only folders for specified K value will be created")
+    parser = argparse.ArgumentParser(description="Creates a folder structure for a given K or range of Ks and copies config file to the target files, adding folder-specific parameters")
+    parser.add_argument("-c", "--config", default="spectrumsdt.config", help="Path to a template configuration file. ./spectrumsdt.config by default.")
+    parser.add_argument("-K", required=True, help="The value of K for which to create the folder. Can either be a scalar, a custom range in the form K1..K2, or 'all' to include all Ks for a given J")
     args = parser.parse_args()
     return args
 

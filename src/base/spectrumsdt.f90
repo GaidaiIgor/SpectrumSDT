@@ -18,15 +18,15 @@ program spectrumsdt
   implicit none
 
   integer :: ierr
-  type(dictionary_t) :: config_dict
+  type(dictionary_t) :: config_dict, auxiliary_info
   type(input_params) :: params
 
-  config_dict = read_config_dict('spectrumsdt.config')
+  call read_config_dict('spectrumsdt.config', config_dict, auxiliary_info)
   ! We have to decide whether to enable MPI before we create an instance of input_params, otherwise we cannot restrict printing during instantiation to 0th processor
   if (extract_string(config_dict, 'stage') /= 'grids' .and. item_or_default(config_dict, 'use_parallel', '1') == '1') then
     call MPI_Init(ierr)
   end if
-  call params % checked_init(config_dict)
+  call params % checked_init(config_dict, auxiliary_info)
 
   call init_all(params)
   call process_stage(params)
@@ -64,26 +64,19 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine process_stage(params)
     type(input_params), intent(in) :: params
-
-    ! Write information
     call print_parallel('Stage: ' // params % stage)
-    ! Call appropriate subroutine
     select case (params % stage)
       case ('grids')
         call generate_grids(params)
-
       case ('basis')
         call calc_basis(params)
-
       case ('overlaps')
         call calc_overlap(params)
         call calculate_overlaps_extra(params, mu, g1, g2)
-
       case ('eigencalc')
         call calculate_states(params)
-
       case ('properties')
-        if (params % cap_type /= 'none') then
+        if (params % cap % type /= 'none') then
           call calculate_state_properties(params, g1, g2, get_real_cap())
         else
           call calculate_state_properties(params, g1, g2)

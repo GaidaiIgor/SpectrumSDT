@@ -78,7 +78,7 @@ contains
       kinetic = compute_kinetic_energy_dvr(mu, n1, n1 * alpha1)
     end if
 
-    if (params % cap_type /= 'none') then
+    if (params % cap % type /= 'none') then
       cap = get_complex_cap()
       call rovib_ham % build(params, kinetic, cap)
     else
@@ -88,7 +88,7 @@ contains
 
     call init_matmul(params) ! rovib_ham is already set
     call print_parallel('Eigenvalue solver has started')
-    call find_eigenpairs_slepc(params % num_states, params % ncv, params % mpd, eivals, eivecs)
+    call find_eigenpairs_slepc(params % eigencalc % num_states, params % eigencalc % ncv, params % eigencalc % mpd, eivals, eivecs)
     call print_spectrum(params, eivals, eivecs)
   end subroutine
 

@@ -87,7 +87,7 @@ contains
 
     ! Extend grid with virtual points so that midpoints coincide with grid ends. Makes handling special cases with grid ends less tedious.
     grid_ext = [grid(1) - 2*(grid(1) - grid_ends(1)), grid, grid(size(grid)) + 2*(grid_ends(2) - grid(size(grid)))]
-    border_inds = map_borders_to_point_indices(borders, grid_ext)
+    border_inds = map_borders_to_point_indices(borders, grid) + 1 ! Find on old grid and shift to avoid finding virtual points
     closest_points = grid_ext(border_inds)
     edges_left = (closest_points + grid_ext(border_inds - 1)) / 2
     edges_right = (closest_points + grid_ext(border_inds + 1)) / 2
@@ -130,6 +130,7 @@ contains
     allocate(wf_sections_dist_mask(size(params % wf_sections), params % K(2) - params % K(1) + 1, size(rho_grid), size(theta_grid), size(phi_borders) - 1))
     wf_sections_dist_mask = 0
     section_inds = get_wf_sections_dist_inds(params, rho_grid, theta_grid, phi_borders)
+
     associate(si => section_inds)
       do i = 1, size(wf_sections_dist_mask, 1)
         wf_sections_dist_mask(i, si(i, 1, 1):si(i, 1, 2), si(i, 2, 1):si(i, 2, 2), si(i, 3, 1):si(i, 3, 2), si(i, 4, 1):si(i, 4, 2)) = 1
@@ -246,7 +247,7 @@ contains
     real(real64) :: phi_range(2)
     complex(real64) :: j_sums(params % basis_size_phi) ! j-sums for different ms
 
-    call get_proc_elem_range(params % num_states, proc_first_state, proc_states)
+    call get_proc_elem_range(params % eigencalc % num_states, proc_first_state, proc_states)
     allocate(proc_p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
     proc_p_dist = 0
 
@@ -292,7 +293,7 @@ contains
     integer, allocatable :: recv_counts(:), recv_shifts(:)
     real(real64), allocatable :: proc_section_stats(:, :)
 
-    call get_proc_elem_range(params % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
+    call get_proc_elem_range(params % eigencalc % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
     call assert(size(proc_p_dist, 1) == proc_states, 'Error: wrong size of proc_p_dist')
     ! Calculate local chunks
     allocate(proc_section_stats(proc_states, size(params % wf_sections)))
@@ -326,13 +327,13 @@ contains
     sym_path = get_sym_path(params)
     spectrum_path = get_spectrum_path(sym_path)
     eigenvalues_3d = read_matrix_real(spectrum_path, skip_lines = 1)
-    call assert(size(eigenvalues_3d, 1) >= params % num_states, 'Error: not enough eigenstates computed')
+    call assert(size(eigenvalues_3d, 1) >= params % eigencalc % num_states, 'Error: not enough eigenstates computed')
 
     N = size(rho_grid)
     L = size(theta_grid)
     ! Load expansion coefficients
     call print_parallel('Loading expansion coefficients...')
-    if (params % use_fixed_basis_JK == 1) then
+    if (params % fixed_basis % enabled == 1) then
       call load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
       call load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
     else

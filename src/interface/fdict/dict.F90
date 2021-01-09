@@ -28,6 +28,12 @@ contains
     type(vector_string) :: vec
     type(dictionary_t) :: pair
     
+    ! Return 0-sized result if dict is empty
+    if (len(dict) == 0) then
+      allocate(set(0))
+      return
+    end if
+
     vec = vector_string()
     pair = .first. dict
     key = trim(.key. pair)
@@ -45,7 +51,7 @@ contains
 ! Returns dict with entries from dict1 that are not present in dict2.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function set_difference(dict1, dict2) result(diff)
-    class(dictionary_t), intent(in) :: dict1, dict2 ! intent(in)
+    class(dictionary_t), intent(in) :: dict1, dict2
     type(dictionary_t) :: diff
     integer :: i
     character(:), allocatable :: next_key

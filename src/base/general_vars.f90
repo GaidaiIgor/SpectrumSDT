@@ -66,18 +66,16 @@ contains
     n2 = params % grid_theta % num_points
     alpha2 = params % grid_theta % step
     allocate(g2(n2), jac2(n2))
-    do i = 1, n2
-      read(file_unit, *) g2(i), jac2(i)
-    end do
+    read(file_unit, *) g2
+    jac2 = 1
     close(file_unit)
     
     open(newunit = file_unit, file = get_grid_phi_path(params))
     read(file_unit, *) skip, skip, alpha3, params % num_points_phi
     n3 = params % num_points_phi
     allocate(g3(n3), jac3(n3))
-    do i = 1, n3
-      read(file_unit, *) g3(i), jac3(i)
-    end do
+    read(file_unit, *) g3
+    jac3 = 1
     close(file_unit)
     
     ! Treat alpha2(3) as a grid step size
