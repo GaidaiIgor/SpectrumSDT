@@ -72,7 +72,7 @@ class SpectrumSDTConfig:
         return int(self.params["basis_K"])
 
     def get_number_of_states(self) -> int:
-        return int(self.params["num_states"])
+        return int(self.params["eigencalc"]["num_states"])
 
     def get_ncv(self) -> int:
         return int(self.params["ncv"])
