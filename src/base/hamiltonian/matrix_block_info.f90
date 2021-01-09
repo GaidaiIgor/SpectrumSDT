@@ -5,10 +5,14 @@ module matrix_block_info_mod
   implicit none
 
   private
-  public :: matrix_block_info
+  public :: matrix_block_info, deallocate_recursive
 
   interface matrix_block_info
     module procedure :: construct_matrix_block_info
+  end interface
+
+  interface deallocate_recursive
+    module procedure :: deallocate_recursive_matrix_block_info_single, deallocate_recursive_matrix_block_info_2D
   end interface
 
   type :: matrix_block_info
@@ -19,7 +23,6 @@ module matrix_block_info_mod
     type(block_borders) :: borders = block_borders(-1, -1, -1, -1)
     type(matrix_block_info), pointer :: subblocks(:, :) => null()
   contains
-    procedure :: deallocate_recursive => deallocate_recursive_matrix_block_info
     final :: finalize_matrix_block_info
     procedure :: shift_to => shift_to_matrix_block_info
     procedure :: update_block_indexes => update_block_indexes_matrix_block_info
@@ -54,13 +57,28 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Deallocates memory recursively for all subblocks down this tree.
+! Deallocates memory recursively for all subblocks down the tree starting at *block_info*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  impure elemental subroutine deallocate_recursive_matrix_block_info(this)
-    class(matrix_block_info), intent(inout) :: this
-    if (associated(this % subblocks)) then
-      deallocate(this % subblocks)
+  recursive subroutine deallocate_recursive_matrix_block_info_single(block_info)
+    class(matrix_block_info), intent(inout) :: block_info
+    if (associated(block_info % subblocks)) then
+      call deallocate_recursive(block_info % subblocks)
+      deallocate(block_info % subblocks)
     end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Deallocates memory recursively for all subblocks down the trees starting at elements of *block_info_2D*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  recursive subroutine deallocate_recursive_matrix_block_info_2D(block_info_2D)
+    class(matrix_block_info), intent(inout) :: block_info_2D(:, :)
+    integer :: i, j
+
+    do j = 1, size(block_info_2D, 2)
+      do i = 1, size(block_info_2D, 1)
+        call deallocate_recursive(block_info_2D(i, j))
+      end do
+    end do
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -69,7 +87,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine finalize_matrix_block_info(this)
     type(matrix_block_info), intent(inout) :: this
-    call this % deallocate_recursive()
+    call deallocate_recursive(this)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -183,7 +201,7 @@ contains
       return
     end if
 
-    ! Correct upper border and block size. Size <= 0 means the block is fully eliminated.
+    ! Correct upper border and number of rows. this % rows <= 0 means the block is fully eliminated.
     this % borders % top = row
     this % rows = this % borders % bottom - this % borders % top + 1
 
@@ -192,23 +210,31 @@ contains
       return
     end if
 
-    ! Find first not completely eliminated block row index
+    ! Otherwise find first not completely eliminated block row index in subblocks
     first_non_empty_row = findloc(this % subblocks(:, 1) % borders % bottom >= row, .true., 1)
-    ! If all subblocks are eliminated
+    ! If all subblocks are eliminated, deallocate this branch and return
     if (first_non_empty_row == 0) then
-      call this % deallocate_recursive()
+      call deallocate_recursive(this)
       return
     end if
-    ! Allocate new version of this layer and copy relevant data from old version
-    allocate(new_subblocks, source = this % subblocks(first_non_empty_row:, :))
+
+    ! Otherwise allocate new version of this layer and copy remaining data from old version
+
+    ! This short version does not work due to Intel compiler bug
+    ! allocate(new_subblocks, source = this % subblocks(first_non_empty_row:, :))
+
+    ! Pointers need manual allocation before assignment
+    allocate(new_subblocks(size(this % subblocks, 1) - first_non_empty_row + 1, size(this % subblocks, 2)))
+    new_subblocks = this % subblocks(first_non_empty_row:, :)
+
     ! Deallocate cutted blocks recursively
-    call this % subblocks(:first_non_empty_row - 1, :) % deallocate_recursive()
+    call deallocate_recursive(this % subblocks(:first_non_empty_row - 1, :))
     ! Deallocate the old version of this layer
     deallocate(this % subblocks)
     ! Associate the pointer with the new version of this layer
     this % subblocks => new_subblocks
 
-    ! The first row is partially eliminated, need to iterate recursively
+    ! The first block row is partially eliminated, so we need to call this recursively for all its elements
     do j = 1, size(this % subblocks, 2)
       call this % subblocks(1, j) % remove_above_row(row)
     end do
@@ -222,7 +248,6 @@ contains
     integer, intent(in) :: row
     integer :: j, last_non_empty_row
     type(matrix_block_info), pointer :: new_subblocks(:, :)
-    ! Workaround for intel bug
     logical, allocatable :: temp(:)
 
     ! If this block is unaffected by cutting then do nothing
@@ -230,7 +255,7 @@ contains
       return
     end if
 
-    ! Correct upper border and block size. Size <= 0 means the block is fully eliminated.
+    ! Correct bottom border and number of rows. this % rows <= 0 means the block is fully eliminated.
     this % borders % bottom = row
     this % rows = this % borders % bottom - this % borders % top + 1
 
@@ -239,25 +264,34 @@ contains
       return
     end if
 
-    ! Find last not completely eliminated block row index
-    temp = this % subblocks(:, 1) % borders % top <= row ! Workaround for intel bug
+    ! Otherwise find last not completely eliminated block row index in subblocks
+
+    ! Intel compiler crashes if temp's expression is plugged directly into findloc, so this is a temporary workaround
+    temp = this % subblocks(:, 1) % borders % top <= row
+
     last_non_empty_row = findloc(temp, .true., 1, back = .true.)
-    ! If all subblocks are eliminated
+    ! If all subblocks are eliminated, deallocate this branch and return
     if (last_non_empty_row == 0) then
-      call this % deallocate_recursive()
+      call deallocate_recursive(this)
       return
     end if
 
-    ! Allocate new version of this layer and copy relevant data from old version
-    allocate(new_subblocks, source = this % subblocks(:last_non_empty_row, :))
+    ! Otherwise allocate new version of this layer and copy remaining data from old version
+
+    ! This short version does not work due to Intel compiler bug
+    ! allocate(new_subblocks, source = this % subblocks(:last_non_empty_row, :))
+
+    allocate(new_subblocks(last_non_empty_row, size(this % subblocks, 2)))
+    new_subblocks = this % subblocks(:last_non_empty_row, :)
+
     ! Deallocate cutted blocks recursively
-    call this % subblocks(last_non_empty_row + 1:, :) % deallocate_recursive()
+    call deallocate_recursive(this % subblocks(last_non_empty_row + 1:, :))
     ! Deallocate the old version of this layer
     deallocate(this % subblocks)
     ! Associate the pointer with the new version of this layer
     this % subblocks => new_subblocks
 
-    ! The last row is partially eliminated, need to iterate recursively
+    ! The last row is partially eliminated, so we need to call this recursively for all its elements
     do j = 1, size(this % subblocks, 2)
       call this % subblocks(size(this % subblocks, 1), j) % remove_below_row(row)
     end do

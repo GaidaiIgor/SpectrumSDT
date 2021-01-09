@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Procedures related to information about K-blocks
+! Procedures related to information about K-blocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module k_block_info
   use algorithms_mod
@@ -10,8 +10,8 @@ module k_block_info
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-!  Initializes sizes of diagonal n blocks
-!  Only block sizes are computed, not positions
+! Initializes sizes of diagonal n blocks.
+! Only block sizes are computed, not positions.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine init_n_block_sizes_diag(block_sizes, n_blocks)
     integer, intent(in) :: block_sizes(:)
@@ -26,7 +26,7 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-!  Loads sizes of all overlap blocks for a given k-block
+! Loads sizes of all overlap blocks for a given k-block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_k_subblock_sizes_diag(block_info_path, k_block_info)
     character(*), intent(in) :: block_info_path
@@ -41,7 +41,7 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-!  Loads number of 2D states kept in each slice
+! Loads number of 2D states kept in each slice.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function load_basis_size_2d(basis_size_info_path) result(basis_size_2d)
     character(*), intent(in) :: basis_size_info_path
@@ -53,7 +53,7 @@ contains
   end function
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-!  Loads matrix block info
+! Loads matrix block info.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_block_info_nonadiabatic(n_channels, n_rho_points, n_blocks, block_sizes, offset, n_rows)
     integer, intent(in) :: n_channels ! number of channels

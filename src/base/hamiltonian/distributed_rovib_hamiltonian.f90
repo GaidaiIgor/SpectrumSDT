@@ -50,8 +50,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine finalize_distributed_rovib_hamiltonian(this)
     type(distributed_rovib_hamiltonian), intent(inout) :: this
-    call this % local_chunk_info % deallocate_recursive()
-    call this % global_chunk_info % deallocate_recursive()
+    call deallocate_recursive(this % local_chunk_info)
+    call deallocate_recursive(this % global_chunk_info)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -157,7 +157,7 @@ contains
     end do
 
     ! Point to the compressed object
-    call global_chunk_info % deallocate_recursive()
+    call deallocate_recursive(global_chunk_info)
     global_chunk_info => compressed_info
   end subroutine
 
