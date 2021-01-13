@@ -12,7 +12,7 @@ program spectrumsdt
   use overlaps_extra_mod, only: calculate_overlaps_extra
   use parallel_utils, only: print_parallel
   use potential_mod, only: init_potential
-  use sdt, only: init_sdt, calc_basis, calc_overlap
+  use sdt, only: calc_basis, calc_overlap
   use spectrum_mod, only: calculate_states
   use state_properties_mod, only: calculate_state_properties
   implicit none
@@ -47,9 +47,6 @@ contains
     if (params % stage == 'basis' .or. params % stage == 'overlaps' .or. params % stage == 'eigencalc' .or. params % stage == 'properties') then
       call init_grids(params)
       call params % check_resolve_grids(g1, g2, g3)
-    end if
-    if (params % stage == 'basis' .or. params % stage == 'overlaps') then
-      call init_sdt(params)
     end if
     if (params % stage == 'basis') then
       call init_potential(params)

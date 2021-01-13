@@ -8,7 +8,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Provides a more convenient interface to dsyev subroutine
 ! matrix - matrix, whose eigenpairs are to be found. Contains eigenvectors on exit.
-! eivals - eigenvalues of matrix
+! eivals - eigenvalues of matrix, in ascending order.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine lapack_eigensolver(matrix, eivals)
     real(real64), intent(inout) :: matrix(:, :)
@@ -23,7 +23,7 @@ contains
     ! Workspace size query
     work_size = -1
     call dsyev('V', 'U', size(matrix, 1), matrix, size(matrix, 1), eivals, work_size_query, work_size, info)
-    call assert(info == 0, 'Error: lapack work space query has failed, info =' // num2str(info))
+    call assert(info == 0, 'Error: lapack workspace query has failed, info =' // num2str(info))
 
     ! Actual solution
     work_size = int(work_size_query(1))

@@ -211,7 +211,7 @@ contains
     end if
 
     ! Otherwise find first not completely eliminated block row index in subblocks
-    first_non_empty_row = findloc(this % subblocks(:, 1) % borders % bottom >= row, .true., 1)
+    first_non_empty_row = findloc(this % subblocks(:, 1) % borders % bottom >= row, .true., dim = 1)
     ! If all subblocks are eliminated, deallocate this branch and return
     if (first_non_empty_row == 0) then
       call deallocate_recursive(this)
