@@ -8,9 +8,7 @@ add_compile_options(-g -fbacktrace -ffree-line-length-0 -Wall -Wextra -Wno-unini
 # set(CMAKE_Fortran_COMPILER mpifort)
 # add_compile_options(-g -traceback -warn all -diag-disable 7712)
 
-project(SpectrumSDT)
-enable_language(Fortran)
-
+project(SpectrumSDT Fortran)
 set(prefix ${CMAKE_CURRENT_LIST_DIR})
 # Specify where to look for external module files (-I option)
 include_directories(${prefix}/src/include ${prefix}/libs/fdict ${prefix}/libs/petsc/include ${prefix}/libs/petsc/debug_64/include ${prefix}/libs/slepc/include ${prefix}/libs/slepc/debug_64/include)
