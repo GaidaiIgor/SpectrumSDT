@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(CMAKE_Fortran_COMPILER gfortran)
+# GNU
+set(CMAKE_Fortran_COMPILER mpifort)
 add_compile_options(-g -fbacktrace -ffree-line-length-0 -Wall -Wextra -Wno-uninitialized -Wno-unused-dummy-argument -std=f2018)
 
-# set(CMAKE_Fortran_COMPILER ifort)
+# Intel
+# set(CMAKE_Fortran_COMPILER mpifort)
 # add_compile_options(-g -traceback -warn all -diag-disable 7712)
 
 project(SpectrumSDT)
