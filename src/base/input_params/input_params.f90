@@ -247,6 +247,7 @@ contains
     do i = 1, size(key_order)
       next_key = key_set(key_order(i)) % to_char_str()
       call associate(subdict, dict, next_key)
+      call associate(auxiliary_subdict, auxiliary_info, next_key)
 
       ! use key name if name attribute is not provided
       if (.not. ('name' .in. subdict)) then
