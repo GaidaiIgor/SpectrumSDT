@@ -12,7 +12,7 @@ program spectrumsdt
   use overlaps_extra_mod, only: calculate_overlaps_extra
   use parallel_utils, only: print_parallel
   use potential_mod, only: init_potential
-  use sdt, only: calc_basis, calc_overlap
+  use sdt, only: calculate_basis, calculate_overlaps
   use spectrum_mod, only: calculate_states
   use state_properties_mod, only: calculate_state_properties
   implicit none
@@ -66,9 +66,9 @@ contains
       case ('grids')
         call generate_grids(params)
       case ('basis')
-        call calc_basis(params)
+        call calculate_basis(params)
       case ('overlaps')
-        call calc_overlap(params)
+        call calculate_overlaps(params)
         call calculate_overlaps_extra(params, mu, g1, g2)
       case ('eigencalc')
         call calculate_states(params)

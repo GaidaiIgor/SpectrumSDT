@@ -15,6 +15,7 @@ module sdt
   use mpi
   use parallel_utils
   use potential_mod, only: pottot
+  use rovib_io_mod, only: load_basis_size_2d, load_solutions_1D, load_solutions_2D
   use spectrumsdt_paths_mod
   implicit none
   integer, parameter :: nvec1min = 3 ! Min number of 1D states in thread before truncation
@@ -240,7 +241,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates 1D and 2D basis.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_basis(params)
+  subroutine calculate_basis(params)
     class(input_params), intent(in) :: params
     integer :: proc_id, proc_slice, ierr, file_unit, i, j
     integer, allocatable :: nvec1(:), val2_counts(:)
@@ -297,209 +298,103 @@ contains
     end if
   end subroutine
 
-  !-----------------------------------------------------------------------
-  !  Loads number of 2D states only.
-  !-----------------------------------------------------------------------
-  subroutine load_nvec2(sym_path, nvec2)
-    character(*), intent(in) :: sym_path
-    integer, allocatable :: nvec2(:)
-    integer :: i, file_unit
-
-    allocate(nvec2(n1))
-    open(newunit = file_unit, file = get_block_info_path(sym_path))
-    do i = 1, n1
-      read(file_unit, '(10X, I10)') nvec2(i)
-    end do
-    close(file_unit)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Frees 1D solution.
-  !-----------------------------------------------------------------------
-  subroutine free_1d(nvec, val, vec)
-    type(array_1d_real), allocatable :: val(:) ! 1D values  for each thread
-    type(array_2d_real), allocatable :: vec(:) ! 1D vectors for each thread
-    integer, allocatable :: nvec(:)      ! Num of 1D vecs
-    integer i
-    if (allocated(nvec)) deallocate(nvec)
-    if (allocated(val)) then
-      do i = 1, n2
-        if (allocated(val(i) % p)) deallocate(val(i) % p)
-      end do
-      deallocate(val)
-    end if
-    if (allocated(vec)) then
-      do i = 1, n2
-        if (allocated(vec(i) % p)) deallocate(vec(i) % p)
-      end do
-      deallocate(vec)
-    end if
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Frees 2D solution.
-  !-----------------------------------------------------------------------
-  subroutine free_2d(nvec,val,vec)
-    real(real64),allocatable::vec(:,:)      ! 2D vectors in basis
-    real(real64),allocatable::val(:)        ! 2D values
-    integer nvec                      ! Num of 2D vecs
-    nvec = 0
-    if (allocated(val)) deallocate(val)
-    if (allocated(vec)) deallocate(vec)
-  end subroutine
-
-  !-----------------------------------------------------------------------
-  !  Loads 1D and 2D eigenvector basis for given slice.
-  !-----------------------------------------------------------------------
-  subroutine load_eibasis(params, isl, nvec1, val1, vec1, val2, vec2)
-    class(input_params), intent(in) :: params
-    type(array_1d_real), allocatable :: val1(:) ! 1D solutions eigenvalues for each thread
-    type(array_2d_real), allocatable :: vec1(:) ! 1D solutions expansion coefficients (over sin / cos) for each thread
-    real(real64), allocatable :: vec2(:, :)      ! 2D solutions expansion coefficients (over 1D solutions)
-    real(real64), allocatable :: val2(:)        ! 2D eigenvalues
-    integer, allocatable :: nvec1(:)      ! Num of 1D solutions in each thread
-    integer nvec2                      ! Num of 2D vecs
-    integer nb2                        ! Size of 2D vector in basis
-    integer isl                        ! Slice number
-    integer :: i, file_unit
-    character(:), allocatable :: sym_path
-    
-    ! Deallocate arrays if allocated
-    call free_1d(nvec1, val1, vec1)
-    call free_2d(nvec2, val2, vec2)
-
-    ! Load 2D solution
-    sym_path = get_sym_path(params)
-    open(newunit = file_unit, file = get_solutions_2d_path(sym_path, isl), form = 'unformatted')
-    read(file_unit) nvec2, nb2
-    if (nvec2 == 0) return ! Exit right away, if empty
-    allocate(val2(nvec2), vec2(nb2, nvec2))
-    read(file_unit) val2
-    read(file_unit) vec2
-    close(file_unit)
-
-    ! Load 1D solution
-    allocate(nvec1(n2), val1(n2), vec1(n2))
-    open(newunit = file_unit, file = get_solutions_1d_path(sym_path, isl), form = 'unformatted')
-    read(file_unit) nvec1
-    do i = 1, n2
-      if (nvec1(i) == 0) cycle
-      allocate(val1(i) % p(nvec1(i)), vec1(i) % p(params % basis_size_phi, nvec1(i)))
-      read(file_unit) val1(i) % p
-      read(file_unit) vec1(i) % p
-    end do
-    close(file_unit)
-  end subroutine
-
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Transforms 2D state from 1D eigenvector basis to DVR or FBR basis.
-! On exit vec2b contains a vector of expansion coefficients of a given 2D solution over sin / cos.
-! Vector has M blocks of length L each. Each M-block contains expansion coefficient over the same function in different ls.
-! Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2e and is fixed within this subroutine).
+! Takes a 2D solution *vec2* expressed over 1D basis and expresses it over FBR of sin/cos, using information about 1D basis given in *nvec1* and *vec1*.
+! nvec1 - Number of 1D solutions in each thread (theta-slice).
+! vec1 - All 1D solutions from all threads expressed over sin/cos. i-th element contains 1D solutions from i-th thread.
+! vec2 - 2D solution expressed over 1D solutions. Expansion coefficients over solutions in all threads are stacked together in a single vector.
+! vec2_fbr - The same 2D solution expressed in the basis of sin/cos.
+! vec2_fbr consists of M blocks of length L each. Each M-block contains expansion coefficient over the same sin/cos function in different ls.
+! Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2 and is fixed within this subroutine).
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine transform_basis_1d_to_fbr(vec1, nvec1, vec2e, vec2b)
-    type(array_2d_real), intent(in) :: vec1(n2) ! i-th element is a 2D array of 1D solutions in the i-th thread given as expansion coefficients over sin / cos basis
-    integer, intent(in) :: nvec1(n2) ! number of 1D vectors in each thread
-    real(real64), intent(in) :: vec2e(:) ! expansion coefficients over 1D solutions
-    real(real64), intent(out) :: vec2b(:) ! 2D vector in basis
-    integer :: is, i, j, basis_size_phi
+  function transform_basis_1d_to_fbr(nvec1, vec1, vec2) result(vec2_fbr)
+    integer, intent(in) :: nvec1(n2)
+    type(array_2d_real), intent(in) :: vec1(n2)
+    real(real64), intent(in) :: vec2(:) ! 2D solution expressed over 1D solutions
+    real(real64), allocatable :: vec2_fbr(:) ! vec2 expressed over FBR of sin/cos
+    integer :: basis_size_phi, i, j, theta_ind
 
     basis_size_phi = size(vec1(1) % p, 1) ! All elements of vec1 are matrices with the same number of rows (basis size phi)
+    allocate(vec2_fbr(n2 * basis_size_phi))
     i = 0
-    do is = 1, n2
-      j = (is-1) * basis_size_phi
-      vec2b(j + 1 : j + basis_size_phi) = matmul(vec1(is) % p, vec2e(i + 1 : i + nvec1(is)))
-      i = i + nvec1(is)
+    j = 0
+    do theta_ind = 1, n2
+      vec2_fbr(j+1 : j+basis_size_phi) = matmul(vec1(theta_ind) % p, vec2(i+1 : i+nvec1(theta_ind)))
+      i = i + nvec1(theta_ind)
+      j = j + basis_size_phi
     end do
-  end subroutine
+  end function
 
-  !-----------------------------------------------------------------------
-  !  Calculates overlaps and saves them on disk in binary form.
-  !  Only blocks in upper triangle.
-  !-----------------------------------------------------------------------
-  subroutine calc_overlap(params)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates overlap block.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function calculate_overlap_block(params, rho_ind_row, rho_ind_col, sym_path, theta_size) result(overlap_block)
     class(input_params), intent(in) :: params
-    ! Arrays for 1D and 2D eigenstates
-    type(array_1d_real), allocatable :: val1c(:)   ! 1D values for ic
-    type(array_1d_real), allocatable :: val1r(:)   ! 1D values for ir
-    type(array_2d_real), allocatable :: vec1c(:)   ! 1D vecs for ic
-    type(array_2d_real), allocatable :: vec1r(:)   ! 1D vecs for ir
-    real(real64), allocatable :: vec2c(:, :)        ! 2D vecs in basis for ic
-    real(real64), allocatable :: vec2r(:, :)        ! 2D vecs in basis for ir
-    real(real64), allocatable :: val2c(:)          ! 2D eivalues for ic slice
-    real(real64), allocatable :: val2r(:)          ! 2D eivalues for ir slice
+    integer, intent(in) :: rho_ind_row, rho_ind_col
+    character(*), intent(in) :: sym_path
+    integer, intent(in) :: theta_size
+    real(real64), allocatable :: overlap_block(:, :)
+    integer :: i, j
+    integer, allocatable :: num_solutions_1d_col(:), num_solutions_1d_row(:)
+    real(real64), allocatable :: energies_2d_col(:), energies_2d_row(:), solution_2d_fbr_col(:), solution_2d_fbr_row(:)
+    real(real64), allocatable :: solutions_2d_col(:, :), solutions_2d_row(:, :)
+    type(array_1d_real), allocatable :: energies_1d_col(:), energies_1d_row(:)
+    type(array_2d_real), allocatable :: solutions_1d_col(:), solutions_1d_row(:)
 
-    ! 2D state arrays
-    real(real64), allocatable :: lambdac(:)        ! 2D state on the grid, ic
-    real(real64), allocatable :: lambdar(:)        ! 2D state on the grid, ir
+    ! Load bases
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_col), theta_size, params % basis_size_phi, num_solutions_1d_col, energies_1d_col, solutions_1d_col)
+    call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_col), energies_2d_col, solutions_2d_col)
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_row), theta_size, params % basis_size_phi, num_solutions_1d_row, energies_1d_row, solutions_1d_row)
+    call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_row), energies_2d_row, solutions_2d_row)
 
-    ! Arrays for data arrays length
-    integer, allocatable :: nvec1c(:)        ! Number of 1D vectors, ic
-    integer, allocatable :: nvec1r(:)        ! Number of 1D vectors, ir
-    integer, allocatable :: nvec2(:)         ! Number of 2D basis vectors
+    ! Calculate overlap matrix
+    allocate(overlap_block(size(solutions_2d_row, 2), size(solutions_2d_col, 2)))
+    do j = 1, size(overlap_block, 2)
+      solution_2d_fbr_col = transform_basis_1d_to_fbr(num_solutions_1d_col, solutions_1d_col, solutions_2d_col(:, j))
+      do i = 1, size(overlap_block, 1)
+        solution_2d_fbr_row = transform_basis_1d_to_fbr(num_solutions_1d_row, solutions_1d_row, solutions_2d_row(:, i))
+        overlap_block(i, j) = dot_product(solution_2d_fbr_row, solution_2d_fbr_col)
+      end do
+    end do
+  end function
 
-    ! Overlap
-    real(real64), allocatable :: olap(:, :)         ! Overlap matrix
-    integer ic, ir                         ! Running block indices
-    integer icmax, irmax                   ! Running block indices, max
-    integer ibl                           ! Global block index
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates overlap blocks in upper triange of Hamiltonian and saves them on disk in binary form.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine calculate_overlaps(params)
+    class(input_params), intent(in) :: params
+    integer :: proc_id, num_procs, rho_ind_col, rho_ind_row, block_ind, file_unit
+    integer, allocatable :: num_solutions_2d(:)
+    real(real64), allocatable :: overlap_block(:, :)
+    character(:), allocatable :: sym_path
 
-    ! Miscellaneous
-    integer :: i, j, file_unit, n23b
+    proc_id = get_proc_id()
+    num_procs = get_num_procs()
+    sym_path = get_sym_path(params)
+    num_solutions_2d = load_basis_size_2d(get_block_info_path(sym_path))
 
-    ! Allocate arrays for vectors
-    n23b = n2 * params % basis_size_phi
-    allocate(lambdac(n23b), lambdar(n23b))
-
-    ! Load nvec2, calculate offsets and final matrix size
-    call load_nvec2(get_sym_path(params), nvec2)
-
-    ! Setup global block index
-    ibl = 0
-    ! Set maximum ir
-    irmax = n1
-
-    ! Loop over n block rows
-    do ir = 1, irmax
-      ! Skip if no basis
-      if (nvec2(ir) == 0) then
+    block_ind = 0
+    do rho_ind_row = 1, n1
+      if (num_solutions_2d(rho_ind_row) == 0) then
         cycle
       end if
 
-      icmax = n1
-      ! Loop over n block columns
-      do ic = ir + 1, icmax
-        ! Skip if no basis
-        if (nvec2(ic) == 0) then
+      do rho_ind_col = rho_ind_row + 1, n1
+        if (num_solutions_2d(rho_ind_col) == 0) then
           cycle
         end if
 
-        ! Update block index
-        ibl = ibl + 1
         ! Assign process
-        if (mod(ibl - 1, get_num_procs()) /= get_proc_id()) cycle
+        block_ind = block_ind + 1
+        if (mod(block_ind - 1, num_procs) /= proc_id) then
+          cycle
+        end if
 
-        ! Load bases
-        call load_eibasis(params, ic, nvec1c, val1c, vec1c, val2c, vec2c)
-        call load_eibasis(params, ir, nvec1r, val1r, vec1r, val2r, vec2r)
-
-        ! Calculate overlap matrix, olap = vec2r * vec2c
-        allocate(olap(nvec2(ir), nvec2(ic)))
-        do j = 1, nvec2(ic)
-          call transform_basis_1d_to_fbr(vec1c, nvec1c, vec2c(:, j), lambdac)
-          do i = 1, nvec2(ir)
-            call transform_basis_1d_to_fbr(vec1r, nvec1r, vec2r(:, i), lambdar)
-            olap(i, j) = dot_product(lambdar, lambdac)
-          end do
-        end do
-
-        ! Save block
-        open(newunit = file_unit, file = get_regular_overlap_file_path(get_sym_path(params), ir, ic), form = 'unformatted')
-        write(file_unit) olap
+        ! Calculate and save block
+        overlap_block = calculate_overlap_block(params, rho_ind_row, rho_ind_col, sym_path, n2)
+        open(newunit = file_unit, file = get_regular_overlap_file_path(sym_path, rho_ind_row, rho_ind_col), form = 'unformatted')
+        write(file_unit) overlap_block
         close(file_unit)
-
-        ! Deallocate matrix
-        deallocate(olap)
       end do
     end do
   end subroutine

@@ -5,6 +5,7 @@ module k_block_info
   use algorithms_mod
   use io_utils
   use matrix_block_info_mod
+  use rovib_io_mod, only: load_basis_size_2d
   implicit none
 
 contains
@@ -41,18 +42,6 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads number of 2D states kept in each slice.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_basis_size_2d(basis_size_info_path) result(basis_size_2d)
-    character(*), intent(in) :: basis_size_info_path
-    integer, allocatable :: basis_size_2d(:)
-    integer, allocatable :: basis_size_matrix(:, :)
-    
-    basis_size_matrix = read_matrix_integer(basis_size_info_path)
-    basis_size_2d = basis_size_matrix(:, 2)
-  end function
-  
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads matrix block info.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_block_info_nonadiabatic(n_channels, n_rho_points, n_blocks, block_sizes, offset, n_rows)
@@ -69,4 +58,5 @@ contains
     offset = prefix_sum_exclusive(block_sizes)
     n_rows = sum(block_sizes)
   end subroutine
+
 end module

@@ -13,10 +13,22 @@ module rovib_io_mod
 contains 
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Loads number of 2D states kept in each slice.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function load_basis_size_2d(basis_size_info_path) result(basis_size_2d)
+    character(*), intent(in) :: basis_size_info_path
+    integer, allocatable :: basis_size_2d(:)
+    integer, allocatable :: basis_size_matrix(:, :)
+
+    basis_size_matrix = read_matrix_integer(basis_size_info_path)
+    basis_size_2d = basis_size_matrix(:, 2)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads 1D solutions.
-! solutions_1d_path - path to the file with eigenvalues and eigenvectors of 1D solutions for specific n and K.
+! solutions_1d_path - path to the file with eigenvalues and eigenvectors of 1D solutions for specific rho index (n) and K.
 ! theta_size - number of points on theta grid.
-! basis_size_1d - number of 1D basis functions used to express 1D solutions.
+! basis_size_1d - number of 1D elemental basis functions (sin/cos) used to express 1D solutions (params % basis_size_phi).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_solutions_1D(solutions_1d_path, theta_size, basis_size_1d, num_solutions_1d, energies_1d, exp_coeffs_1d)
     character(*), intent(in) :: solutions_1d_path
