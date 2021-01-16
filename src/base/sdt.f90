@@ -274,9 +274,7 @@ contains
 
       ! Write number of 2D vectors
       open(newunit = file_unit, file = get_block_info_path(get_sym_path(params)))
-      do i = 1, n1
-        write(file_unit, '(2I10)') i, val2_counts(i)
-      end do
+      write(file_unit, '(I0)') val2_counts
       close(file_unit)
 
       ! Write 2D eivalues and symmetries

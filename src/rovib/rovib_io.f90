@@ -21,7 +21,7 @@ contains
     integer, allocatable :: basis_size_matrix(:, :)
 
     basis_size_matrix = read_matrix_integer(basis_size_info_path)
-    basis_size_2d = basis_size_matrix(:, 2)
+    basis_size_2d = basis_size_matrix(:, 1)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
