@@ -243,12 +243,11 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_basis(params)
     class(input_params), intent(in) :: params
-    integer :: proc_id, proc_slice, ierr, file_unit, i, j
+    integer :: proc_id, proc_slice, ierr, file_unit
     integer, allocatable :: nvec1(:), val2_counts(:)
-    real(real64), allocatable :: val2(:), sendbuf(:)
-    real(real64), allocatable :: val2_all(:, :) ! 2D values
-    type(array_1d_real), allocatable :: val1(:) ! 1D values
-    type(array_2d_real), allocatable :: vec1(:) ! 1D vectors
+    real(real64), allocatable :: val2(:)
+    type(array_1d_real), allocatable :: val1(:)
+    type(array_2d_real), allocatable :: vec1(:)
 
     call assert(get_num_procs() == n1, 'Error: number of processes has to be equal to number of points in grid_rho.dat (' // num2str(n1) // ')')
     proc_id = get_proc_id()
@@ -257,40 +256,15 @@ contains
     call calc_1d(params, proc_slice, nvec1, val1, vec1)
     call calc_2d(params, proc_slice, nvec1, val1, vec1, val2)
 
-    allocate(val2_counts(n1))
-    call MPI_Allgather(size(val2), 1, MPI_INTEGER, val2_counts, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-
-    allocate(sendbuf(maxval(val2_counts)))
-    sendbuf = 0
-    sendbuf(:size(val2)) = val2
     if (proc_id == 0) then
-      allocate(val2_all(size(sendbuf), n1))
+      allocate(val2_counts(n1))
     end if
-    call MPI_Gather(sendbuf, size(sendbuf), MPI_DOUBLE_PRECISION, val2_all, size(sendbuf), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+    call MPI_Gather(size(val2), 1, MPI_INTEGER, val2_counts, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-    ! Only root continues with printing
+    ! Write total number of 2D vectors in each slice
     if (proc_id == 0) then
-      print *, 'Basis done, writing summary'
-
-      ! Write number of 2D vectors
       open(newunit = file_unit, file = get_block_info_path(get_sym_path(params)))
       write(file_unit, '(I0)') val2_counts
-      close(file_unit)
-
-      ! Write 2D eivalues and symmetries
-      open(newunit = file_unit, file = get_2d_energies_path(get_sym_path(params)))
-      write(file_unit, '(10X)', advance = 'no')
-      do j = 1, n1
-        write(file_unit, '(I25)', advance = 'no') j
-      end do
-      write(file_unit, *)
-      do i = 1, size(sendbuf)
-        write(file_unit, '(I10)', advance = 'no') i
-        do j = 1, n1
-          write(file_unit, '(F25.17)', advance = 'no') val2_all(i, j) * au_to_wn
-        end do
-        write(file_unit, *)
-      end do
       close(file_unit)
       print *, 'Total number of 2D basis functions: ', sum(val2_counts)
     end if
