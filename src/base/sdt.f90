@@ -9,7 +9,7 @@ module sdt
   use formulas_mod, only: get_reduced_mass
   use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_utils, only: identity_matrix
-  use general_vars, only: n1, n2, n3, alpha2, alpha3, g1, g2, g3
+  use general_vars, only: alpha2, alpha3, g1, g2, g3
   use input_params_mod
   use iso_fortran_env, only: real64
   use lapack_interface_mod
@@ -28,7 +28,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_phi_basis_grid(params) result(basis)
     class(input_params), intent(in) :: params
-    real(real64) :: basis(n3, params % basis_size_phi)
+    real(real64) :: basis(size(g3), params % basis_size_phi)
     integer :: i, j
     real(real64) :: norm
 
@@ -73,7 +73,7 @@ contains
     do j = 1, size(ham, 2)
       do i = 1, size(ham, 1)
         sum = 0
-        do phi_ind = 1, n3
+        do phi_ind = 1, size(g3)
           sum = sum + basis(phi_ind, i)*pottot(phi_ind, theta_ind, rho_ind)*basis(phi_ind, j)
         end do
         ham(i, j) = sum * alpha3
@@ -101,9 +101,9 @@ contains
     real(real64), allocatable :: val1_all(:) ! All eigenvalues
     real(real64), allocatable :: ham1(:, :) ! 1D Hamiltonian
 
-    allocate(nvec1(n2), val1(n2), vec1(n2))
+    allocate(nvec1(size(g2)), val1(size(g2)), vec1(size(g2)))
     ! Solve eigenval1ue problem for each thread
-    do theta_ind = 1, n2
+    do theta_ind = 1, size(g2)
       ham1 = get_hamiltonian_1d(params, rho_ind, theta_ind)
       call lapack_eigensolver(ham1, val1_all)
 
@@ -116,7 +116,7 @@ contains
     ! Save results in binary file
     open(newunit = file_unit, file = get_solutions_1d_path(get_sym_path(params), rho_ind), form = 'unformatted')
     write(file_unit) nvec1
-    do theta_ind = 1, n2
+    do theta_ind = 1, size(g2)
       if (nvec1(theta_ind) > 0) then
         write(file_unit) val1(theta_ind) % p
         write(file_unit) vec1(theta_ind) % p
@@ -156,7 +156,7 @@ contains
     real(real64), allocatable :: ham(:, :)
     complex(real64), allocatable :: ham_complex(:, :)
 
-    ham_complex = compute_kinetic_energy_dvr(mu, n2, n2 * alpha2)
+    ham_complex = compute_kinetic_energy_dvr(mu, size(g2), size(g2) * alpha2)
     call assert(maxval(abs(aimag(ham_complex))) < 1d-10, 'Error: unexpected imaginary components of equidistant theta DVR')
     ham = 4 / g1(rho_ind)**2 * real(ham_complex)
   end function
@@ -167,9 +167,9 @@ contains
   function build_hamiltonian_2d(mu, rho_ind, nvec1, val1, vec1) result(ham2)
     real(real64), intent(in) :: mu
     integer, intent(in) :: rho_ind
-    integer, intent(in) :: nvec1(n2) ! Number of 1D eigenpairs in each thread
-    type(array_1d_real), intent(in) :: val1(n2) ! 1D eigenvalues for each thread
-    type(array_2d_real), intent(in) :: vec1(n2) ! 1D eigenvectors for each thread
+    integer, intent(in) :: nvec1(size(g2)) ! Number of 1D eigenpairs in each thread
+    type(array_1d_real), intent(in) :: val1(size(g2)) ! 1D eigenvalues for each thread
+    type(array_2d_real), intent(in) :: vec1(size(g2)) ! 1D eigenvectors for each thread
     real(real64), allocatable :: ham2(:, :)
     integer :: ham2_size, ic, ir, i
     integer, allocatable :: offset(:) ! Block offsets in 2D Hamiltonian matrix
@@ -180,13 +180,13 @@ contains
     ham2_size = sum(nvec1)
     allocate(ham2(ham2_size, ham2_size))
     ! Loop over columns
-    do ic = 1, n2
+    do ic = 1, size(g2)
       if (nvec1(ic) == 0) then
         cycle
       end if
 
       ! Loop over rows
-      do ir = 1, n2
+      do ir = 1, size(g2)
         if (nvec1(ir) == 0) then
           cycle
         end if
@@ -218,9 +218,9 @@ contains
   subroutine calc_2d(params, rho_ind, nvec1, val1, vec1, val2)
     class(input_params), intent(in) :: params
     integer, intent(in) :: rho_ind
-    integer, intent(in) :: nvec1(n2) ! Num of 1D vecs in each thread
-    type(array_1d_real), intent(in) :: val1(n2) ! 1D eigenvalues for each thread
-    type(array_2d_real), intent(in) :: vec1(n2) ! 1D eigenvectors for each thread
+    integer, intent(in) :: nvec1(size(g2)) ! Num of 1D vecs in each thread
+    type(array_1d_real), intent(in) :: val1(size(g2)) ! 1D eigenvalues for each thread
+    type(array_2d_real), intent(in) :: vec1(size(g2)) ! 1D eigenvectors for each thread
     real(real64), allocatable, intent(out) :: val2(:) ! 2D values
     integer :: nvec2, file_unit
     real(real64) :: mu
@@ -255,7 +255,7 @@ contains
     type(array_1d_real), allocatable :: val1(:)
     type(array_2d_real), allocatable :: vec1(:)
 
-    call assert(get_num_procs() == n1, 'Error: number of processes has to be equal to number of points in grid_rho.dat (' // num2str(n1) // ')')
+    call assert(get_num_procs() == size(g1), 'Error: number of processes has to be equal to number of points in grid_rho.dat (' // num2str(size(g1)) // ')')
     proc_id = get_proc_id()
     proc_slice = proc_id + 1
 
@@ -263,7 +263,7 @@ contains
     call calc_2d(params, proc_slice, nvec1, val1, vec1, val2)
 
     if (proc_id == 0) then
-      allocate(val2_counts(n1))
+      allocate(val2_counts(size(g1)))
     end if
     call MPI_Gather(size(val2), 1, MPI_INTEGER, val2_counts, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
@@ -286,17 +286,17 @@ contains
 ! Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2 and is fixed within this subroutine).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function transform_basis_1d_to_fbr(nvec1, vec1, vec2) result(vec2_fbr)
-    integer, intent(in) :: nvec1(n2)
-    type(array_2d_real), intent(in) :: vec1(n2)
+    integer, intent(in) :: nvec1(size(g2))
+    type(array_2d_real), intent(in) :: vec1(size(g2))
     real(real64), intent(in) :: vec2(:) ! 2D solution expressed over 1D solutions
     real(real64), allocatable :: vec2_fbr(:) ! vec2 expressed over FBR of sin/cos
     integer :: basis_size_phi, i, j, theta_ind
 
     basis_size_phi = size(vec1(1) % p, 1) ! All elements of vec1 are matrices with the same number of rows (basis size phi)
-    allocate(vec2_fbr(n2 * basis_size_phi))
+    allocate(vec2_fbr(size(g2) * basis_size_phi))
     i = 0
     j = 0
-    do theta_ind = 1, n2
+    do theta_ind = 1, size(g2)
       vec2_fbr(j+1 : j+basis_size_phi) = matmul(vec1(theta_ind) % p, vec2(i+1 : i+nvec1(theta_ind)))
       i = i + nvec1(theta_ind)
       j = j + basis_size_phi
@@ -352,12 +352,12 @@ contains
     num_solutions_2d = load_basis_size_2d(get_block_info_path(sym_path))
 
     block_ind = 0
-    do rho_ind_row = 1, n1
+    do rho_ind_row = 1, size(g1)
       if (num_solutions_2d(rho_ind_row) == 0) then
         cycle
       end if
 
-      do rho_ind_col = rho_ind_row + 1, n1
+      do rho_ind_col = rho_ind_row + 1, size(g1)
         if (num_solutions_2d(rho_ind_col) == 0) then
           cycle
         end if
@@ -369,7 +369,7 @@ contains
         end if
 
         ! Calculate and save block
-        overlap_block = calculate_overlap_block(params, rho_ind_row, rho_ind_col, sym_path, n2)
+        overlap_block = calculate_overlap_block(params, rho_ind_row, rho_ind_col, sym_path, size(g2))
         open(newunit = file_unit, file = get_regular_overlap_file_path(sym_path, rho_ind_row, rho_ind_col), form = 'unformatted')
         write(file_unit) overlap_block
         close(file_unit)
