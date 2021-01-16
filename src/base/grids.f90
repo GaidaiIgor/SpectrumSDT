@@ -5,8 +5,8 @@ module grids_mod
   use config_mod
   use constants
   use coordinate_coversion_mod
+  use formulas_mod, only: get_reduced_mass
   use general_utils
-  use general_vars, only: mu
   use input_params_mod
   use io_utils
   use iso_fortran_env, only: real64
@@ -18,7 +18,7 @@ module grids_mod
   private
   public :: generate_grids
 
-  real(real64) :: env_emax
+  real(real64) :: mu, env_emax
   real(real64), allocatable :: env_grid(:), env_values(:), spline_deriv_2nd(:)
   real(real64) :: env_fit_param, env_fit_min_abs_energy, env_fit_min_x
 
@@ -395,6 +395,7 @@ contains
     real(real64), allocatable :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
 
+    mu = get_reduced_mass(params % mass)
     env_emax = params % grid_rho % max_energy / au_to_wn
     rho_step = params % grid_rho % step
     theta_step = params % grid_theta % step

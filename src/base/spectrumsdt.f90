@@ -4,7 +4,8 @@ program spectrumsdt
   use debug_tools
   use dict_utils, only: extract_string, item_or_default
   use dictionary
-  use general_vars, only: mu, g1, g2, g3, init_masses, init_grids
+  use formulas_mod, only: get_reduced_mass
+  use general_vars, only: g1, g2, g3, init_grids
   use input_params_mod, only: input_params
   use iso_fortran_env, only: real64
   use mpi
@@ -43,7 +44,6 @@ contains
   subroutine init_all(params)
     class(input_params), intent(inout) :: params
     call init_debug(params)
-    call init_masses(params)
     if (params % stage == 'basis' .or. params % stage == 'overlaps' .or. params % stage == 'eigencalc' .or. params % stage == 'properties') then
       call init_grids(params)
       call params % check_resolve_grids(g1, g2, g3)
@@ -52,7 +52,7 @@ contains
       call init_potential(params)
     end if
     if (params % stage == 'eigencalc' .or. params % stage == 'properties') then
-      call init_caps(params)
+      call init_caps(params, g1)
     end if
   end subroutine
 
@@ -61,7 +61,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine process_stage(params)
     type(input_params), intent(in) :: params
+    real(real64) :: mu
+
     call print_parallel('Stage: ' // params % stage)
+    mu = get_reduced_mass(params % mass)
     select case (params % stage)
       case ('grids')
         call generate_grids(params)

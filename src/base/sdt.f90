@@ -6,9 +6,10 @@ module sdt
   use array_1d_mod, only: array_1d_real
   use array_2d_mod, only: array_2d_real
   use constants, only: au_to_wn, pi
+  use formulas_mod, only: get_reduced_mass
   use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_utils, only: identity_matrix
-  use general_vars
+  use general_vars, only: n1, n2, n3, alpha2, alpha3, g1, g2, g3
   use input_params_mod
   use iso_fortran_env, only: real64
   use lapack_interface_mod
@@ -60,11 +61,12 @@ contains
     integer, intent(in) :: rho_ind, theta_ind
     real(real64) :: ham(params % basis_size_phi, params % basis_size_phi)
     integer :: i, j, phi_ind, shift
-    real(real64) :: coeff, sum
+    real(real64) :: mu, coeff, sum
     real(real64), allocatable :: basis(:, :)
 
     basis = get_phi_basis_grid(params)
     ! Coefficient in Hamiltonian operator
+    mu = get_reduced_mass(params % mass)
     coeff = -1/(2*mu) * 4 / g1(rho_ind)**2 / sin(g2(theta_ind))**2
 
     ! Build potential energy matrix
@@ -124,10 +126,10 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes kinetic energy matrix for a particle with given reduced *mass* in DVR basis described by the remaining arguments.
+! Computes kinetic energy matrix for a particle with given reduced mass *mu* in DVR basis described by the remaining arguments.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function compute_kinetic_energy_dvr(mass, num_points, period, jac) result(matrix)
-    real(real64), intent(in) :: mass
+  function compute_kinetic_energy_dvr(mu, num_points, period, jac) result(matrix)
+    real(real64), intent(in) :: mu
     integer, intent(in) :: num_points
     real(real64), intent(in) :: period
     real(real64), optional, intent(in) :: jac(:)
@@ -142,13 +144,14 @@ contains
         matrix = dft_derivative2_equidistant_dvr(num_points, period)
       end if
     end if
-    matrix = -matrix / (2 * mass)
+    matrix = -matrix / (2 * mu)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates kinetic energy matrix for theta.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function compute_kinetic_theta(rho_ind) result(ham)
+  function compute_kinetic_theta(mu, rho_ind) result(ham)
+    real(real64), intent(in) :: mu
     integer, intent(in) :: rho_ind
     real(real64), allocatable :: ham(:, :)
     complex(real64), allocatable :: ham_complex(:, :)
@@ -161,7 +164,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Builds a 2D Hamiltonian in 1D basis in phi.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function build_hamiltonian_2d(rho_ind, nvec1, val1, vec1) result(ham2)
+  function build_hamiltonian_2d(mu, rho_ind, nvec1, val1, vec1) result(ham2)
+    real(real64), intent(in) :: mu
     integer, intent(in) :: rho_ind
     integer, intent(in) :: nvec1(n2) ! Number of 1D eigenpairs in each thread
     type(array_1d_real), intent(in) :: val1(n2) ! 1D eigenvalues for each thread
@@ -172,7 +176,7 @@ contains
     real(real64), allocatable :: kin(:, :), block(:, :)
 
     offset = prefix_sum_exclusive(nvec1)
-    kin = compute_kinetic_theta(rho_ind)
+    kin = compute_kinetic_theta(mu, rho_ind)
     ham2_size = sum(nvec1)
     allocate(ham2(ham2_size, ham2_size))
     ! Loop over columns
@@ -219,10 +223,12 @@ contains
     type(array_2d_real), intent(in) :: vec1(n2) ! 1D eigenvectors for each thread
     real(real64), allocatable, intent(out) :: val2(:) ! 2D values
     integer :: nvec2, file_unit
+    real(real64) :: mu
     real(real64), allocatable :: val2_all(:) ! Eigenvalues
     real(real64), allocatable :: ham2(:, :), vec2(:, :)
 
-    ham2 = build_hamiltonian_2d(rho_ind, nvec1, val1, vec1)
+    mu = get_reduced_mass(params % mass)
+    ham2 = build_hamiltonian_2d(mu, rho_ind, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
     nvec2 = findloc(val2_all < params % cutoff_energy, .true., dim = 1, back = .true.)
     val2 = val2_all(:nvec2)

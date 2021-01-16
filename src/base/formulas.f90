@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Contains functions that evaluate simple physical formulas
+! Contains functions that evaluate simple physical formulas.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module formulas_mod
   use constants
@@ -10,7 +10,7 @@ module formulas_mod
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of rotational constant A, for given ozone reduced mass and geometry
+! Calculates the value of rotational constant A, for given reduced mass and geometry.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_rotational_a(mu, rho, theta) result(a)
     real(real64), intent(in) :: mu, rho, theta
@@ -19,7 +19,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of rotational constant B, for given ozone reduced mass and geometry
+! Calculates the value of rotational constant B, for given reduced mass and geometry.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_rotational_b(mu, rho, theta) result(b)
     real(real64), intent(in) :: mu, rho, theta
@@ -28,7 +28,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of rotational constant C, for given ozone reduced mass and geometry
+! Calculates the value of rotational constant C, for given reduced mass and geometry.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_rotational_c(mu, rho, theta) result(c)
     real(real64), intent(in) :: mu, rho, theta
@@ -37,7 +37,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of lambda plus function
+! Calculates the value of lambda plus function.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_lambda_plus(J, K) result(res)
     integer, intent(in) :: J, K
@@ -46,7 +46,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of U factor for asymmetric term
+! Calculates the value of U factor for asymmetric term.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_U(J, K1, K2, parity) result(U)
     integer, intent(in) :: J, K1, K2, parity
@@ -73,7 +73,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of W factor for coriolis term
+! Calculates the value of W factor for Coriolis term.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calculate_W(J, K1, K2, parity) result(W)
     integer, intent(in) :: J, K1, K2, parity
@@ -96,4 +96,14 @@ contains
       W = W / sqrt(2d0)
     end if
   end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates reduced mass of given 3 *masses*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_reduced_mass(masses) result(mu)
+    real(real64), intent(in) :: masses(3)
+    real(real64) :: mu
+    mu = sqrt(product(masses) / sum(masses))
+  end function
+
 end module

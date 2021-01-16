@@ -67,8 +67,8 @@ set(input_params ${algorithms} ${cap_params} ${config} ${constants} ${dict_utils
 set(debug_tools ${debug_tools_base} ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/utils/rovib_utils.f90)
 set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils_base} ${prefix}/src/base/spectrumsdt_paths.f90)
-set(general_vars ${constants} ${input_params} ${path_utils} ${spectrumsdt_paths} ${prefix}/src/base/general_vars.f90)
-set(cap ${constants} ${general_vars} ${input_params} ${prefix}/src/base/cap.f90)
+set(general_vars ${input_params} ${path_utils} ${spectrumsdt_paths} ${prefix}/src/base/general_vars.f90)
+set(cap ${constants} ${formulas} ${general_utils} ${input_params} ${prefix}/src/base/cap.f90)
 set(potential ${formulas} ${input_params} ${general_vars} ${spectrumsdt_paths} ${prefix}/src/base/potential.f90)
 
 set(block_borders ${prefix}/src/base/hamiltonian/block_borders.f90)
@@ -81,11 +81,11 @@ set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_bl
 set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${input_params} ${parallel_utils} ${path_utils} ${rovib_io} ${rovib_utils} ${vector} ${prefix}/src/base/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${prefix}/src/base/eigencalc/slepc_solver.F90)
 set(lapack_interface ${general_utils} ${prefix}/src/interface/lapack.f90)
-set(sdt ${algorithms} ${array_1d} ${array_2d} ${constants} ${fourier_transform} ${general_utils} ${general_vars} ${input_params} ${lapack_interface} ${parallel_utils} ${potential} ${rovib_io} ${spectrumsdt_paths} ${prefix}/src/base/sdt.f90)
-set(spectrum ${cap} ${constants} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.f90)
-set(grids ${config} ${constants} ${coordinate_conversion} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.f90)
+set(sdt ${algorithms} ${array_1d} ${array_2d} ${constants} ${formulas} ${fourier_transform} ${general_utils} ${general_vars} ${input_params} ${lapack_interface} ${parallel_utils} ${potential} ${rovib_io} ${spectrumsdt_paths} ${prefix}/src/base/sdt.f90)
+set(spectrum ${cap} ${constants} ${formulas} ${general_utils} ${general_vars} ${input_params} ${io_utils} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.f90)
+set(grids ${config} ${constants} ${coordinate_conversion} ${formulas} ${general_utils} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${vector} ${prefix}/src/base/grids.f90)
 
-set(spectrumsdt ${cap} ${config} ${debug_tools} ${dict_utils} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
+set(spectrumsdt ${cap} ${config} ${debug_tools} ${dict_utils} ${formulas} ${general_vars} ${input_params} ${grids} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${spectrum} ${state_properties} ${prefix}/src/base/spectrumsdt.f90)
 
 # Disable all warnings and standard conformation checks for external sources
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")
