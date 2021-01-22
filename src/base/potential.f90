@@ -5,7 +5,6 @@ module potential_mod
   use formulas_mod
   use input_params_mod
   use iso_fortran_env, only: real64
-  use general_vars, only: g1, g2, g3
   use spectrumsdt_paths_mod
   implicit none
 
@@ -41,13 +40,14 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes total potential. Grids have to be initialized first.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine init_potential(params)
+  subroutine init_potential(params, grid_rho, grid_theta, grid_phi)
     class(input_params), intent(in) :: params
     integer :: file_unit, iostat, i1, i2, i3
     real(real64) :: mu
+    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
 
     ! Load vibrational potential
-    allocate(pottot(size(g3), size(g2), size(g1)))
+    allocate(pottot(size(grid_phi), size(grid_theta), size(grid_rho)))
     open(newunit = file_unit, file = get_pes_path(params))
     read(file_unit, *, iostat = iostat) pottot
     close(file_unit)
@@ -55,10 +55,10 @@ contains
 
     ! Add rotational and extra potentials
     mu = get_reduced_mass(params % mass)
-    do i1 = 1, size(g1)
-      do i2 = 1, size(g2)
-        do i3 = 1, size(g3)
-          pottot(i3, i2, i1) = pottot(i3, i2, i1) + calc_rotational_potential(mu, g1(i1), g2(i2), params % J, params % K(1)) + calc_extra_potential(mu, g1(i1), g2(i2))
+    do i1 = 1, size(grid_rho)
+      do i2 = 1, size(grid_theta)
+        do i3 = 1, size(grid_phi)
+          pottot(i3, i2, i1) = pottot(i3, i2, i1) + calc_rotational_potential(mu, grid_rho(i1), grid_theta(i2), params % J, params % K(1)) + calc_extra_potential(mu, grid_rho(i1), grid_theta(i2))
         end do
       end do
     end do

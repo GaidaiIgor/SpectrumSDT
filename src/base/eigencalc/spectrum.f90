@@ -6,7 +6,6 @@ module spectrum_mod
   use constants, only: au_to_wn
   use formulas_mod, only: get_reduced_mass
   use general_utils
-  use general_vars, only: alpha1, jac1
   use input_params_mod
   use io_utils
   use matmul_operator_mod, only: rovib_ham, init_matmul
@@ -63,8 +62,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Sets up rovib_ham and computes (rotational-)vibrational states.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_states(params)
+  subroutine calculate_states(params, period_rho, jacobian_rho)
     type(input_params), intent(in) :: params
+    real(real64), intent(in) :: period_rho
+    real(real64), intent(in) :: jacobian_rho(:)
     real(real64) :: mu
     complex(real64), allocatable :: eivals(:), cap(:)
     complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
@@ -75,10 +76,10 @@ contains
     end if
 
     mu = get_reduced_mass(params % mass)
-    if (any(.not. (jac1 .aeq. 1d0))) then
-      kinetic = compute_kinetic_energy_dvr(mu, size(jac1), size(jac1) * alpha1, jac1)
+    if (any(.not. (jacobian_rho .aeq. 1d0))) then
+      kinetic = compute_kinetic_energy_dvr(mu, size(jacobian_rho), period_rho, jacobian_rho)
     else
-      kinetic = compute_kinetic_energy_dvr(mu, size(jac1), size(jac1) * alpha1)
+      kinetic = compute_kinetic_energy_dvr(mu, size(jacobian_rho), period_rho)
     end if
 
     if (params % cap % type /= 'none') then

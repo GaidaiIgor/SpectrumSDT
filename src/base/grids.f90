@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Procedures related to `grids` stage
+! Procedures and structures related to grids generation and storage.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module grids_mod
   use config_mod
@@ -7,16 +7,18 @@ module grids_mod
   use coordinate_coversion_mod
   use formulas_mod, only: get_reduced_mass
   use general_utils
+  use grid_info_mod
   use input_params_mod
   use io_utils
   use iso_fortran_env, only: real64
   use numerical_recipies
   use path_utils
+  use spectrumsdt_paths_mod
   use vector_mod
   implicit none
 
   private
-  public :: generate_grids
+  public :: generate_grids, load_grids
 
   real(real64) :: mu, env_emax
   real(real64), allocatable :: env_grid(:), env_values(:), spline_deriv_2nd(:)
@@ -433,6 +435,36 @@ contains
     if (params % output_coordinate_system /= 'aph') then
       call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % treat_tp_as_xy, params % mass)
     end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Loads grid information from disk.
+! Jacobian in theta_info and phi_info is not allocated since they are equidistant.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine load_grids(params, rho_info, theta_info, phi_info)
+    class(input_params), intent(in) :: params
+    type(grid_info), intent(out) :: rho_info, theta_info, phi_info
+    integer :: file_unit, num_points, i
+
+    open(newunit = file_unit, file = get_rho_info_path(params))
+    read(file_unit, *) rho_info % from, rho_info % to, rho_info % step, num_points
+    allocate(rho_info % points(num_points), rho_info % jac(num_points))
+    do i = 1, num_points
+      read(file_unit, *) rho_info % points(i), rho_info % jac(i)
+    end do
+    close(file_unit)
+
+    open(newunit = file_unit, file = get_theta_info_path(params))
+    read(file_unit, *) theta_info % from, theta_info % to, theta_info % step, num_points
+    allocate(theta_info % points(num_points))
+    read(file_unit, *) theta_info % points
+    close(file_unit)
+
+    open(newunit = file_unit, file = get_phi_info_path(params))
+    read(file_unit, *) phi_info % from, phi_info % to, phi_info % step, num_points
+    allocate(phi_info % points(num_points))
+    read(file_unit, *) phi_info % points
+    close(file_unit)
   end subroutine
 
 end module

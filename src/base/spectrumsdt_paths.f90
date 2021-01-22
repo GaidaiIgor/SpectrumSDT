@@ -23,7 +23,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to rho grid.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_grid_rho_path(params) result(res)
+  function get_rho_info_path(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
     res = append_path_token(params % grid_path, 'grid_rho.dat')
@@ -32,7 +32,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to theta grid.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_grid_theta_path(params) result(res)
+  function get_theta_info_path(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
     res = append_path_token(params % grid_path, 'grid_theta.dat')
@@ -41,7 +41,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to phi grid.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_grid_phi_path(params) result(res)
+  function get_phi_info_path(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
     res = append_path_token(params % grid_path, 'grid_phi.dat')
