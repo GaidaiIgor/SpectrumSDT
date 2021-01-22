@@ -220,17 +220,17 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Solves 2D problem for *rho_ind*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_2d(params, rho_ind, rho_val, period_theta, nvec1, val1, vec1, val2)
+  subroutine calc_2d(params, rho_ind, rho_val, period_theta, nvec1, val1, vec1, nvec2)
     class(input_params), intent(in) :: params
     integer, intent(in) :: rho_ind
     real(real64), intent(in) :: rho_val, period_theta
     integer, intent(in) :: nvec1(:) ! Num of 1D vecs in each thread
     type(array_1d_real), intent(in) :: val1(:) ! 1D eigenvalues for each thread
     type(array_2d_real), intent(in) :: vec1(:) ! 1D eigenvectors for each thread
-    real(real64), allocatable, intent(out) :: val2(:) ! 2D values
-    integer :: nvec2, file_unit
+    integer, intent(out) :: nvec2
+    integer :: file_unit
     real(real64) :: mu
-    real(real64), allocatable :: val2_all(:) ! Eigenvalues
+    real(real64), allocatable :: val2_all(:), val2(:) ! Eigenvalues
     real(real64), allocatable :: ham2(:, :), vec2(:, :)
 
     mu = get_reduced_mass(params % mass)
@@ -257,32 +257,34 @@ contains
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), intent(in) :: potential(:, :, :)
-    integer :: proc_id, proc_rho_ind, ierr, file_unit
-    integer, allocatable :: nvec1(:), val2_counts(:)
+    integer :: proc_id, proc_first, proc_count, rho_ind, ierr, nvec2, file_unit
+    integer, allocatable :: all_counts(:), all_shifts(:), nvec1(:), proc_nvec2(:), all_nvec2(:)
     real(real64) :: step_theta
-    real(real64), allocatable :: val2(:)
     type(array_1d_real), allocatable :: val1(:)
     type(array_2d_real), allocatable :: vec1(:)
 
-    call assert(get_num_procs() == size(grid_rho), 'Error: number of processes has to be equal to number of points in grid_rho.dat (' // num2str(size(grid_rho)) // ')')
     proc_id = get_proc_id()
-    proc_rho_ind = proc_id + 1
+    call get_proc_elem_range(size(grid_rho), proc_first, proc_count, all_counts, all_shifts)
     step_theta = grid_theta(2) - grid_theta(1)
 
-    call calc_1d(params, proc_rho_ind, grid_rho(proc_rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
-    call calc_2d(params, proc_rho_ind, grid_rho(proc_rho_ind), step_theta, nvec1, val1, vec1, val2)
+    allocate(proc_nvec2(proc_count))
+    do rho_ind = proc_first, proc_first + proc_count - 1
+      call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
+      call calc_2d(params, rho_ind, grid_rho(rho_ind), step_theta, nvec1, val1, vec1, nvec2)
+      proc_nvec2(rho_ind - proc_first + 1) = nvec2
+    end do
 
     if (proc_id == 0) then
-      allocate(val2_counts(size(grid_rho)))
+      allocate(all_nvec2(size(grid_rho)))
     end if
-    call MPI_Gather(size(val2), 1, MPI_INTEGER, val2_counts, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+    call MPI_Gatherv(proc_nvec2, size(proc_nvec2), MPI_INTEGER, all_nvec2, all_counts, all_shifts, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
     ! Write total number of 2D vectors in each slice
     if (proc_id == 0) then
       open(newunit = file_unit, file = get_block_info_path(get_sym_path(params)))
-      write(file_unit, '(I0)') val2_counts
+      write(file_unit, '(I0)') all_nvec2
       close(file_unit)
-      print *, 'Total number of 2D basis functions: ', sum(val2_counts)
+      print *, 'Total number of 2D basis functions: ', sum(all_nvec2)
     end if
   end subroutine
 

@@ -88,7 +88,6 @@ Edit spectrumsdt.config and replace `username` in the paths. Then execute:
 cd K_0/sym_0/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
-At the basis stage `<n_procs>` has to be equal to the number of points in `~/SpectrumSDT_runs/o3/grid_rho.dat` (16 in this example).  
 
 5. Calculate basis cross terms (overlaps)
 ```
