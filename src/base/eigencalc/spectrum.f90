@@ -2,10 +2,11 @@
 ! High level procedures directly related to rovibrational spectrum manipulations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module spectrum_mod
-  use cap_mod, only: get_complex_cap
+  use cap_mod, only: calc_complex_cap
   use constants, only: au_to_wn
   use formulas_mod, only: get_reduced_mass
   use general_utils
+  use grid_info_mod
   use input_params_mod
   use io_utils
   use matmul_operator_mod, only: rovib_ham, init_matmul
@@ -62,11 +63,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Sets up rovib_ham and computes (rotational-)vibrational states.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_states(params, period_rho, jacobian_rho)
+  subroutine calculate_states(params, rho_info)
     type(input_params), intent(in) :: params
-    real(real64), intent(in) :: period_rho
-    real(real64), intent(in) :: jacobian_rho(:)
-    real(real64) :: mu
+    class(grid_info), intent(in) :: rho_info
     complex(real64), allocatable :: eivals(:), cap(:)
     complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
 
@@ -75,15 +74,14 @@ contains
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')
     end if
 
-    mu = get_reduced_mass(params % mass)
-    if (any(.not. (jacobian_rho .aeq. 1d0))) then
-      kinetic = compute_kinetic_energy_dvr(mu, size(jacobian_rho), period_rho, jacobian_rho)
+    if (any(.not. (rho_info % jac .aeq. 1d0))) then
+      kinetic = compute_kinetic_energy_dvr(get_reduced_mass(params % mass), size(rho_info % points), size(rho_info % points) * rho_info % step, rho_info % jac)
     else
-      kinetic = compute_kinetic_energy_dvr(mu, size(jacobian_rho), period_rho)
+      kinetic = compute_kinetic_energy_dvr(get_reduced_mass(params % mass), size(rho_info % points), size(rho_info % points) * rho_info % step)
     end if
 
     if (params % cap % type /= 'none') then
-      cap = get_complex_cap()
+      cap = calc_complex_cap(params, rho_info % points)
       call rovib_ham % build(params, kinetic, cap)
     else
       call rovib_ham % build(params, kinetic)
