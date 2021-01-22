@@ -12,7 +12,7 @@ program spectrumsdt
   use grids_mod, only: generate_grids, load_grids
   use overlaps_extra_mod, only: calculate_overlaps_extra
   use parallel_utils, only: print_parallel
-  use potential_mod, only: init_potential
+  use potential_mod, only: load_potential
   use sdt, only: calculate_basis, calculate_overlaps
   use spectrum_mod, only: calculate_states
   use state_properties_mod, only: calculate_state_properties
@@ -52,9 +52,6 @@ contains
     if (params % stage == 'basis' .or. params % stage == 'overlaps' .or. params % stage == 'eigencalc' .or. params % stage == 'properties') then
       call params % check_resolve_grids(rho_info % points, theta_info % points, phi_info % points)
     end if
-    if (params % stage == 'basis') then
-      call init_potential(params, rho_info % points, theta_info % points, phi_info % points)
-    end if
     if (params % stage == 'eigencalc' .or. params % stage == 'properties') then
       call init_caps(params, rho_info % points)
     end if
@@ -66,6 +63,7 @@ contains
   subroutine process_stage(params, rho_info, theta_info, phi_info)
     type(input_params), intent(in) :: params
     real(real64) :: mu
+    real(real64), allocatable :: potential(:, :, :)
     class(grid_info), intent(in) :: rho_info, theta_info, phi_info
 
     call print_parallel('Stage: ' // params % stage)
@@ -75,7 +73,8 @@ contains
       case ('grids')
         call generate_grids(params)
       case ('basis')
-        call calculate_basis(params, rho_info % points, theta_info % points, phi_info % points)
+        potential = load_potential(params, rho_info % points, theta_info % points, phi_info % points)
+        call calculate_basis(params, rho_info % points, theta_info % points, phi_info % points, potential)
       case ('overlaps')
         call calculate_overlaps(params, size(theta_info % points))
         call calculate_overlaps_extra(params, mu, rho_info % points, theta_info % points)

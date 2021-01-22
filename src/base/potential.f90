@@ -8,9 +8,6 @@ module potential_mod
   use spectrumsdt_paths_mod
   implicit none
 
-  ! Potentials on 3D grid
-  real(real64), allocatable :: pottot(:, :, :)
-
 contains
 
 !------------------------------------------------------------------------------------------------------------------------------------------- 
@@ -40,16 +37,17 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes total potential. Grids have to be initialized first.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine init_potential(params, grid_rho, grid_theta, grid_phi)
+  function load_potential(params, grid_rho, grid_theta, grid_phi) result(potential)
     class(input_params), intent(in) :: params
+    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    real(real64), allocatable :: potential(:, :, :)
     integer :: file_unit, iostat, i1, i2, i3
     real(real64) :: mu
-    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
 
     ! Load vibrational potential
-    allocate(pottot(size(grid_phi), size(grid_theta), size(grid_rho)))
+    allocate(potential(size(grid_phi), size(grid_theta), size(grid_rho)))
     open(newunit = file_unit, file = get_pes_path(params))
-    read(file_unit, *, iostat = iostat) pottot
+    read(file_unit, *, iostat = iostat) potential
     close(file_unit)
     call assert(.not. is_iostat_end(iostat), 'Error: size of pes.out is not sufficient for the specified grids')
 
@@ -58,10 +56,11 @@ contains
     do i1 = 1, size(grid_rho)
       do i2 = 1, size(grid_theta)
         do i3 = 1, size(grid_phi)
-          pottot(i3, i2, i1) = pottot(i3, i2, i1) + calc_rotational_potential(mu, grid_rho(i1), grid_theta(i2), params % J, params % K(1)) + calc_extra_potential(mu, grid_rho(i1), grid_theta(i2))
+          potential(i3, i2, i1) = potential(i3, i2, i1) + calc_rotational_potential(mu, grid_rho(i1), grid_theta(i2), params % J, params % K(1)) + &
+              calc_extra_potential(mu, grid_rho(i1), grid_theta(i2))
         end do
       end do
     end do
-  end subroutine
+  end function
 
 end module

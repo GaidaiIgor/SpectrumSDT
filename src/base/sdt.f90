@@ -14,7 +14,6 @@ module sdt
   use lapack_interface_mod
   use mpi
   use parallel_utils
-  use potential_mod, only: pottot
   use rovib_io_mod, only: load_basis_size_2d, load_solutions_1D, load_solutions_2D
   use spectrumsdt_paths_mod
   implicit none
@@ -56,11 +55,12 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates 1D Hamiltonian (for phi).
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_hamiltonian_1d(params, rho_ind, theta_ind, rho_val, theta_val, grid_phi) result(ham)
+  function get_hamiltonian_1d(params, rho_ind, theta_ind, rho_val, theta_val, grid_phi, potential) result(ham)
     class(input_params), intent(in) :: params
     integer, intent(in) :: rho_ind, theta_ind
     real(real64), intent(in) :: rho_val, theta_val
     real(real64), intent(in) :: grid_phi(:)
+    real(real64), intent(in) :: potential(:, :, :)
     real(real64) :: ham(params % basis_size_phi, params % basis_size_phi)
     integer :: i, j, phi_ind, shift
     real(real64) :: mu, coeff, step_phi, sum
@@ -76,8 +76,8 @@ contains
     do j = 1, size(ham, 2)
       do i = 1, size(ham, 1)
         sum = 0
-        do phi_ind = 1, size(pottot, 1)
-          sum = sum + basis(phi_ind, i)*pottot(phi_ind, theta_ind, rho_ind)*basis(phi_ind, j)
+        do phi_ind = 1, size(potential, 1)
+          sum = sum + basis(phi_ind, i)*potential(phi_ind, theta_ind, rho_ind)*basis(phi_ind, j)
         end do
         ham(i, j) = sum * step_phi
       end do
@@ -94,11 +94,12 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Solves 1D problems for each thread in slice specified by *rho_ind*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_1d(params, rho_ind, rho_val, grid_theta, grid_phi, nvec1, val1, vec1)
+  subroutine calc_1d(params, rho_ind, rho_val, grid_theta, grid_phi, potential, nvec1, val1, vec1)
     class(input_params), intent(in) :: params
     integer, intent(in) :: rho_ind
     real(real64), intent(in) :: rho_val
     real(real64), intent(in) :: grid_theta(:), grid_phi(:)
+    real(real64), intent(in) :: potential(:, :, :)
     integer, allocatable, intent(out) :: nvec1(:) ! Num of 1D vecs in each thread
     type(array_1d_real), allocatable, intent(out) :: val1(:) ! 1D values in each thread
     type(array_2d_real), allocatable, intent(out) :: vec1(:) ! 1D vectors in each thread
@@ -109,7 +110,7 @@ contains
     allocate(nvec1(size(grid_theta)), val1(size(grid_theta)), vec1(size(grid_theta)))
     ! Solve eigenvalue problem for each thread
     do theta_ind = 1, size(grid_theta)
-      ham1 = get_hamiltonian_1d(params, rho_ind, theta_ind, rho_val, grid_theta(theta_ind), grid_phi)
+      ham1 = get_hamiltonian_1d(params, rho_ind, theta_ind, rho_val, grid_theta(theta_ind), grid_phi, potential)
       call lapack_eigensolver(ham1, val1_all)
 
       ! Save results
@@ -252,9 +253,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates 1D and 2D basis.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_basis(params, grid_rho, grid_theta, grid_phi)
+  subroutine calculate_basis(params, grid_rho, grid_theta, grid_phi, potential)
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    real(real64), intent(in) :: potential(:, :, :)
     integer :: proc_id, proc_rho_ind, ierr, file_unit
     integer, allocatable :: nvec1(:), val2_counts(:)
     real(real64) :: step_theta
@@ -267,7 +269,7 @@ contains
     proc_rho_ind = proc_id + 1
     step_theta = grid_theta(2) - grid_theta(1)
 
-    call calc_1d(params, proc_rho_ind, grid_rho(proc_rho_ind), grid_theta, grid_phi, nvec1, val1, vec1)
+    call calc_1d(params, proc_rho_ind, grid_rho(proc_rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
     call calc_2d(params, proc_rho_ind, grid_rho(proc_rho_ind), step_theta, nvec1, val1, vec1, val2)
 
     if (proc_id == 0) then

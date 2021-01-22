@@ -81,7 +81,7 @@ set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_bl
 set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${input_params} ${parallel_utils} ${path_utils} ${rovib_io} ${rovib_utils} ${vector} ${prefix}/src/base/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${prefix}/src/base/eigencalc/slepc_solver.F90)
 set(lapack_interface ${general_utils} ${prefix}/src/interface/lapack.f90)
-set(sdt ${algorithms} ${array_1d} ${array_2d} ${constants} ${formulas} ${fourier_transform} ${general_utils} ${input_params} ${lapack_interface} ${parallel_utils} ${potential} ${rovib_io} ${spectrumsdt_paths} ${prefix}/src/base/sdt.f90)
+set(sdt ${algorithms} ${array_1d} ${array_2d} ${constants} ${formulas} ${fourier_transform} ${general_utils} ${input_params} ${lapack_interface} ${parallel_utils} ${rovib_io} ${spectrumsdt_paths} ${prefix}/src/base/sdt.f90)
 set(spectrum ${cap} ${constants} ${formulas} ${general_utils} ${input_params} ${io_utils} ${matmul_operator} ${parallel_utils} ${path_utils} ${sdt} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigencalc/spectrum.f90)
 set(grids ${config} ${constants} ${coordinate_conversion} ${formulas} ${general_utils} ${grid_info} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${spectrumsdt_paths} ${vector} ${prefix}/src/base/grids.f90)
 
