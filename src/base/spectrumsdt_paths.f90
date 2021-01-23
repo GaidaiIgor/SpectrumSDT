@@ -184,10 +184,10 @@ contains
   function get_block_info_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    character(:), allocatable :: basis_results_path
+    character(:), allocatable :: basis_path
 
-    basis_results_path = get_basis_results_path(sym_path)
-    res = append_path_tokens(basis_results_path, 'nvec2.dat')
+    basis_path = get_basis_path(sym_path)
+    res = append_path_tokens(basis_path, 'num_vectors_2d.dat')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
