@@ -42,9 +42,6 @@ contains
     open(newunit = file_unit, file = solutions_1d_path, form = 'unformatted')
     read(file_unit) num_solutions_1d
     do i = 1, theta_size
-      if (num_solutions_1d(i) == 0) then
-        cycle
-      end if
       allocate(energies_1d(i) % p(num_solutions_1d(i)), exp_coeffs_1d(i) % p(basis_size_1d, num_solutions_1d(i)))
       read(file_unit) energies_1d(i) % p
       read(file_unit) exp_coeffs_1d(i) % p

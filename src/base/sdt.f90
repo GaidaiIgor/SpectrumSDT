@@ -17,7 +17,6 @@ module sdt
   use rovib_io_mod, only: load_basis_size_2d, load_solutions_1D, load_solutions_2D
   use spectrumsdt_paths_mod
   implicit none
-  integer, parameter :: nvec1min = 3 ! Min number of 1D states in thread before truncation
 
 contains
 
@@ -112,7 +111,7 @@ contains
       call lapack_eigensolver(ham1, val1_all)
 
       ! Save results
-      nvec1(theta_ind) = max(nvec1min, findloc(val1_all < params % cutoff_energy, .true., dim = 1, back = .true.))
+      nvec1(theta_ind) = findloc(val1_all < params % cutoff_energy, .true., dim = 1, back = .true.)
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham1(:, :nvec1(theta_ind))
     end do
@@ -121,10 +120,8 @@ contains
     open(newunit = file_unit, file = get_solutions_1d_path(get_sym_path(params), rho_ind), form = 'unformatted')
     write(file_unit) nvec1
     do theta_ind = 1, size(grid_theta)
-      if (nvec1(theta_ind) > 0) then
-        write(file_unit) val1(theta_ind) % p
-        write(file_unit) vec1(theta_ind) % p
-      end if
+      write(file_unit) val1(theta_ind) % p
+      write(file_unit) vec1(theta_ind) % p
     end do
     close(file_unit)
   end subroutine
@@ -292,8 +289,8 @@ contains
 ! vec1 - All 1D solutions from all threads expressed over sin/cos. i-th element contains 1D solutions from i-th thread.
 ! vec2 - 2D solution expressed over 1D solutions. Expansion coefficients over solutions in all threads are stacked together in a single vector.
 ! vec2_fbr - The same 2D solution expressed in the basis of sin/cos.
-! vec2_fbr consists of M blocks of length L each. Each M-block contains expansion coefficient over the same sin/cos function in different ls.
-! Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2 and is fixed within this subroutine).
+! vec2_fbr consists of L blocks of length M each. Each L-block contains expansion coefficient over the same sin/cos function in different ls.
+! Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2 and is fixed within this procedure).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function transform_basis_1d_to_fbr(nvec1, vec1, vec2) result(vec2_fbr)
     integer, intent(in) :: nvec1(:)
@@ -307,6 +304,7 @@ contains
     i = 0
     j = 0
     do theta_ind = 1, size(nvec1)
+      ! The case of nvec1(theta_ind) == 0 is defined and produces a vector of 0
       vec2_fbr(j+1 : j+basis_size_phi) = matmul(vec1(theta_ind) % p, vec2(i+1 : i+nvec1(theta_ind)))
       i = i + nvec1(theta_ind)
       j = j + basis_size_phi
