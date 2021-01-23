@@ -62,8 +62,9 @@ contains
     real(real64), intent(in) :: grid_phi(:)
     real(real64), intent(in) :: potential(:, :, :)
     real(real64) :: ham(params % basis_size_phi, params % basis_size_phi)
-    integer :: i, j, phi_ind, shift
-    real(real64) :: mu, coeff, step_phi, sum
+    integer :: i, j, shift
+    real(real64) :: mu, coeff, step_phi
+    real(real64), allocatable :: func(:)
     real(real64), allocatable :: basis(:, :)
 
     basis = get_phi_basis_grid(params, grid_phi)
@@ -75,11 +76,8 @@ contains
     ! Build potential energy matrix
     do j = 1, size(ham, 2)
       do i = 1, size(ham, 1)
-        sum = 0
-        do phi_ind = 1, size(potential, 1)
-          sum = sum + basis(phi_ind, i)*potential(phi_ind, theta_ind, rho_ind)*basis(phi_ind, j)
-        end do
-        ham(i, j) = sum * step_phi
+        func = basis(:, i) * potential(:, theta_ind, rho_ind) * basis(:, j)
+        ham(i, j) = integrate_1d(func, step_phi)
       end do
     end do
 

@@ -24,4 +24,15 @@ module algorithms_real_mod
     end do
   end function
 
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Integrates *array* using trapezoidal rule.
+! Assumes *array* points are in the middle of intervals, therefore each value corresponds to average trapezoid height and a simple sum can be taken.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function integrate_1d(array, step) result(res)
+    real(real64), intent(in) :: array(:)
+    real(real64), intent(in) :: step
+    real(real64) :: res
+    res = sum(array) * step
+  end function
+
 end module
