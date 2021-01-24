@@ -20,6 +20,11 @@ contains
     call assert(size(matrix, 1) == size(matrix, 2), 'Error: matrix is not square in lapack_eigensolver')
     allocate(eivals(size(matrix, 1)))
 
+    ! Trivial case: return empty vector if empty matrix is given
+    if (size(eivals) == 0) then
+      return
+    end if
+
     ! Workspace size query
     work_size = -1
     call dsyev('V', 'U', size(matrix, 1), matrix, size(matrix, 1), eivals, work_size_query, work_size, info)

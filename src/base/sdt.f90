@@ -238,10 +238,8 @@ contains
     ! Save results in binary file for 3D solution
     open(newunit = file_unit, file = get_solutions_2d_path(get_sym_path(params), rho_ind), form = 'unformatted')
     write(file_unit) nvec2, size(ham2, 1)
-    if (nvec2 > 0) then
-      write(file_unit) val2
-      write(file_unit) vec2
-    end if
+    write(file_unit) val2
+    write(file_unit) vec2
     close(file_unit)
   end subroutine
 

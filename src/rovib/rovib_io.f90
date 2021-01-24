@@ -61,9 +61,6 @@ contains
 
     open(newunit = file_unit, file = solutions_2d_path, form = 'unformatted')
     read(file_unit) num_solutions, exp_size
-    if (num_solutions == 0) then
-      return ! Exit right away, if empty
-    end if
     allocate(energies_2d(num_solutions), exp_coeffs_2d(exp_size, num_solutions))
     read(file_unit) energies_2d
     read(file_unit) exp_coeffs_2d
