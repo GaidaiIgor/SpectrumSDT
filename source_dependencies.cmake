@@ -68,7 +68,7 @@ set(input_params ${algorithms} ${cap_params} ${config} ${constants} ${dict_utils
 set(debug_tools ${debug_tools_base} ${general_utils} ${input_params} ${prefix}/src/base/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/utils/rovib_utils.f90)
 set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils_base} ${prefix}/src/base/spectrumsdt_paths.f90)
-set(cap ${constants} ${formulas} ${input_params} ${prefix}/src/base/cap.f90)
+set(cap ${constants} ${formulas} ${grid_info} ${input_params} ${prefix}/src/base/cap.f90)
 set(potential ${formulas} ${input_params} ${spectrumsdt_paths} ${prefix}/src/base/potential.f90)
 
 set(block_borders ${prefix}/src/base/hamiltonian/block_borders.f90)
@@ -78,7 +78,7 @@ set(k_block_info ${algorithms} ${io_utils} ${matrix_block_info} ${rovib_io} ${pr
 set(overlaps_extra ${array_1d} ${array_2d} ${formulas} ${input_params} ${k_block_info} ${path_utils} ${parallel_utils} ${rovib_io} ${prefix}/src/rovib/overlaps_extra.f90)
 set(distributed_rovib_hamiltonian ${block_borders} ${general_utils} ${formulas} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${rovib_utils} ${spectrumsdt_paths} ${prefix}/src/base/hamiltonian/distributed_rovib_hamiltonian.f90)
 set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_block_info} ${prefix}/src/base/eigencalc/matmul_operator.f90)
-set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${input_params} ${parallel_utils} ${path_utils} ${rovib_io} ${rovib_utils} ${vector} ${prefix}/src/base/state_properties.f90)
+set(state_properties ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${grid_info} ${input_params} ${parallel_utils} ${path_utils} ${rovib_io} ${rovib_utils} ${vector} ${prefix}/src/base/state_properties.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${prefix}/src/base/eigencalc/slepc_solver.F90)
 set(lapack_interface ${general_utils} ${prefix}/src/interface/lapack.f90)
 set(sdt ${algorithms} ${array_1d} ${array_2d} ${constants} ${formulas} ${fourier_transform} ${general_utils} ${input_params} ${lapack_interface} ${parallel_utils} ${rovib_io} ${spectrumsdt_paths} ${prefix}/src/base/sdt.f90)

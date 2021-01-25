@@ -81,7 +81,7 @@ contains
     end if
 
     if (params % cap % type /= 'none') then
-      cap = calc_complex_cap(params, rho_info % points)
+      cap = calc_complex_cap(params, rho_info)
       call rovib_ham % build(params, kinetic, cap)
     else
       call rovib_ham % build(params, kinetic)

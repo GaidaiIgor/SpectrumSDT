@@ -7,6 +7,7 @@ module state_properties_mod
   use array_2d_mod
   use constants
   use general_utils
+  use grid_info_mod
   use input_params_mod
   use io_utils
   use iso_fortran_env, only: real64
@@ -118,34 +119,35 @@ contains
 ! The first dimension of section_masks corresponds to different sections. 
 ! The remaining 4 have the same meaning as dimensions 2-5 of `p_dist`.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function generate_wf_sections_dist_mask(params, rho_grid, theta_grid, phi_borders, cap) result(wf_sections_dist_mask)
+  function generate_wf_sections_dist_mask(params, rho_info, theta_info, phi_borders, cap) result(wf_sections_dist_mask)
     class(input_params), intent(in) :: params
-    real(real64), intent(in) :: rho_grid(:), theta_grid(:), phi_borders(:)
+    class(grid_info), intent(in) :: rho_info, theta_info
+    real(real64), intent(in) :: phi_borders(:)
     real(real64), optional, intent(in) :: cap(:)
     real(real64), allocatable :: wf_sections_dist_mask(:, :, :, :, :)
     integer :: i, j
     integer, allocatable :: section_inds(:, :, :)
     real(real64) :: weights_rho(2), weights_theta(2)
 
-    allocate(wf_sections_dist_mask(size(params % wf_sections), params % K(2) - params % K(1) + 1, size(rho_grid), size(theta_grid), size(phi_borders) - 1))
+    allocate(wf_sections_dist_mask(size(params % wf_sections), params % K(2) - params % K(1) + 1, size(rho_info % points), size(theta_info % points), size(phi_borders) - 1))
     wf_sections_dist_mask = 0
-    section_inds = get_wf_sections_dist_inds(params, rho_grid, theta_grid, phi_borders)
+    section_inds = get_wf_sections_dist_inds(params, rho_info % points, theta_info % points, phi_borders)
 
     associate(si => section_inds)
       do i = 1, size(wf_sections_dist_mask, 1)
         wf_sections_dist_mask(i, si(i, 1, 1):si(i, 1, 2), si(i, 2, 1):si(i, 2, 2), si(i, 3, 1):si(i, 3, 2), si(i, 4, 1):si(i, 4, 2)) = 1
 
-        weights_rho = get_border_weights(params % wf_sections(i) % rho, rho_grid, [params % grid_rho % from, params % grid_rho % to])
+        weights_rho = get_border_weights(params % wf_sections(i) % rho, rho_info % points, [rho_info % from, rho_info % to])
         wf_sections_dist_mask(i, :, si(i, 2, 1), :, :) = wf_sections_dist_mask(i, :, si(i, 2, 1), :, :) * weights_rho(1)
         wf_sections_dist_mask(i, :, si(i, 2, 2), :, :) = wf_sections_dist_mask(i, :, si(i, 2, 2), :, :) * weights_rho(2)
 
-        weights_theta = get_border_weights(params % wf_sections(i) % theta, theta_grid, [params % grid_theta % from, params % grid_theta % to])
+        weights_theta = get_border_weights(params % wf_sections(i) % theta, theta_info % points, [theta_info % from, theta_info % to])
         wf_sections_dist_mask(i, :, :, si(i, 3, 1), :) = wf_sections_dist_mask(i, :, :, si(i, 3, 1), :) * weights_theta(1)
         wf_sections_dist_mask(i, :, :, si(i, 3, 2), :) = wf_sections_dist_mask(i, :, :, si(i, 3, 2), :) * weights_theta(2)
 
         if (params % wf_sections(i) % stat == 'gamma') then
           call assert(present(cap), 'Error: cap has to be given for gamma statistics')
-          call assert(size(cap) == size(rho_grid))
+          call assert(size(cap) == size(rho_info % points))
           do j = 1, size(wf_sections_dist_mask, 3)
             wf_sections_dist_mask(i, :, j, :, :) = wf_sections_dist_mask(i, :, j, :, :) * 2 * cap(j) ! 2 due to definition of gamma
           end do
@@ -159,16 +161,16 @@ contains
 ! *phi_borders* - array of phi values corresponding to integration borders.
 ! See `generate_wf_sections_dist_mask` for details of *wf_sections_dist_mask*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine process_wf_sections(params, rho_grid, theta_grid, cap, phi_borders, wf_sections_dist_mask)
+  subroutine process_wf_sections(params, rho_info, theta_info, cap, phi_borders, wf_sections_dist_mask)
     class(input_params), intent(in) :: params
-    real(real64), intent(in) :: rho_grid(:), theta_grid(:)
+    class(grid_info), intent(in) :: rho_info, theta_info
     real(real64), optional, intent(in) :: cap(:)
     real(real64), allocatable, intent(out) :: phi_borders(:)
     real(real64), allocatable, intent(out) :: wf_sections_dist_mask(:, :, :, :, :)
 
     phi_borders = pack_phi_borders(params)
     phi_borders = get_unique(phi_borders)
-    wf_sections_dist_mask = generate_wf_sections_dist_mask(params, rho_grid, theta_grid, phi_borders, cap)
+    wf_sections_dist_mask = generate_wf_sections_dist_mask(params, rho_info, theta_info, phi_borders, cap)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -308,9 +310,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! The main procedure for calculation of states properties.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calculate_state_properties(params, rho_grid, theta_grid, cap)
+  subroutine calculate_state_properties(params, rho_info, theta_info, cap)
     class(input_params), intent(in) :: params
-    real(real64), intent(in) :: rho_grid(:), theta_grid(:)
+    class(grid_info), intent(in) :: rho_info, theta_info
     real(real64), optional, intent(in) :: cap(:)
     integer :: N, L
     integer, allocatable :: num_solutions_2d(:, :) ! K x n
@@ -329,8 +331,8 @@ contains
     eigenvalues_3d = read_matrix_real(spectrum_path, skip_lines = 1)
     call assert(size(eigenvalues_3d, 1) >= params % eigencalc % num_states, 'Error: not enough eigenstates computed')
 
-    N = size(rho_grid)
-    L = size(theta_grid)
+    N = size(rho_info % points)
+    L = size(theta_info % points)
     ! Load expansion coefficients
     call print_parallel('Loading expansion coefficients...')
     if (params % fixed_basis % enabled == 1) then
@@ -343,7 +345,7 @@ contains
     call load_3D_expansion_coefficients(params, N, num_solutions_2d, proc_Cs)
 
     call print_parallel('Calculating probability distributions...')
-    call process_wf_sections(params, rho_grid, theta_grid, cap, phi_borders, wf_sections_dist_mask)
+    call process_wf_sections(params, rho_info, theta_info, cap, phi_borders, wf_sections_dist_mask)
     proc_p_dist = calculate_wf_integral_all_regions(params, As, Bs, proc_Cs, phi_borders)
 
     call print_parallel('Calculating statistics...')

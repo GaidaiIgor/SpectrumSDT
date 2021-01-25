@@ -49,6 +49,7 @@ contains
   subroutine process_stage(params, rho_info, theta_info, phi_info)
     type(input_params), intent(in) :: params
     class(grid_info), intent(in) :: rho_info, theta_info, phi_info
+    real(real64), allocatable :: cap(:)
     real(real64), allocatable :: potential(:, :, :)
 
     call print_parallel('Stage: ' // params % stage)
@@ -65,9 +66,10 @@ contains
         call calculate_states(params, rho_info)
       case ('properties')
         if (params % cap % type /= 'none') then
-          call calculate_state_properties(params, rho_info % points, theta_info % points, calc_real_cap(params, rho_info % points))
+          cap = calc_real_cap(params, rho_info)
+          call calculate_state_properties(params, rho_info, theta_info, cap)
         else
-          call calculate_state_properties(params, rho_info % points, theta_info % points)
+          call calculate_state_properties(params, rho_info, theta_info)
         end if
     end select
     call print_parallel('Done')
