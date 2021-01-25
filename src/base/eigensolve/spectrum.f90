@@ -90,7 +90,7 @@ contains
 
     call init_matmul(params) ! rovib_ham is already set
     call print_parallel('Eigenvalue solver has started')
-    call find_eigenpairs_slepc(params % eigencalc % num_states, params % eigencalc % ncv, params % eigencalc % mpd, eivals, eivecs)
+    call find_eigenpairs_slepc(params % eigensolve % num_states, params % eigensolve % ncv, params % eigensolve % mpd, eivals, eivecs)
     call print_spectrum(params, eivals, eivecs)
   end subroutine
 

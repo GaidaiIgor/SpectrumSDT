@@ -5,7 +5,7 @@ module input_params_mod
   use constants
   use dictionary
   use dict_utils
-  use eigencalc_params_mod
+  use eigensolve_params_mod
   use fixed_basis_params_mod
   use general_utils
   use grid_params_mod
@@ -25,7 +25,7 @@ module input_params_mod
     character(:), allocatable :: prefix
 
     ! Behavior control
-    character(:), allocatable :: stage ! grids, basis, overlaps, eigencalc or properties
+    character(:), allocatable :: stage ! grids, basis, overlaps, eigensolve or properties
     integer :: use_rovib_coupling = -1 ! enables/disables use_rovib_coupling coupling
 
     ! Grids
@@ -46,8 +46,8 @@ module input_params_mod
     real(real64) :: cutoff_energy = -1 ! solutions with energies higher than this are discarded from basis
     type(fixed_basis_params) :: fixed_basis
 
-    ! Eigencalc
-    type(eigencalc_params) :: eigencalc ! Eigencalc solver parameters
+    ! Eigensolve
+    type(eigensolve_params) :: eigensolve ! Eigensolver parameters
     type(cap_params) :: cap ! Complex Absorbin Potential parameters
 
     ! Properties
@@ -88,7 +88,7 @@ contains
     call put_string(dict_types, 'grid_rho', 'dict')
     call put_string(dict_types, 'grid_theta', 'dict')
     call put_string(dict_types, 'fixed_basis', 'dict')
-    call put_string(dict_types, 'eigencalc', 'dict')
+    call put_string(dict_types, 'eigensolve', 'dict')
     call put_string(dict_types, 'cap', 'dict')
     call put_string(dict_types, 'wf_sections', 'dict')
     call check_key_types(config_dict, auxiliary_info, 'string', dict_types)
@@ -356,8 +356,8 @@ contains
           this % cutoff_energy = str2real_config(next_value, next_key) / au_to_wn
         case ('fixed_basis')
           call this % fixed_basis % checked_init(subdict, auxiliary_subdict)
-        case ('eigencalc')
-          call this % eigencalc % checked_init(subdict, auxiliary_subdict)
+        case ('eigensolve')
+          call this % eigensolve % checked_init(subdict, auxiliary_subdict)
         case ('cap')
           call this % cap % checked_init(subdict, auxiliary_subdict)
         case ('wf_sections')
@@ -406,11 +406,11 @@ contains
     end if
 
     if (this % stage == 'grids' .and. (this % grid_rho % optimized == 1 .or. any(this % output_coordinate_system == [character(100) :: 'jacobi', 'cartesian', 'all bonds', 'internal'])) .or. &
-        this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigencalc' .or. this % stage == 'properties') then
+        this % stage == 'basis' .or. this % stage == 'overlaps' .or. this % stage == 'eigensolve' .or. this % stage == 'properties') then
       call put_string(keys, 'mass')
     end if
 
-    if (any(this % stage == [character(100) :: 'basis', 'overlaps', 'eigencalc', 'properties'])) then
+    if (any(this % stage == [character(100) :: 'basis', 'overlaps', 'eigensolve', 'properties'])) then
       call put_string(keys, 'use_rovib_coupling')
       call put_string(keys, 'J')
       call put_string(keys, 'K')
@@ -425,8 +425,8 @@ contains
       call put_string(keys, 'root_path')
     end if
 
-    if (any(this % stage == [character(100) :: 'eigencalc', 'properties'])) then
-      call put_string(keys, 'eigencalc')
+    if (any(this % stage == [character(100) :: 'eigensolve', 'properties'])) then
+      call put_string(keys, 'eigensolve')
     end if
 
     if (this % stage == 'properties') then
@@ -455,7 +455,7 @@ contains
     call put_string(keys, 'basis_size_phi')
     call put_string(keys, 'cutoff_energy')
     call put_string(keys, 'fixed_basis')
-    call put_string(keys, 'eigencalc')
+    call put_string(keys, 'eigensolve')
     call put_string(keys, 'cap')
     call put_string(keys, 'wf_sections')
     call put_string(keys, 'grid_path')
@@ -488,13 +488,13 @@ contains
 
     if (.not. ('cap' .in. config_dict)) then
       call this % cap % init_default()
-      if (this % stage == 'eigencalc') then
+      if (this % stage == 'eigensolve') then
         call print_parallel('cap is not specified, assuming no cap')
       end if
     end if
 
     if (.not. ('fixed_basis' .in. config_dict)) then
-      if (any(this % stage == [character(100) :: 'overlaps', 'eigencalc', 'properties'])) then
+      if (any(this % stage == [character(100) :: 'overlaps', 'eigensolve', 'properties'])) then
         call print_parallel('fixed_basis is not specified, assuming adiabatic basis')
       end if
     end if
@@ -505,7 +505,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_input_params(this) 
     class(input_params), intent(in) :: this
-    call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigencalc', 'properties']), 'Error: stage can be "grids", "basis", "overlaps", "eigencalc" or "properties"')
+    call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigensolve', 'properties']), 'Error: stage can be "grids", "basis", "overlaps", "eigensolve" or "properties"')
     call assert(any(this % use_rovib_coupling == [-1, 0, 1]), 'Error: use_rovib_coupling can be 0 or 1')
     if (this % treat_tp_as_xy /= 1) then
       call assert((this % grid_theta % from .aeq. -1d0) .or. (this % grid_theta % from .ale. pi/2), 'Error: grid_theta % from should be <= pi/2')
@@ -517,7 +517,7 @@ contains
     call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
     call assert(this % J >= -1, 'Error: J should be >= 0')
     call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
-    if (any(this % stage == [character(len = 100) :: 'eigencalc', 'properties']) .and. this % use_rovib_coupling == 1) then
+    if (any(this % stage == [character(len = 100) :: 'eigensolve', 'properties']) .and. this % use_rovib_coupling == 1) then
       call assert(all(this % K == -1) .or. all(this % K >= get_k_start(this % J, this % parity)), 'Error: K should be >= mod(J+p, 2)')
     else
       call assert(all(this % K >= -1), 'Error: K should be >= 0')

@@ -1,4 +1,4 @@
-module eigencalc_params_mod
+module eigensolve_params_mod
   use config_mod
   use constants
   use dictionary
@@ -10,9 +10,9 @@ module eigencalc_params_mod
   implicit none
 
   private
-  public :: eigencalc_params
+  public :: eigensolve_params
 
-  type :: eigencalc_params
+  type :: eigensolve_params
     character(:), allocatable :: prefix
     integer :: num_states = -1
     integer :: ncv = -1
@@ -20,21 +20,21 @@ module eigencalc_params_mod
     integer :: max_iterations = 10000
 
   contains
-    procedure :: assign_dict => assign_dict_eigencalc_params
-    procedure :: get_mandatory_keys => get_mandatory_keys_eigencalc_params
-    procedure :: get_all_keys => get_all_keys_eigencalc_params
-    procedure :: set_defaults => set_defaults_eigencalc_params
-    procedure :: check_values => check_values_eigencalc_params
-    procedure :: checked_init => checked_init_eigencalc_params
+    procedure :: assign_dict => assign_dict_eigensolve_params
+    procedure :: get_mandatory_keys => get_mandatory_keys_eigensolve_params
+    procedure :: get_all_keys => get_all_keys_eigensolve_params
+    procedure :: set_defaults => set_defaults_eigensolve_params
+    procedure :: check_values => check_values_eigensolve_params
+    procedure :: checked_init => checked_init_eigensolve_params
   end type
 
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Initializes an instance of eigencalc_params from a given *config_dict* with user set key-value parameters.
+! Initializes an instance of eigensolve_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_eigencalc_params(this, config_dict, auxiliary_info)
-    class(eigencalc_params), intent(inout) :: this
+  subroutine assign_dict_eigensolve_params(this, config_dict, auxiliary_info)
+    class(eigensolve_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     integer :: i
     character(:), allocatable :: next_key, full_key, next_value
@@ -62,8 +62,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of mandatory keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_mandatory_keys_eigencalc_params(this) result(keys)
-    class(eigencalc_params), intent(in) :: this
+  function get_mandatory_keys_eigensolve_params(this) result(keys)
+    class(eigensolve_params), intent(in) :: this
     type(dictionary_t) :: keys
     call put_string(keys, 'num_states')
   end function
@@ -71,8 +71,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of all known keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_all_keys_eigencalc_params(this) result(keys)
-    class(eigencalc_params), intent(in) :: this
+  function get_all_keys_eigensolve_params(this) result(keys)
+    class(eigensolve_params), intent(in) :: this
     type(dictionary_t) :: keys
 
     call put_string(keys, 'num_states')
@@ -84,8 +84,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Sets defaults.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine set_defaults_eigencalc_params(this, config_dict, auxiliary_info) 
-    class(eigencalc_params), intent(in) :: this
+  subroutine set_defaults_eigensolve_params(this, config_dict, auxiliary_info) 
+    class(eigensolve_params), intent(in) :: this
     class(dictionary_t), intent(in) :: config_dict, auxiliary_info
     character(:), allocatable :: prefix
 
@@ -98,8 +98,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_values_eigencalc_params(this) 
-    class(eigencalc_params), intent(in) :: this
+  subroutine check_values_eigensolve_params(this) 
+    class(eigensolve_params), intent(in) :: this
     call assert(this % num_states > 0, 'Error: ' // this % prefix // 'num_states should be >= 0')
     call assert(this % ncv == -1 .or. this % ncv > this % num_states, 'Error: ' // this % prefix // 'ncv should be > ' // this % prefix // ' num_states')
     call assert(this % mpd == -1 .or. this % mpd > 1, 'Error: ' // this % prefix // 'mpd should be > 1')
@@ -107,11 +107,11 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Initializes an instance of eigencalc_params from a given *config_dict* with user set key-value parameters.
+! Initializes an instance of eigensolve_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_eigencalc_params(this, config_dict, auxiliary_info)
-    class(eigencalc_params), intent(inout) :: this
+  subroutine checked_init_eigensolve_params(this, config_dict, auxiliary_info)
+    class(eigensolve_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     type(dictionary_t) :: mandatory_keys, all_keys
 

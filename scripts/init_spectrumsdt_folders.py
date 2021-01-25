@@ -39,7 +39,7 @@ def create_paths(target_folders: List[str]):
     """ Creates all paths specified in target_folders. """
     for folder in target_folders:
         target_path = Path(folder)
-        if target_path.name == "basis" or target_path.name == "overlaps" or target_path.name == "eigencalc":
+        if target_path.name == "basis" or target_path.name == "overlaps" or target_path.name == "eigensolve":
             target_path = target_path / ("out_" + target_path.name)
         if not path.exists(target_path):
             os.makedirs(target_path)
@@ -67,8 +67,8 @@ def main():
     base_path = path.dirname(config_path)
     config = SpectrumSDTConfig(config_path)
 
-    folder_names = [["K_" + args.K], ["sym_0", "sym_1"], ["eigencalc", "properties"]]
-    folder_params = [["K = " + args.K], ["symmetry = 0", "symmetry = 1"], ["stage = eigencalc", "stage = properties"]]
+    folder_names = [["K_" + args.K], ["sym_0", "sym_1"], ["eigensolve", "properties"]]
+    folder_params = [["K = " + args.K], ["symmetry = 0", "symmetry = 1"], ["stage = eigensolve", "stage = properties"]]
 
     if args.K.isdigit():
         # add extra stages if K is a single number

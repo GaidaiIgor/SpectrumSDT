@@ -62,7 +62,7 @@ contains
       case ('overlaps')
         call calculate_overlaps(params, size(theta_info % points))
         call calculate_overlaps_extra(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
-      case ('eigencalc')
+      case ('eigensolve')
         call calculate_states(params, rho_info)
       case ('properties')
         if (params % cap % type /= 'none') then

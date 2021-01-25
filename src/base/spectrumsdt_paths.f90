@@ -118,7 +118,7 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with calculation results for a given symmetry and Ks.
-! Parity is relevant for coupled eigencalcs only.
+! Parity is relevant for coupled eigensolves only.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_sym_path_int(k_path, sym_code, parity) result(res)
     character(*), intent(in) :: k_path
@@ -326,22 +326,22 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with eigenpairs calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_eigencalc_path(sym_path) result(res)
+  function get_eigensolve_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    res = append_path_tokens(sym_path, 'eigencalc')
+    res = append_path_tokens(sym_path, 'eigensolve')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with eigenpairs results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_eigencalc_results_path(sym_path) result(res)
+  function get_eigensolve_results_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    character(:), allocatable :: eigencalc_path
+    character(:), allocatable :: eigensolve_path
 
-    eigencalc_path = get_eigencalc_path(sym_path)
-    res = append_path_tokens(eigencalc_path, 'out_eigencalc')
+    eigensolve_path = get_eigensolve_path(sym_path)
+    res = append_path_tokens(eigensolve_path, 'out_eigensolve')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -351,11 +351,11 @@ contains
     character(*), intent(in) :: sym_path
     integer, intent(in) :: k ! solution index
     character(:), allocatable :: res
-    character(:), allocatable :: eigencalc_results_folder, file_name
+    character(:), allocatable :: eigensolve_results_folder, file_name
 
-    eigencalc_results_folder = get_eigencalc_results_path(sym_path)
+    eigensolve_results_folder = get_eigensolve_results_path(sym_path)
     file_name = 'exp.' // num2str(k, '(I0)') // '.bin.out'
-    res = append_path_tokens(eigencalc_results_folder, file_name)
+    res = append_path_tokens(eigensolve_results_folder, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -364,10 +364,10 @@ contains
   function get_spectrum_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    character(:), allocatable :: eigencalc_path
+    character(:), allocatable :: eigensolve_path
 
-    eigencalc_path = get_eigencalc_path(sym_path)
-    res = append_path_tokens(eigencalc_path, 'states.fwc')
+    eigensolve_path = get_eigensolve_path(sym_path)
+    res = append_path_tokens(eigensolve_path, 'states.fwc')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

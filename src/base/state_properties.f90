@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Procedures related to post-processing of wave functions obtained during the `eigencalc` stage
+! Procedures related to post-processing of wave functions obtained during the `eigensolve` stage
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module state_properties_mod
   use algorithms_mod
@@ -249,7 +249,7 @@ contains
     real(real64) :: phi_range(2)
     complex(real64) :: j_sums(params % basis_size_phi) ! j-sums for different ms
 
-    call get_proc_elem_range(params % eigencalc % num_states, proc_first_state, proc_states)
+    call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
     allocate(proc_p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
     proc_p_dist = 0
 
@@ -295,7 +295,7 @@ contains
     integer, allocatable :: recv_counts(:), recv_shifts(:)
     real(real64), allocatable :: proc_section_stats(:, :)
 
-    call get_proc_elem_range(params % eigencalc % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
+    call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
     call assert(size(proc_p_dist, 1) == proc_states, 'Error: wrong size of proc_p_dist')
     ! Calculate local chunks
     allocate(proc_section_stats(proc_states, size(params % wf_sections)))
@@ -329,7 +329,7 @@ contains
     sym_path = get_sym_path(params)
     spectrum_path = get_spectrum_path(sym_path)
     eigenvalues_3d = read_matrix_real(spectrum_path, skip_lines = 1)
-    call assert(size(eigenvalues_3d, 1) >= params % eigencalc % num_states, 'Error: not enough eigenstates computed')
+    call assert(size(eigenvalues_3d, 1) >= params % eigensolve % num_states, 'Error: not enough eigenstates computed')
 
     N = size(rho_info % points)
     L = size(theta_info % points)

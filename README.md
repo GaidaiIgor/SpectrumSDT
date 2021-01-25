@@ -97,7 +97,7 @@ mpiexec -n <n_procs> spectrumsdt
 
 6. Calculate eigenpairs
 ```
-cd ../eigencalc
+cd ../eigensolve
 mpiexec -n <n_procs> spectrumsdt
 ```
 Lowest 50 rovibrational energy levels of ozone-686 J=0 will be printed into `states.fwc` file.
