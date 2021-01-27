@@ -235,7 +235,7 @@ contains
     ! Calculate this proc's share
     do proc_k = 1, proc_points
       if (proc_id == 0) then
-        call track_progress(proc_k * 1d0 / proc_points, 0.001d0)
+        call track_progress(proc_k * 1d0 / proc_points, 0.01d0)
       end if
       k = first_k + proc_k - 1
       proc_pes(proc_k) = calc_potential_point(coords(:, k), mass, shift)
