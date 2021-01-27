@@ -33,7 +33,7 @@ program spectrumsdt
 
   if (params % stage /= 'grids') then
     call load_grids(params, rho_info, theta_info, phi_info)
-    call params % check_resolve_grids(rho_info % points, theta_info % points, phi_info % points)
+    call params % check_resolve_grids(rho_info, theta_info, phi_info)
   end if
   call process_stage(params, rho_info, theta_info, phi_info)
 

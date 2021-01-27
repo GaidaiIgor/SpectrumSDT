@@ -8,6 +8,7 @@ module input_params_mod
   use eigensolve_params_mod
   use fixed_basis_params_mod
   use general_utils
+  use grid_info_mod
   use grid_params_mod
   use optgrid_params_mod
   use iso_fortran_env, only: real64
@@ -554,14 +555,14 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Resolves parameters that require grid information and performs grid related checks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_resolve_grids_input_params(this, grid_rho, grid_theta, grid_phi)
+  subroutine check_resolve_grids_input_params(this, rho_info, theta_info, phi_info)
     class(input_params), intent(inout) :: this
-    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    class(grid_info), intent(in) :: rho_info, theta_info, phi_info
 
-    call assert(this % basis_size_phi == -1 .or. this % basis_size_phi <= size(grid_phi) / 2, 'Error: basis_size_phi should be <= size(grid_phi) / 2')
+    call assert(this % basis_size_phi == -1 .or. this % basis_size_phi <= size(phi_info % points) / 2, 'Error: basis_size_phi should be <= num_points_phi / 2')
     if (this % stage == 'properties') then
-      call this % wf_sections % checked_resolve_rho_bounds(this % grid_rho % from, this % grid_rho % to)
-      call this % wf_sections % checked_resolve_theta_bounds(this % grid_theta % from, this % grid_theta % to)
+      call this % wf_sections % checked_resolve_rho_bounds(rho_info % from, rho_info % to)
+      call this % wf_sections % checked_resolve_theta_bounds(theta_info % from, theta_info % to)
       call this % wf_sections % checked_resolve_phi_bounds(0d0, 2*pi)
     end if
   end subroutine
