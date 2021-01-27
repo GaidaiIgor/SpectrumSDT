@@ -305,7 +305,7 @@ contains
     class(input_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     logical :: wf_sections_provided
-    integer :: i
+    integer :: i, check_values
     character(:), allocatable :: next_key, key_type, next_value, K_str
     type(string), allocatable :: key_set(:)
     type(dictionary_t) :: subdict, auxiliary_subdict
@@ -335,8 +335,11 @@ contains
         case ('grid_rho')
           call this % grid_rho % checked_init(subdict, auxiliary_subdict)
         case ('grid_theta')
-          call this % grid_theta % checked_init(subdict, auxiliary_subdict)
-          call convert_grid_params_deg_to_rad(this % grid_theta)
+          check_values = iff('treat_tp_as_xy' .in. config_dict, 0, 1)
+          call this % grid_theta % checked_init(subdict, auxiliary_subdict, check_values = check_values)
+          if (check_values == 1) then
+            call convert_grid_params_deg_to_rad(this % grid_theta)
+          end if
         case ('num_points_phi')
           this % num_points_phi = str2int_config(next_value, next_key)
         case ('output_coordinate_system')

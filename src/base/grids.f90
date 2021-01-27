@@ -432,7 +432,7 @@ contains
     call write_grid(grid_theta, [params % grid_theta % from, params % grid_theta % to], theta_step, 'grid_theta.dat')
     call write_grid(grid_phi, [0d0, 2*pi], phi_step, 'grid_phi.dat')
 
-    if (params % output_coordinate_system /= 'aph') then
+    if (params % output_coordinate_system /= 'aph' .or. params % treat_tp_as_xy == 1) then
       call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % treat_tp_as_xy, params % mass)
     end if
   end subroutine

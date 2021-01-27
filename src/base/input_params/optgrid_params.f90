@@ -107,10 +107,10 @@ contains
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_optgrid_params(this, config_dict, auxiliary_info, check_extra)
+  subroutine checked_init_optgrid_params(this, config_dict, auxiliary_info, check_extra, check_values)
     class(optgrid_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
-    integer, optional, intent(in) :: check_extra ! have to keep the same signature in child
+    integer, optional, intent(in) :: check_extra, check_values ! have to keep the same signature in child
     type(dictionary_t) :: mandatory_keys, all_keys
 
     all_keys = this % get_all_keys()

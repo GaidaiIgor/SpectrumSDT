@@ -110,11 +110,11 @@ contains
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_grid_params(this, config_dict, auxiliary_info, check_extra)
+  subroutine checked_init_grid_params(this, config_dict, auxiliary_info, check_extra, check_values)
     class(grid_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
-    integer, optional, intent(in) :: check_extra
-    integer :: check_extra_act
+    integer, optional, intent(in) :: check_extra, check_values
+    integer :: check_extra_act, check_values_act
     type(dictionary_t) :: mandatory_keys, all_keys
 
     ! Skippable to enable calls from derived types since their parameters will be unknown here
@@ -132,7 +132,11 @@ contains
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
     call this % set_defaults(config_dict)
-    call this % check_values()
+
+    check_values_act = arg_or_default(check_values, 1)
+    if (check_values_act == 1) then
+      call this % check_values()
+    end if
   end subroutine
 
 end module
