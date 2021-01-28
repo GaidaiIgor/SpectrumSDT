@@ -24,6 +24,7 @@ end module
 program pesprint
   use iso_fortran_env, only: real64
   use mpi
+  use pes_utils
   use pesprint_constants
   use coordinate_coversion_mod
   implicit none
@@ -113,81 +114,6 @@ contains
   end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes exclusive prefix sum, i.e. res(i) = sum( [array(1)..array(i - 1)] ).
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function prefix_sum_exclusive(array) result(res)
-    integer, intent(in) :: array(:)
-    integer, allocatable :: res(:)
-    integer :: i
-    
-    allocate(res(size(array)))
-    res(1) = 0
-    do i = 2, size(array)
-      res(i) = res(i - 1) + array(i - 1)
-    end do
-  end function
-  
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes range of elements to process by this processor.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine get_proc_elem_range(n_elems, first_elem, proc_elems, all_counts, all_shifts)
-    integer, intent(in) :: n_elems ! total number of elements to be processed in parallel
-    integer, intent(out) :: first_elem ! index of the first element that should be processed by this processor
-    integer, intent(out) :: proc_elems ! number of elements to be processed by this processor
-    integer, allocatable, intent(out) :: all_counts(:) ! number of elements to be processed by all processors
-    integer, allocatable, intent(out) :: all_shifts(:) ! shifts of 1st element of all processors with respect to the global 1st element
-    integer :: proc_id, n_procs, remaining_elems, ierr
-
-    call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
-    call MPI_Comm_Size(MPI_COMM_WORLD, n_procs, ierr)
-    proc_elems = n_elems / n_procs
-    remaining_elems = mod(n_elems, n_procs)
-    if (proc_id < remaining_elems) then
-      proc_elems = proc_elems + 1 ! distribute remaining elements
-    end if
-    first_elem = n_elems / n_procs * proc_id + min(proc_id, remaining_elems) + 1
-
-    allocate(all_counts(n_procs))
-    all_counts = n_elems / n_procs
-    all_counts(1:remaining_elems) = all_counts(1:remaining_elems) + 1
-    all_shifts = prefix_sum_exclusive(all_counts)
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Compares given reals with specified precision.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function compare_reals(a, b, comp_precision) result(res)
-    real(real64), intent(in) :: a, b
-    real(real64), intent(in) :: comp_precision
-    integer :: res
-    real(real64) :: difference
-
-    difference = a - b
-    if (abs(difference) < comp_precision) then
-      res = 0
-    else if (difference > 0) then
-      res = 1
-    else if (difference < 0) then
-      res = -1
-    end if
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts real to integer, rounding up if within target accuracy of the next integer, otherwise down.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function real2int(a, comp_precision) result(res)
-    real(real64), intent(in) :: a
-    real(real64), intent(in) :: comp_precision
-    integer :: res
-
-    if (ceiling(a) - a < comp_precision) then
-      res = ceiling(a)
-    else
-      res = int(a)
-    end if
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts a 1D index of 1D-representation into 3 indexes corresponding to it in 3D representation.
 ! Assumes the 3D array was flattened using the following order of dimenisions: 3, 2, 1 (3rd coordinate is changing most frequently).
 ! n1, n2, n3 - sizes of the 3D array.
@@ -261,19 +187,6 @@ contains
     end if
     print *, 'Proc', proc_id, 'is done'
     call MPI_Gatherv(proc_pes, size(proc_pes), MPI_DOUBLE_PRECISION, pes, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Prints PES to file.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine print_pes(pes, file_name)
-    real(real64), intent(in) :: pes(:)
-    character(*), intent(in) :: file_name
-    integer :: file_unit
-
-    open(newunit = file_unit, file = file_name)
-    write(file_unit, '(G23.15)') pes
-    close(file_unit)
   end subroutine
 
 end program
