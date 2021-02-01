@@ -4,7 +4,8 @@ A parallel Fortran program for calculation of ro-vibrational energy levels and l
 
 0. Prerequisites
     1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake` (3.5+), `gfortran` (9.3.0+), `mpich`, `libblas-dev`, `liblapack-dev`.  
-    2. Make sure you machine has at least 2GB of RAM (for compilation)
+    With the appropriate modifications of the build configuration files, the code should also work with `ifort`. In our experience, `ifort` generates much faster code than `gfortran`, therefore we recommend to change the default settings to build with `ifort` on system where it is available. 
+    2. Make sure you machine has at least 2GB of RAM (for compilation).
 
 1. Clone the repo
 `git clone https://github.com/IgorGayday/SpectrumSDT`  
@@ -17,7 +18,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     ```
     cd ~/SpectrumSDT/libs/fdict
     ```
-    Edit `setup.make` to change compiler options if necessary (default should work). Then run:
+    Edit `setup.make` to change compiler options (optional). Then run:
     ```
     make
     ```
