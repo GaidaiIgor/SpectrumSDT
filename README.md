@@ -62,7 +62,7 @@ cp ~/SpectrumSDT/config_examples/o3/grids.config spectrumsdt.config
 ```
 Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combination of points in the generated grid files in atomic units of energy (Hartree).
 
-2. Calculate the values of PES. Here we will use an example program that reads grid files and uses the PES of ozone calculated by Dawes et al. to generate a set of `pes.out.x` files. Each of them contains a chunk of the overall PES calculated by processor x. First, compile the program:
+2. Calculate the values of PES. Here we will use an example program that reads grid files and uses the PES of ozone calculated by Dawes et al. to generate `pes.out` file. First, compile the program:
 ```
 cd ~/SpectrumSDT/PES_examples/ozone/
 mkdir build && cd build
