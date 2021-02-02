@@ -221,8 +221,8 @@ contains
     else
       do m1_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
         do m2_ind = m1_ind, size(As(K_ind_comp, n, l) % p, 1)
-          m1 = m_ind_to_m(m1_ind, K_val, params % symmetry)
-          m2 = m_ind_to_m(m2_ind, K_val, params % symmetry)
+          m1 = m_ind_to_m(m1_ind, K_val, params % basis % symmetry)
+          m2 = m_ind_to_m(m2_ind, K_val, params % basis % symmetry)
           phi_integral = calc_phi_integral(m1, m2, phi_range(1), phi_range(2), K_sym)
           product_coeff = real(j_sums(m1_ind) * conjg(j_sums(m2_ind)))
           if (m1_ind /= m2_ind) then

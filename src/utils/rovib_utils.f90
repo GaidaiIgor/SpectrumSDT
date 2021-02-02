@@ -41,7 +41,7 @@ contains
     integer, optional, intent(out) :: K_ind, K_sym, K_ind_comp
 
     K_ind = get_k_ind(K, params % K(1))
-    K_sym = get_k_symmetry(K, params % symmetry)
+    K_sym = get_k_symmetry(K, params % basis % symmetry)
     K_ind_comp = merge(K_sym + 1, K_ind, params % basis % fixed % enabled == 1) ! compressed index for possibly compressed structures
   end subroutine
 

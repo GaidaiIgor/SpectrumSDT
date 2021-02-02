@@ -40,7 +40,6 @@ module input_params_mod
     integer :: J = -1 ! total angular momentum quantum number
     integer :: K(2) = -1 ! boundaries of K-range for use_rovib_coupling calculation. In symmetric top rotor both values should be the same
     integer :: parity = -1 ! 0(+) or 1(-)
-    integer :: symmetry = -1 ! 0 (even, cos, +) or 1 (odd, sin, -). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
 
     type(basis_params) :: basis ! Basis parameters
     type(eigensolve_params) :: eigensolve ! Eigensolver parameters
@@ -305,6 +304,9 @@ contains
 
     wf_sections_provided = .false.
     this % prefix = extract_string(auxiliary_info, 'prefix')
+    ! Other parameters need stage, so assign it first
+    this % stage = extract_string(config_dict, 'stage')
+
     ! Iterate over the keys given by user
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
@@ -322,15 +324,13 @@ contains
       end select
 
       select case (next_key)
-        case ('stage')
-          this % stage = next_value
         case ('use_rovib_coupling')
           this % use_rovib_coupling = str2int_config(next_value, next_key)
         case ('grid_rho')
-          call this % grid_rho % checked_init(subdict, auxiliary_subdict)
+          call this % grid_rho % checked_init(subdict, auxiliary_subdict, this % stage)
         case ('grid_theta')
           check_values = iff('treat_tp_as_xy' .in. config_dict, 0, 1)
-          call this % grid_theta % checked_init(subdict, auxiliary_subdict, check_values = check_values)
+          call this % grid_theta % checked_init(subdict, auxiliary_subdict, this % stage, check_values = check_values)
           if (check_values == 1) then
             call convert_grid_params_deg_to_rad(this % grid_theta)
           end if
@@ -346,12 +346,10 @@ contains
           K_str = next_value
         case ('parity')
           this % parity = str2int_config(next_value, next_key)
-        case ('symmetry')
-          this % symmetry = str2int_config(next_value, next_key)
         case ('basis')
-          call this % basis % checked_init(subdict, auxiliary_subdict)
+          call this % basis % checked_init(subdict, auxiliary_subdict, this % stage)
         case ('eigensolve')
-          call this % eigensolve % checked_init(subdict, auxiliary_subdict)
+          call this % eigensolve % checked_init(subdict, auxiliary_subdict, this % stage)
         case ('cap')
           call this % cap % checked_init(subdict, auxiliary_subdict)
         case ('wf_sections')
@@ -408,7 +406,6 @@ contains
       call put_string(keys, 'use_rovib_coupling')
       call put_string(keys, 'J')
       call put_string(keys, 'K')
-      call put_string(keys, 'symmetry')
       if (this % use_rovib_coupling == 1) then
         call put_string(keys, 'parity')
       end if
@@ -444,7 +441,6 @@ contains
     call put_string(keys, 'J')
     call put_string(keys, 'K')
     call put_string(keys, 'parity')
-    call put_string(keys, 'symmetry')
     call put_string(keys, 'basis')
     call put_string(keys, 'eigensolve')
     call put_string(keys, 'cap')
@@ -483,12 +479,6 @@ contains
         call print_parallel('cap is not specified, assuming no cap')
       end if
     end if
-
-    if (.not. ('fixed_basis' .in. config_dict)) then
-      if (any(this % stage == [character(100) :: 'overlaps', 'eigensolve', 'properties'])) then
-        call print_parallel('fixed_basis is not specified, assuming adiabatic basis')
-      end if
-    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -496,30 +486,29 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_input_params(this) 
     class(input_params), intent(in) :: this
-    call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigensolve', 'properties']), 'Error: stage can be "grids", "basis", "overlaps", "eigensolve" or "properties"')
-    call assert(any(this % use_rovib_coupling == [-1, 0, 1]), 'Error: use_rovib_coupling can be 0 or 1')
+    call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigensolve', 'properties']), 'Error: stage should be "grids", "basis", "overlaps", "eigensolve" or "properties"')
+    call assert(any(this % use_rovib_coupling == [-1, 0, 1]), 'Error: use_rovib_coupling should be 0 or 1')
     if (this % treat_tp_as_xy /= 1) then
       call assert((this % grid_theta % from .aeq. -1d0) .or. (this % grid_theta % from .ale. pi/2), 'Error: grid_theta % from should be <= pi/2')
       call assert((this % grid_theta % to .aeq. -1d0) .or. (this % grid_theta % to .ale. pi/2), 'Error: grid_theta % to should be <= pi/2')
     end if
     call assert(this % num_points_phi == -1 .or. this % num_points_phi > 1, 'Error: num_points_phi should be > 1')
     call assert(any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
-        'Error: output_coordinate_system can be "aph", "mass jacobi", "jacobi", "cartesian", "all bonds" or "internal"')
+        'Error: output_coordinate_system should be "aph", "mass jacobi", "jacobi", "cartesian", "all bonds" or "internal"')
     call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
     call assert(this % J >= -1, 'Error: J should be >= 0')
-    call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value can be 0 or 1')
+    call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value should be 0 or 1')
     if (any(this % stage == [character(len = 100) :: 'eigensolve', 'properties']) .and. this % use_rovib_coupling == 1) then
       call assert(all(this % K == -1) .or. all(this % K >= get_k_start(this % J, this % parity)), 'Error: K should be >= mod(J+p, 2)')
     else
       call assert(all(this % K >= -1), 'Error: K should be >= 0')
     end if
     call assert(all(this % K <= this % J), 'Error: K should be <= J')
-    call assert(any(this % symmetry == [-1, 0, 1]), 'Error: symmery value can be 0 or 1')
-    call assert(any(this % use_parallel == [-1, 0, 1]), 'Error: use_parallel can be 0 or 1')
-    call assert(any(this % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
-    call assert(any(this % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) can be 0 or 1')
-    call assert(any(this % optimized_mult == [-1, 0, 1]), 'Error: optimized_mult can be 0 or 1')
-    call assert(any(this % treat_tp_as_xy == [-1, 0, 1]), 'Error: treat_tp_as_xy can be 0 or 1')
+    call assert(any(this % use_parallel == [-1, 0, 1]), 'Error: use_parallel should be 0 or 1')
+    call assert(any(this % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) should be 0 or 1')
+    call assert(any(this % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) should be 0 or 1')
+    call assert(any(this % optimized_mult == [-1, 0, 1]), 'Error: optimized_mult should be 0 or 1')
+    call assert(any(this % treat_tp_as_xy == [-1, 0, 1]), 'Error: treat_tp_as_xy should be 0 or 1')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

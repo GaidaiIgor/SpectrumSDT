@@ -67,7 +67,7 @@ contains
 
     n_k_blocks = params % K(2) - params % K(1) + 1
     allocate(k_blocks_info(n_k_blocks, n_k_blocks))
-    next_sym = get_k_symmetry(params % K(1), params % symmetry)
+    next_sym = get_k_symmetry(params % K(1), params % basis % symmetry)
     total_rows = 0
     K_ind = 1
 
@@ -262,7 +262,7 @@ contains
 
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
-    K_sym = get_k_symmetry(K, params % symmetry)
+    K_sym = get_k_symmetry(K, params % basis % symmetry)
 
     do ir = 1, size(local_k_block_info % subblocks, 1)
       do ic = 1, size(local_k_block_info % subblocks, 2)
@@ -391,7 +391,7 @@ contains
 
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
-    K_sym = get_k_symmetry(K, params % symmetry)
+    K_sym = get_k_symmetry(K, params % basis % symmetry)
 
     ! Iterate thorugh n-blocks
     do n = 1, size(local_k_block_info % subblocks, 1)
@@ -525,7 +525,7 @@ contains
 
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
-    K_sym = get_k_symmetry(K, params % symmetry)
+    K_sym = get_k_symmetry(K, params % basis % symmetry)
 
     ! Iterate over n-blocks
     do ir = 1, size(local_k_block_info % subblocks, 1)
@@ -609,7 +609,7 @@ contains
     K_col_ind = global_k_block_info % block_col_ind
     K_row = k_ind_to_k(K_row_ind, params % K(1))
     K_col = k_ind_to_k(K_col_ind, params % K(1))
-    K_row_sym = get_k_symmetry(K_row, params % symmetry)
+    K_row_sym = get_k_symmetry(K_row, params % basis % symmetry)
 
     if (params % basis % fixed % enabled == 1) then
       ! All K-blocks are the same, so we only need to keep K_row_load different from K_col_load for the correct block transposition 
@@ -700,7 +700,7 @@ contains
     K_col_ind = global_k_block_info % block_col_ind
     K_row = k_ind_to_k(K_row_ind, params % K(1))
     K_col = k_ind_to_k(K_col_ind, params % K(1))
-    K_row_sym = get_k_symmetry(K_row, params % symmetry)
+    K_row_sym = get_k_symmetry(K_row, params % basis % symmetry)
 
     if (params % basis % fixed % enabled == 1) then
       K_row_load = merge(params % basis % fixed % K, params % basis % fixed % K + 2, K_row <= K_col)

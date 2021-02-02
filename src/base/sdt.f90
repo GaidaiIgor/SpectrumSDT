@@ -33,7 +33,7 @@ contains
     norm = sqrt(1 / pi)
     do j = 1, size(basis, 2)
       do i = 1, size(basis, 1)
-        select case (params % symmetry)
+        select case (params % basis % symmetry)
           case (0)
             if (j == 1) then
               basis(i, j) = norm / sqrt(2d0)
@@ -81,7 +81,7 @@ contains
     end do
 
     ! Add kinetic energy matrix
-    shift = iff(params % symmetry == 0, 1, 0)
+    shift = iff(params % basis % symmetry == 0, 1, 0)
     do i = 1, size(ham, 1)
       ! Extra minus comes from basis function derivative
       ham(i, i) = ham(i, i) + coeff * (-1) * (i-shift)**2

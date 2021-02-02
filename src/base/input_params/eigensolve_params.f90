@@ -84,13 +84,14 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Sets defaults.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine set_defaults_eigensolve_params(this, config_dict, auxiliary_info) 
+  subroutine set_defaults_eigensolve_params(this, config_dict, auxiliary_info, stage)
     class(eigensolve_params), intent(in) :: this
     class(dictionary_t), intent(in) :: config_dict, auxiliary_info
+    character(*), intent(in) :: stage
     character(:), allocatable :: prefix
 
     prefix = extract_string(auxiliary_info, 'prefix')
-    if (.not. ('mpd' .in. config_dict)) then
+    if (.not. ('mpd' .in. config_dict) .and. stage == 'eigensolve') then
       call print_parallel(prefix // 'mpd is not specified. Its value will be determined by SLEPc')
     end if
   end subroutine
@@ -101,7 +102,7 @@ contains
   subroutine check_values_eigensolve_params(this) 
     class(eigensolve_params), intent(in) :: this
     call assert(this % num_states > 0, 'Error: ' // this % prefix // 'num_states should be >= 0')
-    call assert(this % ncv == -1 .or. this % ncv > this % num_states, 'Error: ' // this % prefix // 'ncv should be > ' // this % prefix // ' num_states')
+    call assert(this % ncv == -1 .or. this % ncv > this % num_states, 'Error: ' // this % prefix // 'ncv should be > ' // this % prefix // 'num_states')
     call assert(this % mpd == -1 .or. this % mpd > 1, 'Error: ' // this % prefix // 'mpd should be > 1')
     call assert(this % max_iterations > 0, 'Error: ' // this % prefix // 'max_iterations should be > 0')
   end subroutine
@@ -110,9 +111,10 @@ contains
 ! Initializes an instance of eigensolve_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_eigensolve_params(this, config_dict, auxiliary_info)
+  subroutine checked_init_eigensolve_params(this, config_dict, auxiliary_info, stage)
     class(eigensolve_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
+    character(*), intent(in) :: stage
     type(dictionary_t) :: mandatory_keys, all_keys
 
     all_keys = this % get_all_keys()
@@ -121,7 +123,7 @@ contains
     call this % assign_dict(config_dict, auxiliary_info)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
-    call this % set_defaults(config_dict, auxiliary_info)
+    call this % set_defaults(config_dict, auxiliary_info, stage)
     call this % check_values()
   end subroutine
 

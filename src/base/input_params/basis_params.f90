@@ -15,6 +15,7 @@ module basis_params_mod
   type :: basis_params
     character(:), allocatable :: prefix
     integer :: num_functions_phi = -1 ! number of sines or cosines in basis of 1D problem
+    integer :: symmetry = -1 ! 0 (even, cos, +) or 1 (odd, sin, -). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
     real(real64) :: cutoff_energy = -1 ! solutions with energies higher than this are discarded from basis
     type(fixed_basis_params) :: fixed ! parameters describing rotational state of fixed basis, if used
 
@@ -23,6 +24,7 @@ module basis_params_mod
     procedure :: assign_dict => assign_dict_basis_params
     procedure :: get_mandatory_keys => get_mandatory_keys_basis_params
     procedure :: get_all_keys => get_all_keys_basis_params
+    procedure :: set_defaults => set_defaults_basis_params
     procedure :: check_values => check_values_basis_params
     procedure :: checked_init => checked_init_basis_params
   end type
@@ -71,8 +73,10 @@ contains
       select case (next_key)
         case ('num_functions_phi')
           this % num_functions_phi = str2int_config(next_value, full_key)
+        case ('symmetry')
+          this % symmetry = str2int_config(next_value, full_key)
         case ('cutoff_energy')
-          this % cutoff_energy = str2real_config(next_value, next_key) / au_to_wn
+          this % cutoff_energy = str2real_config(next_value, full_key) / au_to_wn
         case ('fixed')
           call this % fixed % checked_init(subdict, auxiliary_subdict)
       end select
@@ -87,6 +91,7 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'num_functions_phi')
+    call put_string(keys, 'symmetry')
     call put_string(keys, 'cutoff_energy')
   end function
 
@@ -98,25 +103,41 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'num_functions_phi')
+    call put_string(keys, 'symmetry')
     call put_string(keys, 'cutoff_energy')
     call put_string(keys, 'fixed')
   end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Sets default values.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine set_defaults_basis_params(this, config_dict, stage)
+    class(basis_params), intent(inout) :: this
+    class(dictionary_t), intent(in) :: config_dict
+    character(*), intent(in) :: stage
+
+    if (.not. ('fixed' .in. config_dict) .and. any(stage == [character(100) :: 'overlaps', 'eigensolve', 'properties'])) then
+      call print_parallel('fixed_basis is not specified, assuming adiabatic basis')
+    end if
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_basis_params(this) 
     class(basis_params), intent(in) :: this
-    call assert(this % num_functions_phi == -1 .or. this % num_functions_phi > 0, 'Error: ' // this % prefix //  'num_functions_phi should be > 0')
+    call assert(this % num_functions_phi == -1 .or. this % num_functions_phi > 0, 'Error: ' // this % prefix // 'num_functions_phi should be > 0')
+    call assert(any(this % symmetry == [-1, 0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of basis_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_basis_params(this, config_dict, auxiliary_info)
+  subroutine checked_init_basis_params(this, config_dict, auxiliary_info, stage)
     class(basis_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
+    character(*), intent(in) :: stage
     type(dictionary_t) :: mandatory_keys, all_keys
 
     all_keys = this % get_all_keys()
@@ -125,6 +146,7 @@ contains
     call this % assign_dict(config_dict, auxiliary_info)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
+    call this % set_defaults(config_dict, stage)
     call this % check_values()
   end subroutine
 

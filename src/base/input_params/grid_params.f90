@@ -89,9 +89,10 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Sets defaults.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine set_defaults_grid_params(this, config_dict)
+  subroutine set_defaults_grid_params(this, config_dict, stage)
     class(grid_params), intent(inout) :: this
     class(dictionary_t), intent(in) :: config_dict
+    character(*), intent(in) :: stage
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -110,9 +111,10 @@ contains
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_grid_params(this, config_dict, auxiliary_info, check_extra, check_values)
+  subroutine checked_init_grid_params(this, config_dict, auxiliary_info, stage, check_extra, check_values)
     class(grid_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
+    character(*), intent(in) :: stage
     integer, optional, intent(in) :: check_extra, check_values
     integer :: check_extra_act, check_values_act
     type(dictionary_t) :: mandatory_keys, all_keys
@@ -131,7 +133,7 @@ contains
     call check_only_one_set(config_dict, string([character(100) :: 'step', 'num_points']), this % prefix)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
-    call this % set_defaults(config_dict)
+    call this % set_defaults(config_dict, stage)
 
     check_values_act = arg_or_default(check_values, 1)
     if (check_values_act == 1) then

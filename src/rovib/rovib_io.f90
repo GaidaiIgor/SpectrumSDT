@@ -123,7 +123,7 @@ contains
 
     do K = K_start, K_end
       K_ind = get_k_ind(K, K_start)
-      K_sym = get_k_symmetry(K, params % symmetry)
+      K_sym = get_k_symmetry(K, params % basis % symmetry)
       sym_path = get_sym_path_root(params % root_path, K, K_sym)
       call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis % num_functions_phi, num_solutions_1d, As)
     end do
@@ -211,7 +211,7 @@ contains
 
     do K = K_start, K_end
       K_ind = get_k_ind(K, K_start)
-      K_sym = get_k_symmetry(K, params % symmetry)
+      K_sym = get_k_symmetry(K, params % basis % symmetry)
       sym_path = get_sym_path_root(params % root_path, K, K_sym)
       call load_2D_expansion_coefficients_K(sym_path, K_ind, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
     end do

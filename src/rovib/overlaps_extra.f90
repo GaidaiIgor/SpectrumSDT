@@ -163,7 +163,7 @@ contains
     root_path = params % root_path
     K_row = params % K(1)
     K_col = iff(params % basis % fixed % enabled == 1, K_row, K_row + 1)
-    sym_row = params % symmetry
+    sym_row = params % basis % symmetry
     sym_col = 1 - sym_row ! opposite symmetry for column block
 
     sym_folder_row = get_sym_path_root(root_path, K_row, sym_row)
@@ -266,8 +266,8 @@ contains
     allocate(asym_factors(size(theta_grid)), partial_sum(size(theta_grid)))
 
     root_path = params % root_path
-    sym_folder_row = get_sym_path_root(root_path, K_row, params % symmetry)
-    sym_folder_col = get_sym_path_root(root_path, K_col, params % symmetry)
+    sym_folder_row = get_sym_path_root(root_path, K_row, params % basis % symmetry)
+    sym_folder_col = get_sym_path_root(root_path, K_col, params % basis % symmetry)
     block_info_path_row = get_block_info_path(sym_folder_row)
     block_info_path_col = get_block_info_path(sym_folder_col)
     num_solutions_2d_row = load_basis_size_2d(block_info_path_row)
@@ -333,13 +333,13 @@ contains
     logical :: file_exists
     character(:), allocatable :: block_info_path
 
-    block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), params % symmetry))
+    block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), params % basis % symmetry))
     inquire(file = block_info_path, exist = file_exists)
     call assert(file_exists, 'Error: basis is not computed')
 
     ! the other symmetry is also required in this mode
     if (params % basis % fixed % enabled == 1) then
-      block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), 1 - params % symmetry))
+      block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), 1 - params % basis % symmetry))
       inquire(file = block_info_path, exist = file_exists)
       call assert(file_exists, 'Error: basis of both symmetries has to be computed in fixed basis mode')
     end if

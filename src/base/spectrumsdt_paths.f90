@@ -154,7 +154,7 @@ contains
     character(:), allocatable :: k_path
 
     k_path = get_k_folder_path(params)
-    res = get_sym_path_int(k_path, params % symmetry, params % parity)
+    res = get_sym_path_int(k_path, params % basis % symmetry, params % parity)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
