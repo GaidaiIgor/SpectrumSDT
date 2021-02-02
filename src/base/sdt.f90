@@ -26,7 +26,7 @@ contains
   function get_phi_basis_grid(params, grid_phi) result(basis)
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: grid_phi(:)
-    real(real64) :: basis(size(grid_phi), params % basis_size_phi)
+    real(real64) :: basis(size(grid_phi), params % basis % num_functions_phi)
     integer :: i, j
     real(real64) :: norm
 
@@ -60,7 +60,7 @@ contains
     real(real64), intent(in) :: rho_val, theta_val
     real(real64), intent(in) :: grid_phi(:)
     real(real64), intent(in) :: potential(:, :, :)
-    real(real64) :: ham(params % basis_size_phi, params % basis_size_phi)
+    real(real64) :: ham(params % basis % num_functions_phi, params % basis % num_functions_phi)
     integer :: i, j, shift
     real(real64) :: mu, coeff, step_phi
     real(real64), allocatable :: func(:)
@@ -111,7 +111,7 @@ contains
       call lapack_eigensolver(ham1, val1_all)
 
       ! Save results
-      nvec1(theta_ind) = findloc(val1_all < params % cutoff_energy, .true., dim = 1, back = .true.)
+      nvec1(theta_ind) = findloc(val1_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.)
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham1(:, :nvec1(theta_ind))
     end do
@@ -231,7 +231,7 @@ contains
     mu = get_reduced_mass(params % mass)
     ham2 = build_hamiltonian_2d(mu, rho_val, period_theta, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
-    nvec2 = findloc(val2_all < params % cutoff_energy, .true., dim = 1, back = .true.)
+    nvec2 = findloc(val2_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.)
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
 
@@ -325,9 +325,9 @@ contains
     type(array_2d_real), allocatable :: solutions_1d_col(:), solutions_1d_row(:)
 
     ! Load bases
-    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_col), num_points_theta, params % basis_size_phi, num_solutions_1d_col, energies_1d_col, solutions_1d_col)
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_col), num_points_theta, params % basis % num_functions_phi, num_solutions_1d_col, energies_1d_col, solutions_1d_col)
     call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_col), energies_2d_col, solutions_2d_col)
-    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_row), num_points_theta, params % basis_size_phi, num_solutions_1d_row, energies_1d_row, solutions_1d_row)
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_row), num_points_theta, params % basis % num_functions_phi, num_solutions_1d_row, energies_1d_row, solutions_1d_row)
     call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_row), energies_2d_row, solutions_2d_row)
 
     ! Calculate overlap matrix

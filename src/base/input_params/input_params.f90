@@ -1,12 +1,12 @@
 module input_params_mod
   use algorithms_mod
+  use basis_params_mod
   use cap_params_mod
   use config_mod
   use constants
   use dictionary
   use dict_utils
   use eigensolve_params_mod
-  use fixed_basis_params_mod
   use general_utils
   use grid_info_mod
   use grid_params_mod
@@ -42,16 +42,9 @@ module input_params_mod
     integer :: parity = -1 ! 0(+) or 1(-)
     integer :: symmetry = -1 ! 0 (even, cos, +) or 1 (odd, sin, -). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
 
-    ! Basis
-    integer :: basis_size_phi = -1 ! number of sines or cosines for 1D step
-    real(real64) :: cutoff_energy = -1 ! solutions with energies higher than this are discarded from basis
-    type(fixed_basis_params) :: fixed_basis
-
-    ! Eigensolve
+    type(basis_params) :: basis ! Basis parameters
     type(eigensolve_params) :: eigensolve ! Eigensolver parameters
     type(cap_params) :: cap ! Complex Absorbin Potential parameters
-
-    ! Properties
     type(wf_section_params), allocatable :: wf_sections(:) ! wave function sections for integration on the properties stage
     
     ! Paths
@@ -88,7 +81,7 @@ contains
 
     call put_string(dict_types, 'grid_rho', 'dict')
     call put_string(dict_types, 'grid_theta', 'dict')
-    call put_string(dict_types, 'fixed_basis', 'dict')
+    call put_string(dict_types, 'basis', 'dict')
     call put_string(dict_types, 'eigensolve', 'dict')
     call put_string(dict_types, 'cap', 'dict')
     call put_string(dict_types, 'wf_sections', 'dict')
@@ -318,14 +311,15 @@ contains
       next_key = key_set(i) % to_char_str()
       key_type = extract_string(auxiliary_info, next_key // '_type')
 
-      if (key_type == 'string') then
-        next_value = extract_string(config_dict, next_key)
-      else if (key_type == 'dict') then
-        call associate(subdict, config_dict, next_key)
-        call associate(auxiliary_subdict, auxiliary_info, next_key)
-      else
-        stop 'Error: wrong key type'
-      end if
+      select case (key_type)
+        case ('string')
+          next_value = extract_string(config_dict, next_key)
+        case ('dict')
+          call associate(subdict, config_dict, next_key)
+          call associate(auxiliary_subdict, auxiliary_info, next_key)
+        case default
+          stop 'Error: wrong key type'
+      end select
 
       select case (next_key)
         case ('stage')
@@ -354,12 +348,8 @@ contains
           this % parity = str2int_config(next_value, next_key)
         case ('symmetry')
           this % symmetry = str2int_config(next_value, next_key)
-        case ('basis_size_phi')
-          this % basis_size_phi = str2int_config(next_value, next_key)
-        case ('cutoff_energy')
-          this % cutoff_energy = str2real_config(next_value, next_key) / au_to_wn
-        case ('fixed_basis')
-          call this % fixed_basis % checked_init(subdict, auxiliary_subdict)
+        case ('basis')
+          call this % basis % checked_init(subdict, auxiliary_subdict)
         case ('eigensolve')
           call this % eigensolve % checked_init(subdict, auxiliary_subdict)
         case ('cap')
@@ -423,8 +413,7 @@ contains
         call put_string(keys, 'parity')
       end if
 
-      call put_string(keys, 'cutoff_energy')
-      call put_string(keys, 'basis_size_phi')
+      call put_string(keys, 'basis')
       call put_string(keys, 'grid_path')
       call put_string(keys, 'root_path')
     end if
@@ -456,9 +445,7 @@ contains
     call put_string(keys, 'K')
     call put_string(keys, 'parity')
     call put_string(keys, 'symmetry')
-    call put_string(keys, 'basis_size_phi')
-    call put_string(keys, 'cutoff_energy')
-    call put_string(keys, 'fixed_basis')
+    call put_string(keys, 'basis')
     call put_string(keys, 'eigensolve')
     call put_string(keys, 'cap')
     call put_string(keys, 'wf_sections')
@@ -528,7 +515,6 @@ contains
     end if
     call assert(all(this % K <= this % J), 'Error: K should be <= J')
     call assert(any(this % symmetry == [-1, 0, 1]), 'Error: symmery value can be 0 or 1')
-    call assert(this % basis_size_phi == -1 .or. this % basis_size_phi > 0, 'Error: basis_size_phi should be > 0')
     call assert(any(this % use_parallel == [-1, 0, 1]), 'Error: use_parallel can be 0 or 1')
     call assert(any(this % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) can be 0 or 1')
     call assert(any(this % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) can be 0 or 1')
@@ -562,7 +548,7 @@ contains
     class(input_params), intent(inout) :: this
     class(grid_info), intent(in) :: rho_info, theta_info, phi_info
 
-    call assert(this % basis_size_phi == -1 .or. this % basis_size_phi <= size(phi_info % points) / 2, 'Error: basis_size_phi should be <= num_points_phi / 2')
+    call assert(this % basis % num_functions_phi == -1 .or. this % basis % num_functions_phi <= size(phi_info % points) / 2, 'Error: basis % num_functions_phi should be <= num_points_phi / 2')
     if (this % stage == 'properties') then
       call this % wf_sections % checked_resolve_rho_bounds(rho_info % from, rho_info % to)
       call this % wf_sections % checked_resolve_theta_bounds(theta_info % from, theta_info % to)

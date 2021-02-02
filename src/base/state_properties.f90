@@ -247,7 +247,7 @@ contains
     integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, phi_group_ind, m_ind, j
     real(real64) :: i_sum
     real(real64) :: phi_range(2)
-    complex(real64) :: j_sums(params % basis_size_phi) ! j-sums for different ms
+    complex(real64) :: j_sums(params % basis % num_functions_phi) ! j-sums for different ms
 
     call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
     allocate(proc_p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
@@ -335,7 +335,7 @@ contains
     L = size(theta_info % points)
     ! Load expansion coefficients
     call print_parallel('Loading expansion coefficients...')
-    if (params % fixed_basis % enabled == 1) then
+    if (params % basis % fixed % enabled == 1) then
       call load_1D_expansion_coefficients_fixed_basis(params, N, L, As, num_solutions_1d)
       call load_2D_expansion_coefficients_fixed_basis(params, N, L, num_solutions_1d, Bs, num_solutions_2d)
     else

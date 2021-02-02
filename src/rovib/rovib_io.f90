@@ -28,7 +28,7 @@ contains
 ! Loads 1D solutions.
 ! solutions_1d_path - path to the file with eigenvalues and eigenvectors of 1D solutions for specific rho index (n) and K.
 ! theta_size - number of points on theta grid.
-! basis_size_1d - number of 1D elemental basis functions (sin/cos) used to express 1D solutions (params % basis_size_phi).
+! basis_size_1d - number of 1D elemental basis functions (sin/cos) used to express 1D solutions (params % basis % num_functions_phi).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine load_solutions_1D(solutions_1d_path, theta_size, basis_size_1d, num_solutions_1d, energies_1d, exp_coeffs_1d)
     character(*), intent(in) :: solutions_1d_path
@@ -125,7 +125,7 @@ contains
       K_ind = get_k_ind(K, K_start)
       K_sym = get_k_symmetry(K, params % symmetry)
       sym_path = get_sym_path_root(params % root_path, K, K_sym)
-      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis_size_phi, num_solutions_1d, As)
+      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis % num_functions_phi, num_solutions_1d, As)
     end do
   end subroutine
 
@@ -143,8 +143,8 @@ contains
     allocate(As(2, N, L), num_solutions_1d(2, N, L))
     do K_sym = 0, 1
       K_ind = K_sym + 1
-      sym_path = get_sym_path_root(params % fixed_basis % root_path, params % fixed_basis % K, K_sym)
-      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis_size_phi, num_solutions_1d, As)
+      sym_path = get_sym_path_root(params % basis % fixed % root_path, params % basis % fixed % K, K_sym)
+      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis % num_functions_phi, num_solutions_1d, As)
     end do
   end subroutine
 
@@ -239,7 +239,7 @@ contains
 
     do K_sym = 0, 1
       K_ind = K_sym + 1
-      sym_path = get_sym_path_root(params % fixed_basis % root_path, params % fixed_basis % K, K_sym)
+      sym_path = get_sym_path_root(params % basis % fixed % root_path, params % basis % fixed % K, K_sym)
       call load_2D_expansion_coefficients_K(sym_path, K_ind, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
     end do
   end subroutine

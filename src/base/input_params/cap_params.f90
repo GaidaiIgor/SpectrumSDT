@@ -1,6 +1,6 @@
 module cap_params_mod
   use config_mod
-  use constants
+  use constants, only: au_to_wn
   use dictionary
   use dict_utils
   use general_utils
