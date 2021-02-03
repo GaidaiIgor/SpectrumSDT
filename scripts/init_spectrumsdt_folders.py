@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
-import copy
 import itertools
 import os
 import shutil
 import os.path as path
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
-from SpectrumSDTConfig import SpectrumSDTConfig
-            
 
 def parse_command_line_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Creates a folder structure for a given K or range of Ks and copies config file to the target files, adding folder-specific parameters")
@@ -20,73 +17,81 @@ def parse_command_line_args() -> argparse.Namespace:
     return args
 
 
-def generate_paths(base_path: str, folder_names: List[List[str]]) -> List[str]:
-    """ Generates all combinations of folders specified in folder_names and prepends with *base_path*. Returns a list of generated paths. """
-    name_combos = itertools.product(*folder_names)
-    paths = list(map(lambda name_combo: path.join(base_path, *name_combo), name_combos))
-    return paths
+def generate_paths(base_path: str, param_names: List[str], value_combos) -> List[str]:
+    """ Generates all config paths for all combination of values of all parameters. """
+    all_paths = []
+    for i in range(len(value_combos)):
+        next_path = base_path
+        next_combo = value_combos[i]
+        for j in range(len(next_combo)):
+            if next_combo[j].isdigit():
+                next_path = path.join(next_path, param_names[j] + "_" + next_combo[j])
+            else:
+                next_path = path.join(next_path, next_combo[j])
+        all_paths.append(next_path)
+    return all_paths
 
 
-def generate_config_lines(folder_params: List[List[str]]) -> List[str]:
-    """ Each folder has a specific config parameter associated with it. 
-    In a similar to generate_paths fashion this function generates full combination of all params for each folder. """
-    param_combos = itertools.product(*folder_params)
-    config_lines = list(map(lambda param_combo: "\n".join(param_combo) + "\n", param_combos))
-    return config_lines
+def create_paths(target_paths: List[str]):
+    """ Creates all paths specified in target_paths. """
+    for next_path in target_paths:
+        next_path = Path(next_path)
+        if next_path.name == "basis" or next_path.name == "overlaps" or next_path.name == "eigensolve":
+            next_path = next_path / ("out_" + next_path.name)
+        if not path.exists(next_path):
+            os.makedirs(next_path)
 
 
-def create_paths(target_folders: List[str]):
-    """ Creates all paths specified in target_folders. """
-    for folder in target_folders:
-        target_path = Path(folder)
-        if target_path.name == "basis" or target_path.name == "overlaps" or target_path.name == "eigensolve":
-            target_path = target_path / ("out_" + target_path.name)
-        if not path.exists(target_path):
-            os.makedirs(target_path)
+def multicopy_config(config_path: str, target_paths: List[str]) -> List[str]:
+    """ Copies specified config file into specified list of directories. """
+    for target_path in target_paths:
+        shutil.copyfile(config_path, path.join(target_path, "spectrumsdt.config"))
 
 
-def multicopy_config(config_path: str, target_folders: List[str]) -> List[str]:
-    """ Copies specified config file into specified list of directories. Returns a list of full paths to new configs. """
-    config_name = path.basename(config_path)
-    new_config_paths = list(map(lambda folder: path.join(folder, config_name), target_folders))
-    for new_path in new_config_paths:
-        shutil.copyfile(config_path, new_path)
-    return new_config_paths
+def generate_param_dicts(param_names: List[str], value_combos) -> List[Dict[str, str]]:
+    """ Transforms lists of names and value combinations to list of dictionaries. """
+    res = []
+    for i in range(len(value_combos)):
+        next_dict = {}
+        for j in range(len(value_combos[i])):
+            next_dict[param_names[j]] = value_combos[i][j]
+        res.append(next_dict)
+    return res
 
 
-def set_config_params(config_paths: List[str], config_lines: List[str]):
-    """ Appends i-th config_lines to i-th config in config_paths """
-    for i in range(len(config_paths)):
-        with open(config_paths[i], "a") as config:
-            config.write(config_lines[i])
+def set_placeholder_params(target_paths: List[str], param_dicts: List[Dict[str, str]]):
+    """ Iterates over configs at *target_paths* and sets placeholder params according to *param_dicts*. """
+    for i in range(len(target_paths)):
+        with open(path.join(target_paths[i], "spectrumsdt.config"), "r+") as config:
+            content = config.read()
+            formatted = content.format(**param_dicts[i])
+            config.seek(0)
+            config.write(formatted)
+            config.truncate()
 
 
 def main():
     args = parse_command_line_args()
-    config_path = path.abspath(args.config)
-    base_path = path.dirname(config_path)
-    config = SpectrumSDTConfig(config_path)
-
-    folder_names = [["K_" + args.K], ["sym_0", "sym_1"], ["eigensolve", "properties"]]
-    folder_params = [["K = " + args.K], ["symmetry = 0", "symmetry = 1"], ["stage = eigensolve", "stage = properties"]]
-
+    param_names = ["K", "symmetry", "stage"]
+    param_values = [[args.K], ["0", "1"], ["eigensolve", "properties"]]
     if args.K.isdigit():
         # add extra stages if K is a single number
-        folder_names[2].insert(0, "basis")
-        folder_params[2].insert(0, "stage = basis")
-        folder_names[2].insert(1, "overlaps")
-        folder_params[2].insert(1, "stage = overlaps")
+        param_values[2].insert(0, "basis")
+        param_values[2].insert(1, "overlaps")
     else:
-        # add parity if K is a range
-        folder_names.insert(1, ["parity_0", "parity_1"])
-        folder_params.insert(1, ["parity = 0", "parity = 1"])
+        # add parity param if K is a range
+        param_names.insert(1, "parity")
+        param_values.insert(1, ["0", "1"])
+    value_combos = list(itertools.product(*param_values))
 
-    target_folders = generate_paths(base_path, folder_names)
-    config_lines = generate_config_lines(folder_params)
+    config_path = path.abspath(args.config)
+    base_path = path.dirname(config_path)
+    target_paths = generate_paths(base_path, param_names, value_combos)
+    create_paths(target_paths)
+    multicopy_config(config_path, target_paths)
 
-    create_paths(target_folders)
-    config_paths = multicopy_config(config_path, target_folders)
-    set_config_params(config_paths, config_lines)
+    param_dicts = generate_param_dicts(param_names, value_combos)
+    set_placeholder_params(target_paths, param_dicts)
 
 
 if __name__ == "__main__":
