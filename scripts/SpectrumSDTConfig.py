@@ -12,12 +12,12 @@ class SpectrumSDTConfig:
             line = line.split("!")[0].strip() # remove comments
             if len(line) == 0:
                 continue
-            if line == "}":
+            if line == ")":
                 return dict, line_num
             tokens = line.split("=")
             key = tokens[0].strip()
             value = tokens[1].strip()
-            if value == "{":
+            if value == "(":
                 value, line_num = self.read_inner_dict(config_lines, line_num)
             dict[key] = value
         return dict, line_num
@@ -60,7 +60,7 @@ class SpectrumSDTConfig:
         return int(self.params["parity"])
 
     def get_symmetry(self) -> int:
-        return int(self.params["symmetry"])
+        return int(self.params["basis"]["symmetry"])
 
     def get_basis_root_path(self) -> str:
         return self.params["basis_root_path"]
