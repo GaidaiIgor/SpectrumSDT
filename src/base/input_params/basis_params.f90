@@ -17,6 +17,7 @@ module basis_params_mod
     integer :: num_functions_phi = -1 ! number of sines or cosines in basis of 1D problem
     integer :: symmetry = -1 ! 0 (even, cos, +) or 1 (odd, sin, -). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
     real(real64) :: cutoff_energy = -1 ! solutions with energies higher than this are discarded from basis
+    integer :: min_solutions = 3 ! minimum number of solutions in each slice, kept even if energies are higher than cutoff_energy
     type(fixed_basis_params) :: fixed ! parameters describing rotational state of fixed basis, if used
 
   contains
@@ -77,6 +78,8 @@ contains
           this % symmetry = str2int_config(next_value, full_key)
         case ('cutoff_energy')
           this % cutoff_energy = str2real_config(next_value, full_key) / au_to_wn
+        case ('min_solutions')
+          this % min_solutions = str2int_config(next_value, full_key)
         case ('fixed')
           call this % fixed % checked_init(subdict, auxiliary_subdict)
       end select
@@ -105,6 +108,7 @@ contains
     call put_string(keys, 'num_functions_phi')
     call put_string(keys, 'symmetry')
     call put_string(keys, 'cutoff_energy')
+    call put_string(keys, 'min_solutions')
     call put_string(keys, 'fixed')
   end function
 
@@ -126,8 +130,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_basis_params(this) 
     class(basis_params), intent(in) :: this
-    call assert(this % num_functions_phi == -1 .or. this % num_functions_phi > 0, 'Error: ' // this % prefix // 'num_functions_phi should be > 0')
-    call assert(any(this % symmetry == [-1, 0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1')
+    call assert(this % num_functions_phi > 0, 'Error: ' // this % prefix // 'num_functions_phi should be > 0')
+    call assert(any(this % symmetry == [0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1')
+    call assert(this % min_solutions > 0, 'Error: ' // this % prefix // 'min_solutions should be > 0')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

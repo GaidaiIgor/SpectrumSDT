@@ -111,7 +111,7 @@ contains
       call lapack_eigensolver(ham1, val1_all)
 
       ! Save results
-      nvec1(theta_ind) = findloc(val1_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.)
+      nvec1(theta_ind) = max(findloc(val1_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.), params % basis % min_solutions)
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham1(:, :nvec1(theta_ind))
     end do
@@ -231,7 +231,7 @@ contains
     mu = get_reduced_mass(params % mass)
     ham2 = build_hamiltonian_2d(mu, rho_val, period_theta, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
-    nvec2 = findloc(val2_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.)
+    nvec2 = max(findloc(val2_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.), params % basis % min_solutions)
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
 
