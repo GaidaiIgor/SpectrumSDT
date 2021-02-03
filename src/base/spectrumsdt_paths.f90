@@ -127,7 +127,7 @@ contains
     character(:), allocatable :: res
     character(:), allocatable :: sym_name
 
-    sym_name = 'sym_' // num2str(sym_code)
+    sym_name = 'symmetry_' // num2str(sym_code)
     res = get_sym_path_str(k_path, sym_name, parity)
   end function
 
