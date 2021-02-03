@@ -46,7 +46,7 @@ contains
         ! skip empty/commented lines
         cycle 
       end if
-      if (line == '}') then
+      if (line == ')') then
         ! finished reading inner dict
         call assert(recursion_level > 1, 'Config error at line ' // num2str(line_num) // '. Mismatched bracket.')
         exit 
@@ -58,7 +58,7 @@ contains
       key = trim(adjustl(line_tokens(1) % to_char_str()))
       call assert(.not. (key .in. user_info), 'Config error at line ' // num2str(line_num) // '. This key has already been specified.')
       value = trim(adjustl(line_tokens(2) % to_char_str()))
-      if (value == '{') then
+      if (value == '(') then
         ! new inner dict
         call read_inner_dict(file_unit, recursion_level + 1, line_num, prefix // key // ' % ', inner_user_info, inner_auxiliary_info)
         call extend(user_info, key .kvp. inner_user_info)
