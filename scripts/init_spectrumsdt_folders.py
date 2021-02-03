@@ -10,9 +10,11 @@ from typing import List, Dict
 
 
 def parse_command_line_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Creates a folder structure for a given K or range of Ks and copies config file to the target files, adding folder-specific parameters")
+    parser = argparse.ArgumentParser(description="Creates a folder structure for a given value of K, copies config template to the target folders, and fills out placeholder values. "
+            "Placeholder values can be referred to in config template as {parameter}, where parameter name can be one of: K, symmetry, stage or parity (if K is a range)")
     parser.add_argument("-c", "--config", default="spectrumsdt.config", help="Path to a template configuration file. ./spectrumsdt.config by default.")
-    parser.add_argument("-K", required=True, help="The value of K for which to create the folder. Can either be a scalar, a custom range in the form K1..K2, or 'all' to include all Ks for a given J")
+    parser.add_argument("-K", required=True, help="The value of K for which to generate the folder structure. "
+    "Can either be a scalar, a custom range in the form K1..K2, or 'all' to include all Ks for a given J and parity")
     args = parser.parse_args()
     return args
 
