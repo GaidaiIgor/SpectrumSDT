@@ -22,7 +22,7 @@ module pesprint_constants
 end module
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! This version reads pes.in instead of dynamical coordinates conversion.
+! This version reads pes.in instead of plain grid files.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 program pesprint
   use iso_fortran_env, only: real64
