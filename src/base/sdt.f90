@@ -10,6 +10,7 @@ module sdt
   use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_utils, only: identity_matrix
   use input_params_mod
+  use io_utils, only: write_matrix
   use iso_fortran_env, only: real64
   use lapack_interface_mod
   use mpi
@@ -19,6 +20,28 @@ module sdt
   implicit none
 
 contains
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Prints 2D energies from all slices to file. Debug.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine print_2d_energies(params)
+    class(input_params), intent(in) :: params
+    integer :: rho_ind
+    integer, allocatable :: num_solutions_2d(:)
+    real(real64), allocatable :: energies_2d(:)
+    real(real64), allocatable :: solutions_2d(:, :), energies_2d_all(:, :)
+    character(:), allocatable :: sym_path
+
+    sym_path = get_sym_path(params)
+    num_solutions_2d = load_basis_size_2d(get_block_info_path(sym_path))
+    allocate(energies_2d_all(maxval(num_solutions_2d), size(num_solutions_2d)))
+    energies_2d_all = 0
+    do rho_ind = 1, size(num_solutions_2d)
+      call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind), energies_2d, solutions_2d)
+      energies_2d_all(1:size(energies_2d), rho_ind) = energies_2d
+    end do
+    call write_matrix(energies_2d_all * au_to_wn, 'energies_2d')
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates phi basis on the grid.
