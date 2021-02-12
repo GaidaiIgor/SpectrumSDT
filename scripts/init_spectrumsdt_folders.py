@@ -19,14 +19,14 @@ def parse_command_line_args() -> argparse.Namespace:
     return args
 
 
-def generate_paths(base_path: str, param_names: List[str], value_combos) -> List[str]:
+def generate_paths(base_path: str, param_names: List[str], use_param_names: List[bool], value_combos) -> List[str]:
     """ Generates all config paths for all combination of values of all parameters. """
     all_paths = []
     for i in range(len(value_combos)):
         next_path = base_path
         next_combo = value_combos[i]
         for j in range(len(next_combo)):
-            if next_combo[j].isdigit():
+            if use_param_names[j]:
                 next_path = path.join(next_path, param_names[j] + "_" + next_combo[j])
             else:
                 next_path = path.join(next_path, next_combo[j])
@@ -75,6 +75,7 @@ def set_placeholder_params(target_paths: List[str], param_dicts: List[Dict[str, 
 def main():
     args = parse_command_line_args()
     param_names = ["K", "symmetry", "stage"]
+    use_param_names = [True, True, False]
     param_values = [[args.K], ["0", "1"], ["eigensolve", "properties"]]
     if args.K.isdigit():
         # add extra stages if K is a single number
@@ -83,12 +84,13 @@ def main():
     else:
         # add parity param if K is a range
         param_names.insert(1, "parity")
+        use_param_names.insert(1, True)
         param_values.insert(1, ["0", "1"])
     value_combos = list(itertools.product(*param_values))
 
     config_path = path.abspath(args.config)
     base_path = path.dirname(config_path)
-    target_paths = generate_paths(base_path, param_names, value_combos)
+    target_paths = generate_paths(base_path, param_names, use_param_names, value_combos)
     create_paths(target_paths)
     multicopy_config(config_path, target_paths)
 
