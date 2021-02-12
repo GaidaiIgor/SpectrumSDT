@@ -59,17 +59,22 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with calculation results for given Ks. K range version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_k_folder_path_root_range(root_path, K, J, parity) result(res)
+  function get_k_folder_path_root_range(root_path, K, J, parity, stage, rovib_coupling) result(res)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K(2)
     integer, optional, intent(in) :: J, parity
-    integer :: J_act, parity_act
+    character(*), optional, intent(in) :: stage
+    integer, optional, intent(in) :: rovib_coupling
+    integer :: J_act, parity_act, rovib_coupling_act
     character(:), allocatable :: res
-    character(:), allocatable :: k_folder_name
+    character(:), allocatable :: stage_act, k_folder_name
     
     J_act = arg_or_default(J, -1)
     parity_act = arg_or_default(parity, -1)
-    if (J_act /= -1 .and. parity_act /= -1 .and. K(1) == get_k_start(J_act, parity_act) .and. K(2) == J_act) then
+    stage_act = arg_or_default(stage, '')
+    rovib_coupling_act = arg_or_default(rovib_coupling, -1)
+    if (rovib_coupling_act == 1 .and. (stage_act == 'eigensolve' .or. stage_act == 'properties') .and. &
+        J_act /= -1 .and. parity_act /= -1 .and. K(1) == get_k_start(J_act, parity_act) .and. K(2) == J_act) then
       k_folder_name = 'K_all'
     else if (K(1) == K(2)) then
       k_folder_name = 'K_' // num2str(K(1))
@@ -82,12 +87,11 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with calculation results for given Ks. Single K version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_k_folder_path_root(root_path, K, J, parity) result(res)
+  function get_k_folder_path_root(root_path, K) result(res)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K
-    integer, optional, intent(in) :: J, parity
     character(:), allocatable :: res
-    res = get_k_folder_path_root_range(root_path, [K, K], J, parity)
+    res = get_k_folder_path_root_range(root_path, [K, K])
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -96,7 +100,7 @@ contains
   function get_k_folder_path_params(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = get_k_folder_path_root_range(params % root_path, params % K, params % J, params % parity)
+    res = get_k_folder_path_root_range(params % root_path, params % K, params % J, params % parity, params % stage, params % use_rovib_coupling)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -134,19 +138,19 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with calculation results for a given symmetry and Ks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_sym_path_root(root_path, K, sym_code, J, parity) result(res)
+  function get_sym_path_root(root_path, K, sym_code, parity) result(res)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K, sym_code
-    integer, intent(in), optional :: J, parity
+    integer, intent(in), optional :: parity
     character(:), allocatable :: res
     character(:), allocatable :: k_path
 
-    k_path = get_k_folder_path(root_path, K, J, parity)
+    k_path = get_k_folder_path(root_path, K)
     res = get_sym_path_int(k_path, sym_code, parity)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for a given symmetry and Ks.
+! Generates path to folder with calculation results for symmetry and Ks, taken from input *params*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_sym_path_params(params) result(res)
     class(input_params), intent(in) :: params
@@ -154,7 +158,11 @@ contains
     character(:), allocatable :: k_path
 
     k_path = get_k_folder_path(params)
-    res = get_sym_path_int(k_path, params % basis % symmetry, params % parity)
+    if (params % use_rovib_coupling == 1 .and. (params % stage == 'eigensolve' .or. params % stage == 'properties')) then
+      res = get_sym_path_int(k_path, params % basis % symmetry, params % parity)
+    else
+      res = get_sym_path_int(k_path, params % basis % symmetry)
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
