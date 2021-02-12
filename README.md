@@ -58,7 +58,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
 1. Generate the grids
 ```
 mkdir -p ~/SpectrumSDT_runs/o3/ && cd ~/SpectrumSDT_runs/o3/
-cp ~/SpectrumSDT/config_examples/o3/grids_simple.config spectrumsdt.config
+cp ~/SpectrumSDT/config_examples/o3/1.simple/grids.config spectrumsdt.config
 ~/SpectrumSDT/build/spectrumsdt
 ```
 Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combination of points in the generated grid files in atomic units of energy (Hartree).
@@ -79,14 +79,14 @@ Replace `<n_procs>` with however many MPI tasks you want to use. After this, `pe
 3. Setup SpectrumSDT directory structure
 ```
 mkdir J_0 && cd J_0
-cp ~/SpectrumSDT/config_examples/spectrumsdt_simple.config .
+cp ~/SpectrumSDT/config_examples/o3/1.simple/spectrumsdt.config .
 ```
 Edit spectrumsdt.config and replace `username` in the paths. Then execute:  
 `~/SpectrumSDT/scripts/init_spectrum_folders.py -K 0`
 
 4. Calculate basis
 ```
-cd K_0/sym_0/basis
+cd K_0/symmetry_0/basis
 mpiexec -n <n_procs> spectrumsdt
 ```
 
@@ -102,6 +102,13 @@ cd ../eigensolve
 mpiexec -n <n_procs> spectrumsdt
 ```
 Lowest 50 rovibrational energy levels of ozone-686 J=0 will be printed into `states.fwc` file.
+
+7. Calculate wave function properties (optional)
+```
+cd ../properties
+mpiexec -n <n_procs> spectrumsdt
+```
+The requested properties will be printed into `states.fwc` file.
 
 # References
 
