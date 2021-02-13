@@ -496,7 +496,7 @@ contains
     call assert(any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
         'Error: output_coordinate_system should be "aph", "mass jacobi", "jacobi", "cartesian", "all bonds" or "internal"')
     call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
-    call assert((this % mass(1) .aeq. this % mass(3)) .and. .not. (this % mass(1) .aeq. this % mass(2)), 'Error: mass should be specified in ABA order')
+    call assert(all(this % mass .aeq. -1d0) .or. (this % mass(1) .aeq. this % mass(3)) .and. .not. (this % mass(1) .aeq. this % mass(2)), 'Error: mass should be specified in ABA order')
     call assert(this % J >= -1, 'Error: J should be >= 0')
     call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value should be 0 or 1')
     if (any(this % stage == [character(len = 100) :: 'eigensolve', 'properties']) .and. this % use_rovib_coupling == 1) then
