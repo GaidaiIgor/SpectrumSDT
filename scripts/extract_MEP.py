@@ -19,8 +19,6 @@ def main():
         potential = [float(line) for line in potential_file]
     rho_step = grid_sizes[1]*grid_sizes[2]
     mep_rho = [min(potential[rho_ind*rho_step : (rho_ind+1)*rho_step]) for rho_ind in range(grid_sizes[0])]
-    ind = potential.index(mep_rho[0])
-    print(ind)
     with open("MEP_rho.dat", "w") as mep_file:
         for rho_ind in range(grid_sizes[0]):
             mep_file.write("{0} {1}\n".format(grid_rho[rho_ind], mep_rho[rho_ind]))
