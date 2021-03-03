@@ -112,8 +112,10 @@ The requested properties will be printed into `states.fwc` file.
 
 # References
 
-A. Teplukhin and D. Babikov, J. Chem. Phys. 145, 114106 (2016).
+1. Gayday, I.; Grushnikova, E.; Babikov, D. Influence of the Coriolis Effect on the Properties of Scattering Resonances in Symmetric and Asymmetric Isotopomers of Ozone. Phys. Chem. Chem. Phys. 2020, 22, 27560–27571.  
 
-I. Gayday, A. Teplukhin, B.K. Kendrick, and D. Babikov, J. Phys. Chem. A 124, 2808 (2020).
+2. Gayday, I.; Teplukhin, A.; Kendrick, B. K.; Babikov, D. The Role of Rotation–Vibration Coupling in Symmetric and Asymmetric Isotopomers of Ozone. J. Chem. Phys. 2020, 152, 144104.  
 
-I. Gayday, A. Teplukhin, B.K. Kendrick, and D. Babikov, J. Chem. Phys. 152, 144104 (2020).
+3. Gayday, I.; Teplukhin, A.; Kendrick, B. K.; Babikov, D. Theoretical Treatment of the Coriolis Effect Using Hyperspherical Coordinates, with Application to the Ro-Vibrational Spectrum of Ozone. J. Phys. Chem. A 2020, 124, 2808–2819.  
+
+4. Teplukhin, A.; Babikov, D. Efficient Method for Calculations of Ro-Vibrational States in Triatomic Molecules near Dissociation Threshold: Application to Ozone. J. Chem. Phys. 2016, 145, 114106.  
