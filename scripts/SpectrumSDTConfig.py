@@ -31,12 +31,6 @@ class SpectrumSDTConfig:
     def get_stage(self) -> str:
         return self.params["stage"]
 
-    def get_fixed_basis_JK(self) -> int:
-        if "use_fixed_basis_JK" in self.params:
-            return int(self.params["use_fixed_basis_JK"])
-        else:
-            return 0
-
     def get_mass_str(self) -> str:
         return self.params["mass"]
 

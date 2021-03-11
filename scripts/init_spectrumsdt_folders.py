@@ -7,6 +7,7 @@ import shutil
 import os.path as path
 from pathlib import Path
 from typing import List, Dict
+from SpectrumSDTConfig import SpectrumSDTConfig
 
 
 def parse_command_line_args() -> argparse.Namespace:
@@ -74,13 +75,29 @@ def set_placeholder_params(target_paths: List[str], param_dicts: List[Dict[str, 
 
 def main():
     args = parse_command_line_args()
+    config_path = path.abspath(args.config)
+    config = SpectrumSDTConfig(config_path)
+
     param_names = ["K", "symmetry", "stage"]
     use_param_names = [True, True, False]
     param_values = [[args.K], ["0", "1"], ["eigensolve", "properties"]]
     if args.K.isdigit():
-        # add extra stages if K is a single number
-        param_values[2].insert(0, "basis")
-        param_values[2].insert(1, "overlaps")
+        do_basis = False
+        if "fixed" in config.params["basis"]:
+            J = int(config.params["J"])
+            K = int(args.K)
+            fixed_J = int(config.params["basis"]["fixed"]["J"])
+            fixed_K = int(config.params["basis"]["fixed"]["K"])
+            if J == fixed_J and K == fixed_K:
+                do_basis = True
+        else:
+            do_basis = True
+
+        if do_basis:
+            # add extra stages if K is necessary
+            param_values[2].insert(0, "basis")
+            param_values[2].insert(1, "overlaps")
+
     else:
         # add parity param if K is a range
         param_names.insert(1, "parity")
@@ -88,7 +105,6 @@ def main():
         param_values.insert(1, ["0", "1"])
     value_combos = list(itertools.product(*param_values))
 
-    config_path = path.abspath(args.config)
     base_path = path.dirname(config_path)
     target_paths = generate_paths(base_path, param_names, use_param_names, value_combos)
     create_paths(target_paths)
