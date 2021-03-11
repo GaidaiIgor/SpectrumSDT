@@ -12,12 +12,23 @@ from SpectrumSDTConfig import SpectrumSDTConfig
 
 def parse_command_line_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Creates a folder structure for a given value of K, copies config template to the target folders, and fills out placeholder values. "
-            "Placeholder values can be referred to in config template as {parameter}, where parameter name can be one of: K, symmetry, stage or parity (if K is a range)")
+            "Placeholder values can be referred to in config template as {parameter}, where parameter name can be one of: K, symmetry, stage or parity (if K is a range).")
     parser.add_argument("-c", "--config", default="spectrumsdt.config", help="Path to a template configuration file. ./spectrumsdt.config by default.")
     parser.add_argument("-K", required=True, help="The value of K for which to generate the folder structure. "
-    "Can either be a scalar, a custom range in the form K1..K2, or 'all' to include all Ks for a given J and parity")
+    "Can either be a scalar, a custom range in the form K1..K2, or 'all' to include all Ks for a given J and parity.")
+    parser.add_argument("--extra", help="A dictionary with extra placeholder values that are applied to all target folders.")
     args = parser.parse_args()
     return args
+
+
+def resolve_defaults(args: argparse.Namespace):
+    if args.extra is None:
+        args.extra = {}
+    else:
+        args.extra = eval(args.extra)
+        for key, value in args.extra.items():
+            if not isinstance(value, str):
+                args.extra[key] = str(value)
 
 
 def generate_paths(base_path: str, param_names: List[str], use_param_names: List[bool], value_combos) -> List[str]:
@@ -51,13 +62,14 @@ def multicopy_config(config_path: str, target_paths: List[str]) -> List[str]:
         shutil.copyfile(config_path, path.join(target_path, "spectrumsdt.config"))
 
 
-def generate_param_dicts(param_names: List[str], value_combos) -> List[Dict[str, str]]:
+def generate_param_dicts(param_names: List[str], value_combos, extra: Dict[str, str]) -> List[Dict[str, str]]:
     """ Transforms lists of names and value combinations to list of dictionaries. """
     res = []
     for i in range(len(value_combos)):
         next_dict = {}
         for j in range(len(value_combos[i])):
             next_dict[param_names[j]] = value_combos[i][j]
+        next_dict.update(extra)
         res.append(next_dict)
     return res
 
@@ -75,6 +87,7 @@ def set_placeholder_params(target_paths: List[str], param_dicts: List[Dict[str, 
 
 def main():
     args = parse_command_line_args()
+    resolve_defaults(args)
     config_path = path.abspath(args.config)
     config = SpectrumSDTConfig(config_path)
 
@@ -110,7 +123,7 @@ def main():
     create_paths(target_paths)
     multicopy_config(config_path, target_paths)
 
-    param_dicts = generate_param_dicts(param_names, value_combos)
+    param_dicts = generate_param_dicts(param_names, value_combos, args.extra)
     set_placeholder_params(target_paths, param_dicts)
 
 
