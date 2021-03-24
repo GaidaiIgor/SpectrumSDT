@@ -3,6 +3,12 @@ module pes_utils
   use iso_fortran_env, only: real64
   implicit none
 
+  real(real64), parameter :: pi = acos(-1d0)
+  real(real64), parameter :: au_to_wn = 219474.6313708d0 ! cm^-1 / Eh (wavenumbers per Hartree)
+  real(real64), parameter :: amu_to_kg = 1.660538921d-27 ! kg / amu (kilograms per atomic mass unit)
+  real(real64), parameter :: aum_to_kg = 9.10938291d-31 ! kg / aum (kilogram per electron (atomic unit of mass))
+  real(real64), parameter :: amu_to_aum = amu_to_kg / aum_to_kg ! aum / amu
+
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -20,6 +26,39 @@ contains
     read(file_unit, *) coords
     close(file_unit)
   end function
+  
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Loads requested coordinates.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine load_grids_aph(grid_rho, grid_theta, grid_phi)
+    real(real64), allocatable, intent(out) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    integer :: file_unit, num_points, i
+    real(real64) :: skip
+
+    open(newunit = file_unit, file = 'grid_rho.dat')
+    read(file_unit, *) skip, skip, skip, num_points
+    allocate(grid_rho(num_points))
+    do i = 1, num_points
+      read(file_unit, *) grid_rho(i)
+    end do
+    close(file_unit)
+
+    open(newunit = file_unit, file = 'grid_theta.dat')
+    read(file_unit, *) skip, skip, skip, num_points
+    allocate(grid_theta(num_points))
+    do i = 1, num_points
+      read(file_unit, *) grid_theta(i)
+    end do
+    close(file_unit)
+
+    open(newunit = file_unit, file = 'grid_phi.dat')
+    read(file_unit, *) skip, skip, skip, num_points
+    allocate(grid_phi(num_points))
+    do i = 1, num_points
+      read(file_unit, *) grid_phi(i)
+    end do
+    close(file_unit)
+  end subroutine
   
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Computes exclusive prefix sum, i.e. res(i) = sum( [array(1)..array(i - 1)] ).
@@ -60,6 +99,28 @@ contains
     all_counts = n_elems / n_procs
     all_counts(1:remaining_elems) = all_counts(1:remaining_elems) + 1
     all_shifts = prefix_sum_exclusive(all_counts)
+  end subroutine
+      
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts a 1D index of 1D-representation into 3 indexes corresponding to it in 3D representation.
+! Assumes the 3D array was flattened using the following order of dimenisions: 3, 2, 1 (3rd coordinate is changing most frequently).
+! n1, n2, n3 - sizes of the 3D array.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine convert_1d_ind_to_3d(ind_1d, n1, n2, n3, i1_3d, i2_3d, i3_3d)
+    integer, intent(in) :: ind_1d, n1, n2, n3
+    integer, intent(out) :: i1_3d, i2_3d, i3_3d
+    integer :: ind_1d_0, i1_3d_0, i2_3d_0, i3_3d_0
+
+    ! Convert using 0-based indexing
+    ind_1d_0 = ind_1d - 1
+    i1_3d_0 = ind_1d_0 / (n2 * n3)
+    i2_3d_0 = (ind_1d_0 - i1_3d_0 * n2 * n3) / n3
+    i3_3d_0 = ind_1d_0 - i1_3d_0 * n2 * n3 - i2_3d_0 * n3
+
+    ! Shift back to 1-based indexing
+    i1_3d = i1_3d_0 + 1
+    i2_3d = i2_3d_0 + 1
+    i3_3d = i3_3d_0 + 1
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
