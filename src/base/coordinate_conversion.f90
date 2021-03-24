@@ -1,6 +1,7 @@
 module coordinate_coversion_mod
   use iso_fortran_env, only: real64
   implicit none
+  real(real64), parameter, private :: pi = acos(-1d0)
 
 contains
 
@@ -276,7 +277,6 @@ contains
     real(real64) :: new_coord_list(size(coord_list, 1), size(coord_list, 2))
     integer :: i
     real(real64), parameter :: theta_length = 5d0 ! length of theta axis in aph plot in Bohr (arbitrary scaling factor).
-    real(real64), parameter :: pi = acos(-1d0)
 
     do i = 1, size(coord_list, 2)
       new_coord_list(1, i) = coord_list(2, i) / (pi/2) * theta_length * cos(coord_list(3, i))
@@ -293,7 +293,6 @@ contains
     real(real64) :: new_coord_list(size(coord_list, 1), size(coord_list, 2))
     integer :: i
     real(real64), parameter :: theta_length = 5d0 ! length of theta axis in aph plot in Bohr (arbitrary scaling factor).
-    real(real64), parameter :: pi = acos(-1d0)
 
     do i = 1, size(coord_list, 2)
       new_coord_list(1, i) = coord_list(3, i)
