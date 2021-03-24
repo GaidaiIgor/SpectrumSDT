@@ -375,7 +375,7 @@ contains
     character(:), allocatable :: eigensolve_path
 
     eigensolve_path = get_eigensolve_path(sym_path)
-    res = append_path_tokens(eigensolve_path, 'states.fwc')
+    res = append_path_tokens(eigensolve_path, 'states.fwc') ! Fixed width columns
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -396,7 +396,7 @@ contains
     character(:), allocatable :: properties_path
 
     properties_path = get_properties_path(sym_path)
-    res = append_path_tokens(properties_path, 'states.fwc') ! Fixed width columns
+    res = append_path_tokens(properties_path, 'states.ssdtp') ! SpectrumSDT properties
   end function
 
 end module
