@@ -42,10 +42,13 @@ contains
     real(real64) :: s_factor
 
     do i = 1, size(coord_list, 2)
-      s_factor = sqrt((coord_list(2, i)**2 - coord_list(1, i)**2)**2 + (2*coord_list(2, i)*coord_list(1, i)*cos(coord_list(3, i)))**2);
-      new_coord_list(1, i) = sqrt(coord_list(2, i)**2 + coord_list(1, i)**2);
-      new_coord_list(2, i) = atan(s_factor / (2*coord_list(2, i)*coord_list(1, i)*sin(coord_list(3, i))));
-      new_coord_list(3, i) = atan2(2*coord_list(2, i)*coord_list(1, i)*cos(coord_list(3, i)) / s_factor, (coord_list(2, i)**2 - coord_list(1, i)**2) / s_factor);
+      s_factor = sqrt((coord_list(2, i)**2 - coord_list(1, i)**2)**2 + (2*coord_list(2, i)*coord_list(1, i)*cos(coord_list(3, i)))**2)
+      new_coord_list(1, i) = sqrt(coord_list(2, i)**2 + coord_list(1, i)**2)
+      new_coord_list(2, i) = atan(s_factor / (2*coord_list(2, i)*coord_list(1, i)*sin(coord_list(3, i))))
+      new_coord_list(3, i) = atan2(2*coord_list(2, i)*coord_list(1, i)*cos(coord_list(3, i)) / s_factor, (coord_list(2, i)**2 - coord_list(1, i)**2) / s_factor)
+      if (new_coord_list(3, i) < 0) then
+        new_coord_list(3, i) = new_coord_list(3, i) + 2*pi
+      end if
     end do
   end function
 
@@ -298,7 +301,7 @@ contains
       new_coord_list(3, i) = atan2(coord_list(2, i), coord_list(1, i))
       ! Shift to [0; 2pi] range
       if (new_coord_list(3, i) < 0) then
-        new_coord_list(3, i) = new_coord_list(3, i) + 2 * pi
+        new_coord_list(3, i) = new_coord_list(3, i) + 2*pi
       end if
     end do
   end function
