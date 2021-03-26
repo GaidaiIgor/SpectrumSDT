@@ -17,6 +17,8 @@ module sdt
   use parallel_utils
   use rovib_io_mod, only: load_basis_size_2d, load_solutions_1D, load_solutions_2D
   use spectrumsdt_paths_mod
+
+  use debug_tools
   implicit none
 
 contains
@@ -254,7 +256,12 @@ contains
     mu = get_reduced_mass(params % mass)
     ham2 = build_hamiltonian_2d(mu, rho_val, period_theta, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
-    nvec2 = max(findloc(val2_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.), params % basis % min_solutions)
+    if (debug_mode == 'lower_ecut_2d') then
+      print *, 'Using lower_ecut_2d'
+      nvec2 = max(findloc(val2_all < params % basis % cutoff_energy - debug_real / au_to_wn, .true., dim = 1, back = .true.), params % basis % min_solutions)
+    else
+      nvec2 = max(findloc(val2_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.), params % basis % min_solutions)
+    end if
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
 
