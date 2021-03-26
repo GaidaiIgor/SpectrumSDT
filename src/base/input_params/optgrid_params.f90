@@ -28,9 +28,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of grid_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_optgrid_params(this, config_dict, auxiliary_info)
+  subroutine assign_dict_optgrid_params(this, config_dict)
     class(optgrid_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
+    class(dictionary_t) :: config_dict ! intent(in)
     integer :: i
     character(:), allocatable :: next_key, full_key, next_value
     type(string), allocatable :: key_set(:)
@@ -114,11 +114,12 @@ contains
     integer, optional, intent(in) :: check_extra, check_values ! have to keep the same signature in child
     type(dictionary_t) :: mandatory_keys, all_keys
 
+    this % prefix = extract_string(auxiliary_info, 'prefix')
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys, this % prefix) ! Checks that unknown keys were not specified
     call check_key_types(config_dict, auxiliary_info, 'string')
     call this % grid_params % checked_init(config_dict, auxiliary_info, stage, check_extra = 0) ! First, check init parental type
-    call this % assign_dict(config_dict, auxiliary_info) ! Init type as is to ease branching in getting keys
+    call this % assign_dict(config_dict) ! Init type as is to ease branching in getting keys
     mandatory_keys = this % get_mandatory_keys() ! Save mandatory keys because we will reuse them later for unused key check
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix) ! Make sure mandatory keys are set to ease checking values
     call this % set_defaults(config_dict, stage)

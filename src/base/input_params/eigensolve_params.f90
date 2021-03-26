@@ -33,14 +33,13 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of eigensolve_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine assign_dict_eigensolve_params(this, config_dict, auxiliary_info)
+  subroutine assign_dict_eigensolve_params(this, config_dict)
     class(eigensolve_params), intent(inout) :: this
-    class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
+    class(dictionary_t) :: config_dict ! intent(in)
     integer :: i
     character(:), allocatable :: next_key, full_key, next_value
     type(string), allocatable :: key_set(:)
 
-    this % prefix = extract_string(auxiliary_info, 'prefix')
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
@@ -117,10 +116,11 @@ contains
     character(*), intent(in) :: stage
     type(dictionary_t) :: mandatory_keys, all_keys
 
+    this % prefix = extract_string(auxiliary_info, 'prefix')
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys, this % prefix)
     call check_key_types(config_dict, auxiliary_info, 'string')
-    call this % assign_dict(config_dict, auxiliary_info)
+    call this % assign_dict(config_dict)
     mandatory_keys = this % get_mandatory_keys()
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
     call this % set_defaults(config_dict, auxiliary_info, stage)

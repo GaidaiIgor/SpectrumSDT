@@ -54,7 +54,6 @@ contains
     type(string), allocatable :: key_set(:)
     type(dictionary_t) :: subdict, auxiliary_subdict
 
-    this % prefix = extract_string(auxiliary_info, 'prefix')
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
@@ -145,6 +144,7 @@ contains
     character(*), intent(in) :: stage
     type(dictionary_t) :: mandatory_keys, all_keys
 
+    this % prefix = extract_string(auxiliary_info, 'prefix')
     all_keys = this % get_all_keys()
     call check_extra_keys(config_dict, all_keys, this % prefix)
     call check_key_types_basis_params(config_dict, auxiliary_info)
