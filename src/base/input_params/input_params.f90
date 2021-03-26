@@ -4,6 +4,7 @@ module input_params_mod
   use cap_params_mod
   use config_mod
   use constants
+  use debug_params_mod
   use dictionary
   use dict_utils
   use eigensolve_params_mod
@@ -27,22 +28,22 @@ module input_params_mod
 
     ! Behavior control
     character(:), allocatable :: stage ! grids, basis, overlaps, eigensolve or properties
-    integer :: use_rovib_coupling = -1 ! enables/disables use_rovib_coupling coupling
+    integer :: use_rovib_coupling = 0 ! enables/disables rotation-vibration coupling
 
     ! Grids
     type(optgrid_params) :: grid_rho
     type(grid_params) :: grid_theta
-    integer :: num_points_phi = -1
+    integer :: num_points_phi = 2
     character(:), allocatable :: output_coordinate_system
 
     ! System
-    real(real64) :: mass(3) = -1
-    integer :: J = -1 ! total angular momentum quantum number
-    integer :: K(2) = -1 ! boundaries of K-range for use_rovib_coupling calculation. In symmetric top rotor both values should be the same
-    integer :: parity = -1 ! 0(+) or 1(-)
+    real(real64) :: mass(3) = 1
+    integer :: J = 0 ! total angular momentum quantum number
+    integer :: K(2) = 0 ! boundaries of K-range for use_rovib_coupling calculation. In symmetric top rotor both values should be the same
+    integer :: parity = 0 ! 0 or 1
 
-    type(basis_params) :: basis ! Basis parameters
-    type(eigensolve_params) :: eigensolve ! Eigensolver parameters
+    type(basis_params) :: basis ! basis parameters
+    type(eigensolve_params) :: eigensolve ! eigensolver parameters
     type(cap_params) :: cap ! Complex Absorbin Potential parameters
     type(wf_section_params), allocatable :: wf_sections(:) ! wave function sections for integration on the properties stage
     
@@ -51,12 +52,8 @@ module input_params_mod
     character(:), allocatable :: root_path ! path to root folder for main calculations
 
     ! Debug
-    integer :: use_parallel = -1 ! parallel execution
-    integer :: enable_terms(2) = 1 ! 1st digit - coriolis, 2nd - asymmetric
-    integer :: optimized_mult = 1 ! disables matrix-vector multiplication optimizations
-    integer :: treat_tp_as_xy = 0 ! treats theta and phi grids as x and y grids for aph plots
-    character(:), allocatable :: debug_mode
-    character(:), allocatable :: debug_param_1
+    integer :: use_parallel = -1 ! parallel execution; default is set in set_defaults
+    type(debug_params) :: debug
 
   contains
     procedure, nopass :: check_key_types_input_params
@@ -84,6 +81,7 @@ contains
     call put_string(dict_types, 'eigensolve', 'dict')
     call put_string(dict_types, 'cap', 'dict')
     call put_string(dict_types, 'wf_sections', 'dict')
+    call put_string(dict_types, 'debug', 'dict')
     call check_key_types(config_dict, auxiliary_info, 'string', dict_types)
   end subroutine
 
@@ -252,17 +250,6 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Parses user-provided value of `enable_terms`.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function parse_enable_terms(enable_terms_str) result(enable_terms)
-    character(*), intent(in) :: enable_terms_str
-    integer :: enable_terms(2)
-    
-    enable_terms(1) = str2int_config(enable_terms_str(1:1), 'enable_terms(1)')
-    enable_terms(2) = str2int_config(enable_terms_str(2:2), 'enable_terms(2)')
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Parses user-provided value of `K`.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function parse_K(K_str, J, parity) result(K)
@@ -361,16 +348,8 @@ contains
           this % root_path = next_value
         case ('use_parallel')
           this % use_parallel = str2int_config(next_value, next_key)
-        case ('enable_terms')
-          this % enable_terms = parse_enable_terms(next_value)
-        case ('optimized_mult')
-          this % optimized_mult = str2int_config(next_value, next_key)
-        case ('treat_tp_as_xy')
-          this % treat_tp_as_xy = str2int_config(next_value, next_key)
-        case ('debug_mode')
-          this % debug_mode = next_value
-        case ('debug_param_1')
-          this % debug_param_1 = next_value
+        case ('debug')
+          call this % debug % checked_init(subdict, auxiliary_subdict)
       end select
     end do
 
@@ -448,11 +427,7 @@ contains
     call put_string(keys, 'grid_path')
     call put_string(keys, 'root_path')
     call put_string(keys, 'use_parallel')
-    call put_string(keys, 'enable_terms')
-    call put_string(keys, 'optimized_mult')
-    call put_string(keys, 'treat_tp_as_xy')
-    call put_string(keys, 'debug_mode')
-    call put_string(keys, 'debug_param_1')
+    call put_string(keys, 'debug')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -487,29 +462,25 @@ contains
   subroutine check_values_input_params(this) 
     class(input_params), intent(in) :: this
     call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigensolve', 'properties']), 'Error: stage should be "grids", "basis", "overlaps", "eigensolve" or "properties"')
-    call assert(any(this % use_rovib_coupling == [-1, 0, 1]), 'Error: use_rovib_coupling should be 0 or 1')
-    if (this % treat_tp_as_xy /= 1) then
-      call assert((this % grid_theta % from .aeq. -1d0) .or. (this % grid_theta % from .ale. pi/2), 'Error: grid_theta % from should be <= pi/2')
-      call assert((this % grid_theta % to .aeq. -1d0) .or. (this % grid_theta % to .ale. pi/2), 'Error: grid_theta % to should be <= pi/2')
+    call assert(any(this % use_rovib_coupling == [0, 1]), 'Error: use_rovib_coupling should be 0 or 1')
+    if (this % debug % treat_tp_as_xy /= 1) then
+      call assert(this % grid_theta % from .ale. pi/2, 'Error: grid_theta % from should be <= pi/2')
+      call assert(this % grid_theta % to .ale. pi/2, 'Error: grid_theta % to should be <= pi/2')
     end if
-    call assert(this % num_points_phi == -1 .or. this % num_points_phi > 1, 'Error: num_points_phi should be > 1')
+    call assert(this % num_points_phi > 1, 'Error: num_points_phi should be > 1')
     call assert(any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
         'Error: output_coordinate_system should be "aph", "mass jacobi", "jacobi", "cartesian", "all bonds" or "internal"')
-    call assert(all(this % mass .aeq. -1d0) .or. all(this % mass > 0), 'Error: all mass should be > 0')
-    call assert(all(this % mass .aeq. -1d0) .or. (this % mass(1) .aeq. this % mass(3)) .and. .not. (this % mass(1) .aeq. this % mass(2)), 'Error: mass should be specified in ABA order')
-    call assert(this % J >= -1, 'Error: J should be >= 0')
-    call assert(any(this % parity == [-1, 0, 1]), 'Error: parity value should be 0 or 1')
+    call assert(all(this % mass > 0), 'Error: all mass should be > 0')
+    call assert((this % mass(1) .aeq. this % mass(3)) .and. .not. (this % mass(1) .aeq. this % mass(2)), 'Error: mass should be specified in ABA order')
+    call assert(this % J >= 0, 'Error: J should be >= 0')
+    call assert(any(this % parity == [0, 1]), 'Error: parity value should be 0 or 1')
     if (any(this % stage == [character(len = 100) :: 'eigensolve', 'properties']) .and. this % use_rovib_coupling == 1) then
-      call assert(all(this % K == -1) .or. all(this % K >= get_k_start(this % J, this % parity)), 'Error: K should be >= mod(J+p, 2)')
+      call assert(all(this % K >= get_k_start(this % J, this % parity)), 'Error: K should be >= mod(J+p, 2)')
     else
-      call assert(all(this % K >= -1), 'Error: K should be >= 0')
+      call assert(all(this % K >= 0), 'Error: K should be >= 0')
     end if
     call assert(all(this % K <= this % J), 'Error: K should be <= J')
-    call assert(any(this % use_parallel == [-1, 0, 1]), 'Error: use_parallel should be 0 or 1')
-    call assert(any(this % enable_terms(1) == [-1, 0, 1]), 'Error: enable_terms(1) should be 0 or 1')
-    call assert(any(this % enable_terms(2) == [-1, 0, 1]), 'Error: enable_terms(2) should be 0 or 1')
-    call assert(any(this % optimized_mult == [-1, 0, 1]), 'Error: optimized_mult should be 0 or 1')
-    call assert(any(this % treat_tp_as_xy == [-1, 0, 1]), 'Error: treat_tp_as_xy should be 0 or 1')
+    call assert(any(this % use_parallel == [0, 1]), 'Error: use_parallel should be 0 or 1')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -538,7 +509,7 @@ contains
     class(input_params), intent(inout) :: this
     class(grid_info), intent(in) :: rho_info, theta_info, phi_info
 
-    call assert(this % basis % num_functions_phi == -1 .or. this % basis % num_functions_phi <= size(phi_info % points) / 2, 'Error: basis % num_functions_phi should be <= num_points_phi / 2')
+    call assert(this % basis % num_functions_phi <= size(phi_info % points) / 2, 'Error: basis % num_functions_phi should be <= num_points_phi / 2')
     if (this % stage == 'properties') then
       call this % wf_sections % checked_resolve_rho_bounds(rho_info % from, rho_info % to)
       call this % wf_sections % checked_resolve_theta_bounds(theta_info % from, theta_info % to)

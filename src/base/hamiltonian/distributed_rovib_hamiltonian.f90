@@ -809,14 +809,14 @@ contains
       return
     end if
 
-    if (params % enable_terms(1) == 0) then
+    if (params % debug % enable_terms(1) == 0) then
       call print_parallel('Coriolis term is disabled')
     else
       call this % load_chunk_coriolis_term(params, ham_info)
       call print_parallel('Coriolis term is loaded')
     end if
 
-    if (params % enable_terms(2) == 0) then
+    if (params % debug % enable_terms(2) == 0) then
       call print_parallel('Asymmetric term is disabled')
     else
       call this % load_chunk_asym_term(params, ham_info)

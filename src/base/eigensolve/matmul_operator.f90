@@ -41,7 +41,7 @@ contains
 
     rog = rovib_ham % global_chunk_info % subblocks(1, 1) % borders % top - 1
     msize = rovib_ham % global_chunk_info % columns
-    if (params % optimized_mult == 1) then
+    if (params % debug % optimized_mult == 1) then
       active_matmul_operator => ham_mult_compressed
     else
       active_matmul_operator => ham_mult_uncompressed

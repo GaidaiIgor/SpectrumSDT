@@ -69,7 +69,7 @@ contains
     complex(real64), allocatable :: eivals(:), cap(:)
     complex(real64), allocatable :: eivecs(:, :), kinetic(:, :)
 
-    rovib_ham % compression = params % optimized_mult ! Global in matmul_operator_mod
+    rovib_ham % compression = params % debug % optimized_mult ! Global in matmul_operator_mod
     if (rovib_ham % compression /= 1) then
       call print_parallel('Warning: using uncompressed Hamiltonian matrix')
     end if
