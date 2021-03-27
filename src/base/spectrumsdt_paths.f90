@@ -187,6 +187,18 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to file with number of 1D basis functions in each rho-slice.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_basis_1D_summary_path(sym_path) result(res)
+    character(*), intent(in) :: sym_path
+    character(:), allocatable :: res
+    character(:), allocatable :: basis_path
+
+    basis_path = get_basis_path(sym_path)
+    res = append_path_tokens(basis_path, 'num_vectors_1d.dat')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to k-block info (overlap structure).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_block_info_path(sym_path) result(res)

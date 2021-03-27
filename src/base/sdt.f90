@@ -281,7 +281,7 @@ contains
     real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), intent(in) :: potential(:, :, :)
     integer :: proc_id, proc_first, proc_count, rho_ind, ierr, nvec2, file_unit
-    integer, allocatable :: all_counts(:), all_shifts(:), nvec1(:), proc_nvec2(:), all_nvec2(:)
+    integer, allocatable :: all_counts(:), all_shifts(:), nvec1(:), proc_nvec1(:), proc_nvec2(:), all_nvec1(:), all_nvec2(:)
     real(real64) :: step_theta
     type(array_1d_real), allocatable :: val1(:)
     type(array_2d_real), allocatable :: vec1(:)
@@ -290,23 +290,31 @@ contains
     call get_proc_elem_range(size(grid_rho), proc_first, proc_count, all_counts, all_shifts)
     step_theta = grid_theta(2) - grid_theta(1)
 
-    allocate(proc_nvec2(proc_count))
+    allocate(proc_nvec1(proc_count), proc_nvec2(proc_count))
     do rho_ind = proc_first, proc_first + proc_count - 1
       call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
       call calc_2d(params, rho_ind, grid_rho(rho_ind), step_theta, nvec1, val1, vec1, nvec2)
+      proc_nvec1(rho_ind - proc_first + 1) = sum(nvec1)
       proc_nvec2(rho_ind - proc_first + 1) = nvec2
     end do
 
     if (proc_id == 0) then
-      allocate(all_nvec2(size(grid_rho)))
+      allocate(all_nvec1(size(grid_rho)), all_nvec2(size(grid_rho)))
+    else
+      allocate(all_nvec1(0), all_nvec2(0))
     end if
+    call MPI_Gatherv(proc_nvec1, size(proc_nvec1), MPI_INTEGER, all_nvec1, all_counts, all_shifts, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
     call MPI_Gatherv(proc_nvec2, size(proc_nvec2), MPI_INTEGER, all_nvec2, all_counts, all_shifts, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-    ! Write total number of 2D vectors in each slice
+    ! Write total number of 1D and 2D vectors
     if (proc_id == 0) then
+      open(newunit = file_unit, file = get_basis_1D_summary_path(get_sym_path(params)))
+      write(file_unit, '(I0)') all_nvec1
+      close(file_unit)
       open(newunit = file_unit, file = get_block_info_path(get_sym_path(params)))
       write(file_unit, '(I0)') all_nvec2
       close(file_unit)
+      print *, 'Total number of 1D basis functions: ', sum(all_nvec1)
       print *, 'Total number of 2D basis functions: ', sum(all_nvec2)
     end if
   end subroutine
