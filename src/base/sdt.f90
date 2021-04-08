@@ -259,6 +259,9 @@ contains
     if (debug_mode == 'lower_ecut_2d') then
       print *, 'Using lower_ecut_2d'
       nvec2 = max(findloc(val2_all < params % basis % cutoff_energy - debug_real / au_to_wn, .true., dim = 1, back = .true.), params % basis % min_solutions)
+    else if (debug_mode == 'fixed_channels') then
+      print *, 'Using fixed number of channels'
+      nvec2 = min(debug_int, size(val2_all))
     else
       nvec2 = max(findloc(val2_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.), params % basis % min_solutions)
     end if
