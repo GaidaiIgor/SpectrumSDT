@@ -44,7 +44,7 @@ module input_params_mod
 
     type(basis_params) :: basis ! basis parameters
     type(eigensolve_params) :: eigensolve ! eigensolver parameters
-    type(cap_params) :: cap ! Complex Absorbin Potential parameters
+    type(cap_params) :: cap ! Complex Absorbing Potential parameters
     type(wf_section_params), allocatable :: wf_sections(:) ! wave function sections for integration on the properties stage
     
     ! Paths
