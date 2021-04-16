@@ -16,8 +16,10 @@ module basis_params_mod
     character(:), allocatable :: prefix
     integer :: num_functions_phi = -1 ! number of sines or cosines in basis of 1D problem
     integer :: symmetry = -1 ! 0 (even, cos, +) or 1 (odd, sin, -). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
-    real(real64) :: cutoff_energy = -1 ! solutions with energies higher than this are discarded from basis
-    integer :: min_solutions = 3 ! minimum number of solutions in each slice, kept even if energies are higher than cutoff_energy
+    real(real64) :: cutoff_energy_1d = 0 ! 1D solutions with energies higher than this are discarded from basis
+    real(real64) :: cutoff_energy_2d = 0 ! 2D solutions with energies higher than this are discarded from basis
+    integer :: min_solutions_1d = 1 ! minimum number of 1D solutions in each slice, kept even if energies are higher than cutoff_energy_1d
+    integer :: min_solutions_2d = 1 ! minimum number of 2D solutions in each slice, kept even if energies are higher than cutoff_energy_2d
     type(fixed_basis_params) :: fixed ! parameters describing rotational state of fixed basis, if used
 
   contains
@@ -75,10 +77,14 @@ contains
           this % num_functions_phi = str2int_config(next_value, full_key)
         case ('symmetry')
           this % symmetry = str2int_config(next_value, full_key)
-        case ('cutoff_energy')
-          this % cutoff_energy = str2real_config(next_value, full_key) / au_to_wn
-        case ('min_solutions')
-          this % min_solutions = str2int_config(next_value, full_key)
+        case ('cutoff_energy_1d')
+          this % cutoff_energy_1d = str2real_config(next_value, full_key) / au_to_wn
+        case ('cutoff_energy_2d')
+          this % cutoff_energy_2d = str2real_config(next_value, full_key) / au_to_wn
+        case ('min_solutions_1d')
+          this % min_solutions_1d = str2int_config(next_value, full_key)
+        case ('min_solutions_2d')
+          this % min_solutions_2d = str2int_config(next_value, full_key)
         case ('fixed')
           call this % fixed % checked_init(subdict, auxiliary_subdict)
       end select
@@ -94,7 +100,7 @@ contains
 
     call put_string(keys, 'num_functions_phi')
     call put_string(keys, 'symmetry')
-    call put_string(keys, 'cutoff_energy')
+    call put_string(keys, 'min_solutions_2d')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -106,8 +112,10 @@ contains
 
     call put_string(keys, 'num_functions_phi')
     call put_string(keys, 'symmetry')
-    call put_string(keys, 'cutoff_energy')
-    call put_string(keys, 'min_solutions')
+    call put_string(keys, 'cutoff_energy_1d')
+    call put_string(keys, 'cutoff_energy_2d')
+    call put_string(keys, 'min_solutions_1d')
+    call put_string(keys, 'min_solutions_2d')
     call put_string(keys, 'fixed')
   end function
 
@@ -119,8 +127,18 @@ contains
     class(dictionary_t), intent(in) :: config_dict
     character(*), intent(in) :: stage
 
+    if (.not. ('min_solutions_1d' .in. config_dict) .and. stage == 'basis') then
+      this % min_solutions_1d = this % min_solutions_2d
+      call print_parallel(this % prefix // 'min_functions_1d is not specified. Setting it equal to ' // this % prefix // 'min_functions_2d (likely an overkill).')
+    end if
+    if (.not. ('cutoff_energy_1d' .in. config_dict) .and. stage == 'basis') then
+      call print_parallel(this % prefix // 'cutoff_energy_1d is not specified. Assuming a default value of ' // num2str(this % cutoff_energy_1d) // '.')
+    end if
+    if (.not. ('cutoff_energy_2d' .in. config_dict) .and. stage == 'basis') then
+      call print_parallel(this % prefix // 'cutoff_energy_2d is not specified. Assuming a default value of ' // num2str(this % cutoff_energy_2d) // '.')
+    end if
     if (.not. ('fixed' .in. config_dict) .and. any(stage == [character(100) :: 'overlaps', 'eigensolve', 'properties'])) then
-      call print_parallel('fixed_basis is not specified, assuming adiabatic basis')
+      call print_parallel(this % prefix // 'fixed is not specified. Assuming adiabatic basis.')
     end if
   end subroutine
 
@@ -131,7 +149,8 @@ contains
     class(basis_params), intent(in) :: this
     call assert(this % num_functions_phi > 0, 'Error: ' // this % prefix // 'num_functions_phi should be > 0')
     call assert(any(this % symmetry == [0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1')
-    call assert(this % min_solutions > 0, 'Error: ' // this % prefix // 'min_solutions should be > 0')
+    call assert(this % min_solutions_1d > 0, 'Error: ' // this % prefix // 'min_solutions_1d should be > 0')
+    call assert(this % min_solutions_2d > 0, 'Error: ' // this % prefix // 'min_solutions_2d should be > 0')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

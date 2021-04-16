@@ -136,7 +136,7 @@ contains
       call lapack_eigensolver(ham1, val1_all)
 
       ! Save results
-      nvec1(theta_ind) = max(findloc(val1_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.), params % basis % min_solutions)
+      nvec1(theta_ind) = max(findloc(val1_all < params % basis % cutoff_energy_1d, .true., dim = 1, back = .true.), params % basis % min_solutions_1d)
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham1(:, :nvec1(theta_ind))
     end do
@@ -256,18 +256,7 @@ contains
     mu = get_reduced_mass(params % mass)
     ham2 = build_hamiltonian_2d(mu, rho_val, period_theta, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
-    if (debug_mode == 'lower_ecut_2d') then
-      print *, 'Using lower_ecut_2d'
-      nvec2 = max(findloc(val2_all < params % basis % cutoff_energy - debug_real / au_to_wn, .true., dim = 1, back = .true.), params % basis % min_solutions)
-    else if (debug_mode == 'fixed_channels') then
-      print *, 'Using fixed number of channels'
-      nvec2 = min(debug_int, size(val2_all))
-    else if (debug_mode == 'combo') then
-      print *, 'Using both ecut and min funcs'
-      nvec2 = max(findloc(val2_all < debug_real / au_to_wn, .true., dim = 1, back = .true.), debug_int)
-    else
-      nvec2 = max(findloc(val2_all < params % basis % cutoff_energy, .true., dim = 1, back = .true.), params % basis % min_solutions)
-    end if
+    nvec2 = max(findloc(val2_all < params % basis % cutoff_energy_2d, .true., dim = 1, back = .true.), params % basis % min_solutions_2d)
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
 
