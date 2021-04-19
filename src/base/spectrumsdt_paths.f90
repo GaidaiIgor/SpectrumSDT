@@ -211,6 +211,20 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to file with formatted 1D eigenvalues from all theta slices in a specific rho slice.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_formatted_energies_1d_path(sym_path, slice_ind) result(res)
+    character(*), intent(in) :: sym_path
+    integer, intent(in) :: slice_ind
+    character(:), allocatable :: res
+    character(:), allocatable :: basis_path, file_name
+
+    basis_path = get_basis_path(sym_path)
+    file_name = 'energies_1d.' // num2str(slice_ind, '(I0)') // '.txt'
+    res = append_path_tokens(basis_path, file_name)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with 1D eigenvalues and eigenvectors from all theta slices in a specific rho slice.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_solutions_1d_path(sym_path, slice_ind) result(res)

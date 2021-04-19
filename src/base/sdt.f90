@@ -149,6 +149,16 @@ contains
       write(file_unit) vec1(theta_ind) % p
     end do
     close(file_unit)
+
+    ! Also save to formatted file, if requested
+    if (params % basis % print_energies_1d == 1) then
+      open(newunit = file_unit, file = get_formatted_energies_1d_path(get_sym_path(params), rho_ind), form = 'formatted')
+      write(file_unit, '(' // num2str(size(nvec1)) // '(I5))') nvec1
+      do theta_ind = 1, size(grid_theta)
+        write(file_unit, '(' // num2str(nvec1(theta_ind)) // '(G25.15))') val1(theta_ind) % p * au_to_wn
+      end do
+      close(file_unit)
+    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
