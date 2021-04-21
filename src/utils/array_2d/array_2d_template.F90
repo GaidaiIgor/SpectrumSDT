@@ -13,7 +13,7 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Appends all 2D slices to form a single 2D array. Assumes the number of rows is the same in each 2D slice.
-! blocks is an additional optional output argument, which saves initial slice number of each column in the resulting array
+! *blocks* is an additional optional output argument, which saves initial slice number of each column in the resulting array.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(new_array_2d_,TEMPLATE_TYPE_NAME)(p) result(new_instance)
     TEMPLATE_TYPE, intent(in) :: p(:, :)
@@ -23,7 +23,7 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Appends all 2D slices to form a single 2D array. Assumes the number of rows is the same in each 2D slice.
-! blocks is an additional optional output argument, which saves initial slice number of each column in the resulting array
+! *blocks* is an additional optional output argument, which saves initial slice number of each column in the resulting array.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(flatten_array_2d_,TEMPLATE_TYPE_NAME)(array_2d, blocks) result(res)
     class(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), intent(in) :: array_2d(:)
@@ -51,7 +51,7 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes total number of columns in all slices of ragged array
+! Computes total number of columns in all slices of ragged array.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(columns_number_,TEMPLATE_TYPE_NAME)(array_2d) result(res)
     class(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), intent(in) :: array_2d(:)

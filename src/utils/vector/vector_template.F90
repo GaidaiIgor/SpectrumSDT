@@ -71,7 +71,7 @@ subroutine CONCAT2(push_all_,TEMPLATE_TYPE_NAME)(this, array)
   TEMPLATE_TYPE, intent(in) :: array(:)
   integer :: i
 
-  do i = 1,size(array)
+  do i = 1, size(array)
     call this % push(array(i))
   end do
 end subroutine
@@ -83,7 +83,7 @@ subroutine CONCAT2(append_vector_,TEMPLATE_TYPE_NAME)(this, other)
   class(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: this, other
   integer :: i
 
-  do i = 1,other % get_size()
+  do i = 1, other % get_size()
     call this % push(other % get(i))
   end do
 end subroutine
@@ -178,7 +178,7 @@ subroutine CONCAT2(write_vector_,TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list,
   character(*), intent(inout) :: iomsg
   integer :: i
   
-  do i = 1,this % get_size() - 1
+  do i = 1, this % get_size() - 1
     write(unit, *, iostat = iostat) this % get(i), ','
   end do
   write(unit, *, iostat = iostat) this % get(this % get_size())

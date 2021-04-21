@@ -18,7 +18,7 @@ end type
 contains
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Override default constructor to copy by value
+! Overrides default constructor to copy by value.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(new_array_1d_,TEMPLATE_TYPE_NAME)(p) result(new_instance)
     TEMPLATE_TYPE, intent(in) :: p(:)
@@ -27,7 +27,7 @@ contains
   end function
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Writes
+! Writes array_1d.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(write_array_1d_,TEMPLATE_TYPE_NAME)(this, unit, iotype, v_list, iostat, iomsg)
     class(CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)), intent(in) :: this
@@ -40,7 +40,7 @@ contains
   end
 
 !---------------------------------------------------------------------------------------------------------------------------------------------
-! Returns inner array
+! Returns inner array.
 !---------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT3(array_1d_,TEMPLATE_TYPE_NAME,_to_plain_array)(this) result(res)
     class(CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)), intent(in) :: this
@@ -48,29 +48,52 @@ contains
     res = this % p
   end function
 
-!-----------------------------------------------------------------------
-! Appends all 1D slices to form a single 1D array
-! blocks is an additional optional output argument, which saves initial slice number of each element in the resulting array
-!-----------------------------------------------------------------------
-  function CONCAT2(flatten_1d_,TEMPLATE_TYPE_NAME)(ragged_array, blocks) result(res)
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Appends all elements of 1D array of 1D arrays (ragged 2D array) to form a single plain 1D array.
+! *index_map* contains positions of first elements from each ragged dimension (column) of the original array in the flattened array.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine CONCAT2(flatten_1d_array_1d_,TEMPLATE_TYPE_NAME)(ragged_array, flattened, index_map)
     class(CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)), intent(in) :: ragged_array(:)
-    TEMPLATE_TYPE_OUT, allocatable :: res(:)
-    integer, allocatable, optional, intent(out) :: blocks(:)
+    TEMPLATE_TYPE_OUT, allocatable, intent(out) :: flattened(:)
+    integer, allocatable, optional, intent(out) :: index_map(:)
+    integer :: i
+    integer :: index_map_act(size(ragged_array))
     type(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: accumulator
-    type(vector_integer) :: blocks_vec
-    integer :: i, j
-    accumulator = CONCAT2(vector_,TEMPLATE_TYPE_NAME)()
-    blocks_vec = vector_integer()
 
-    do i = 1,size(ragged_array)
-      do j = 1,size(ragged_array(i) % p)
-        call accumulator % push(ragged_array(i) % p(j))
-        call blocks_vec % push(i)
+    accumulator = CONCAT2(vector_,TEMPLATE_TYPE_NAME)()
+    do i = 1, size(ragged_array)
+      index_map_act(i) = accumulator % get_size() + 1
+      call accumulator % push_all(ragged_array(i) % p)
+    end do
+
+    flattened = accumulator % to_array()
+    if (present(index_map)) then
+      index_map = index_map_act
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Appends all elements of 2D array of 1D arrays (ragged 3D array) to form a single plain 1D array in column-wise order.
+! *index_map* contains rows and columns of first elements from each ragged dimension of the original array in the flattened array.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine CONCAT2(flatten_2d_array_1d_,TEMPLATE_TYPE_NAME)(ragged_array, flattened, index_map)
+    class(CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)), intent(in) :: ragged_array(:, :)
+    TEMPLATE_TYPE_OUT, allocatable, intent(out) :: flattened(:)
+    integer, allocatable, optional, intent(out) :: index_map(:, :)
+    integer :: i, j
+    integer :: index_map_act(size(ragged_array, 1), size(ragged_array, 2))
+    type(CONCAT2(vector_,TEMPLATE_TYPE_NAME)) :: accumulator
+
+    accumulator = CONCAT2(vector_,TEMPLATE_TYPE_NAME)()
+    do j = 1, size(ragged_array, 2)
+      do i = 1, size(ragged_array, 1)
+        index_map_act(i, j) = accumulator % get_size() + 1
+        call accumulator % push_all(ragged_array(i, j) % p)
       end do
     end do
 
-    res = accumulator % to_array()
-    if (present(blocks)) then
-      blocks = blocks_vec % to_array()
+    flattened = accumulator % to_array()
+    if (present(index_map)) then
+      index_map = index_map_act
     end if
-  end function
+  end subroutine
