@@ -20,7 +20,8 @@ module basis_params_mod
     real(real64) :: cutoff_energy_2d = 0 ! 2D solutions with energies higher than this are discarded from basis
     integer :: min_solutions_1d = 1 ! minimum number of 1D solutions in each slice, kept even if energies are higher than cutoff_energy_1d
     integer :: min_solutions_2d = 1 ! minimum number of 2D solutions in each slice, kept even if energies are higher than cutoff_energy_2d
-    integer :: print_energies_1d = 0 ! whether or not to create a file with 1D energies
+    integer :: print_energies_1d = 0 ! whether or not to create a file with formatted 1D energies
+    integer :: print_energies_2d = 0 ! whether or not to create a file with formatted 2D energies
     type(fixed_basis_params) :: fixed ! parameters describing rotational state of fixed basis, if used
 
   contains
@@ -88,6 +89,8 @@ contains
           this % min_solutions_2d = str2int_config(next_value, full_key)
         case ('print_energies_1d')
           this % print_energies_1d = str2int_config(next_value, full_key)
+        case ('print_energies_2d')
+          this % print_energies_2d = str2int_config(next_value, full_key)
         case ('fixed')
           call this % fixed % checked_init(subdict, auxiliary_subdict)
       end select
@@ -120,6 +123,7 @@ contains
     call put_string(keys, 'min_solutions_1d')
     call put_string(keys, 'min_solutions_2d')
     call put_string(keys, 'print_energies_1d')
+    call put_string(keys, 'print_energies_2d')
     call put_string(keys, 'fixed')
   end function
 
@@ -156,6 +160,7 @@ contains
     call assert(this % min_solutions_1d > 0, 'Error: ' // this % prefix // 'min_solutions_1d should be > 0')
     call assert(this % min_solutions_2d > 0, 'Error: ' // this % prefix // 'min_solutions_2d should be > 0')
     call assert(any(this % print_energies_1d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_1d should be 0 or 1')
+    call assert(any(this % print_energies_2d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_2d should be 0 or 1')
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

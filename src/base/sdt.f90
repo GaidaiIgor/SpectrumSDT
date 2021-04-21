@@ -149,16 +149,6 @@ contains
       write(file_unit) vec1(theta_ind) % p
     end do
     close(file_unit)
-
-    ! Also save to formatted file, if requested
-    if (params % basis % print_energies_1d == 1) then
-      open(newunit = file_unit, file = get_formatted_energies_1d_path(get_sym_path(params), rho_ind), form = 'formatted')
-      write(file_unit, '(' // num2str(size(nvec1)) // '(I5))') nvec1
-      do theta_ind = 1, size(grid_theta)
-        write(file_unit, '(' // num2str(nvec1(theta_ind)) // '(G25.15))') val1(theta_ind) % p * au_to_wn
-      end do
-      close(file_unit)
-    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -250,7 +240,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Solves 2D problem for *rho_ind*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_2d(params, rho_ind, rho_val, period_theta, nvec1, val1, vec1, nvec2)
+  subroutine calc_2d(params, rho_ind, rho_val, period_theta, nvec1, val1, vec1, nvec2, val2)
     class(input_params), intent(in) :: params
     integer, intent(in) :: rho_ind
     real(real64), intent(in) :: rho_val, period_theta
@@ -258,9 +248,10 @@ contains
     type(array_1d_real), intent(in) :: val1(:) ! 1D eigenvalues for each thread
     type(array_2d_real), intent(in) :: vec1(:) ! 1D eigenvectors for each thread
     integer, intent(out) :: nvec2
+    real(real64), allocatable, intent(out) :: val2(:)
     integer :: file_unit
     real(real64) :: mu
-    real(real64), allocatable :: val2_all(:), val2(:) ! Eigenvalues
+    real(real64), allocatable :: val2_all(:)
     real(real64), allocatable :: ham2(:, :), vec2(:, :)
 
     mu = get_reduced_mass(params % mass)
@@ -279,52 +270,108 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Gathers and writes all 1D basis energies from all values of theta and rho.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine gather_write_energies_1d(proc_val1, file_path)
+    class(array_1d_real), intent(in) :: proc_val1(:, :)
+    character(*), intent(in) :: file_path
+    integer :: file_unit, i
+    integer, allocatable :: proc_shifts(:), flat_global_index_map(:)
+    integer, allocatable :: proc_index_map(:, :), global_index_map(:, :)
+    real(real64), allocatable :: flat_proc_val1(:), flat_global_val1(:), val1_section(:)
+
+    call flatten_2d_array_1d_real(proc_val1, flat_proc_val1, proc_index_map)
+    call gather_array_1d_real(flat_proc_val1, flat_global_val1, proc_shifts = proc_shifts)
+    call gather_cols_array_2d_integer(proc_index_map + proc_shifts(get_proc_id() + 1), global_index_map)
+
+    if (get_proc_id() == 0) then
+      flat_global_index_map = [global_index_map, size(flat_global_val1) + 1]
+      open(newunit = file_unit, file = file_path)
+      write(file_unit, '(2I5)') size(global_index_map, 2), size(global_index_map, 1) ! Number of points in rho and theta
+      do i = 1, size(flat_global_index_map) - 1
+        val1_section = flat_global_val1(flat_global_index_map(i) : flat_global_index_map(i + 1) - 1)
+        write(file_unit, '(' // num2str(size(val1_section)) // 'G25.15)') val1_section * au_to_wn
+      end do
+      close(file_unit)
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Gathers and writes all 2D basis energies from all values of rho.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine gather_write_energies_2d(proc_val2, file_path)
+    class(array_1d_real), intent(in) :: proc_val2(:)
+    character(*), intent(in) :: file_path
+    integer :: file_unit, i
+    integer, allocatable :: proc_index_map(:), proc_shifts(:), global_index_map(:)
+    real(real64), allocatable :: flat_proc_val2(:), flat_global_val2(:), val2_section(:)
+
+    call flatten_1d_array_1d_real(proc_val2, flat_proc_val2, proc_index_map)
+    call gather_array_1d_real(flat_proc_val2, flat_global_val2, proc_shifts = proc_shifts)
+    call gather_array_1d_integer(proc_index_map + proc_shifts(get_proc_id() + 1), global_index_map)
+
+    if (get_proc_id() == 0) then
+      global_index_map = [global_index_map, size(flat_global_val2) + 1]
+      open(newunit = file_unit, file = file_path)
+      write(file_unit, '(I5)') size(global_index_map) - 1 ! Number of points in rho
+      do i = 1, size(global_index_map) - 1
+        val2_section = flat_global_val2(global_index_map(i) : global_index_map(i + 1) - 1)
+        write(file_unit, '(' // num2str(size(val2_section)) // 'G25.15)') val2_section * au_to_wn
+      end do
+      close(file_unit)
+    end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates 1D and 2D basis.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_basis(params, grid_rho, grid_theta, grid_phi, potential)
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), intent(in) :: potential(:, :, :)
-    integer :: proc_id, proc_first, proc_count, rho_ind, ierr, nvec2, file_unit
-    integer, allocatable :: all_counts1(:), all_shifts1(:), all_counts2(:), all_shifts2(:), nvec1(:), proc_nvec2(:), all_nvec2(:)
+    integer :: proc_first, proc_rhos, rho_ind, nvec2, file_unit
+    integer, allocatable :: nvec1(:), proc_nvec2(:), all_nvec2(:)
     integer, allocatable :: proc_nvec1(:, :), all_nvec1(:, :)
     real(real64) :: step_theta
-    type(array_1d_real), allocatable :: val1(:)
+    real(real64), allocatable :: val2(:)
+    type(array_1d_real), allocatable :: val1(:), proc_val2(:)
+    type(array_1d_real), allocatable :: proc_val1(:, :)
     type(array_2d_real), allocatable :: vec1(:)
 
-    proc_id = get_proc_id()
-    call get_proc_elem_range(size(grid_rho), proc_first, proc_count, all_counts2, all_shifts2)
-    all_counts1 = all_counts2 * size(grid_theta)
-    all_shifts1 = all_shifts2 * size(grid_theta)
-
-    allocate(proc_nvec2(proc_count))
-    allocate(proc_nvec1(size(grid_theta), proc_count))
+    call get_proc_elem_range(size(grid_rho), proc_first, proc_rhos)
+    allocate(proc_nvec2(proc_rhos), proc_val2(proc_rhos))
+    allocate(proc_nvec1(size(grid_theta), proc_rhos), proc_val1(size(grid_theta), proc_rhos))
     step_theta = grid_theta(2) - grid_theta(1)
-    do rho_ind = proc_first, proc_first + proc_count - 1
+    do rho_ind = proc_first, proc_first + proc_rhos - 1
       call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
-      call calc_2d(params, rho_ind, grid_rho(rho_ind), step_theta, nvec1, val1, vec1, nvec2)
       proc_nvec1(:, rho_ind - proc_first + 1) = nvec1
+      proc_val1(:, rho_ind - proc_first + 1) = val1
+
+      call calc_2d(params, rho_ind, grid_rho(rho_ind), step_theta, nvec1, val1, vec1, nvec2, val2)
       proc_nvec2(rho_ind - proc_first + 1) = nvec2
+      proc_val2(rho_ind - proc_first + 1) % p = val2
     end do
 
-    if (proc_id == 0) then
-      allocate(all_nvec1(size(grid_theta), size(grid_rho)))
-      allocate(all_nvec2(size(grid_rho)))
-    else
-      allocate(all_nvec1(0, 0))
-      allocate(all_nvec2(0))
+    if (params % basis % print_energies_1d == 1) then
+      call gather_write_energies_1d(proc_val1, get_energies_1d_path(get_sym_path(params)))
     end if
-    call MPI_Gatherv(proc_nvec1, size(proc_nvec1), MPI_INTEGER, all_nvec1, all_counts1, all_shifts1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-    call MPI_Gatherv(proc_nvec2, size(proc_nvec2), MPI_INTEGER, all_nvec2, all_counts2, all_shifts2, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+    if (params % basis % print_energies_2d == 1) then
+      call gather_write_energies_2d(proc_val2, get_energies_2d_path(get_sym_path(params)))
+    end if
+
+    call gather_cols_array_2d_integer(proc_nvec1, all_nvec1)
+    call gather_array_1d_integer(proc_nvec2, all_nvec2)
 
     ! Write total number of 1D and 2D vectors
-    if (proc_id == 0) then
+    if (get_proc_id() == 0) then
       open(newunit = file_unit, file = get_basis_1D_summary_path(get_sym_path(params)))
       write(file_unit, '(' // num2str(size(grid_theta)) // '(I5))') all_nvec1
       close(file_unit)
+
       open(newunit = file_unit, file = get_block_info_path(get_sym_path(params)))
       write(file_unit, '(I0)') all_nvec2
       close(file_unit)
+
       print *, 'Total number of 1D basis functions: ', sum(all_nvec1)
       print *, 'Maximum number of 1D basis functions per slice: ', maxval(all_nvec1)
       print *, 'Total number of 2D basis functions: ', sum(all_nvec2)
