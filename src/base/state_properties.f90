@@ -292,10 +292,9 @@ contains
     real(real64), intent(in) :: wf_sections_dist_mask(:, :, :, :, :), proc_p_dist(:, :, :, :, :) ! wf_section/state x sizes of all sections in order K, rho, theta, phi
     real(real64), allocatable, intent(out) :: section_stats(:, :)
     integer :: proc_first_state, proc_states, i, j
-    integer, allocatable :: recv_counts(:), recv_shifts(:)
     real(real64), allocatable :: proc_section_stats(:, :)
 
-    call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states, recv_counts, recv_shifts)
+    call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
     call assert(size(proc_p_dist, 1) == proc_states, 'Error: wrong size of proc_p_dist')
     ! Calculate local chunks
     allocate(proc_section_stats(proc_states, size(params % wf_sections)))
@@ -304,7 +303,7 @@ contains
         proc_section_stats(i, j) = sum(wf_sections_dist_mask(j, :, :, :, :) * proc_p_dist(i, :, :, :, :))
       end do
     end do
-    call gather_chunks(proc_section_stats, recv_counts, recv_shifts, section_stats)
+    call gather_rows_array_2d_real(proc_section_stats, section_stats)
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

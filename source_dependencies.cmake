@@ -12,13 +12,17 @@ set(general_char_str ${prefix}/src/utils/general/general_char_str.F90)
 set(general_integer ${general_char_str} ${prefix}/src/utils/general/general_integer.F90)
 set(general_real ${general_char_str} ${prefix}/src/utils/general/general_real.F90)
 set(general_real_array ${prefix}/src/utils/general/general_real_array.F90)
-set(general_utils ${general_integer} ${general_real} ${general_real_array} ${general_char_str} ${prefix}/src/utils/general/general.F90)
+set(general_utils ${general_integer} ${general_real} ${general_real_array} ${general_char_str} ${prefix}/src/utils/general/general.f90)
 
 set(path_utils ${general_utils} ${prefix}/src/utils/path.f90)
 set(fourier_transform ${constants} ${general_utils} ${prefix}/src/utils/fourier_transform.f90)
 set(formulas ${constants} ${general_utils} ${prefix}/src/base/formulas.f90)
-set(parallel_utils ${algorithms} ${general_utils} ${prefix}/src/utils/parallel.f90)
 set(string ${general_utils} ${prefix}/src/utils/string/string.f90)
+
+set(parallel_base ${prefix}/src/utils/parallel/parallel_base.f90)
+set(parallel_integer ${algorithms} ${parallel_base} ${prefix}/src/utils/parallel/parallel_integer.F90)
+set(parallel_real ${algorithms} ${parallel_base} ${prefix}/src/utils/parallel/parallel_real.F90)
+set(parallel_utils ${algorithms} ${general_utils} ${parallel_base} ${parallel_integer} ${parallel_real} ${prefix}/src/utils/parallel/parallel.f90)
 
 set(vector_integer ${general_utils} ${prefix}/src/utils/vector/vector_integer.F90)
 set(vector_real ${general_utils} ${prefix}/src/utils/vector/vector_real.F90)
@@ -38,15 +42,15 @@ set(algorithms_integer ${general_utils} ${vector} ${prefix}/src/utils/algorithms
 set(algorithms_real ${general_utils} ${vector} ${prefix}/src/utils/algorithms/algorithms_real.F90)
 set(algorithms ${algorithms_integer} ${algorithms_real} ${prefix}/src/utils/algorithms/algorithms.f90)
 
-set(array_1d ${array_1d_real} ${array_1d_integer} ${array_1d_complex} ${prefix}/src/utils/array_1d/array_1d.F90)
+set(array_1d ${array_1d_real} ${array_1d_integer} ${array_1d_complex} ${prefix}/src/utils/array_1d/array_1d.f90)
 set(array_2d_real ${prefix}/src/utils/array_2d/array_2d_real.F90)
 set(array_2d_complex ${prefix}/src/utils/array_2d/array_2d_complex.F90)
-set(array_2d ${array_2d_real} ${array_2d_complex} ${prefix}/src/utils/array_2d/array_2d.F90)
+set(array_2d ${array_2d_real} ${array_2d_complex} ${prefix}/src/utils/array_2d/array_2d.f90)
 
 set(dict_integer ${prefix}/src/interface/fdict/dict_integer.F90)
 set(dict_integer_array ${prefix}/src/interface/fdict/dict_integer_array.F90)
 set(dict_char_str ${prefix}/src/interface/fdict/dict_char_str.F90)
-set(dict_utils ${dict_integer} ${dict_integer_array} ${dict_char_str} ${string} ${vector_string} ${prefix}/src/interface/fdict/dict.F90)
+set(dict_utils ${dict_integer} ${dict_integer_array} ${dict_char_str} ${string} ${vector_string} ${prefix}/src/interface/fdict/dict.f90)
 
 set(string_utils ${vector_string} ${prefix}/src/utils/string/string_utils.f90)
 

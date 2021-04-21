@@ -3,46 +3,12 @@ module parallel_utils
   use general_utils
   use iso_fortran_env, only: real64
   use mpi
+  use parallel_base_mod
+  use parallel_integer_mod
+  use parallel_real_mod
   implicit none
 
 contains
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Wraps MPI_Initialized into a function.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function is_mpi_enabled() result(mpi_enabled)
-    logical :: mpi_enabled
-    integer :: ierr
-    call MPI_Initialized(mpi_enabled, ierr)
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns current process id.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_proc_id() result(proc_id)
-    integer :: proc_id
-    integer :: ierr
-
-    if (is_mpi_enabled()) then
-      call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
-    else
-      proc_id = 0
-    end if
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Returns number of processors.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_num_procs() result(num_procs)
-    integer :: num_procs
-    integer :: ierr
-
-    if (is_mpi_enabled()) then
-      call MPI_Comm_Size(MPI_COMM_WORLD, num_procs, ierr)
-    else
-      num_procs = 1
-    end if
-  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Computes range of elements to process by this processor.
@@ -94,9 +60,9 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Gathers local chunks on 0th processor.
+! Gathers local chunks of rows to a global 2D array on 0th processor.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine gather_chunks(chunk, counts, shifts, global)
+  subroutine gather_rows(chunk, counts, shifts, global)
     real(real64), intent(in) :: chunk(:, :)
     integer, intent(in) :: counts(:), shifts(:)
     real(real64), allocatable, intent(out) :: global(:, :)
