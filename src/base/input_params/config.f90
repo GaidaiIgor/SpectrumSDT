@@ -3,13 +3,13 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module config_mod
   use dictionary
-  use dict_utils
-  use general_utils
-  use io_utils
+  use dict_utils_mod
+  use general_utils_mod
+  use io_utils_mod
   use iso_fortran_env, only: real64
-  use parallel_utils
+  use parallel_utils_mod
   use string_mod
-  use string_utils
+  use string_utils_mod
   implicit none
   
   private :: read_inner_dict

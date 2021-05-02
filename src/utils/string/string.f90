@@ -1,5 +1,5 @@
 module string_mod
-  use general_utils
+  use general_utils_mod
   use iso_fortran_env, only: real64
   implicit none
   
@@ -217,5 +217,23 @@ contains
     class(string), intent(inout) :: this
     this % s = trim(adjustl(this % s))
   end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Finds index of *value* in *array* of strings.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function findloc_string(array, value) result(ind)
+    class(string), intent(in) :: array(:)
+    character(*), intent(in) :: value
+    integer :: ind
+    integer :: i
+
+    ind = 0
+    do i = 1, size(array)
+      if (array(i) == value) then
+        ind = i
+        exit
+      end if
+    end do
+  end function
 
 end module

@@ -1,6 +1,6 @@
 module matrix_block_info_mod
   use block_borders_mod
-  use general_utils
+  use general_utils_mod
   use iso_fortran_env, only: real64
   implicit none
 

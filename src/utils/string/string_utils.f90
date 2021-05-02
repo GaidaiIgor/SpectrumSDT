@@ -1,4 +1,4 @@
-module string_utils
+module string_utils_mod
   use vector_string_mod
   implicit none
 

@@ -1,21 +1,22 @@
 program spectrumsdt
+  use basis_mod
   use cap_mod, only: calc_real_cap
   use config_mod, only: read_config_dict
-  use debug_tools
-  use dict_utils, only: extract_string, item_or_default
+  use debug_tools_mod
+  use dict_utils_mod, only: extract_string, item_or_default
   use dictionary
+  use eigensolve_mod, only: calculate_states
   use formulas_mod, only: get_reduced_mass
   use input_params_mod, only: input_params
   use iso_fortran_env, only: real64
   use mpi
   use grid_info_mod
   use grids_mod, only: generate_grids, load_grids
-  use overlaps_extra_mod, only: calculate_overlaps_extra
-  use parallel_utils, only: print_parallel
+  use overlaps_mod
+  use overlaps_extra_mod
+  use parallel_utils_mod, only: print_parallel
   use potential_mod, only: load_potential
-  use sdt, only: calculate_basis, calculate_overlaps
-  use spectrum_mod, only: calculate_states
-  use state_properties_mod, only: calculate_state_properties
+  use properties_mod
   implicit none
 
   integer :: ierr
@@ -56,20 +57,33 @@ contains
     select case (params % stage)
       case ('grids')
         call generate_grids(params)
+
       case ('basis')
         potential = load_potential(params, rho_info % points, theta_info % points, phi_info % points)
-        call calculate_basis(params, rho_info % points, theta_info % points, phi_info % points, potential)
+        if (params % use_geometric_phase == 0) then
+          call calculate_basis_real(params, rho_info % points, theta_info % points, phi_info % points, potential)
+        else
+          call calculate_basis_complex(params, rho_info % points, theta_info % points, phi_info % points, potential)
+        end if
+
       case ('overlaps')
-        call calculate_overlaps(params, size(theta_info % points))
-        call calculate_overlaps_extra(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
+        if (params % use_geometric_phase == 0) then
+          call calculate_overlaps_real(params, size(theta_info % points))
+          call calculate_overlaps_extra_real(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
+        else
+          call calculate_overlaps_complex(params, size(theta_info % points))
+          call calculate_overlaps_extra_complex(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
+        end if
+
       case ('eigensolve')
         call calculate_states(params, rho_info)
+
       case ('properties')
-        if (params % cap % type /= 'none') then
-          cap = calc_real_cap(params, rho_info)
-          call calculate_state_properties(params, rho_info, theta_info, cap)
+        cap = calc_real_cap(params, rho_info) ! Returns 0s if no cap
+        if (params % use_geometric_phase == 0) then
+          call calculate_state_properties_real(params, rho_info, theta_info, cap)
         else
-          call calculate_state_properties(params, rho_info, theta_info)
+          call calculate_state_properties_complex(params, rho_info, theta_info, cap)
         end if
     end select
     call print_parallel('Done')

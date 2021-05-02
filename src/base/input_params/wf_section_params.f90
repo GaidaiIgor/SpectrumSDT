@@ -2,11 +2,11 @@ module wf_section_params_mod
   use config_mod
   use constants
   use dictionary
-  use dict_utils
-  use general_utils
+  use dict_utils_mod
+  use general_utils_mod
   use iso_fortran_env, only: real64
   use string_mod
-  use string_utils
+  use string_utils_mod
   implicit none
 
   private

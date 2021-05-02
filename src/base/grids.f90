@@ -6,13 +6,13 @@ module grids_mod
   use constants
   use coordinate_coversion_mod
   use formulas_mod, only: get_reduced_mass
-  use general_utils
+  use general_utils_mod
   use grid_info_mod
   use input_params_mod
-  use io_utils
+  use io_utils_mod
   use iso_fortran_env, only: real64
   use numerical_recipies
-  use path_utils
+  use path_utils_mod
   use spectrumsdt_paths_mod
   use vector_mod
   implicit none

@@ -1,6 +1,5 @@
 #include "funcs.macro"
-  use general_utils
-  use vector_mod
+  use algorithms_base_mod
   implicit none
 
 contains

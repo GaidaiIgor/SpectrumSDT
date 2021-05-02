@@ -3,14 +3,15 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module distributed_rovib_hamiltonian_mod
   use block_borders_mod
-  use general_utils
+  use general_utils_mod
   use formulas_mod
   use input_params_mod
   use iso_fortran_env, only: real64
-  use k_block_info
+  use k_block_info_mod
   use matrix_block_info_mod
-  use parallel_utils
+  use parallel_utils_mod
   use rovib_utils_mod
+  use spectrumsdt_io_mod
   use spectrumsdt_paths_mod
   implicit none
 
@@ -24,7 +25,9 @@ module distributed_rovib_hamiltonian_mod
     integer, allocatable :: all_counts(:) ! how many rows each processor has
     integer, allocatable :: all_shifts(:) ! prefix sum of all_counts
     integer :: compression
+
   contains
+
     private
     final :: finalize_distributed_rovib_hamiltonian
     procedure :: load_chunk_info
@@ -190,60 +193,18 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads an overlap block for given values of Ks and slice indexes.
-! overlap_type: 0 - regular, 10 - symmetric J, 11 - symmetric K, 2 - coriolis, 3 - asymmetric.
+! General wrapper for loading overlap blocks. Converts real blocks to complex.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_overlap_block(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns) result(block)
+  function load_overlap_block(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real) result(block)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns
-    logical :: swap_condition
-    integer :: file_unit, K_row_act, K_col_act, K_row_sym_act, slice_ind_row_act, slice_ind_col_act, rows_act, columns_act
-    real(real64), allocatable :: block(:, :)
-    character(:), allocatable :: sym_path, file_path
+    logical, intent(in) :: is_file_real
+    complex(real64), allocatable :: block(:, :)
 
-    ! Load identity matrix for regular diagonal overlaps
-    if (K_row == K_col .and. slice_ind_row == slice_ind_col .and. overlap_type == 0) then
-      call assert(rows == columns, 'Assertion error: diagonal overlap is not square')
-      block = identity_matrix(rows)
-      return
-    end if
-
-    ! Since the matrix is symmetric only blocks above the main diagonal are actually stored, blocks below are just transposed upper diagonal blocks
-    ! Prepare to load transposed version of block if it's below main diagonal
-    swap_condition = K_row > K_col .or. slice_ind_row > slice_ind_col
-    K_row_act = merge(K_col, K_row, swap_condition)
-    K_col_act = merge(K_row, K_col, swap_condition)
-    K_row_sym_act = merge(1 - K_row_sym, K_row_sym, swap_condition .and. overlap_type == 2) ! In case of coriolis we also need to change symmetry
-    slice_ind_row_act = merge(slice_ind_col, slice_ind_row, swap_condition)
-    slice_ind_col_act = merge(slice_ind_row, slice_ind_col, swap_condition)
-    rows_act = merge(columns, rows, swap_condition)
-    columns_act = merge(rows, columns, swap_condition)
-
-    allocate(block(rows_act, columns_act))
-    sym_path = get_sym_path_root(root_path, K_row_act, K_row_sym_act)
-    if (overlap_type == 0) then
-      file_path = get_regular_overlap_file_path(sym_path, slice_ind_row_act, slice_ind_col_act)
-    else if (overlap_type == 10) then
-      file_path = get_symmetric_overlap_J_file_path(sym_path, slice_ind_row_act)
-    else if (overlap_type == 11) then
-      file_path = get_symmetric_overlap_K_file_path(sym_path, slice_ind_row_act)
-    else if (overlap_type == 2) then
-      file_path = get_coriolis_overlap_file_path(sym_path, slice_ind_row_act)
-    else if (overlap_type == 3) then
-      if (K_row == 1 .and. K_col == 1) then
-        file_path = get_asymmetric_overlap_file_1_path(sym_path, slice_ind_row_act)
-      else
-        file_path = get_asymmetric_overlap_file_path(sym_path, slice_ind_row_act)
-      end if
-    end if
-
-    open(newunit = file_unit, file = file_path, form = 'unformatted')
-    read(file_unit) block
-    close(file_unit)
-
-    ! transpose back once loaded
-    if (swap_condition) then
-      block = transpose(block)
+    if (is_file_real) then
+      block = load_overlap_block_real(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
+    else
+      block = load_overlap_block_complex(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
     end if
   end function
 
@@ -254,8 +215,9 @@ contains
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
+    logical :: is_file_real
     integer :: ir, ic, K, K_load, K_ind, K_sym, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
-    real(real64), allocatable :: overlap_block(:, :)
+    complex(real64), allocatable :: overlap_block(:, :)
     complex(real64), pointer :: local_overlap_info_data(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
@@ -263,6 +225,7 @@ contains
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
     K_sym = get_k_symmetry(K, params % basis % symmetry)
+    is_file_real = params % use_geometric_phase == 0
 
     do ir = 1, size(local_k_block_info % subblocks, 1)
       do ic = 1, size(local_k_block_info % subblocks, 2)
@@ -279,7 +242,7 @@ contains
         columns = full_ham_overlap_info % columns
         K_load = merge(params % basis % fixed % K, K, params % basis % fixed % enabled == 1)
         root_path = iff(params % basis % fixed % enabled == 1, params % basis % fixed % root_path, params % root_path)
-        overlap_block = load_overlap_block(root_path, K_load, K_load, 0, K_sym, slice_ind_row, slice_ind_col, rows, columns)
+        overlap_block = load_overlap_block(root_path, K_load, K_load, 0, K_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
         last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
@@ -516,9 +479,9 @@ contains
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
+    logical :: is_file_real
     integer :: K_ind, K, K_sym, ir, ic, K_load, slice_row_ind, slice_col_ind, rows, first_row, last_row, J_shift, K_shift, J_factor, K_factor
-    real(real64), allocatable :: overlap_block_J(:, :), overlap_block_K(:, :)
-    complex(real64), allocatable :: overlap_block_slice(:, :)
+    complex(real64), allocatable :: overlap_block_J(:, :), overlap_block_K(:, :), overlap_block_slice(:, :)
     complex(real64), pointer :: existing_overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
@@ -526,6 +489,7 @@ contains
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
     K_sym = get_k_symmetry(K, params % basis % symmetry)
+    is_file_real = params % use_geometric_phase == 0
 
     ! Iterate over n-blocks
     do ir = 1, size(local_k_block_info % subblocks, 1)
@@ -547,8 +511,8 @@ contains
 
         K_load = merge(params % basis % fixed % K, K, params % basis % fixed % enabled == 1)
         root_path = iff(params % basis % fixed % enabled == 1, params % basis % fixed % root_path, params % root_path)
-        overlap_block_J = load_overlap_block(root_path, K_load, K_load, 10, K_sym, slice_row_ind, slice_col_ind, rows, rows)
-        overlap_block_K = load_overlap_block(root_path, K_load, K_load, 11, K_sym, slice_row_ind, slice_col_ind, rows, rows)
+        overlap_block_J = load_overlap_block(root_path, K_load, K_load, 10, K_sym, slice_row_ind, slice_col_ind, rows, rows, is_file_real)
+        overlap_block_K = load_overlap_block(root_path, K_load, K_load, 11, K_sym, slice_row_ind, slice_col_ind, rows, rows, is_file_real)
 
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
@@ -598,9 +562,10 @@ contains
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
+    logical :: is_file_real
     integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, ir, ic, K_row_load, K_col_load, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
     real(real64) :: W
-    real(real64), allocatable :: overlap_block(:, :)
+    complex(real64), allocatable :: overlap_block(:, :)
     complex(real64), pointer :: local_overlap_info_data(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
@@ -610,6 +575,7 @@ contains
     K_row = k_ind_to_k(K_row_ind, params % K(1))
     K_col = k_ind_to_k(K_col_ind, params % K(1))
     K_row_sym = get_k_symmetry(K_row, params % basis % symmetry)
+    is_file_real = params % use_geometric_phase == 0
 
     if (params % basis % fixed % enabled == 1) then
       ! All K-blocks are the same, so we only need to keep K_row_load different from K_col_load for the correct block transposition 
@@ -646,7 +612,7 @@ contains
         ! Load block
         rows = full_ham_overlap_info % rows
         columns = full_ham_overlap_info % columns
-        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 2, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
+        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 2, K_row_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
         last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
@@ -689,9 +655,9 @@ contains
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
+    logical :: is_file_real
     integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, K_row_load, K_col_load, ir, ic, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
-    real(real64), allocatable :: overlap_block(:, :)
-    complex(real64), allocatable :: overlap_block_slice(:, :)
+    complex(real64), allocatable :: overlap_block(:, :), overlap_block_slice(:, :)
     complex(real64), pointer :: existing_overlap_block(:, :)
     character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
@@ -701,6 +667,7 @@ contains
     K_row = k_ind_to_k(K_row_ind, params % K(1))
     K_col = k_ind_to_k(K_col_ind, params % K(1))
     K_row_sym = get_k_symmetry(K_row, params % basis % symmetry)
+    is_file_real = params % use_geometric_phase == 0
 
     if (params % basis % fixed % enabled == 1) then
       K_row_load = merge(params % basis % fixed % K, params % basis % fixed % K + 2, K_row <= K_col)
@@ -729,7 +696,7 @@ contains
         ! load block
         rows = full_ham_overlap_info % rows
         columns = full_ham_overlap_info % columns
-        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 3, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
+        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 3, K_row_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
 
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1

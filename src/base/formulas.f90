@@ -3,7 +3,7 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module formulas_mod
   use constants
-  use general_utils
+  use general_utils_mod
   use iso_fortran_env, only: real64
   implicit none
 

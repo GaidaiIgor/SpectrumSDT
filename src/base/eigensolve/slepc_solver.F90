@@ -1,9 +1,9 @@
 module slepc_solver_mod
 #include <slepc/finclude/slepceps.h>
-  use general_utils, only: num2str
+  use general_utils_mod, only: num2str
   use iso_fortran_env, only: real64
   use matmul_operator_mod, only: active_matmul_operator, msize, rovib_ham
-  use parallel_utils, only: get_proc_id, get_proc_elem_range, print_parallel
+  use parallel_utils_mod, only: get_proc_id, get_proc_elem_range, print_parallel
   use slepcds
   use slepceps
   implicit none

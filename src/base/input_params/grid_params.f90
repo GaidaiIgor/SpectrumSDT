@@ -1,8 +1,8 @@
 module grid_params_mod
   use config_mod
   use dictionary
-  use dict_utils
-  use general_utils
+  use dict_utils_mod
+  use general_utils_mod
   use iso_fortran_env, only: real64
   use string_mod
   implicit none

@@ -29,6 +29,11 @@ contains
     allocate(cap(size(rho_info % points)))
     cap = 0
 
+    ! Return zeros if no cap is set
+    if (params % cap % type == 'none') then
+      return
+    end if
+
     ! Setup parameters for Manolopoulos CAP
     delta = c / (4 * pi)
     mu = get_reduced_mass(params % mass)

@@ -4,9 +4,9 @@
 ! value of K and symmetry.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module spectrumsdt_paths_mod
-  use general_utils
+  use general_utils_mod
   use input_params_mod
-  use path_utils
+  use path_utils_mod
   use rovib_utils_base_mod
   implicit none
 

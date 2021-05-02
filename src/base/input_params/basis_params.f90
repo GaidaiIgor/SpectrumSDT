@@ -2,9 +2,9 @@ module basis_params_mod
   use config_mod
   use constants, only: au_to_wn
   use dictionary
-  use dict_utils
+  use dict_utils_mod
   use fixed_basis_params_mod
-  use general_utils
+  use general_utils_mod
   use iso_fortran_env, only: real64
   use string_mod
   implicit none
@@ -15,7 +15,7 @@ module basis_params_mod
   type :: basis_params
     character(:), allocatable :: prefix
     integer :: num_functions_phi = -1 ! number of sines or cosines in basis of 1D problem
-    integer :: symmetry = -1 ! 0 (even, cos, +) or 1 (odd, sin, -). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
+    integer :: symmetry = 2 ! 0 (even, cos, +) or 1 (odd, sin, -) or 2 (both). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
     real(real64) :: cutoff_energy_1d = 0 ! 1D solutions with energies higher than this are discarded from basis
     real(real64) :: cutoff_energy_2d = 0 ! 2D solutions with energies higher than this are discarded from basis
     integer :: min_solutions_1d = 1 ! minimum number of 1D solutions in each slice, kept even if energies are higher than cutoff_energy_1d
@@ -100,13 +100,16 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of mandatory keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_mandatory_keys_basis_params(this) result(keys)
+  function get_mandatory_keys_basis_params(this, use_geometric_phase) result(keys)
     class(basis_params), intent(in) :: this
+    integer, intent(in) :: use_geometric_phase
     type(dictionary_t) :: keys
 
     call put_string(keys, 'num_functions_phi')
-    call put_string(keys, 'symmetry')
     call put_string(keys, 'min_solutions_2d')
+    if (use_geometric_phase == 0) then
+      call put_string(keys, 'symmetry')
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -153,24 +156,32 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_values_basis_params(this) 
+  subroutine check_values_basis_params(this, use_geometric_phase)
     class(basis_params), intent(in) :: this
-    call assert(this % num_functions_phi > 0, 'Error: ' // this % prefix // 'num_functions_phi should be > 0')
-    call assert(any(this % symmetry == [0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1')
-    call assert(this % min_solutions_1d > 0, 'Error: ' // this % prefix // 'min_solutions_1d should be > 0')
-    call assert(this % min_solutions_2d > 0, 'Error: ' // this % prefix // 'min_solutions_2d should be > 0')
-    call assert(any(this % print_energies_1d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_1d should be 0 or 1')
-    call assert(any(this % print_energies_2d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_2d should be 0 or 1')
+    integer, intent(in) :: use_geometric_phase
+
+    call assert(this % num_functions_phi > 0, 'Error: ' // this % prefix // 'num_functions_phi should be > 0.')
+    call assert(this % min_solutions_1d > 0, 'Error: ' // this % prefix // 'min_solutions_1d should be > 0.')
+    call assert(this % min_solutions_2d > 0, 'Error: ' // this % prefix // 'min_solutions_2d should be > 0.')
+    call assert(any(this % print_energies_1d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_1d should be 0 or 1.')
+    call assert(any(this % print_energies_2d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_2d should be 0 or 1.')
+
+    if (use_geometric_phase == 1) then
+      call assert(this % symmetry == 2, 'Error: ' // this % prefix // 'symmery should be 2, if geometric phase effects are requested.')
+    else
+      call assert(any(this % symmetry == [0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1.')
+    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of basis_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_basis_params(this, config_dict, auxiliary_info, stage)
+  subroutine checked_init_basis_params(this, config_dict, auxiliary_info, stage, use_geometric_phase)
     class(basis_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
     character(*), intent(in) :: stage
+    integer, intent(in) :: use_geometric_phase
     type(dictionary_t) :: mandatory_keys, all_keys
 
     this % prefix = extract_string(auxiliary_info, 'prefix')
@@ -178,10 +189,10 @@ contains
     call check_extra_keys(config_dict, all_keys, this % prefix)
     call check_key_types_basis_params(config_dict, auxiliary_info)
     call this % assign_dict(config_dict, auxiliary_info)
-    mandatory_keys = this % get_mandatory_keys()
+    mandatory_keys = this % get_mandatory_keys(use_geometric_phase)
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
     call this % set_defaults(config_dict, stage)
-    call this % check_values()
+    call this % check_values(use_geometric_phase)
   end subroutine
 
 end module

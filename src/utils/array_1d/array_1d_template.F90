@@ -1,19 +1,19 @@
 #include "funcs.macro"
-use vector_integer_mod
-implicit none
+  use vector_integer_mod
+  implicit none
 
-interface CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)
-  module procedure :: CONCAT2(new_array_1d_,TEMPLATE_TYPE_NAME)
-end interface
+  interface CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)
+    module procedure :: CONCAT2(new_array_1d_,TEMPLATE_TYPE_NAME)
+  end interface
 
-type CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)
-  TEMPLATE_TYPE_OUT, allocatable :: p(:)
-contains
-  procedure :: write => CONCAT2(write_array_1d_,TEMPLATE_TYPE_NAME)
-  generic :: write(formatted) => write
-  
-  procedure :: to_plain_array => CONCAT3(array_1d_,TEMPLATE_TYPE_NAME,_to_plain_array)
-end type
+  type CONCAT2(array_1d_,TEMPLATE_TYPE_NAME)
+    TEMPLATE_TYPE_OUT, allocatable :: p(:)
+  contains
+    procedure :: write => CONCAT2(write_array_1d_,TEMPLATE_TYPE_NAME)
+    generic :: write(formatted) => write
+    
+    procedure :: to_plain_array => CONCAT3(array_1d_,TEMPLATE_TYPE_NAME,_to_plain_array)
+  end type
 
 contains
 

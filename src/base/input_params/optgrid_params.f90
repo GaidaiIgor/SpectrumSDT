@@ -1,10 +1,10 @@
 module optgrid_params_mod
   use config_mod
   use dictionary
-  use dict_utils
+  use dict_utils_mod
   use grid_params_mod
   use iso_fortran_env, only: real64
-  use parallel_utils
+  use parallel_utils_mod
   use string_mod
   implicit none
 

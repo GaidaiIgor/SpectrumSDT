@@ -1,11 +1,11 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Procedures related to information about K-blocks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-module k_block_info
+module k_block_info_mod
   use algorithms_mod
-  use io_utils
+  use io_utils_mod
   use matrix_block_info_mod
-  use rovib_io_mod, only: load_basis_size_2d
+  use spectrumsdt_io_mod, only: load_basis_size_2d
   implicit none
 
 contains

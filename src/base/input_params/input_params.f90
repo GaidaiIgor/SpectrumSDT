@@ -6,17 +6,17 @@ module input_params_mod
   use constants
   use debug_params_mod
   use dictionary
-  use dict_utils
+  use dict_utils_mod
   use eigensolve_params_mod
-  use general_utils
+  use general_utils_ext_mod
   use grid_info_mod
   use grid_params_mod
   use optgrid_params_mod
   use iso_fortran_env, only: real64
-  use parallel_utils
+  use parallel_utils_mod
   use rovib_utils_base_mod
   use string_mod
-  use string_utils
+  use string_utils_mod
   use wf_section_params_mod
   implicit none
 
@@ -28,7 +28,8 @@ module input_params_mod
 
     ! Behavior control
     character(:), allocatable :: stage ! grids, basis, overlaps, eigensolve or properties
-    integer :: use_rovib_coupling = 0 ! enables/disables rotation-vibration coupling
+    integer :: use_rovib_coupling = 0 ! controls inclusion of rotation-vibration coupling
+    integer :: use_geometric_phase = 0 ! controls inclusion of geometric phase effects
 
     ! Grids
     type(optgrid_params) :: grid_rho
@@ -278,24 +279,41 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Moves specified *key* to position *new_ind* in *key_set*.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine move_key(key, new_ind, key_set)
+    character(*), intent(in) :: key
+    integer, intent(in) :: new_ind
+    class(string), intent(inout) :: key_set(:)
+    integer :: key_ind
+
+    key_ind = findloc_string(key_set, key)
+    call swap(key_set(key_ind), key_set(new_ind))
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of input_params from a given *config_dict* with user set key-value parameters.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine assign_dict_input_params(this, config_dict, auxiliary_info)
     class(input_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
-    logical :: wf_sections_provided
     integer :: i, check_values
-    character(:), allocatable :: next_key, key_type, next_value, K_str
+    character(:), allocatable :: next_key, key_type, next_value
     type(string), allocatable :: key_set(:)
     type(dictionary_t) :: subdict, auxiliary_subdict
 
-    wf_sections_provided = .false.
+    ! Extract some mandatory parameters first, since they affect others
     this % prefix = extract_string(auxiliary_info, 'prefix')
-    ! Other parameters need stage, so assign it first
     this % stage = extract_string(config_dict, 'stage')
 
     ! Iterate over the keys given by user
     key_set = get_key_set(config_dict)
+    ! We need to make sure some keys are assigned after other keys they depend on
+    call move_key('basis', size(key_set), key_set) ! depends on use_geometric_phase
+    call move_key('wf_sections', size(key_set) - 1, key_set) ! depends on K
+    call move_key('K', size(key_set) - 2, key_set) ! depends on J and parity
+    call move_key('grid_theta', size(key_set) - 3, key_set) ! depends on debug % treat_tp_as_xy
+
     do i = 1, size(key_set)
       next_key = key_set(i) % to_char_str()
       key_type = extract_string(auxiliary_info, next_key // '_type')
@@ -313,10 +331,12 @@ contains
       select case (next_key)
         case ('use_rovib_coupling')
           this % use_rovib_coupling = str2int_config(next_value, next_key)
+        case ('use_geometric_phase')
+          this % use_geometric_phase = str2int_config(next_value, next_key)
         case ('grid_rho')
           call this % grid_rho % checked_init(subdict, auxiliary_subdict, this % stage)
         case ('grid_theta')
-          check_values = iff('treat_tp_as_xy' .in. config_dict, 0, 1)
+          check_values = this % debug % treat_tp_as_xy == 0
           call this % grid_theta % checked_init(subdict, auxiliary_subdict, this % stage, check_values = check_values)
           if (check_values == 1) then
             call convert_grid_params_deg_to_rad(this % grid_theta)
@@ -330,18 +350,18 @@ contains
         case ('J')
           this % J = str2int_config(next_value, next_key)
         case ('K')
-          K_str = next_value
+          this % K = parse_K(next_value, this % J, this % parity)
         case ('parity')
           this % parity = str2int_config(next_value, next_key)
         case ('basis')
-          call this % basis % checked_init(subdict, auxiliary_subdict, this % stage)
+          call this % basis % checked_init(subdict, auxiliary_subdict, this % stage, this % use_geometric_phase)
         case ('eigensolve')
           call this % eigensolve % checked_init(subdict, auxiliary_subdict, this % stage)
         case ('cap')
           call this % cap % checked_init(subdict, auxiliary_subdict)
         case ('wf_sections')
-          wf_sections_provided = .true.
           this % wf_sections = parse_wf_sections(subdict, auxiliary_subdict)
+          call this % wf_sections % checked_resolve_Ks(this % K(1), this % K(2))
         case ('grid_path')
           this % grid_path = next_value
         case ('root_path')
@@ -352,14 +372,6 @@ contains
           call this % debug % checked_init(subdict, auxiliary_subdict)
       end select
     end do
-
-    ! Values whose interpretation depends on other values are initialized after the main set loop
-    if (allocated(K_str)) then
-      this % K = parse_K(K_str, this % J, this % parity)
-    end if
-    if (wf_sections_provided) then
-      call this % wf_sections % checked_resolve_Ks(this % K(1), this % K(2))
-    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -412,6 +424,7 @@ contains
 
     call put_string(keys, 'stage')
     call put_string(keys, 'use_rovib_coupling')
+    call put_string(keys, 'use_geometric_phase')
     call put_string(keys, 'grid_rho')
     call put_string(keys, 'grid_theta')
     call put_string(keys, 'num_points_phi')
@@ -440,7 +453,7 @@ contains
     if (.not. ('output_coordinate_system' .in. config_dict)) then
       this % output_coordinate_system = 'aph'
       if (this % stage == 'grids') then
-        call print_parallel('output_coordinate_system is not specified, assuming aph')
+        call print_parallel('output_coordinate_system is not specified. Assuming APH.')
       end if
     end if
 
@@ -451,7 +464,13 @@ contains
     if (.not. ('cap' .in. config_dict)) then
       call this % cap % init_default()
       if (this % stage == 'eigensolve') then
-        call print_parallel('cap is not specified, assuming no cap')
+        call print_parallel('cap is not specified. Assuming no CAP.')
+      end if
+    end if
+      
+    if (.not. ('use_geometric_phase' .in. config_dict)) then
+      if (this % stage /= 'grids') then
+        call print_parallel('use_geometric_phase is not specified. Assuming no geometric phase effects.')
       end if
     end if
   end subroutine
@@ -463,6 +482,7 @@ contains
     class(input_params), intent(in) :: this
     call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigensolve', 'properties']), 'Error: stage should be "grids", "basis", "overlaps", "eigensolve" or "properties"')
     call assert(any(this % use_rovib_coupling == [0, 1]), 'Error: use_rovib_coupling should be 0 or 1')
+    call assert(any(this % use_geometric_phase == [0, 1]), 'Error: use_geometric_phase should be 0 or 1')
     if (this % debug % treat_tp_as_xy /= 1) then
       call assert(this % grid_theta % from .ale. pi/2, 'Error: grid_theta % from should be <= pi/2')
       call assert(this % grid_theta % to .ale. pi/2, 'Error: grid_theta % to should be <= pi/2')

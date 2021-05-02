@@ -1,0 +1,6 @@
+module general_utils_char_str_mod
+#include "type_list.macro"
+#define TYPE_ID CHAR_STR_ID
+#include "type_attributes.macro"
+#include "general_utils_template.F90"
+end module

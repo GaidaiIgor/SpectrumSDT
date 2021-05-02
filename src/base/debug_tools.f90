@@ -1,5 +1,5 @@
-module debug_tools
-  use debug_tools_base
+module debug_tools_mod
+  use debug_tools_base_mod
   use input_params_mod
   implicit none
 
