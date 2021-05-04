@@ -288,7 +288,9 @@ contains
     integer :: key_ind
 
     key_ind = findloc_string(key_set, key)
-    call swap(key_set(key_ind), key_set(new_ind))
+    if (key_ind > 0) then
+      call swap(key_set(key_ind), key_set(new_ind))
+    end if
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -308,6 +310,7 @@ contains
 
     ! Iterate over the keys given by user
     key_set = get_key_set(config_dict)
+
     ! We need to make sure some keys are assigned after other keys they depend on
     call move_key('basis', size(key_set), key_set) ! depends on use_geometric_phase
     call move_key('wf_sections', size(key_set) - 1, key_set) ! depends on K
