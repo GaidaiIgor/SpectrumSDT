@@ -1,4 +1,4 @@
-A parallel Fortran program for calculation of ro-vibrational energy levels and lifetimes of ABA-molecules.
+A parallel Fortran program for calculation of ro-vibrational energy levels and lifetimes of ABA-molecules. Note that the current version is limited to wave functions that do not extend into linear and equilateral triangle configurations (see manual for details).
 
 # Building
 
