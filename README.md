@@ -53,7 +53,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     make spectrumsdt
     ```
 
-# A basic example of running (ozone)
+# Basic example of running (ozone)
 
 1. Generate the grids
 ```
@@ -61,7 +61,7 @@ mkdir -p ~/SpectrumSDT_runs/o3/ && cd ~/SpectrumSDT_runs/o3/
 cp ~/SpectrumSDT/config_examples/o3/1.simple/grids.config spectrumsdt.config
 ~/SpectrumSDT/build/spectrumsdt
 ```
-Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combination of points in the generated grid files in atomic units of energy (Hartree).
+After this, 3 files will be generated: grid_rho.dat, grid_theta.dat and grid_phi.dat. Each file stores values of grid points in each dimension, given in Bohr (for rho) and radians (for theta and phi). Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combination of these points in atomic units of energy (Hartree). See [manual](Manual.pdf) for more details.
 
 2. Calculate the values of PES. Here we will use an example program that reads grid files and uses the PES of ozone calculated by Dawes et al. to generate `pes.out` file. First, compile the program:
 ```
