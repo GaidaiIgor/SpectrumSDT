@@ -1,9 +1,9 @@
-A parallel Fortran program for calculation of ro-vibrational energy levels and lifetimes of ABA-molecules. Note that the current version is limited to wave functions that do not extend into linear and equilateral triangle configurations (see manual for details).
+A parallel Fortran program for calculation of ro-vibrational energy levels and lifetimes of ABA-molecules. Note that the current version is limited to wave functions that do not extend into linear and equilateral triangle configurations (see [manual](Manual.pdf) for details).
 
 # Building
 
 0. Prerequisites
-    1. Make sure the following packages are installed: `build-essential`, `python3-dev`, `cmake` (3.5+), `gfortran` (9.3.0+), `mpich`, `libblas-dev`, `liblapack-dev`.  
+    1. Make sure the following packages (or their equivalents) are installed: `build-essential`, `python3-dev`, `cmake` (3.5+), `gfortran` (9.3.0+), `mpich`, `libblas-dev`, `liblapack-dev`.  
     With the appropriate modifications of the build configuration files, the code should also work with `ifort`. In our experience, `ifort` generates much faster code than `gfortran`, therefore we recommend to change the default settings to build with `ifort` on system where it is available. 
     2. Make sure you machine has at least 2GB of RAM (for compilation).
 
