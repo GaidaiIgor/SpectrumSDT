@@ -80,12 +80,14 @@ contains
       kinetic = compute_kinetic_energy_dvr(get_reduced_mass(params % mass), size(rho_info % points), size(rho_info % points) * rho_info % step)
     end if
 
+    cap = calc_complex_cap(params, rho_info)
     if (params % cap % type /= 'none') then
-      cap = calc_complex_cap(params, rho_info)
-      call rovib_ham % build(params, kinetic, cap)
-    else
-      call rovib_ham % build(params, kinetic)
+      if (get_proc_id() == 0) then
+        call write_array(-aimag(cap) * au_to_wn, get_cap_path(get_sym_path(params)))
+        print *, 'CAP is printed'
+      end if
     end if
+    call rovib_ham % build(params, kinetic, cap)
     call print_parallel('Hamiltonian matrix is built. Size: ' // num2str(rovib_ham % global_chunk_info % columns) // ' x ' // num2str(size(rovib_ham % proc_chunk, 2)))
 
     call init_matmul(params) ! rovib_ham is already set

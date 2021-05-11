@@ -371,6 +371,18 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to file with CAP.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_cap_path(sym_path) result(res)
+    character(*), intent(in) :: sym_path
+    character(:), allocatable :: res
+    character(:), allocatable :: eigensolve_path
+
+    eigensolve_path = get_eigensolve_path(sym_path)
+    res = append_path_tokens(eigensolve_path, 'cap.txt')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with eigenpairs results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function get_eigensolve_results_path(sym_path) result(res)
