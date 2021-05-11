@@ -796,7 +796,8 @@ contains
     call this % include_kinetic_energy(kinetic) ! has to be called when only overlaps are loaded
     call this % load_chunk_eivals_2d(params, ham_info)
 
-    if (present(cap)) then
+    if (params % cap % type /= 'none') then
+      call assert(present(cap), 'Error: cap has to be provided if cap type is not none')
       call this % include_cap(cap, ham_info)
     end if
 
