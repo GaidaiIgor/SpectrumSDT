@@ -3,8 +3,9 @@ A parallel Fortran program for calculation of ro-vibrational energy levels and l
 # Building
 
 0. Prerequisites
-    1. Make sure the following packages (or their equivalents) are installed: `build-essential`, `python3-dev`, `cmake` (3.5+), `gfortran` (9.3.0+), `mpich`, `libblas-dev`, `liblapack-dev`.  
-    With the appropriate modifications of the build configuration files, the code should also work with `ifort`. In our experience, `ifort` generates much faster code than `gfortran`, therefore we recommend to change the default settings to build with `ifort` on system where it is available. 
+    1. Make sure the following software is installed: `Python 3`, `CMake (v3.5+)`, Fortan compiler (`gfortran (v9.3.0+)` or `ifort (v19.0.3+)`), `MPICH`, `BLAS` and `LAPACK` libraries. The following example is also going to assume that `mpiexec` wrapper is availble. Other implementations of Fortran compilers or MPI libraries may work, but have not been tested.<br/>  
+    The build files have been configured to work with `gfortran` by default, but with the appropriate modifications the code should also work with `ifort`. In our experience, `ifort` generates much faster code than `gfortran`, therefore we recommend to change the default settings to build with `ifort` on system where it is available.<br/>  
+    
     2. Make sure you machine has at least 2GB of RAM (for compilation).
 
 1. Clone the repo
@@ -53,7 +54,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     make spectrumsdt
     ```
 
-# A basic example of running (ozone)
+# Basic example of running (ozone)
 
 1. Generate the grids
 ```
@@ -61,7 +62,7 @@ mkdir -p ~/SpectrumSDT_runs/o3/ && cd ~/SpectrumSDT_runs/o3/
 cp ~/SpectrumSDT/config_examples/o3/1.simple/grids.config spectrumsdt.config
 ~/SpectrumSDT/build/spectrumsdt
 ```
-Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combination of points in the generated grid files in atomic units of energy (Hartree).
+After this, 3 files will be generated: `grid_rho.dat`, `grid_theta.dat` and `grid_phi.dat`. Each file stores values of grid points in each dimension, given in Bohr (for rho) and radians (for theta and phi). Before proceeding to the next stage, user should provide file `pes.out` with the values of potential at all combinations of these points in atomic units of energy (Hartree). See the `potential` section in [manual](Manual.pdf) for more details.
 
 2. Calculate the values of PES. Here we will use an example program that reads grid files and uses the PES of ozone calculated by Dawes et al. to generate `pes.out` file. First, compile the program:
 ```
