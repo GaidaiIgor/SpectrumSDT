@@ -14,7 +14,7 @@ module basis_params_mod
 
   type :: basis_params
     character(:), allocatable :: prefix
-    integer :: num_functions_phi = -1 ! number of sines or cosines in basis of 1D problem
+    integer :: num_funcs_phi_per_sym = -1 ! number of sines or cosines in basis of 1D problem
     integer :: symmetry = 2 ! 0 (even, cos, +) or 1 (odd, sin, -) or 2 (both). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
     real(real64) :: cutoff_energy_1d = 0 ! 1D solutions with energies higher than this are discarded from basis
     real(real64) :: cutoff_energy_2d = 0 ! 2D solutions with energies higher than this are discarded from basis
@@ -75,10 +75,14 @@ contains
       end select
 
       select case (next_key)
-        case ('num_functions_phi')
-          this % num_functions_phi = str2int_config(next_value, full_key)
+        case ('num_funcs_phi_per_sym')
+          this % num_funcs_phi_per_sym = str2int_config(next_value, full_key)
         case ('symmetry')
-          this % symmetry = str2int_config(next_value, full_key)
+          if (next_value == 'all') then
+            this % symmetry = 2
+          else
+            this % symmetry = str2int_config(next_value, full_key)
+          end if
         case ('cutoff_energy_1d')
           this % cutoff_energy_1d = str2real_config(next_value, full_key) / au_to_wn
         case ('cutoff_energy_2d')
@@ -105,7 +109,7 @@ contains
     integer, intent(in) :: use_geometric_phase
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'num_functions_phi')
+    call put_string(keys, 'num_funcs_phi_per_sym')
     call put_string(keys, 'min_solutions_2d')
     if (use_geometric_phase == 0) then
       call put_string(keys, 'symmetry')
@@ -119,7 +123,7 @@ contains
     class(basis_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'num_functions_phi')
+    call put_string(keys, 'num_funcs_phi_per_sym')
     call put_string(keys, 'symmetry')
     call put_string(keys, 'cutoff_energy_1d')
     call put_string(keys, 'cutoff_energy_2d')
@@ -160,14 +164,14 @@ contains
     class(basis_params), intent(in) :: this
     integer, intent(in) :: use_geometric_phase
 
-    call assert(this % num_functions_phi > 0, 'Error: ' // this % prefix // 'num_functions_phi should be > 0.')
+    call assert(this % num_funcs_phi_per_sym > 0, 'Error: ' // this % prefix // 'num_funcs_phi_per_sym should be > 0.')
     call assert(this % min_solutions_1d > 0, 'Error: ' // this % prefix // 'min_solutions_1d should be > 0.')
     call assert(this % min_solutions_2d > 0, 'Error: ' // this % prefix // 'min_solutions_2d should be > 0.')
     call assert(any(this % print_energies_1d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_1d should be 0 or 1.')
     call assert(any(this % print_energies_2d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_2d should be 0 or 1.')
 
     if (use_geometric_phase == 1) then
-      call assert(this % symmetry == 2, 'Error: ' // this % prefix // 'symmery should be 2, if geometric phase effects are requested.')
+      call assert(this % symmetry == 2, 'Error: ' // this % prefix // 'symmery should be all, if geometric phase effects are requested.')
     else
       call assert(any(this % symmetry == [0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1.')
     end if

@@ -3,7 +3,6 @@ module basis_base_mod
   use array_1d_mod, only: array_1d_real
   use array_2d_mod
   use constants, only: au_to_wn, pi
-  use formulas_mod, only: get_reduced_mass
   use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_utils_mod, only: iff, identity_matrix
   use input_params_mod
@@ -12,6 +11,7 @@ module basis_base_mod
   use mpi
   use parallel_utils_mod
   use spectrumsdt_paths_mod
+  use spectrumsdt_utils_mod
   implicit none
 
 contains
@@ -26,7 +26,7 @@ contains
     integer :: nphi, nphi_total, j, sin_shift
     real(real64) :: norm
 
-    nphi = params % basis % num_functions_phi
+    nphi = params % basis % num_funcs_phi_per_sym
     nphi_total = iff(params % basis % symmetry == 2, 2 * nphi, nphi)
     allocate(basis(size(grid_phi), nphi_total))
     norm = sqrt(1 / pi)

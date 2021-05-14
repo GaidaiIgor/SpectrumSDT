@@ -53,9 +53,9 @@ contains
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable :: solutions_1d_col(:), solutions_1d_row(:)
 
     ! Load bases
-    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_col), num_points_theta, params % basis % num_functions_phi, num_solutions_1d_col, energies_1d_col, solutions_1d_col)
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_col), num_points_theta, params % basis % num_funcs_phi_per_sym, num_solutions_1d_col, energies_1d_col, solutions_1d_col)
     call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_col), energies_2d_col, solutions_2d_col)
-    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_row), num_points_theta, params % basis % num_functions_phi, num_solutions_1d_row, energies_1d_row, solutions_1d_row)
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_row), num_points_theta, params % basis % num_funcs_phi_per_sym, num_solutions_1d_row, energies_1d_row, solutions_1d_row)
     call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_row), energies_2d_row, solutions_2d_row)
 
     ! Calculate overlap matrix
@@ -64,7 +64,7 @@ contains
       solution_2d_fbr_col = transform_basis_1d_to_fbr(num_solutions_1d_col, solutions_1d_col, solutions_2d_col(:, j))
       do i = 1, size(overlap_block, 1)
         solution_2d_fbr_row = transform_basis_1d_to_fbr(num_solutions_1d_row, solutions_1d_row, solutions_2d_row(:, i))
-        overlap_block(i, j) = dot_product(conjg(solution_2d_fbr_row), solution_2d_fbr_col)
+        overlap_block(i, j) = dot_product(solution_2d_fbr_row, solution_2d_fbr_col)
       end do
     end do
   end function

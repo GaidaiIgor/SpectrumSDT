@@ -9,5 +9,6 @@ module spectrumsdt_io_base_mod
   use parallel_utils_mod
   use rovib_utils_mod
   use spectrumsdt_paths_mod
+  use spectrumsdt_utils_mod
   implicit none
 end module

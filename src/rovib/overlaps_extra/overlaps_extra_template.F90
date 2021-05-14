@@ -15,7 +15,7 @@ contains
     real(real64), intent(in) :: mu ! reduced mass
     real(real64), intent(in) :: rho_grid(:), theta_grid(:)
     integer :: my_id, n_procs
-    integer :: n, l, ir, ic, n_basis, file_unit
+    integer :: n, l, ir, ic, num_funcs_phi, file_unit
     ! Arrays for data arrays length
     integer, allocatable :: num_solutions_1d(:) ! number of 1D solutions in each theta slice (for fixed rho)
     integer, allocatable :: num_solutions_2d(:) ! number of 2D solutions in each rho slice
@@ -36,7 +36,7 @@ contains
     call print_parallel('Calculating sym term')
     my_id = get_proc_id()
     n_procs = get_num_procs()
-    n_basis = params % basis % num_functions_phi
+    num_funcs_phi = params % basis % num_funcs_phi_per_sym
     allocate(sym_factors_J(size(theta_grid)), sym_factors_K(size(theta_grid)), partial_sum(size(theta_grid)))
 
     sym_folder = get_sym_path(params)
@@ -52,7 +52,7 @@ contains
 
       ! Load solutions
       solutions_1d_path = get_solutions_1d_path(sym_folder, n)
-      call load_solutions_1D(solutions_1d_path, size(theta_grid), n_basis, num_solutions_1d, energies_1d, exp_coeffs_1d)
+      call load_solutions_1D(solutions_1d_path, size(theta_grid), num_funcs_phi, num_solutions_1d, energies_1d, exp_coeffs_1d)
       solutions_2d_path = get_solutions_2d_path(sym_folder, n)
       call load_solutions_2D(solutions_2d_path, energies_2d, exp_coeffs_2d)
 
@@ -74,7 +74,7 @@ contains
           exp_coeffs_2d_prim_row = transform_basis_1d_to_fbr(num_solutions_1d, exp_coeffs_1d, exp_coeffs_2d(:, ir))
           ! Compute partial sums
           do l = 1, size(theta_grid)
-            partial_sum(l) = dot_product(conjg(exp_coeffs_2d_prim_row((l - 1)*n_basis + 1 : l*n_basis)), exp_coeffs_2d_prim_col((l - 1)*n_basis + 1 : l*n_basis))
+            partial_sum(l) = dot_product(exp_coeffs_2d_prim_row((l - 1)*num_funcs_phi + 1 : l*num_funcs_phi), exp_coeffs_2d_prim_col((l - 1)*num_funcs_phi + 1 : l*num_funcs_phi))
           end do
           sym_block_J(ir, ic) = dot_product(sym_factors_J, partial_sum)
           sym_block_K(ir, ic) = dot_product(sym_factors_K, partial_sum)
@@ -104,7 +104,7 @@ contains
     real(real64), intent(in) :: mu ! reduced mass
     real(real64), intent(in) :: rho_grid(:), theta_grid(:)
     integer :: my_id, n_procs
-    integer :: n, m, l, ir, ic, n_basis, file_unit
+    integer :: n, m, l, ir, ic, num_funcs_phi, file_unit
     integer :: K_row, K_col, m_shift_row, m_shift_col, first_m_row, last_m_row, first_m_col, last_m_col, sym_row, sym_col
     ! Arrays for data arrays length
     integer, allocatable :: num_solutions_1d_row(:), num_solutions_1d_col(:) ! number of 1D solutions in each theta slice (for fixed rho)
@@ -118,7 +118,7 @@ contains
     TEMPLATE_TYPE, allocatable :: exp_coeffs_2d_row(:, :), exp_coeffs_2d_col(:, :) ! Expansion coefficients of all 2D solutions over 1D solutions
     ! Calculation of coriolis term
     real(real64), allocatable :: cor_factors_m(:), cor_factors_b(:)
-    TEMPLATE_TYPE, allocatable :: m_product(:), partial_sum(:)
+    TEMPLATE_TYPE, allocatable :: partial_sum(:)
     TEMPLATE_TYPE, allocatable :: cor_block(:, :)
     character(:), allocatable :: root_path, sym_folder_row, sym_folder_col, block_info_path_row, block_info_path_col, cor_block_path
     character(:), allocatable :: solutions_1d_path_row, solutions_1d_path_col, solutions_2d_path_row, solutions_2d_path_col
@@ -126,8 +126,8 @@ contains
     call print_parallel('Calculating Coriolis term')
     my_id = get_proc_id()
     n_procs = get_num_procs()
-    n_basis = params % basis % num_functions_phi
-    allocate(cor_factors_m(n_basis - 1), cor_factors_b(size(theta_grid)), partial_sum(size(theta_grid)))
+    num_funcs_phi = params % basis % num_funcs_phi_per_sym
+    allocate(cor_factors_m(num_funcs_phi - 1), cor_factors_b(size(theta_grid)), partial_sum(size(theta_grid)))
 
     root_path = params % root_path
     K_row = params % K(1)
@@ -151,17 +151,17 @@ contains
 
       ! Load solutions
       solutions_1d_path_row = get_solutions_1d_path(sym_folder_row, n)
-      call load_solutions_1D(solutions_1d_path_row, size(theta_grid), n_basis, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
+      call load_solutions_1D(solutions_1d_path_row, size(theta_grid), num_funcs_phi, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
       solutions_2d_path_row = get_solutions_2d_path(sym_folder_row, n)
       call load_solutions_2D(solutions_2d_path_row, energies_2d_row, exp_coeffs_2d_row)
 
       solutions_1d_path_col = get_solutions_1d_path(sym_folder_col, n)
-      call load_solutions_1D(solutions_1d_path_col, size(theta_grid), n_basis, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
+      call load_solutions_1D(solutions_1d_path_col, size(theta_grid), num_funcs_phi, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
       solutions_2d_path_col = get_solutions_2d_path(sym_folder_col, n)
       call load_solutions_2D(solutions_2d_path_col, energies_2d_col, exp_coeffs_2d_col)
 
       ! Compute m-factors
-      do m = 1, n_basis - 1
+      do m = 1, num_funcs_phi - 1
         ! Sign of factor depends on which function we take derivative from
         cor_factors_m(m) = (-1) ** sym_row * m
       end do
@@ -181,12 +181,11 @@ contains
           exp_coeffs_2d_prim_row = transform_basis_1d_to_fbr(num_solutions_1d_row, exp_coeffs_1d_row, exp_coeffs_2d_row(:, ir))
           ! Compute partial sums
           do l = 1, size(theta_grid)
-            first_m_row = (l - 1)*n_basis + 1 + m_shift_row
-            last_m_row = l*n_basis - 1 + m_shift_row
-            first_m_col = (l - 1)*n_basis + 1 + m_shift_col
-            last_m_col = l*n_basis - 1 + m_shift_col
-            m_product = conjg(exp_coeffs_2d_prim_row(first_m_row : last_m_row)) * exp_coeffs_2d_prim_col(first_m_col : last_m_col)
-            partial_sum(l) = dot_product(cor_factors_m, m_product)
+            first_m_row = (l - 1)*num_funcs_phi + 1 + m_shift_row
+            last_m_row = l*num_funcs_phi - 1 + m_shift_row
+            first_m_col = (l - 1)*num_funcs_phi + 1 + m_shift_col
+            last_m_col = l*num_funcs_phi - 1 + m_shift_col
+            partial_sum(l) = dot_product(exp_coeffs_2d_prim_row(first_m_row : last_m_row), cor_factors_m * exp_coeffs_2d_prim_col(first_m_col : last_m_col))
           end do
           cor_block(ir, ic) = dot_product(cor_factors_b, partial_sum) * 4d0
         end do
@@ -210,7 +209,7 @@ contains
     real(real64), intent(in) :: mu ! reduced mass
     real(real64), intent(in) :: rho_grid(:), theta_grid(:)
     integer :: my_id, n_procs
-    integer :: n, l, ir, ic, n_basis, file_unit
+    integer :: n, l, ir, ic, num_funcs_phi, file_unit
     ! Arrays for data arrays length
     integer, allocatable :: num_solutions_1d_row(:), num_solutions_1d_col(:) ! number of 1D solutions in each theta slice (for fixed rho)
     integer, allocatable :: num_solutions_2d_row(:), num_solutions_2d_col(:) ! number of 2D solutions in each rho slice
@@ -232,7 +231,7 @@ contains
     call assert(K_row + 2 == K_col .or. K_row == 1 .and. K_col == 1 .or. params % basis % fixed % enabled == 1 .and. K_row == K_col, 'Wrong combination of Ks for asym term')
     my_id = get_proc_id()
     n_procs = get_num_procs()
-    n_basis = params % basis % num_functions_phi
+    num_funcs_phi = params % basis % num_funcs_phi_per_sym
     allocate(asym_factors(size(theta_grid)), partial_sum(size(theta_grid)))
 
     root_path = params % root_path
@@ -252,12 +251,12 @@ contains
 
       ! Load solutions
       solutions_1d_path_row = get_solutions_1d_path(sym_folder_row, n)
-      call load_solutions_1D(solutions_1d_path_row, size(theta_grid), n_basis, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
+      call load_solutions_1D(solutions_1d_path_row, size(theta_grid), num_funcs_phi, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
       solutions_2d_path_row = get_solutions_2d_path(sym_folder_row, n)
       call load_solutions_2D(solutions_2d_path_row, energies_2d_row, exp_coeffs_2d_row)
 
       solutions_1d_path_col = get_solutions_1d_path(sym_folder_col, n)
-      call load_solutions_1D(solutions_1d_path_col, size(theta_grid), n_basis, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
+      call load_solutions_1D(solutions_1d_path_col, size(theta_grid), num_funcs_phi, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
       solutions_2d_path_col = get_solutions_2d_path(sym_folder_col, n)
       call load_solutions_2D(solutions_2d_path_col, energies_2d_col, exp_coeffs_2d_col)
 
@@ -275,7 +274,7 @@ contains
           exp_coeffs_2d_prim_row = transform_basis_1d_to_fbr(num_solutions_1d_row, exp_coeffs_1d_row, exp_coeffs_2d_row(:, ir))
           ! Compute partial sums
           do l = 1, size(theta_grid)
-            partial_sum(l) = dot_product(conjg(exp_coeffs_2d_prim_row((l - 1)*n_basis + 1 : l*n_basis)), exp_coeffs_2d_prim_col((l - 1)*n_basis + 1 : l*n_basis))
+            partial_sum(l) = dot_product(exp_coeffs_2d_prim_row((l - 1)*num_funcs_phi + 1 : l*num_funcs_phi), exp_coeffs_2d_prim_col((l - 1)*num_funcs_phi + 1 : l*num_funcs_phi))
           end do
           asym_block(ir, ic) = dot_product(asym_factors, partial_sum) / 2d0
         end do

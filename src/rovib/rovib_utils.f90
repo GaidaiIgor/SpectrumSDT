@@ -20,7 +20,14 @@ contains
   function get_k_symmetry(K, K0_sym) result(symmetry)
     integer, intent(in) :: K, K0_sym
     integer :: symmetry
-    symmetry = mod(K + K0_sym, 2)
+
+    if (any(K0_sym == [0, 1])) then
+      symmetry = mod(K + K0_sym, 2)
+    else if (K0_sym == 2) then
+      symmetry = 2
+    else
+      stop 'Error: unknown symmetry'
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -39,18 +46,21 @@ contains
     integer, intent(in) :: K
     class(input_params), intent(in) :: params
     integer, optional, intent(out) :: K_ind, K_sym, K_ind_comp
+    integer :: K_ind_act, K_sym_act
 
-    K_ind = get_k_ind(K, params % K(1))
-    K_sym = get_k_symmetry(K, params % basis % symmetry)
-    K_ind_comp = merge(K_sym + 1, K_ind, params % basis % fixed % enabled == 1) ! compressed index for possibly compressed structures
+    K_ind_act = get_k_ind(K, params % K(1))
+    if (present(K_ind)) then
+      K_ind = K_ind_act
+    end if
+
+    K_sym_act = get_k_symmetry(K, params % basis % symmetry)
+    if (present(K_sym)) then
+      K_sym = K_sym_act
+    end if
+
+    if (present(K_ind_comp)) then
+      K_ind_comp = merge(K_sym_act + 1, K_ind_act, params % basis % fixed % enabled == 1) ! compressed index for possibly compressed structures
+    end if
   end subroutine
 
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Computes m value corresponding to given m index.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function m_ind_to_m(m_ind, K, K0_sym) result(m)
-    integer, intent(in) :: m_ind, K, K0_sym
-    integer :: m
-    m = m_ind - 1 + get_k_symmetry(K, K0_sym)
-  end function
 end module

@@ -16,48 +16,69 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(calculate_wf_integral_all_regions_,TEMPLATE_TYPE_NAME)(params, As, Bs, proc_Cs, phi_borders) result(proc_p_dist)
     class(input_params), intent(in) :: params
-    ! Arrays of size 2 x N x L (or K x N x L if compression is disabled). Each element is a matrix with expansion coefficients - M x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
+    ! Arrays of size 2 x N x L (or K x N x L if compression is disabled). Each element is a matrix with expansion coefficients - num_funcs_phi x S_Knl for A (1D), S_Knl x S_Kn for B (2D)
     class(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), intent(in) :: As(:, :, :), Bs(:, :, :) 
     class(array_2d_complex), intent(in) :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
     real(real64), intent(in) :: phi_borders(:)
     real(real64), allocatable :: proc_p_dist(:, :, :, :, :)
-    integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, phi_group_ind, m_ind, j
-    real(real64) :: i_sum
+    logical :: use_simplified_method
+    integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, phi_range_ind, m_ind, j
+    real(real64) :: i_sum, m_sum
     real(real64) :: phi_range(2)
-    complex(real64) :: j_sums(params % basis % num_functions_phi) ! j-sums for different ms
+    real(real64), allocatable :: phi_integral_matrix(:, :, :), phi_integral_matrix_1(:, :, :)
+    complex(real64) :: j_sums(params % basis % num_funcs_phi_per_sym) ! j-sums for different ms
 
     call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
     allocate(proc_p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
     proc_p_dist = 0
 
-    do proc_state_ind = 1, size(proc_p_dist, 1)
-      if (get_proc_id() == 0) then
-        call track_progress(proc_state_ind * 1d0 / size(proc_p_dist, 1), 1d-2)
+    ! Use simplified method if only the whole range [0; 2*pi] is of interest
+    use_simplified_method = size(phi_borders) == 2 .and. (phi_borders(1) .aeq. 0d0) .and. (phi_borders(2) .aeq. 2*pi)
+    if (.not. use_simplified_method) then
+      phi_integral_matrix = calc_phi_integral_matrix(params % basis % num_funcs_phi_per_sym, params % basis % symmetry, phi_borders)
+      if (any(params % basis % symmetry == [0, 1]) .and. params % K(2) - params % K(1) > 0) then
+        ! second matrix stores integrals for the opposite symmetry when both symmetries are needed but independent (rovib coupled without geometric phase)
+        phi_integral_matrix_1 = calc_phi_integral_matrix(params % basis % num_funcs_phi_per_sym, 1 - params % basis % symmetry, phi_borders)
       end if
+    end if
 
+    do proc_state_ind = 1, size(proc_p_dist, 1)
       do K_val = params % K(1), params % K(2)
         call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
-        do n = 1, size(As, 2)
+        do n = 1, size(proc_p_dist, 3)
           ! Skip empty n-slices
           if (.not. allocated(Bs(K_ind_comp, n, 1) % p)) then
             cycle
           end if
 
-          do l = 1, size(As, 3)
-            do phi_group_ind = 1, size(proc_p_dist, 5)
-              phi_range = phi_borders(phi_group_ind : phi_group_ind + 1)
-              j_sums = 0
-              do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
-                do j = 1, size(Bs(K_ind_comp, n, l) % p, 2)
-                  i_sum = dot_product(Bs(K_ind_comp, n, l) % p(:, j), As(K_ind_comp, n, l) % p(m_ind, :))
-                  j_sums(m_ind) = j_sums(m_ind) + proc_Cs(K_ind, n) % p(j, proc_state_ind) * i_sum
-                end do
+          do l = 1, size(proc_p_dist, 4)
+            j_sums = 0
+            do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
+              do j = 1, size(Bs(K_ind_comp, n, l) % p, 2)
+                i_sum = dot_product(Bs(K_ind_comp, n, l) % p(:, j), As(K_ind_comp, n, l) % p(m_ind, :))
+                j_sums(m_ind) = j_sums(m_ind) + proc_Cs(K_ind, n) % p(j, proc_state_ind) * i_sum
               end do
-              proc_p_dist(proc_state_ind, K_ind, n, l, phi_group_ind) = proc_p_dist(proc_state_ind, K_ind, n, l, phi_group_ind) + calc_m_sum(params, K_val, n, l, phi_range, j_sums)
+            end do
+
+            do phi_range_ind = 1, size(proc_p_dist, 5)
+              if (use_simplified_method) then
+                m_sum = real(dot_product(j_sums, j_sums))
+              else
+                if (K_sym == params % basis % symmetry) then
+                  m_sum = calculate_vT_A_v_symmetric_real(phi_integral_matrix(:, :, phi_range_ind), j_sums)
+                else
+                  m_sum = calculate_vT_A_v_symmetric_real(phi_integral_matrix_1(:, :, phi_range_ind), j_sums)
+                end if
+              end if
+              proc_p_dist(proc_state_ind, K_ind, n, l, phi_range_ind) = proc_p_dist(proc_state_ind, K_ind, n, l, phi_range_ind) + m_sum
             end do
           end do
         end do
       end do
+
+      if (get_proc_id() == 0) then
+        call track_progress(proc_state_ind * 1d0 / size(proc_p_dist, 1), 1d-2)
+      end if
     end do
   end function
 

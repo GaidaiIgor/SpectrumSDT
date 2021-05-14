@@ -15,6 +15,7 @@ module properties_base_mod
   use parallel_utils_mod
   use path_utils_mod
   use spectrumsdt_io_mod
+  use spectrumsdt_utils_mod
   use rovib_utils_mod
   use vector_mod
   implicit none
@@ -171,31 +172,6 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Evaluates the value of phi integral in the range [a, b] (F~_Ks(m,m') = int(F_m1^+-(phi) * F_m2^+-(phi), a, b)).
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_phi_integral(m1, m2, a, b, F_sym) result(integral_value)
-    integer, intent(in) :: m1, m2 ! Frequency of integrand functions
-    real(real64), intent(in) :: a, b ! Range of integration
-    integer, intent(in) :: F_sym ! Symmetry of integrand functions: 0 or 1 (same for both)
-    real(real64) :: integral_value ! Result
-    integer :: sign
-    real(real64) :: norm
-
-    call assert(m1 == 0 .or. m2 == 0 .means. F_sym == 0, 'm can be 0 only for symmetry 0')
-    call assert(m1 >= 0 .and. m2 >= 0, 'm values should be non-negative')
-
-    sign = (-1) ** F_sym
-    if (m1 == 0 .and. m2 == 0) then
-      integral_value = (b - a) / (2*pi)
-    elseif (m1 == m2) then
-      integral_value = 1/(2*pi) * (b - a - sign*(sin(2*a*m1) - sin(2*b*m1)) / (2*m1))
-    elseif (m1 /= m2) then
-      norm = 1/(2*pi*sqrt(1d0*(delta(m1, 0) + 1)*(delta(m2, 0) + 1)))
-      integral_value = norm * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2)) - sign*sin(a*(m1 + m2))) / (m1 + m2))
-    end if
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calls calculate_wf_section_probabilities for all states in parallel and gathers results.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine calculate_wf_sections_statistics_all(params, wf_sections_dist_mask, proc_p_dist, section_stats)
@@ -218,38 +194,65 @@ contains
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates m-sum in wf integral.
+! Evaluates the value of phi integral for functions of given symmetry in the range [a, b].
+! m1 and m2 >= 0. m1 or m2 can be 0 only if corresponding F_sym is 0. F_sym is either 0 (cos) or 1 (sin). a <= b. Both a and b are from 0 to 2*pi.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_m_sum(params, K_val, n, l, phi_range, j_sums) result(m_sum)
-    class(input_params), intent(in) :: params
-    integer, intent(in) :: K_val, n, l
-    real(real64), intent(in) :: phi_range(2)
-    complex(real64), intent(in) :: j_sums(:)
-    real(real64) :: m_sum
-    integer :: K_ind, K_sym, K_ind_comp, m1, m2, m1_ind, m2_ind
-    real(real64) :: product_coeff, phi_integral
+  function calc_phi_integral(m1, m2, F1_sym, F2_sym, a, b) result(integral_value)
+    integer, intent(in) :: m1, m2 ! Frequency of integrand functions
+    real(real64), intent(in) :: a, b ! Range of integration
+    integer, intent(in) :: F1_sym, F2_sym ! Symmetry of integrand functions: 0 for cos, 1 for sin
+    real(real64) :: integral_value ! Result
+    integer :: sign
+    real(real64) :: norm
 
-    call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
-    m_sum = 0
-    if ((phi_range(1) .aeq. 0d0) .and. (phi_range(2) .aeq. 2*pi)) then
-      ! Simplified method for the case when phi range is not restricted
-      do m1_ind = 1, size(j_sums)
-        m_sum = m_sum + real(conjg(j_sums(m1_ind)) * j_sums(m1_ind))
-      end do
-    else
-      do m1_ind = 1, size(j_sums)
-        do m2_ind = m1_ind, size(j_sums)
-          m1 = m_ind_to_m(m1_ind, K_val, params % basis % symmetry)
-          m2 = m_ind_to_m(m2_ind, K_val, params % basis % symmetry)
-          phi_integral = calc_phi_integral(m1, m2, phi_range(1), phi_range(2), K_sym)
-          product_coeff = real(conjg(j_sums(m1_ind)) * j_sums(m2_ind))
-          if (m1_ind /= m2_ind) then
-            product_coeff = 2 * product_coeff ! since m-integral matrix is hermitian
-          end if
-          m_sum = m_sum + phi_integral * product_coeff
+    norm = 1 / (pi * sqrt(1d0 * (delta(m1, 0) + 1) * (delta(m2, 0) + 1)))
+    sign = (-1) ** F1_sym
+    if (m1 == 0 .and. m2 == 0) then
+      integral_value = norm * (b - a)
+
+    else if (m1 == m2) then
+      if (F1_sym == F2_sym) then
+        integral_value = norm * 0.5d0 * (b - a - sign*(sin(2*a*m1) - sin(2*b*m1)) / (2*m1))
+      else
+        integral_value = norm * 0.5d0 * (cos(2*a*m1) - cos(2*b*m1)) / (2*m1)
+      end if
+
+    else if (m1 /= m2) then
+      if (F1_sym == F2_sym) then
+        integral_value = norm * 0.5d0 * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2)) - sign*sin(a*(m1 + m2))) / (m1 + m2))
+      else
+        integral_value = norm * 0.5d0 * ((-sign*cos(a*(m1 - m2)) + sign*cos(b*(m1 - m2))) / (m1 - m2) + (cos(a*(m1 + m2)) - cos(b*(m1 + m2))) / (m1 + m2))
+      end if
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates phi-integral matrix for each phi range and symmetry. Only upper triangle is calculated since matrix is symmetric.
+! num_funcs_per_sym - number of phi basis functions per symmetry.
+! phi_sym - symmetry. 0 for cos, 1 for sin, 2 for both.
+! phi_borders - array of considered phi borders.
+! phi_integral_matrix - 3D matrix. 1st dim - m1, 2nd - m2, 3rd - phi_range_ind.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function calc_phi_integral_matrix(num_funcs_phi_per_sym, phi_sym, phi_borders) result(phi_integral_matrix)
+    integer, intent(in) :: num_funcs_phi_per_sym, phi_sym
+    real(real64), intent(in) :: phi_borders(:)
+    real(real64), allocatable :: phi_integral_matrix(:, :, :)
+    integer :: num_funcs_phi, range_ind, m1_ind, m2_ind, m1, m2, m1_sym, m2_sym
+    real(real64) :: a, b
+
+    num_funcs_phi = get_num_funcs_phi(num_funcs_phi_per_sym, phi_sym)
+    allocate(phi_integral_matrix(num_funcs_phi, num_funcs_phi, size(phi_borders) - 1))
+    do range_ind = 1, size(phi_integral_matrix, 3)
+      a = phi_borders(range_ind)
+      b = phi_borders(range_ind + 1)
+      do m2_ind = 1, size(phi_integral_matrix, 2)
+        call get_m_ind_info(m2_ind, phi_sym, num_funcs_phi_per_sym, m = m2, m_sym = m2_sym)
+        do m1_ind = 1, m2_ind
+          call get_m_ind_info(m1_ind, phi_sym, num_funcs_phi_per_sym, m = m1, m_sym = m1_sym)
+          phi_integral_matrix(m1_ind, m2_ind, range_ind) = calc_phi_integral(m1, m2, m1_sym, m2_sym, a, b)
         end do
       end do
-    end if
+    end do
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

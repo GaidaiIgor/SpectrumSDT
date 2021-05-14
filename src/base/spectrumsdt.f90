@@ -6,7 +6,6 @@ program spectrumsdt
   use dict_utils_mod, only: extract_string, item_or_default
   use dictionary
   use eigensolve_mod, only: calculate_states
-  use formulas_mod, only: get_reduced_mass
   use input_params_mod, only: input_params
   use iso_fortran_env, only: real64
   use mpi
@@ -17,6 +16,7 @@ program spectrumsdt
   use parallel_utils_mod, only: print_parallel
   use potential_mod, only: load_potential
   use properties_mod
+  use spectrumsdt_utils_mod, only: get_reduced_mass
   implicit none
 
   integer :: ierr

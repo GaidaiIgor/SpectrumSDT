@@ -131,7 +131,11 @@ contains
     character(:), allocatable :: res
     character(:), allocatable :: sym_name
 
-    sym_name = 'symmetry_' // num2str(sym_code)
+    if (sym_code == 2) then
+      sym_name = 'symmetry_all'
+    else
+      sym_name = 'symmetry_' // num2str(sym_code)
+    end if
     res = get_sym_path_str(k_path, sym_name, parity)
   end function
 

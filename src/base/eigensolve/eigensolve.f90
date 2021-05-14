@@ -5,7 +5,6 @@ module eigensolve_mod
   use basis_mod, only: compute_kinetic_energy_dvr
   use cap_mod, only: calc_complex_cap
   use constants, only: au_to_wn
-  use formulas_mod, only: get_reduced_mass
   use general_utils_mod
   use grid_info_mod
   use input_params_mod
@@ -15,6 +14,7 @@ module eigensolve_mod
   use path_utils_mod
   use slepc_solver_mod, only: find_eigenpairs_slepc
   use spectrumsdt_paths_mod
+  use spectrumsdt_utils_mod, only: get_reduced_mass
   implicit none
 
 contains

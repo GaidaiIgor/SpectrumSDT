@@ -5,7 +5,6 @@ module grids_mod
   use config_mod
   use constants
   use coordinate_coversion_mod
-  use formulas_mod, only: get_reduced_mass
   use general_utils_mod
   use grid_info_mod
   use input_params_mod
@@ -14,6 +13,7 @@ module grids_mod
   use numerical_recipies
   use path_utils_mod
   use spectrumsdt_paths_mod
+  use spectrumsdt_utils_mod, only: get_reduced_mass
   use vector_mod
   implicit none
 

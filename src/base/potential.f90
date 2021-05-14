@@ -2,10 +2,10 @@
 ! Procedures related to potential.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module potential_mod
-  use formulas_mod
   use input_params_mod
   use iso_fortran_env, only: real64
   use spectrumsdt_paths_mod
+  use spectrumsdt_utils_mod
   implicit none
 
 contains

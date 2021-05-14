@@ -1,7 +1,6 @@
 module overlaps_extra_base_mod
   use array_1d_mod
   use array_2d_mod
-  use formulas_mod
   use input_params_mod
   use iso_fortran_env, only: real64
   use k_block_info_mod
@@ -9,6 +8,7 @@ module overlaps_extra_base_mod
   use parallel_utils_mod
   use path_utils_mod
   use spectrumsdt_io_mod
+  use spectrumsdt_utils_mod
   implicit none
 
 contains

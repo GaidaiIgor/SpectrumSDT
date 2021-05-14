@@ -24,7 +24,7 @@ contains
     real(real64), intent(in) :: rho_val, theta_val
     real(real64), intent(in) :: grid_phi(:), potential_phi(:)
     TEMPLATE_TYPE, allocatable :: ham(:, :)
-    integer :: nphi, l_dash, i, j, nphi_shift, j_shift, m
+    integer :: funcs_per_sym, l_dash, m1_ind, m2_ind, m_shift, m
     real(real64) :: mu, coeff, step_phi
     real(real64), allocatable :: func(:)
     real(real64), allocatable :: basis(:, :)
@@ -32,39 +32,35 @@ contains
     basis = get_phi_basis_grid(params, grid_phi)
     mu = get_reduced_mass(params % mass)
     step_phi = grid_phi(2) - grid_phi(1)
-    nphi = params % basis % num_functions_phi
+    funcs_per_sym = params % basis % num_funcs_phi_per_sym
     l_dash = 3
 
     allocate(ham(size(basis, 2), size(basis, 2)))
     ham = 0
 
     ! Build potential energy matrix
-    do j = 1, size(ham, 2)
-      nphi_shift = iff(j > nphi, nphi, 0) ! Skip empty quadrant when both symmetries are included
-      do i = 1 + nphi_shift, j
-        func = basis(:, i) * potential_phi * basis(:, j)
-        ham(i, j) = integrate_1d(func, step_phi)
-        ham(j, i) = ham(i, j)
+    do m2_ind = 1, size(ham, 2)
+      m_shift = iff(m2_ind > funcs_per_sym, funcs_per_sym, 0) ! Skip empty quadrant when both symmetries are included
+      do m1_ind = 1 + m_shift, m2_ind
+        func = basis(:, m1_ind) * potential_phi * basis(:, m2_ind)
+        ham(m1_ind, m2_ind) = integrate_1d(func, step_phi)
+        ham(m2_ind, m1_ind) = ham(m1_ind, m2_ind)
       end do
     end do
 
     ! Add kinetic energy matrix
-    j_shift = iff(any(params % basis % symmetry == [0, 2]), 1, 0)
     coeff = -2 / mu / rho_val**2 / sin(theta_val)**2
-    do j = 1, size(ham, 2)
-      if (j <= nphi) then
-        m = iff(any(params % basis % symmetry == [0, 2]), j - 1, j)
-      else
-        m = j - nphi
-      end if
-      ham(j, j) = ham(j, j) + coeff * -m ** 2
+    do m2_ind = 1, size(ham, 2)
+      call get_m_ind_info(m2_ind, params % basis % symmetry, funcs_per_sym, m = m)
+      ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) + coeff * -m ** 2
 
 #if TYPE_ID == COMPLEX_ID
       if (params % use_geometric_phase == 1) then
-        ham(j, j) = ham(j, j) - l_dash**2 / 4
-        if (j > nphi) then
-          ham(j, m + 1) = (0, 1d0) * l_dash * m
-          ham(m + 1, j) = conjg(ham(j, m + 1))
+        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - l_dash**2 / 4
+        if (m2_ind > funcs_per_sym) then
+          m1_ind = m + 1
+          ham(m1_ind, m2_ind) = (0, 1d0) * l_dash * m
+          ham(m2_ind, m1_ind) = conjg(ham(m1_ind, m2_ind))
         end if
       end if
 #endif

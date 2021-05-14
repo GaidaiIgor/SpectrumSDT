@@ -40,11 +40,11 @@ contains
 ! Loads 1D solutions (eigenpairs).
 ! solutions_1d_path - path to the file with eigenvalues and eigenvectors of 1D solutions for specific rho index (n) and K.
 ! theta_size - number of points on theta grid.
-! basis_size_1d - number of 1D elemental basis functions (sin/cos) used to express 1D solutions (params % basis % num_functions_phi).
+! num_funcs_phi - total number of 1D elemental basis functions (sin/cos) used to express 1D solutions.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine CONCAT2(load_solutions_1D_,TEMPLATE_TYPE_NAME)(solutions_1d_path, theta_size, basis_size_1d, num_solutions_1d, energies_1d, exp_coeffs_1d)
+  subroutine CONCAT2(load_solutions_1D_,TEMPLATE_TYPE_NAME)(solutions_1d_path, theta_size, num_funcs_phi, num_solutions_1d, energies_1d, exp_coeffs_1d)
     character(*), intent(in) :: solutions_1d_path
-    integer, intent(in) :: theta_size, basis_size_1d
+    integer, intent(in) :: theta_size, num_funcs_phi
     integer, allocatable, intent(out) :: num_solutions_1d(:) ! Num of 1D solutions (S_Knl) in each thread (l)
     type(array_1d_real), allocatable, intent(out) :: energies_1d(:) ! 1D solutions eigenvalues for each thread (l)
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, intent(out) :: exp_coeffs_1d(:) ! 1D solutions expansion coefficients (over sin/cos) for each thread (l)
@@ -54,7 +54,7 @@ contains
     open(newunit = file_unit, file = solutions_1d_path, form = 'unformatted')
     read(file_unit) num_solutions_1d
     do i = 1, theta_size
-      allocate(energies_1d(i) % p(num_solutions_1d(i)), exp_coeffs_1d(i) % p(basis_size_1d, num_solutions_1d(i)))
+      allocate(energies_1d(i) % p(num_solutions_1d(i)), exp_coeffs_1d(i) % p(num_funcs_phi, num_solutions_1d(i)))
       read(file_unit) energies_1d(i) % p
       read(file_unit) exp_coeffs_1d(i) % p
     end do
@@ -63,14 +63,14 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads 1D expansion coefficients of a specific K and sym stored at *sym_path* into *K_ind* of *num_solutions_1d* and *As*.
-! N, L, M - basis size in rho, theta and phi.
+! N, L, num_funcs_phi - basis size in rho, theta and phi.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine CONCAT2(load_1D_expansion_coefficients_K_,TEMPLATE_TYPE_NAME)(sym_path, K_ind, N, L, M, num_solutions_1d, As)
+  subroutine CONCAT2(load_1D_expansion_coefficients_K_,TEMPLATE_TYPE_NAME)(sym_path, K_ind, N, L, num_funcs_phi, num_solutions_1d, As)
     character(*), intent(in) :: sym_path
-    integer, intent(in) :: K_ind, N, L, M
+    integer, intent(in) :: K_ind, N, L, num_funcs_phi
     integer, intent(inout) :: num_solutions_1d(:, :, :)
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), intent(inout) :: As(:, :, :)
-    integer :: n_val
+    integer :: n_val, nphi
     integer, allocatable :: num_solutions_1d_ls(:)
     character(:), allocatable :: solutions_path ! path to file with all 1D solutions for all l-s for given K and n
     type(array_1d_real), allocatable :: energies_1d(:)
@@ -78,7 +78,7 @@ contains
 
     do n_val = 1, N
       solutions_path = get_solutions_1d_path(sym_path, n_val)
-      call load_solutions_1D(solutions_path, L, M, num_solutions_1d_ls, energies_1d, As_slice)
+      call load_solutions_1D(solutions_path, L, num_funcs_phi, num_solutions_1d_ls, energies_1d, As_slice)
       num_solutions_1d(K_ind, n_val, :) = num_solutions_1d_ls
       As(K_ind, n_val, :) = As_slice
     end do
@@ -92,7 +92,7 @@ contains
     integer, intent(in) :: N, L ! Num of points along rho and theta
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, intent(out) :: As(:, :, :) ! K x N x L. Inner matrix is M x S_Knl
     integer, allocatable, intent(out) :: num_solutions_1d(:, :, :)
-    integer :: K_start, K_end, total_Ks, K, K_ind, K_sym
+    integer :: K_start, K_end, total_Ks, K, K_ind, K_sym, num_funcs_phi
     character(:), allocatable :: sym_path
 
     K_start = params % K(1)
@@ -104,7 +104,8 @@ contains
       K_ind = get_k_ind(K, K_start)
       K_sym = get_k_symmetry(K, params % basis % symmetry)
       sym_path = get_sym_path_root(params % root_path, K, K_sym)
-      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis % num_functions_phi, num_solutions_1d, As)
+      num_funcs_phi = get_num_funcs_phi(params)
+      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, num_funcs_phi, num_solutions_1d, As)
     end do
   end subroutine
 
@@ -116,14 +117,15 @@ contains
     integer, intent(in) :: N, L ! Num of points along rho and theta
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, intent(out) :: As(:, :, :) ! first dim: 1 - even, 2 - odd. Inner matrix is M x S_Knl.
     integer, allocatable, intent(out) :: num_solutions_1d(:, :, :)
-    integer :: K_ind, K_sym
+    integer :: K_ind, K_sym, num_funcs_phi
     character(:), allocatable :: sym_path
 
     allocate(As(2, N, L), num_solutions_1d(2, N, L))
     do K_sym = 0, 1
       K_ind = K_sym + 1
       sym_path = get_sym_path_root(params % basis % fixed % root_path, params % basis % fixed % K, K_sym)
-      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, params % basis % num_functions_phi, num_solutions_1d, As)
+      num_funcs_phi = get_num_funcs_phi(params)
+      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, L, num_funcs_phi, num_solutions_1d, As)
     end do
   end subroutine
 

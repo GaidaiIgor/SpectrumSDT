@@ -532,7 +532,7 @@ contains
     class(input_params), intent(inout) :: this
     class(grid_info), intent(in) :: rho_info, theta_info, phi_info
 
-    call assert(this % basis % num_functions_phi <= size(phi_info % points) / 2, 'Error: basis % num_functions_phi should be <= num_points_phi / 2')
+    call assert(this % basis % num_funcs_phi_per_sym <= size(phi_info % points) / 2, 'Error: basis % num_funcs_phi_per_sym should be <= num_points_phi / 2')
     if (this % stage == 'properties') then
       call this % wf_sections % checked_resolve_rho_bounds(rho_info % from, rho_info % to)
       call this % wf_sections % checked_resolve_theta_bounds(theta_info % from, theta_info % to)

@@ -1,11 +1,16 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Contains functions that evaluate simple physical formulas.
+! Miscellaneous procedures specific to spectrumsdt.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-module formulas_mod
+module spectrumsdt_utils_mod
   use constants
   use general_utils_mod
+  use input_params_mod
   use iso_fortran_env, only: real64
   implicit none
+
+  interface get_num_funcs_phi
+    module procedure :: get_num_funcs_phi_plain, get_num_funcs_phi_params
+  end interface
 
 contains
 
@@ -37,65 +42,37 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of lambda plus function.
+! Returns information associated with a given *m_ind*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_lambda_plus(J, K) result(res)
-    integer, intent(in) :: J, K
-    real(real64) :: res
-    res = sqrt(1d0 * (J + K + 1) * (J - K))
-  end function
+  subroutine get_m_ind_info(m_ind, phi_sym, num_funcs_phi_per_sym, m, m_sym)
+    integer, intent(in) :: m_ind, phi_sym
+    integer, optional, intent(in) :: num_funcs_phi_per_sym
+    integer, optional, intent(out) :: m, m_sym
+    integer :: m_act, m_sym_act
 
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of U factor for asymmetric term.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_U(J, K1, K2, parity) result(U)
-    integer, intent(in) :: J, K1, K2, parity
-    real(real64) :: U
-
-    call assert(K1 + 2 == K2 .or. K1 - 2 == K2 .or. K1 == 1 .and. K2 == 1, 'Wrong input for U')
-    U = 0
-    if (K1 + 2 == K2) then ! above diagonal
-      U = calculate_lambda_plus(J, K1) * calculate_lambda_plus(J, K1 + 1)
-    else if (K1 - 2 == K2) then ! below diagonal
-      U = calculate_lambda_plus(J, K1 - 1) * calculate_lambda_plus(J, K1 - 2)
+    if (any(phi_sym == [0, 1])) then
+      m_act = iff(phi_sym == 0, m_ind - 1, m_ind)
+      m_sym_act = phi_sym
+    else if (phi_sym == 2) then
+      call assert(present(num_funcs_phi_per_sym), 'Error: num_funcs_phi_per_sym has to be supplied if phi_sym == 2')
+      if (m_ind <= num_funcs_phi_per_sym) then
+        m_act = m_ind - 1
+        m_sym_act = 0
+      else
+        m_act = m_ind - num_funcs_phi_per_sym
+        m_sym_act = 1
+      end if
+    else
+      stop 'Unknown phi_sym'
     end if
 
-    ! Extra diagonal across
-    if (2 - K1 == K2) then
-      U = U + (-1) ** (J + K1 + parity) * calculate_lambda_plus(J, K1 - 1) * calculate_lambda_plus(J, K1 - 2)
+    if (present(m)) then
+      m = m_act
     end if
-    U = U / 2d0
-
-    ! Delta-term for K=0 case
-    if (K1 == 0 .or. K2 == 0) then
-      U = U / sqrt(2d0)
+    if (present(m_sym)) then
+      m_sym = m_sym_act
     end if
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates the value of W factor for Coriolis term.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function calculate_W(J, K1, K2, parity) result(W)
-    integer, intent(in) :: J, K1, K2, parity
-    real(real64) :: W
-
-    call assert(K1 + 1 == K2 .or. K1 - 1 == K2, 'Wrong input for W')
-    if (K1 + 1 == K2) then ! above diagonal
-      W = calculate_lambda_plus(J, K1)
-    else if (K1 - 1 == K2) then ! below diagonal
-      W = -calculate_lambda_plus(J, K1 - 1)
-    end if
-
-    if (1 - K1 == K2) then ! (1, 0) or (0, 1)
-      W = W + (-1) ** (J + K1 + parity) * calculate_lambda_plus(J, K1 - 1)
-    end if
-    W = W / 2d0
-
-    ! Delta-term for K=0 case
-    if (K1 == 0 .or. K2 == 0) then
-      W = W / sqrt(2d0)
-    end if
-  end function
+  end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates reduced mass of given 3 *masses*.
@@ -104,6 +81,29 @@ contains
     real(real64), intent(in) :: masses(3)
     real(real64) :: mu
     mu = sqrt(product(masses) / sum(masses))
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns total number of phi functions.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_num_funcs_phi_plain(num_funcs_phi_per_sym, sym) result(num_funcs_phi)
+    integer, intent(in) :: num_funcs_phi_per_sym, sym
+    integer :: num_funcs_phi
+
+    if (sym == 2) then
+      num_funcs_phi = 2 * num_funcs_phi_per_sym
+    else
+      num_funcs_phi = num_funcs_phi_per_sym
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns total number of phi functions.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_num_funcs_phi_params(params) result(num_funcs_phi)
+    class(input_params), intent(in) :: params
+    integer :: num_funcs_phi
+    num_funcs_phi = get_num_funcs_phi_plain(params % basis % num_funcs_phi_per_sym, params % basis % symmetry)
   end function
 
 end module

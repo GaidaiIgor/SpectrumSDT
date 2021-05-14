@@ -82,22 +82,23 @@ set(debug_params ${config} ${dict_utils} ${general_utils} ${string} ${prefix}/sr
 set(input_params ${algorithms} ${basis_params} ${cap_params} ${config} ${constants} ${debug_params} ${dict_utils} ${eigensolve_params} ${general_utils_ext} ${grid_info} ${grid_params} ${optgrid_params} ${parallel_utils} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
 
 set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils_base} ${prefix}/src/base/spectrumsdt_paths.f90)
+set(spectrumsdt_utils ${constants} ${general_utils} ${input_params} ${prefix}/src/base/spectrumsdt_utils.f90)
 set(debug_tools ${debug_tools_base} ${input_params} ${prefix}/src/base/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/rovib/rovib_utils.f90)
-set(cap ${constants} ${formulas} ${grid_info} ${input_params} ${prefix}/src/base/cap.f90)
 
-set(potential ${formulas} ${input_params} ${spectrumsdt_paths} ${prefix}/src/base/potential.f90)
+set(cap ${constants} ${grid_info} ${input_params} ${spectrumsdt_utils} ${prefix}/src/base/cap.f90)
+set(potential ${input_params} ${spectrumsdt_paths} ${spectrumsdt_utils} ${prefix}/src/base/potential.f90)
 
-set(spectrumsdt_io_base ${array_1d} ${array_2d} ${constants} ${general_utils} ${io_utils} ${input_params} ${parallel_utils} ${rovib_utils} ${spectrumsdt_paths} ${prefix}/src/base/io/spectrumsdt_io_base.f90)
+set(spectrumsdt_io_base ${array_1d} ${array_2d} ${constants} ${general_utils} ${io_utils} ${input_params} ${parallel_utils} ${rovib_utils} ${spectrumsdt_paths} ${spectrumsdt_utils} ${prefix}/src/base/io/spectrumsdt_io_base.f90)
 set(spectrumsdt_io_real ${spectrumsdt_io_base} ${prefix}/src/base/io/spectrumsdt_io_real.F90)
 set(spectrumsdt_io_complex ${spectrumsdt_io_base} ${prefix}/src/base/io/spectrumsdt_io_complex.F90)
 set(spectrumsdt_io ${spectrumsdt_io_real} ${spectrumsdt_io_complex} ${prefix}/src/base/io/spectrumsdt_io.f90)
 
 set(k_block_info ${algorithms} ${io_utils} ${matrix_block_info} ${spectrumsdt_io} ${prefix}/src/base/hamiltonian/k_block_info.f90)
 
-set(grids ${config} ${constants} ${coordinate_conversion} ${formulas} ${general_utils} ${grid_info} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${spectrumsdt_paths} ${vector} ${prefix}/src/base/grids.f90)
+set(grids ${config} ${constants} ${coordinate_conversion} ${general_utils} ${grid_info} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${spectrumsdt_paths} ${spectrumsdt_utils} ${vector} ${prefix}/src/base/grids.f90)
 
-set(basis_base ${algorithms} ${array_1d} ${array_2d} ${constants} ${formulas} ${fourier_transform} ${general_utils} ${input_params} ${lapack_interface} ${parallel_utils} ${spectrumsdt_paths} ${prefix}/src/base/basis/basis_base.f90)
+set(basis_base ${algorithms} ${array_1d} ${array_2d} ${constants} ${fourier_transform} ${general_utils} ${input_params} ${lapack_interface} ${parallel_utils} ${spectrumsdt_paths} ${spectrumsdt_utils} ${prefix}/src/base/basis/basis_base.f90)
 set(basis_real ${basis_base} ${prefix}/src/base/basis/basis_real.F90)
 set(basis_complex ${basis_base} ${prefix}/src/base/basis/basis_complex.F90)
 set(basis ${basis_real} ${basis_complex} ${prefix}/src/base/basis/basis.f90)
@@ -107,22 +108,22 @@ set(overlaps_real ${overlaps_base} ${prefix}/src/base/overlaps/overlaps_real.F90
 set(overlaps_complex ${overlaps_base} ${prefix}/src/base/overlaps/overlaps_complex.F90)
 set(overlaps ${overlaps_real} ${overlaps_complex} ${prefix}/src/base/overlaps/overlaps.f90)
 
-set(overlaps_extra_base ${array_1d} ${array_2d} ${formulas} ${input_params} ${spectrumsdt_io} ${k_block_info} ${overlaps} ${path_utils} ${parallel_utils} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_base.f90)
+set(overlaps_extra_base ${array_1d} ${array_2d} ${input_params} ${k_block_info} ${overlaps} ${parallel_utils} ${path_utils} ${spectrumsdt_io} ${spectrumsdt_utils} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_base.f90)
 set(overlaps_extra_real ${overlaps_extra_base} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_real.F90)
 set(overlaps_extra_complex ${overlaps_extra_base} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_complex.F90)
 set(overlaps_extra ${overlaps_extra_real} ${overlaps_extra_complex} ${prefix}/src/rovib/overlaps_extra/overlaps_extra.f90)
 
-set(distributed_rovib_hamiltonian ${block_borders} ${general_utils} ${formulas} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${rovib_utils} ${spectrumsdt_io} ${spectrumsdt_paths} ${prefix}/src/base/hamiltonian/distributed_rovib_hamiltonian.f90)
+set(distributed_rovib_hamiltonian ${block_borders} ${general_utils} ${input_params} ${k_block_info} ${matrix_block_info} ${parallel_utils} ${rovib_utils} ${spectrumsdt_io} ${spectrumsdt_paths} ${prefix}/src/base/hamiltonian/distributed_rovib_hamiltonian.f90)
 set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_block_info} ${prefix}/src/base/eigensolve/matmul_operator.f90)
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${prefix}/src/base/eigensolve/slepc_solver.F90)
-set(eigensolve ${basis} ${cap} ${constants} ${formulas} ${general_utils} ${grid_info} ${input_params} ${io_utils} ${matmul_operator} ${parallel_utils} ${path_utils} ${slepc_solver} ${spectrumsdt_paths} ${prefix}/src/base/eigensolve/eigensolve.f90)
+set(eigensolve ${basis} ${cap} ${constants} ${general_utils} ${grid_info} ${input_params} ${io_utils} ${matmul_operator} ${parallel_utils} ${path_utils} ${slepc_solver} ${spectrumsdt_paths} ${spectrumsdt_utils} ${prefix}/src/base/eigensolve/eigensolve.f90)
 
-set(properties_base ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${grid_info} ${input_params} ${parallel_utils} ${path_utils} ${spectrumsdt_io} ${rovib_utils} ${vector} ${prefix}/src/base/properties/properties_base.f90)
+set(properties_base ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${grid_info} ${input_params} ${parallel_utils} ${path_utils} ${spectrumsdt_io} ${spectrumsdt_utils} ${rovib_utils} ${vector} ${prefix}/src/base/properties/properties_base.f90)
 set(properties_real ${properties_base} ${prefix}/src/base/properties/properties_real.F90)
 set(properties_complex ${properties_base} ${prefix}/src/base/properties/properties_complex.F90)
 set(properties ${properties_real} ${properties_complex} ${prefix}/src/base/properties/properties.f90)
 
-set(spectrumsdt ${basis} ${cap} ${config} ${debug_tools} ${dict_utils} ${eigensolve} ${formulas} ${input_params} ${grid_info} ${grids} ${overlaps} ${overlaps_extra} ${parallel_utils} ${potential} ${sdt} ${properties} ${prefix}/src/base/spectrumsdt.f90)
+set(spectrumsdt ${basis} ${cap} ${config} ${debug_tools} ${dict_utils} ${eigensolve} ${input_params} ${grid_info} ${grids} ${overlaps} ${overlaps_extra} ${parallel_utils} ${potential} ${properties} ${spectrumsdt_utils} ${prefix}/src/base/spectrumsdt.f90)
 
 # Disable all warnings and standard conformation checks for external sources
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")
