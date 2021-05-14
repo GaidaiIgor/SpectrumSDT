@@ -94,6 +94,11 @@ def main():
     param_names = ["K", "symmetry", "stage"]
     use_param_names = [True, True, False]
     param_values = [[args.K], ["0", "1"], ["eigensolve", "properties"]]
+
+    # both symmetries are used when geometric phase effects are enabled
+    if config.params["use_geometric_phase"] == "1":
+        param_values[1] = ["all"]
+
     if args.K.isdigit():
         do_basis = False
         if "fixed" in config.params["basis"]:
