@@ -339,7 +339,7 @@ contains
         case ('grid_rho')
           call this % grid_rho % checked_init(subdict, auxiliary_subdict, this % stage)
         case ('grid_theta')
-          check_values = this % debug % treat_tp_as_xy == 0
+          check_values = iff(this % debug % treat_tp_as_xy == 0, 1, 0)
           call this % grid_theta % checked_init(subdict, auxiliary_subdict, this % stage, check_values = check_values)
           if (check_values == 1) then
             call convert_grid_params_deg_to_rad(this % grid_theta)
