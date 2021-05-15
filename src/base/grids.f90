@@ -35,6 +35,7 @@ contains
     real(real64), allocatable :: envelope_matrix(:, :)
 
     envelope_matrix = read_matrix_real(params % grid_rho % envelope_path)
+    call assert(size(envelope_matrix, 1) > 1 .and. size(envelope_matrix, 2) == 2, 'Error: grid_rho % envelope_path does not exist or has wrong format')
     env_grid = envelope_matrix(:, 1)
     env_values = envelope_matrix(:, 2)
 
