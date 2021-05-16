@@ -96,7 +96,7 @@ def main():
     param_values = [[args.K], ["0", "1"], ["eigensolve", "properties"]]
 
     # both symmetries are used when geometric phase effects are enabled
-    if config.params["use_geometric_phase"] == "1":
+    if "use_geometric_phase" in config.params and config.params["use_geometric_phase"] == "1":
         param_values[1] = ["all"]
 
     if args.K.isdigit():
