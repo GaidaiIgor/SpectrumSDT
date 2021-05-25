@@ -22,22 +22,20 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Prints spectrum.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine print_spectrum(params, eivals, eivecs)
+  subroutine print_states(params, eivals, eivecs)
     class(input_params), intent(in) :: params
     complex(real64), allocatable, intent(in) :: eivals(:)
     complex(real64), allocatable, intent(in) :: eivecs(:, :)
     integer :: proc_first_state, proc_states, file_unit, i, global_state_ind, col_width
     real(real64) :: energy, gamma
-    character(:), allocatable :: sym_path, file_path
+    character(:), allocatable :: file_path
 
     call get_proc_elem_range(size(eivals), proc_first_state, proc_states)
-    sym_path = get_sym_path(params)
-
     ! Write each eigenvector in a separate binary file
     do i = 1, proc_states
       ! Get global state number
       global_state_ind = proc_first_state + i - 1
-      file_path = get_solution_3d_path(sym_path, global_state_ind)
+      file_path = get_solution_3d_path(params, global_state_ind)
 
       open(newunit = file_unit, file = file_path, form = 'unformatted')
       write(file_unit) eivecs(:, i)
@@ -45,10 +43,12 @@ contains
     end do
 
     ! Final file is written by the 0th proc
-    if (get_proc_id() /= 0) return
-    ! Write spectrum
-    file_path = get_spectrum_path(sym_path)
+    if (get_proc_id() /= 0) then
+      return
+    end if
 
+    ! Write states
+    file_path = get_states_path(params)
     col_width = 25
     open(newunit = file_unit, file = file_path)
     write(file_unit, '(2A)') align_center('Energy (cm^-1)', col_width), align_center('Total Gamma (cm^-1)', col_width)
@@ -83,7 +83,7 @@ contains
     cap = calc_complex_cap(params, rho_info)
     if (params % cap % type /= 'none') then
       if (get_proc_id() == 0) then
-        call write_array(-aimag(cap) * au_to_wn, get_cap_path(get_sym_path(params)))
+        call write_array(-aimag(cap) * au_to_wn, get_cap_path(params))
         print *, 'CAP is printed'
       end if
     end if
@@ -93,7 +93,7 @@ contains
     call init_matmul(params) ! rovib_ham is already set
     call print_parallel('Eigenvalue solver has started')
     call find_eigenpairs_slepc(params % eigensolve % num_states, params % eigensolve % ncv, params % eigensolve % mpd, eivals, eivecs)
-    call print_spectrum(params, eivals, eivecs)
+    call print_states(params, eivals, eivecs)
   end subroutine
 
 end module

@@ -10,7 +10,7 @@ module general_utils_integer_mod
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function num2str_integer(num, format) result(str)
     integer, intent(in) :: num
-    character(*), intent(in), optional :: format
+    character(*), optional, intent(in) :: format
     character(:), allocatable :: str
     character(256) :: buffer
     character(:), allocatable :: format_act

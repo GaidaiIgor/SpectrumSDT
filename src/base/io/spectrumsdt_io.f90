@@ -44,7 +44,7 @@ contains
     integer :: total_solutions_2d, first_elem, proc_elems, sln_ind, total_Ks, start_ind, K, K_ind, K_sym, K_ind_comp, n_val
     complex(real64), allocatable :: Cs_raw_col(:) ! column in Cs_raw
     complex(real64), allocatable :: Cs_raw(:, :) ! unarranged Cs
-    character(:), allocatable :: sym_path, exp_coeffs_path
+    character(:), allocatable :: exp_coeffs_path
 
     ! Count total number of 2D solutions
     total_solutions_2d = 0
@@ -56,9 +56,8 @@ contains
     ! Load raw matrix
     call get_proc_elem_range(params % eigensolve % num_states, first_elem, proc_elems)
     allocate(Cs_raw(total_solutions_2d, proc_elems))
-    sym_path = get_sym_path(params)
     do sln_ind = first_elem, first_elem + proc_elems - 1
-      exp_coeffs_path = get_solution_3d_path(sym_path, sln_ind)
+      exp_coeffs_path = get_solution_3d_path(params, sln_ind)
       call load_solution_3D(exp_coeffs_path, total_solutions_2d, Cs_raw_col)
       Cs_raw(:, sln_ind - first_elem + 1) = Cs_raw_col
     end do
@@ -88,7 +87,7 @@ contains
     real(real64), intent(in) :: eigenvalues_3D(:, :), section_stats(:, :)
     integer :: file_unit, i, j, col_width, num_digits
     real(real64) :: next_output
-    character(:), allocatable :: sym_path, properties_result_path, format_string
+    character(:), allocatable :: state_properties_path, format_string
 
     ! Sequential print
     if (get_proc_id() /= 0) then
@@ -97,13 +96,12 @@ contains
 
     call assert(size(eigenvalues_3D, 1) == size(section_stats, 1), 'Error: sizes of input arrays have to be the same')
     call assert(size(params % wf_sections) == size(section_stats, 2), 'Error: sizes of wf_sections and section_stats are inconsistent')
-    sym_path = get_sym_path(params)
-    properties_result_path = get_properties_result_path(sym_path)
+    state_properties_path = get_state_properties_path(params)
 
     col_width = 25
     num_digits = 15
     format_string = 'G' // num2str(col_width) // '.' // num2str(num_digits)
-    open(newunit = file_unit, file = properties_result_path)
+    open(newunit = file_unit, file = state_properties_path)
 
     ! Write header
     write(file_unit, '(2A)', advance = 'no') align_center('Energy (cm^-1)', col_width), align_center('Total Gamma (cm^-1)', col_width)

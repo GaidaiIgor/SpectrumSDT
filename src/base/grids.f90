@@ -429,12 +429,12 @@ contains
 
     call generate_equidistant_grid_points(0d0, 2*pi, params % num_points_phi, grid_phi, jac_phi, phi_step)
 
-    call write_grid(grid_rho, [params % grid_rho % from, params % grid_rho % to], rho_step, 'grid_rho.dat', jac = jac_rho)
-    call write_grid(grid_theta, [params % grid_theta % from, params % grid_theta % to], theta_step, 'grid_theta.dat')
-    call write_grid(grid_phi, [0d0, 2*pi], phi_step, 'grid_phi.dat')
+    call write_grid(grid_rho, [params % grid_rho % from, params % grid_rho % to], rho_step, get_rho_info_name(), jac = jac_rho)
+    call write_grid(grid_theta, [params % grid_theta % from, params % grid_theta % to], theta_step, get_theta_info_name())
+    call write_grid(grid_phi, [0d0, 2*pi], phi_step, get_phi_info_name())
 
     if (params % output_coordinate_system /= 'aph' .or. params % debug % treat_tp_as_xy == 1) then
-      call write_pes_request(grid_rho, grid_theta, grid_phi, 'pes.in', params % output_coordinate_system, params % debug % treat_tp_as_xy, params % mass)
+      call write_pes_request(grid_rho, grid_theta, grid_phi, get_pes_request_path(), params % output_coordinate_system, params % debug % treat_tp_as_xy, params % mass)
     end if
   end subroutine
 

@@ -97,15 +97,14 @@ contains
     real(real64), allocatable :: section_stats(:, :) ! rows - states, columns - statistics
     real(real64), allocatable :: wf_sections_dist_mask(:, :, :, :, :) ! For each wf_section (1st dim) stores weights of each point in K x rho x theta x phi grid corresponding to that section
     real(real64), allocatable :: proc_p_dist(:, :, :, :, :) ! For each state (1st dim) stores probabilities in each point of K x rho x theta x phi grid
-    character(:), allocatable :: sym_path, spectrum_path
+    character(:), allocatable :: states_path
     ! Arrays of size 2 x N x L (or K x N x L for adiabatic basis). Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable :: As(:, :, :), Bs(:, :, :)
     type(array_2d_complex), allocatable :: proc_Cs(:, :) ! local 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S
 
     ! Load energies and gammas
-    sym_path = get_sym_path(params)
-    spectrum_path = get_spectrum_path(sym_path)
-    eigenvalues_3d = read_matrix_real(spectrum_path, skip_lines = 1)
+    states_path = get_states_path(params)
+    eigenvalues_3d = read_matrix_real(states_path, skip_lines = 1)
     call assert(size(eigenvalues_3d, 1) >= params % eigensolve % num_states, 'Error: not enough eigenstates computed')
 
     N = size(rho_info % points)

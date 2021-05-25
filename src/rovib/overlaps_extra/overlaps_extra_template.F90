@@ -82,13 +82,13 @@ contains
       end do
 
       ! Save sym blocks
-      sym_block_J_path = get_symmetric_overlap_J_file_path(sym_folder, n)
+      sym_block_J_path = get_symmetric_overlap_J_path(sym_folder, n)
       open(newunit=file_unit, file=sym_block_J_path, form='unformatted')
       write(file_unit) sym_block_J
       close(file_unit)
       deallocate(sym_block_J)
 
-      sym_block_K_path = get_symmetric_overlap_K_file_path(sym_folder, n)
+      sym_block_K_path = get_symmetric_overlap_K_path(sym_folder, n)
       open(newunit=file_unit, file=sym_block_K_path, form='unformatted')
       write(file_unit) sym_block_K
       close(file_unit)
@@ -192,7 +192,7 @@ contains
       end do
 
       ! Save cor block
-      cor_block_path = get_coriolis_overlap_file_path(sym_folder_row, n) ! Results are saved in the folder corresponding to K_row
+      cor_block_path = get_coriolis_overlap_path(sym_folder_row, n) ! Results are saved in the folder corresponding to K_row
       open(newunit=file_unit, file=cor_block_path, form='unformatted')
       write(file_unit) cor_block
       close(file_unit)
@@ -283,9 +283,9 @@ contains
       ! Save asym block
       ! Results are saved in the folder corresponding to K_row
       if (K_row == 1 .and. K_col == 1 .and. params % basis % fixed % enabled == 0) then
-        asym_block_path = get_asymmetric_overlap_file_1_path(sym_folder_row, n)
+        asym_block_path = get_asymmetric_overlap_1_path(sym_folder_row, n)
       else
-        asym_block_path = get_asymmetric_overlap_file_path(sym_folder_row, n)
+        asym_block_path = get_asymmetric_overlap_path(sym_folder_row, n)
       end if
       open(newunit=file_unit, file=asym_block_path, form='unformatted')
       write(file_unit) asym_block

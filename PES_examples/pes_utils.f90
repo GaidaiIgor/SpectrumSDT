@@ -1,4 +1,4 @@
-module pes_utils
+module pes_utils_mod
   use mpi
   use iso_fortran_env, only: real64
   implicit none
@@ -8,6 +8,15 @@ module pes_utils
   real(real64), parameter :: amu_to_kg = 1.660538921d-27 ! kg / amu (kilograms per atomic mass unit)
   real(real64), parameter :: aum_to_kg = 9.10938291d-31 ! kg / aum (kilogram per electron (atomic unit of mass))
   real(real64), parameter :: amu_to_aum = amu_to_kg / aum_to_kg ! aum / amu
+
+  abstract interface
+    function pes_point_calculator(coords, mass, shift) result(res)
+      import real64
+      real(real64), intent(in) :: coords(3), mass(3)
+      real(real64), intent(in) :: shift
+      real(real64) :: res
+    end function
+  end interface
 
 contains
 
@@ -35,7 +44,7 @@ contains
     integer :: file_unit, num_points, i
     real(real64) :: skip
 
-    open(newunit = file_unit, file = 'grid_rho.dat')
+    open(newunit = file_unit, file = 'rho_info.txt')
     read(file_unit, *) skip, skip, skip, num_points
     allocate(grid_rho(num_points))
     do i = 1, num_points
@@ -43,7 +52,7 @@ contains
     end do
     close(file_unit)
 
-    open(newunit = file_unit, file = 'grid_theta.dat')
+    open(newunit = file_unit, file = 'theta_info.txt')
     read(file_unit, *) skip, skip, skip, num_points
     allocate(grid_theta(num_points))
     do i = 1, num_points
@@ -51,7 +60,7 @@ contains
     end do
     close(file_unit)
 
-    open(newunit = file_unit, file = 'grid_phi.dat')
+    open(newunit = file_unit, file = 'phi_info.txt')
     read(file_unit, *) skip, skip, skip, num_points
     allocate(grid_phi(num_points))
     do i = 1, num_points
@@ -101,41 +110,6 @@ contains
     all_shifts = prefix_sum_exclusive(all_counts)
   end subroutine
       
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Converts a 1D index of 1D-representation into 3 indexes corresponding to it in 3D representation.
-! Assumes the 3D array was flattened using the following order of dimenisions: 3, 2, 1 (3rd coordinate is changing most frequently).
-! n1, n2, n3 - sizes of the 3D array.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine convert_1d_ind_to_3d(ind_1d, n1, n2, n3, i1_3d, i2_3d, i3_3d)
-    integer, intent(in) :: ind_1d, n1, n2, n3
-    integer, intent(out) :: i1_3d, i2_3d, i3_3d
-    integer :: ind_1d_0, i1_3d_0, i2_3d_0, i3_3d_0
-
-    ! Convert using 0-based indexing
-    ind_1d_0 = ind_1d - 1
-    i1_3d_0 = ind_1d_0 / (n2 * n3)
-    i2_3d_0 = (ind_1d_0 - i1_3d_0 * n2 * n3) / n3
-    i3_3d_0 = ind_1d_0 - i1_3d_0 * n2 * n3 - i2_3d_0 * n3
-
-    ! Shift back to 1-based indexing
-    i1_3d = i1_3d_0 + 1
-    i2_3d = i2_3d_0 + 1
-    i3_3d = i3_3d_0 + 1
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Prints PES to file.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine print_pes(pes, file_name)
-    real(real64), intent(in) :: pes(:)
-    character(*), intent(in) :: file_name
-    integer :: file_unit
-
-    open(newunit = file_unit, file = file_name)
-    write(file_unit, '(G23.15)') pes
-    close(file_unit)
-  end subroutine
-
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Compares given reals with specified precision.
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -188,6 +162,72 @@ contains
         print *
       end if
     end if
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns direct product of the three grids. Each point is a column.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function aph_grids_to_coord_list(grid_rho, grid_theta, grid_phi) result(coords)
+    real(real64), intent(in) :: grid_rho(:), grid_theta(:), grid_phi(:)
+    real(real64), allocatable :: coords(:, :)
+    integer :: total_points, ind_rho, ind_theta, ind_phi, i
+
+    total_points = size(grid_rho) * size(grid_theta) * size(grid_phi)
+    allocate(coords(3, total_points))
+    i = 1
+    do ind_rho = 1, size(grid_rho)
+      do ind_theta = 1, size(grid_theta)
+        do ind_phi = 1, size(grid_phi)
+          coords(:, i) = [grid_rho(ind_rho), grid_theta(ind_theta), grid_phi(ind_phi)]
+          i = i + 1
+        end do
+      end do
+    end do
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Calculates potential energy surface for each row in *coords* in parallel. Result is defined on 0th processor only.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine calc_pes(coords, mass, shift, point_calculator, pes)
+    real(real64), intent(in) :: coords(:, :)
+    real(real64), intent(in) :: mass(3)
+    real(real64), intent(in) :: shift
+    procedure(pes_point_calculator) :: point_calculator
+    real(real64), allocatable, intent(out) :: pes(:)
+    integer :: proc_id, ierr, first_k, proc_points, proc_k, k
+    integer, allocatable :: proc_counts(:), proc_shifts(:)
+    real(real64), allocatable :: proc_pes(:)
+
+    call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
+    ! Split all points between available processors
+    call get_proc_elem_range(size(coords, 2), first_k, proc_points, proc_counts, proc_shifts)
+    allocate(proc_pes(proc_points))
+
+    ! Calculate this proc's share
+    do proc_k = 1, proc_points
+      k = first_k + proc_k - 1
+      proc_pes(proc_k) = point_calculator(coords(:, k), mass, shift)
+    end do
+
+    ! Allocate global storage on 0th proc
+    if (proc_id == 0) then
+      allocate(pes(size(coords, 2)))
+    end if
+    print *, 'Proc', proc_id, 'is done'
+    call MPI_Gatherv(proc_pes, size(proc_pes), MPI_DOUBLE_PRECISION, pes, proc_counts, proc_shifts, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+  end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Prints PES to file.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  subroutine print_pes(pes, file_name)
+    real(real64), intent(in) :: pes(:)
+    character(*), intent(in) :: file_name
+    integer :: file_unit
+
+    open(newunit = file_unit, file = file_name)
+    write(file_unit, '(G23.15)') pes
+    close(file_unit)
   end subroutine
 
 end module

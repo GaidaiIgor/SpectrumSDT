@@ -239,7 +239,7 @@ contains
       close(file_unit)
 
       open(newunit = file_unit, file = get_block_info_path(get_sym_path(params)))
-      write(file_unit, '(I0)') all_nvec2
+      write(file_unit, '(I5)') all_nvec2
       close(file_unit)
 
       print *, 'Total number of 1D basis functions: ', sum(all_nvec1)

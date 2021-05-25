@@ -400,7 +400,7 @@ contains
       call put_string(keys, 'use_rovib_coupling')
       call put_string(keys, 'J')
       call put_string(keys, 'K')
-      if (this % use_rovib_coupling == 1) then
+      if (this % use_rovib_coupling == 1 .and. this % K(1) <= 1 .and. 1 <= this % K(2)) then
         call put_string(keys, 'parity')
       end if
 
@@ -453,6 +453,12 @@ contains
     class(input_params), intent(inout) :: this
     class(dictionary_t), intent(in) :: config_dict
 
+    if (.not. ('use_geometric_phase' .in. config_dict)) then
+      if (this % stage /= 'grids') then
+        call print_parallel('use_geometric_phase is not specified. Assuming no geometric phase effects.')
+      end if
+    end if
+
     if (.not. ('output_coordinate_system' .in. config_dict)) then
       this % output_coordinate_system = 'aph'
       if (this % stage == 'grids') then
@@ -460,8 +466,10 @@ contains
       end if
     end if
 
-    if (.not. ('use_parallel' .in. config_dict)) then
-      this % use_parallel = iff(this % stage == 'grids', 0, 1)
+    if (.not. ('parity' .in. config_dict)) then
+      if (all(this % K == 0)) then
+        this % parity = mod(this % J, 2)
+      end if
     end if
 
     if (.not. ('cap' .in. config_dict)) then
@@ -470,11 +478,9 @@ contains
         call print_parallel('cap is not specified. Assuming no CAP.')
       end if
     end if
-      
-    if (.not. ('use_geometric_phase' .in. config_dict)) then
-      if (this % stage /= 'grids') then
-        call print_parallel('use_geometric_phase is not specified. Assuming no geometric phase effects.')
-      end if
+
+    if (.not. ('use_parallel' .in. config_dict)) then
+      this % use_parallel = iff(this % stage == 'grids', 0, 1)
     end if
   end subroutine
 
@@ -496,13 +502,14 @@ contains
     call assert(all(this % mass > 0), 'Error: all mass should be > 0')
     call assert((this % mass(1) .aeq. this % mass(3)) .and. .not. (this % mass(1) .aeq. this % mass(2)), 'Error: mass should be specified in ABA order')
     call assert(this % J >= 0, 'Error: J should be >= 0')
-    call assert(any(this % parity == [0, 1]), 'Error: parity value should be 0 or 1')
     if (any(this % stage == [character(len = 100) :: 'eigensolve', 'properties']) .and. this % use_rovib_coupling == 1) then
       call assert(all(this % K >= get_k_start(this % J, this % parity)), 'Error: K should be >= mod(J+p, 2)')
     else
       call assert(all(this % K >= 0), 'Error: K should be >= 0')
     end if
     call assert(all(this % K <= this % J), 'Error: K should be <= J')
+    call assert(any(this % parity == [0, 1]), 'Error: parity value should be 0 or 1')
+    call assert(this % K(1) == 0 .means. this % parity == mod(this % J, 2), 'Error: only mod(J, 2) parity exists for K = 0')
     call assert(any(this % use_parallel == [0, 1]), 'Error: use_parallel should be 0 or 1')
   end subroutine
 

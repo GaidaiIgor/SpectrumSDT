@@ -9,12 +9,12 @@ program so2_pes
   real(real64), allocatable :: coords(:, :)
 
   call MPI_Init(ierr)
-  coords = load_coords('pes.in')
+  coords = load_coords('pes_in.txt')
   call calc_pes(coords, pes)
 
   call MPI_Comm_Rank(MPI_COMM_WORLD, proc_id, ierr)
   if (proc_id == 0) then
-    call print_pes(pes, 'pes.out')
+    call print_pes(pes, 'pes_out.txt')
     print *, 'Done'
   end if
   call MPI_Finalize(ierr)

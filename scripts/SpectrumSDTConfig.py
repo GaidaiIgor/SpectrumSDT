@@ -37,11 +37,13 @@ class SpectrumSDTConfig:
     def get_J(self) -> int:
         return int(self.params["J"])
 
-    def get_Ks(self) -> List[int]:
-        K_str = self.params["K"]
+    def get_parity(self) -> int:
+        return int(self.params["parity"])
+
+    @staticmethod
+    def parse_Ks(K_str, J, parity = None) -> List[int]:
         if K_str == "all":
-            J = self.get_J()
-            k_start = (J + self.get_parity()) % 2
+            k_start = 1 if parity is None else (J + parity) % 2
             return [k_start, J]
 
         K_str_tokens = K_str.split("..")
@@ -50,26 +52,23 @@ class SpectrumSDTConfig:
         else:
             return [int(K_str_tokens[0]), int(K_str_tokens[1])]
 
-    def get_parity(self) -> int:
-        return int(self.params["parity"])
+    def get_Ks(self) -> List[int]:
+        return SpectrumSDTConfig.parse_Ks(self.params["K"], self.get_J(), self.get_parity())
 
     def get_symmetry(self) -> int:
         return int(self.params["basis"]["symmetry"])
 
-    def get_basis_root_path(self) -> str:
-        return self.params["basis_root_path"]
+    def get_basis_fixed_J(self) -> int:
+        return int(self.params["basis"]["fixed"]["J"])
 
-    def get_basis_J(self) -> int:
-        return int(self.params["basis_J"])
+    def get_basis_fixed_K(self) -> int:
+        return int(self.params["basis"]["fixed"]["K"])
 
-    def get_basis_K(self) -> int:
-        return int(self.params["basis_K"])
+    def get_basis_fixed_root_path(self) -> str:
+        return self.params["basis"]["fixed"]["root_path"]
 
     def get_number_of_states(self) -> int:
         return int(self.params["eigensolve"]["num_states"])
-
-    def get_ncv(self) -> int:
-        return int(self.params["ncv"])
 
     def get_grid_path(self) -> str:
         return self.params["grid_path"]

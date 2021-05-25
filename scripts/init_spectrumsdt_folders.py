@@ -50,8 +50,9 @@ def create_paths(target_paths: List[str]):
     """ Creates all paths specified in target_paths. """
     for next_path in target_paths:
         next_path = Path(next_path)
-        if next_path.name == "basis" or next_path.name == "overlaps" or next_path.name == "eigensolve":
-            next_path = next_path / ("out_" + next_path.name)
+        create_bin = any(list(map(lambda part: part == "basis" or part == "overlaps" or part == "eigensolve", next_path.parts[-2:])))
+        if create_bin:
+            next_path = next_path / "bin"
         if not path.exists(next_path):
             os.makedirs(next_path)
 
@@ -91,6 +92,7 @@ def main():
     config_path = path.abspath(args.config)
     config = SpectrumSDTConfig(config_path)
 
+    # this is general template, which may be modified below
     param_names = ["K", "symmetry", "stage"]
     use_param_names = [True, True, False]
     param_values = [[args.K], ["0", "1"], ["eigensolve", "properties"]]
@@ -99,29 +101,39 @@ def main():
     if "use_geometric_phase" in config.params and config.params["use_geometric_phase"] == "1":
         param_values[1] = ["all"]
 
-    if args.K.isdigit():
+    Ks = SpectrumSDTConfig.parse_Ks(args.K, config.get_J())
+    if Ks[0] == Ks[1]:
         do_basis = False
         if "fixed" in config.params["basis"]:
-            J = int(config.params["J"])
-            K = int(args.K)
-            fixed_J = int(config.params["basis"]["fixed"]["J"])
-            fixed_K = int(config.params["basis"]["fixed"]["K"])
-            if J == fixed_J and K == fixed_K:
+            J = config.get_J()
+            fixed_J = config.get_basis_fixed_J()
+            fixed_K = config.get_basis_fixed_K()
+            if J == fixed_J and Ks[0] == fixed_K:
                 do_basis = True
         else:
             do_basis = True
 
         if do_basis:
-            # add extra stages if K is necessary
+            # add extra stages if basis calculation is needed
             param_values[2].insert(0, "basis")
             param_values[2].insert(1, "overlaps")
 
+    if config.params["use_rovib_coupling"] == "1" and Ks[0] <= 1:
+        param_names.insert(3, "parity")
+        use_param_names.insert(3, True)
+        if Ks[0] == 0:
+            param_values.insert(3, str(config.get_J() % 2))
+        else:
+            param_values.insert(3, ["0", "1"])
+
+    if len(param_values) == 4 and len(param_values[2]) == 4:
+        parity_insensitive_values = param_values[0:2]
+        parity_insensitive_values[2] = parity_insensitive_values[2][0:1]
+        parity_sensitive_values = param_values
+        parity_sensitive_values[2] = parity_sensitive_values[2][2:3]
+        value_combos = list(itertools.product(*parity_insensitive_values)) + list(itertools.product(*parity_sensitive_values))
     else:
-        # add parity param if K is a range
-        param_names.insert(1, "parity")
-        use_param_names.insert(1, True)
-        param_values.insert(1, ["0", "1"])
-    value_combos = list(itertools.product(*param_values))
+        value_combos = list(itertools.product(*param_values))
 
     base_path = path.dirname(config_path)
     target_paths = generate_paths(base_path, param_names, use_param_names, value_combos)

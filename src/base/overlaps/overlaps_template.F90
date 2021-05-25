@@ -104,7 +104,7 @@ contains
 
         ! Calculate and save block
         overlap_block = CONCAT2(calculate_overlap_block_,TEMPLATE_TYPE_NAME)(params, rho_ind_row, rho_ind_col, num_points_theta, sym_path)
-        open(newunit = file_unit, file = get_regular_overlap_file_path(sym_path, rho_ind_row, rho_ind_col), form = 'unformatted')
+        open(newunit = file_unit, file = get_regular_overlap_path(sym_path, rho_ind_row, rho_ind_col), form = 'unformatted')
         write(file_unit) overlap_block
         close(file_unit)
       end do

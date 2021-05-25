@@ -15,10 +15,18 @@ module spectrumsdt_paths_mod
   end interface
 
   interface get_sym_path
-    module procedure :: get_sym_path_str, get_sym_path_params
+    module procedure :: get_sym_path_params
   end interface
 
 contains
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns name of rho info file.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_rho_info_name() result(res)
+    character(:), allocatable :: res
+    res = 'rho_info.txt'
+  end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to rho grid.
@@ -26,7 +34,15 @@ contains
   function get_rho_info_path(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = append_path_token(params % grid_path, 'grid_rho.dat')
+    res = append_path_token(params % grid_path, get_rho_info_name())
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns name of theta info file.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_theta_info_name() result(res)
+    character(:), allocatable :: res
+    res = 'theta_info.txt'
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -35,7 +51,15 @@ contains
   function get_theta_info_path(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = append_path_token(params % grid_path, 'grid_theta.dat')
+    res = append_path_token(params % grid_path, get_theta_info_name())
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns name of phi info file.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_phi_info_name() result(res)
+    character(:), allocatable :: res
+    res = 'phi_info.txt'
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -44,7 +68,15 @@ contains
   function get_phi_info_path(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = append_path_token(params % grid_path, 'grid_phi.dat')
+    res = append_path_token(params % grid_path, get_phi_info_name())
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns name of the file with the requested values of PES.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_pes_request_path() result(res)
+    character(:), allocatable :: res
+    res = 'pes_in.txt'
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -53,34 +85,33 @@ contains
   function get_pes_path(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = append_path_token(params % grid_path, 'pes.out')
+    res = append_path_token(params % grid_path, 'pes_out.txt')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with calculation results for given Ks. K range version.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_k_folder_path_root_range(root_path, K, J, parity, stage, rovib_coupling) result(res)
+  function get_k_folder_path_root_range(root_path, K, J, parity) result(res)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K(2)
     integer, optional, intent(in) :: J, parity
-    character(*), optional, intent(in) :: stage
-    integer, optional, intent(in) :: rovib_coupling
-    integer :: J_act, parity_act, rovib_coupling_act
     character(:), allocatable :: res
-    character(:), allocatable :: stage_act, k_folder_name
+    character(:), allocatable :: k_folder_name
     
-    J_act = arg_or_default(J, -1)
-    parity_act = arg_or_default(parity, -1)
-    stage_act = arg_or_default(stage, '')
-    rovib_coupling_act = arg_or_default(rovib_coupling, -1)
-    if (rovib_coupling_act == 1 .and. (stage_act == 'eigensolve' .or. stage_act == 'properties') .and. &
-        J_act /= -1 .and. parity_act /= -1 .and. K(1) == get_k_start(J_act, parity_act) .and. K(2) == J_act) then
-      k_folder_name = 'K_all'
-    else if (K(1) == K(2)) then
-      k_folder_name = 'K_' // num2str(K(1))
-    else
-      k_folder_name = 'K_' // num2str(K(1)) // '..' // num2str(K(2))
+    if (present(J) .and. present(parity)) then
+      if (K(1) == get_k_start(J, parity) .and. K(2) == J) then
+        k_folder_name = 'K_all'
+      end if
     end if
+
+    if (.not. allocated(k_folder_name)) then
+      if (K(1) == K(2)) then
+        k_folder_name = 'K_' // num2str(K(1))
+      else
+        k_folder_name = 'K_' // num2str(K(1)) // '..' // num2str(K(2))
+      end if
+    end if
+
     res = append_path_tokens(root_path, k_folder_name)
   end function
 
@@ -100,34 +131,15 @@ contains
   function get_k_folder_path_params(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = get_k_folder_path_root_range(params % root_path, params % K, params % J, params % parity, params % stage, params % use_rovib_coupling)
+    res = get_k_folder_path_root_range(params % root_path, params % K, params % J, params % parity)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for a given symmetry and Ks.
+! Generates path to folder with calculation results for a given Ks and symmetry.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_sym_path_str(k_path, sym_name, parity) result(res)
-    character(*), intent(in) :: k_path, sym_name
-    integer, intent(in), optional :: parity
-    character(:), allocatable :: res
-
-    res = k_path
-    if (present(parity)) then
-      if (parity /= -1) then
-        res = append_path_tokens(res, 'parity_' // num2str(parity)) 
-      end if
-    end if
-    res = append_path_tokens(res, sym_name)
-  end function
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to folder with calculation results for a given symmetry and Ks.
-! Parity is relevant for coupled eigensolves only.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_sym_path_int(k_path, sym_code, parity) result(res)
+  function get_sym_path_int(k_path, sym_code) result(res)
     character(*), intent(in) :: k_path
     integer, intent(in) :: sym_code
-    integer, intent(in), optional :: parity
     character(:), allocatable :: res
     character(:), allocatable :: sym_name
 
@@ -136,21 +148,20 @@ contains
     else
       sym_name = 'symmetry_' // num2str(sym_code)
     end if
-    res = get_sym_path_str(k_path, sym_name, parity)
+    res = append_path_token(k_path, sym_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with calculation results for a given symmetry and Ks.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_sym_path_root(root_path, K, sym_code, parity) result(res)
+  function get_sym_path_root(root_path, K, sym_code) result(res)
     character(*), intent(in) :: root_path
     integer, intent(in) :: K, sym_code
-    integer, intent(in), optional :: parity
     character(:), allocatable :: res
     character(:), allocatable :: k_path
 
     k_path = get_k_folder_path(root_path, K)
-    res = get_sym_path_int(k_path, sym_code, parity)
+    res = get_sym_path_int(k_path, sym_code)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -162,11 +173,7 @@ contains
     character(:), allocatable :: k_path
 
     k_path = get_k_folder_path(params)
-    if (params % use_rovib_coupling == 1 .and. (params % stage == 'eigensolve' .or. params % stage == 'properties')) then
-      res = get_sym_path_int(k_path, params % basis % symmetry, params % parity)
-    else
-      res = get_sym_path_int(k_path, params % basis % symmetry)
-    end if
+    res = get_sym_path_int(k_path, params % basis % symmetry)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -181,13 +188,13 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with basis results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_basis_results_path(sym_path) result(res)
+  function get_basis_bin_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
     character(:), allocatable :: basis_path
 
     basis_path = get_basis_path(sym_path)
-    res = append_path_tokens(basis_path, 'out_basis')
+    res = append_path_tokens(basis_path, 'bin')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -199,7 +206,7 @@ contains
     character(:), allocatable :: basis_path
 
     basis_path = get_basis_path(sym_path)
-    res = append_path_tokens(basis_path, 'num_vectors_1d.dat')
+    res = append_path_tokens(basis_path, 'num_vectors_1d.fwc')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -211,7 +218,7 @@ contains
     character(:), allocatable :: basis_path
 
     basis_path = get_basis_path(sym_path)
-    res = append_path_tokens(basis_path, 'num_vectors_2d.dat')
+    res = append_path_tokens(basis_path, 'num_vectors_2d.fwc')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -220,7 +227,7 @@ contains
   function get_energies_1d_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    res = append_path_tokens(get_basis_path(sym_path), 'energies_1d.txt')
+    res = append_path_tokens(get_basis_path(sym_path), 'energies_1d.fwc')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -229,7 +236,7 @@ contains
   function get_energies_2d_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
-    res = append_path_tokens(get_basis_path(sym_path), 'energies_2d.txt')
+    res = append_path_tokens(get_basis_path(sym_path), 'energies_2d.fwc')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -239,11 +246,11 @@ contains
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind
     character(:), allocatable :: res
-    character(:), allocatable :: basis_results_path, file_name
+    character(:), allocatable :: basis_bin_path, file_name
 
-    basis_results_path = get_basis_results_path(sym_path)
-    file_name = 'bas1.' // num2str(slice_ind, '(I0)') // '.bin.out'
-    res = append_path_tokens(basis_results_path, file_name)
+    basis_bin_path = get_basis_bin_path(sym_path)
+    file_name = 'basis_1d.' // num2str(slice_ind, '(I0)') // '.bin'
+    res = append_path_tokens(basis_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -253,11 +260,11 @@ contains
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind
     character(:), allocatable :: res
-    character(:), allocatable :: basis_results_path, file_name
+    character(:), allocatable :: basis_bin_path, file_name
 
-    basis_results_path = get_basis_results_path(sym_path)
-    file_name = 'bas2.' // num2str(slice_ind, '(I0)') // '.bin.out'
-    res = append_path_tokens(basis_results_path, file_name)
+    basis_bin_path = get_basis_bin_path(sym_path)
+    file_name = 'basis_2d.' // num2str(slice_ind, '(I0)') // '.bin'
+    res = append_path_tokens(basis_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -272,177 +279,215 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with overlaps results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_overlaps_results_path(sym_path) result(res)
+  function get_overlaps_bin_path(sym_path) result(res)
     character(*), intent(in) :: sym_path
     character(:), allocatable :: res
     character(:), allocatable :: overlaps_path
 
     overlaps_path = get_overlaps_path(sym_path)
-    res = append_path_tokens(overlaps_path, 'out_overlaps')
+    res = append_path_tokens(overlaps_path, 'bin')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with a regular overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_regular_overlap_file_path(sym_path, slice_ind_1, slice_ind_2) result(res)
+  function get_regular_overlap_path(sym_path, slice_ind_1, slice_ind_2) result(res)
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind_1, slice_ind_2
     character(:), allocatable :: res
-    character(:), allocatable :: overlaps_results_path, file_name
+    character(:), allocatable :: overlaps_bin_path, file_name
 
-    overlaps_results_path = get_overlaps_results_path(sym_path)
-    file_name = 'overlap.' // num2str(slice_ind_1, '(I0)') // '.' // num2str(slice_ind_2, '(I0)') // '.bin.out'
-    res = append_path_tokens(overlaps_results_path, file_name)
+    overlaps_bin_path = get_overlaps_bin_path(sym_path)
+    file_name = 'overlap.' // num2str(slice_ind_1, '(I0)') // '.' // num2str(slice_ind_2, '(I0)') // '.bin'
+    res = append_path_tokens(overlaps_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with a symmetric overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_symmetric_overlap_J_file_path(sym_path, slice_ind) result(res)
+  function get_symmetric_overlap_J_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind
     character(:), allocatable :: res
-    character(:), allocatable :: overlaps_results_path, file_name
+    character(:), allocatable :: overlaps_bin_path, file_name
 
-    overlaps_results_path = get_overlaps_results_path(sym_path)
-    file_name = 'sym_J.' // num2str(slice_ind) // '.bin.out'
-    res = append_path_tokens(overlaps_results_path, file_name)
+    overlaps_bin_path = get_overlaps_bin_path(sym_path)
+    file_name = 'sym_J.' // num2str(slice_ind) // '.bin'
+    res = append_path_tokens(overlaps_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with a symmetric overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_symmetric_overlap_K_file_path(sym_path, slice_ind) result(res)
+  function get_symmetric_overlap_K_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind
     character(:), allocatable :: res
-    character(:), allocatable :: overlaps_results_path, file_name
+    character(:), allocatable :: overlaps_bin_path, file_name
 
-    overlaps_results_path = get_overlaps_results_path(sym_path)
-    file_name = 'sym_K.' // num2str(slice_ind) // '.bin.out'
-    res = append_path_tokens(overlaps_results_path, file_name)
+    overlaps_bin_path = get_overlaps_bin_path(sym_path)
+    file_name = 'sym_K.' // num2str(slice_ind) // '.bin'
+    res = append_path_tokens(overlaps_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with a coriolis overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_coriolis_overlap_file_path(sym_path, slice_ind) result(res)
+  function get_coriolis_overlap_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind
     character(:), allocatable :: res
-    character(:), allocatable :: overlaps_results_path, file_name
+    character(:), allocatable :: overlaps_bin_path, file_name
 
-    overlaps_results_path = get_overlaps_results_path(sym_path)
-    file_name = 'coriolis.' // num2str(slice_ind) // '.bin.out'
-    res = append_path_tokens(overlaps_results_path, file_name)
+    overlaps_bin_path = get_overlaps_bin_path(sym_path)
+    file_name = 'coriolis.' // num2str(slice_ind) // '.bin'
+    res = append_path_tokens(overlaps_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with an asymmetric overlap block. Negative values of slice_ind indicate K=1 block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_asymmetric_overlap_file_path(sym_path, slice_ind) result(res)
+  function get_asymmetric_overlap_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind
     character(:), allocatable :: res
-    character(:), allocatable :: overlaps_results_path, file_name
+    character(:), allocatable :: overlaps_bin_path, file_name
 
-    overlaps_results_path = get_overlaps_results_path(sym_path)
-    file_name = 'asym.' // num2str(slice_ind) // '.bin.out'
-    res = append_path_tokens(overlaps_results_path, file_name)
+    overlaps_bin_path = get_overlaps_bin_path(sym_path)
+    file_name = 'asym.' // num2str(slice_ind) // '.bin'
+    res = append_path_tokens(overlaps_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with an asymmetric overlap block. Negative values of slice_ind indicate K=1 block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_asymmetric_overlap_file_1_path(sym_path, slice_ind) result(res)
+  function get_asymmetric_overlap_1_path(sym_path, slice_ind) result(res)
     character(*), intent(in) :: sym_path
     integer, intent(in) :: slice_ind
     character(:), allocatable :: res
-    character(:), allocatable :: overlaps_results_path, file_name
+    character(:), allocatable :: overlaps_bin_path, file_name
 
-    overlaps_results_path = get_overlaps_results_path(sym_path)
-    file_name = 'asym_1.' // num2str(slice_ind) // '.bin.out'
-    res = append_path_tokens(overlaps_results_path, file_name)
+    overlaps_bin_path = get_overlaps_bin_path(sym_path)
+    file_name = 'asym_1.' // num2str(slice_ind) // '.bin'
+    res = append_path_tokens(overlaps_bin_path, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with eigenpairs calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_eigensolve_path(sym_path) result(res)
-    character(*), intent(in) :: sym_path
+  function get_eigensolve_path(params) result(res)
+    class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = append_path_tokens(sym_path, 'eigensolve')
+    res = append_path_tokens(get_sym_path(params), 'eigensolve')
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to current stage.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_stage_path(params) result(res)
+    class(input_params), intent(in) :: params
+    character(:), allocatable :: res
+    res = append_path_tokens(get_sym_path(params), params % stage)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Appends parity folder to a given stage folder if parity matters.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_parity_path(params, stage_path) result(res)
+    class(input_params), intent(in) :: params
+    character(*), optional, intent(in) :: stage_path
+    character(:), allocatable :: res
+    character(:), allocatable :: stage_path_act
+
+    stage_path_act = arg_or_default(stage_path, get_stage_path(params))
+    if (params % use_rovib_coupling == 1 .and. params % K(1) <= 1) then
+      res = append_path_tokens(stage_path_act, 'parity_' // num2str(params % parity))
+    else
+      res = stage_path_act
+    end if
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to folder with binary stage results.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_stage_binary_path(params) result(res)
+    class(input_params), intent(in) :: params
+    character(:), allocatable :: res
+    character(:), allocatable :: parity_path
+
+    parity_path = get_parity_path(params)
+    res = append_path_tokens(parity_path, 'bin')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with CAP.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_cap_path(sym_path) result(res)
-    character(*), intent(in) :: sym_path
+  function get_cap_path(params) result(res)
+    class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    character(:), allocatable :: eigensolve_path
+    character(:), allocatable :: parity_path
 
-    eigensolve_path = get_eigensolve_path(sym_path)
-    res = append_path_tokens(eigensolve_path, 'cap.txt')
+    parity_path = get_parity_path(params, get_eigensolve_path(params))
+    res = append_path_tokens(parity_path, 'cap.fwc')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with eigenpairs results calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_eigensolve_results_path(sym_path) result(res)
-    character(*), intent(in) :: sym_path
+  function get_eigensolve_bin_path(params) result(res)
+    class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    character(:), allocatable :: eigensolve_path
+    character(:), allocatable :: parity_path
 
-    eigensolve_path = get_eigensolve_path(sym_path)
-    res = append_path_tokens(eigensolve_path, 'out_eigensolve')
+    parity_path = get_parity_path(params, get_eigensolve_path(params))
+    res = append_path_tokens(parity_path, 'bin')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to file with 3D expansion coefficients for a given state number k.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_solution_3d_path(sym_path, k) result(res)
-    character(*), intent(in) :: sym_path
+  function get_solution_3d_path(params, k) result(res)
+    class(input_params), intent(in) :: params
     integer, intent(in) :: k ! solution index
     character(:), allocatable :: res
-    character(:), allocatable :: eigensolve_results_folder, file_name
+    character(:), allocatable :: eigensolve_bin_folder, file_name
 
-    eigensolve_results_folder = get_eigensolve_results_path(sym_path)
-    file_name = 'exp.' // num2str(k, '(I0)') // '.bin.out'
-    res = append_path_tokens(eigensolve_results_folder, file_name)
+    eigensolve_bin_folder = get_eigensolve_bin_path(params)
+    file_name = 'exp.' // num2str(k) // '.bin'
+    res = append_path_tokens(eigensolve_bin_folder, file_name)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to computed spectrum.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_spectrum_path(sym_path) result(res)
-    character(*), intent(in) :: sym_path
+  function get_states_path(params) result(res)
+    class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    character(:), allocatable :: eigensolve_path
+    character(:), allocatable :: parity_path
 
-    eigensolve_path = get_eigensolve_path(sym_path)
-    res = append_path_tokens(eigensolve_path, 'states.fwc') ! Fixed width columns
+    parity_path = get_parity_path(params, get_eigensolve_path(params))
+    res = append_path_tokens(parity_path, 'states.fwc') ! fixed width columns
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Generates path to folder with properties calculations.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_properties_path(sym_path) result(res)
-    character(*), intent(in) :: sym_path
+  function get_properties_path(params) result(res)
+    class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = append_path_tokens(sym_path, 'properties')
+    res = append_path_tokens(get_sym_path(params), 'properties')
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Generates path to file with properties results calculation.
+! Generates path to file with state properties calculation.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_properties_result_path(sym_path) result(res)
-    character(*), intent(in) :: sym_path
+  function get_state_properties_path(params) result(res)
+    class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    character(:), allocatable :: properties_path
+    character(:), allocatable :: parity_path
 
-    properties_path = get_properties_path(sym_path)
-    res = append_path_tokens(properties_path, 'states.ssdtp') ! SpectrumSDT properties
+    parity_path = get_parity_path(params, get_properties_path(params))
+    res = append_path_tokens(parity_path, 'state_properties.fwc') ! fixed width columns
   end function
 
 end module

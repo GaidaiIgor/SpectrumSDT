@@ -276,18 +276,18 @@ contains
 
     sym_path = get_sym_path_root(root_path, K_row_load, K_row_load_sym)
     if (overlap_type == 0) then
-      file_path = get_regular_overlap_file_path(sym_path, slice_ind_row_load, slice_ind_col_load)
+      file_path = get_regular_overlap_path(sym_path, slice_ind_row_load, slice_ind_col_load)
     else if (overlap_type == 10) then
-      file_path = get_symmetric_overlap_J_file_path(sym_path, slice_ind_row_load)
+      file_path = get_symmetric_overlap_J_path(sym_path, slice_ind_row_load)
     else if (overlap_type == 11) then
-      file_path = get_symmetric_overlap_K_file_path(sym_path, slice_ind_row_load)
+      file_path = get_symmetric_overlap_K_path(sym_path, slice_ind_row_load)
     else if (overlap_type == 2) then
-      file_path = get_coriolis_overlap_file_path(sym_path, slice_ind_row_load)
+      file_path = get_coriolis_overlap_path(sym_path, slice_ind_row_load)
     else if (overlap_type == 3) then
       if (K_row == 1 .and. K_col == 1) then
-        file_path = get_asymmetric_overlap_file_1_path(sym_path, slice_ind_row_load)
+        file_path = get_asymmetric_overlap_1_path(sym_path, slice_ind_row_load)
       else
-        file_path = get_asymmetric_overlap_file_path(sym_path, slice_ind_row_load)
+        file_path = get_asymmetric_overlap_path(sym_path, slice_ind_row_load)
       end if
     end if
 

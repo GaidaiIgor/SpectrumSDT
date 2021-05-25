@@ -50,7 +50,7 @@ program pesprint
   call calc_pes(grid_rho, grid_theta, grid_phi, shift, pes)
 
   if (proc_id == 0) then
-    call print_pes(pes, 'pes.out')
+    call print_pes(pes, 'pes_out.txt')
   end if
   call MPI_Finalize(ierr)
 
