@@ -19,7 +19,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
     ```
     cd ~/SpectrumSDT/libs/fdict
     ```
-    Edit `setup.make` to change compiler options (optional). Then run:
+    Edit `setup.make` to change compiler options as necessary. Then run:
     ```
     make
     ```
@@ -44,7 +44,7 @@ This example assumes the repo is cloned into `~/SpectrumSDT`
 3. Build the main program  
 `cd ~/SpectrumSDT`
 
-    1. Edit `CMakeLists.txt` to specify custom compiler options (optional)  
+    1. Edit `CMakeLists.txt` to specify custom compiler options as necessary  
 
     2. Build the executable  
     Note: do not move the executable to another folder since some paths are resolved relative to its location.  
