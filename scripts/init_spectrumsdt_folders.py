@@ -71,6 +71,9 @@ def generate_param_dicts(param_names: List[str], value_combos, extra: Dict[str, 
         for j in range(len(value_combos[i])):
             next_dict[param_names[j]] = value_combos[i][j]
         next_dict.update(extra)
+        if not 'parity' in next_dict:
+            # If parity is not defined, then it does not matter, set it to 0
+            next_dict['parity'] = 0
         res.append(next_dict)
     return res
 

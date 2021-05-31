@@ -38,7 +38,7 @@ class SpectrumSDTConfig:
         return int(self.params["J"])
 
     def get_parity(self) -> int:
-        return int(self.params["parity"])
+        return int(self.params["parity"]) if "parity" in self.params else None
 
     @staticmethod
     def parse_Ks(K_str, J, parity = None) -> List[int]:
