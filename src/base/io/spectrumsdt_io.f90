@@ -115,7 +115,7 @@ contains
       write(file_unit, '(2' // format_string // ')', advance = 'no') eigenvalues_3D(i, :)
       do j = 1, size(params % wf_sections)
         next_output = section_stats(i, j)
-        if (params % wf_sections(j) % stat == 'gamma') then
+        if (any(params % wf_sections(j) % stat == [character(100) :: 'gamma', 'A', 'B', 'C'])) then
           next_output = next_output * au_to_wn
         end if
         write(file_unit, '(' // format_string // ')', advance = 'no') next_output

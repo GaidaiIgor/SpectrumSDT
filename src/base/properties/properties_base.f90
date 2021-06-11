@@ -123,14 +123,16 @@ contains
     real(real64), intent(in) :: phi_borders(:)
     real(real64), optional, intent(in) :: cap(:)
     real(real64), allocatable :: wf_sections_dist_mask(:, :, :, :, :)
-    integer :: i, j
+    integer :: i, n, l
     integer, allocatable :: section_inds(:, :, :)
+    real(real64) :: mu
     real(real64) :: weights_rho(2), weights_theta(2)
 
     allocate(wf_sections_dist_mask(size(params % wf_sections), params % K(2) - params % K(1) + 1, size(rho_info % points), size(theta_info % points), size(phi_borders) - 1))
     wf_sections_dist_mask = 0
     section_inds = get_wf_sections_dist_inds(params, rho_info % points, theta_info % points, phi_borders)
 
+    mu = get_reduced_mass(params % mass)
     associate(si => section_inds)
       do i = 1, size(wf_sections_dist_mask, 1)
         wf_sections_dist_mask(i, si(i, 1, 1):si(i, 1, 2), si(i, 2, 1):si(i, 2, 2), si(i, 3, 1):si(i, 3, 2), si(i, 4, 1):si(i, 4, 2)) = 1
@@ -146,8 +148,20 @@ contains
         if (params % wf_sections(i) % stat == 'gamma') then
           call assert(present(cap), 'Error: cap has to be given for gamma statistics')
           call assert(size(cap) == size(rho_info % points))
-          do j = 1, size(wf_sections_dist_mask, 3)
-            wf_sections_dist_mask(i, :, j, :, :) = wf_sections_dist_mask(i, :, j, :, :) * 2 * cap(j) ! 2 due to definition of gamma
+          do n = 1, size(wf_sections_dist_mask, 3)
+            wf_sections_dist_mask(i, :, n, :, :) = wf_sections_dist_mask(i, :, n, :, :) * 2 * cap(n) ! 2 due to definition of gamma
+          end do
+        else if (any(params % wf_sections(i) % stat == ['A', 'B', 'C'])) then
+          do l = 1, size(wf_sections_dist_mask, 4)
+            do n = 1, size(wf_sections_dist_mask, 3)
+              if (params % wf_sections(i) % stat == 'A') then
+                wf_sections_dist_mask(i, :, n, l, :) = wf_sections_dist_mask(i, :, n, l, :) * get_rotational_a(mu, rho_info % points(n), theta_info % points(l))
+              else if (params % wf_sections(i) % stat == 'B') then
+                wf_sections_dist_mask(i, :, n, l, :) = wf_sections_dist_mask(i, :, n, l, :) * get_rotational_b(mu, rho_info % points(n), theta_info % points(l))
+              else ! C
+                wf_sections_dist_mask(i, :, n, l, :) = wf_sections_dist_mask(i, :, n, l, :) * get_rotational_c(mu, rho_info % points(n), theta_info % points(l))
+              end if
+            end do
           end do
         end if
       end do

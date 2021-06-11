@@ -141,7 +141,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine check_values_wf_section_params(this)
     class(wf_section_params), intent(in) :: this
-    call assert(any(this % stat == [character(100) :: 'probability', 'gamma']), 'Error: ' // this % prefix // 'stat can be probability or gamma')
+    call assert(any(this % stat == [character(100) :: 'probability', 'gamma', 'A', 'B', 'C']), 'Error: ' // this % prefix // 'stat can be probability or gamma')
     ! Check of individual boundaries are performed later, when grid and K information is available
     call assert(any(this % K == -2) .or. this % K(1) <= this % K(2), 'Error: ' // this % prefix // 'K(1) should be <= K(2)')
     call assert(any(this % rho .aeq. -2d0) .or. this % rho(1) < this % rho(2), 'Error: ' // this % prefix // 'rho(1) should be < rho(2)')
