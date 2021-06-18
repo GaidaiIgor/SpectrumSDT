@@ -131,7 +131,12 @@ contains
   function get_k_folder_path_params(params) result(res)
     class(input_params), intent(in) :: params
     character(:), allocatable :: res
-    res = get_k_folder_path_root_range(params % root_path, params % K, params % J, params % parity)
+
+    if (params % use_rovib_coupling == 0) then
+      res = get_k_folder_path_root_range(params % root_path, params % K)
+    else
+      res = get_k_folder_path_root_range(params % root_path, params % K, params % J, params % parity)
+    end if
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
