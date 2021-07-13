@@ -22,10 +22,10 @@ contains
     real(real64), intent(in) :: phi_borders(:)
     real(real64), allocatable :: proc_p_dist(:, :, :, :, :)
     logical :: use_simplified_method
-    integer :: proc_first_state, proc_states, proc_state_ind, K_val, K_ind, K_ind_comp, K_sym, n, l, phi_range_ind, m_ind, j
+    integer :: proc_first_state, proc_states, K_ind, K_sym, K_ind_comp, proc_state_ind, K_val, n, l, phi_range_ind, m_ind, j
     real(real64) :: i_sum, m_sum
     real(real64) :: phi_range(2)
-    real(real64), allocatable :: phi_integral_matrix(:, :, :), phi_integral_matrix_1(:, :, :)
+    type(array_3d_real) :: phi_integral_matrix(3) ! Phi-integal matrices for each symmetry
     complex(real64) :: j_sums(params % basis % num_funcs_phi_per_sym) ! j-sums for different ms
 
     call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
@@ -35,10 +35,11 @@ contains
     ! Use simplified method if only the whole range [0; 2*pi] is of interest
     use_simplified_method = size(phi_borders) == 2 .and. (phi_borders(1) .aeq. 0d0) .and. (phi_borders(2) .aeq. 2*pi)
     if (.not. use_simplified_method) then
-      phi_integral_matrix = calc_phi_integral_matrix(params % basis % num_funcs_phi_per_sym, params % basis % symmetry, phi_borders)
-      if (any(params % basis % symmetry == [0, 1]) .and. params % K(2) - params % K(1) > 0) then
-        ! second matrix stores integrals for the opposite symmetry when both symmetries are needed but independent (rovib coupled without geometric phase)
-        phi_integral_matrix_1 = calc_phi_integral_matrix(params % basis % num_funcs_phi_per_sym, 1 - params % basis % symmetry, phi_borders)
+      ! Calculate necessary phi-integral matrices
+      call get_k_attributes(params % K(1), params, K_ind, K_sym, K_ind_comp)
+      phi_integral_matrix(K_sym + 1) % p = calc_phi_integral_matrix(params % basis % num_funcs_phi_per_sym, K_sym, phi_borders)
+      if (any(K_sym == [0, 1]) .and. params % K(2) > params % K(1)) then
+        phi_integral_matrix(2 - K_sym) % p = calc_phi_integral_matrix(params % basis % num_funcs_phi_per_sym, 1 - K_sym, phi_borders)
       end if
     end if
 
@@ -64,11 +65,7 @@ contains
               if (use_simplified_method) then
                 m_sum = real(dot_product(j_sums, j_sums))
               else
-                if (K_sym == params % basis % symmetry) then
-                  m_sum = calculate_vT_A_v_symmetric_real(phi_integral_matrix(:, :, phi_range_ind), j_sums)
-                else
-                  m_sum = calculate_vT_A_v_symmetric_real(phi_integral_matrix_1(:, :, phi_range_ind), j_sums)
-                end if
+                m_sum = calculate_vT_A_v_symmetric_real(phi_integral_matrix(K_sym + 1) % p(:, :, phi_range_ind), j_sums)
               end if
               proc_p_dist(proc_state_ind, K_ind, n, l, phi_range_ind) = proc_p_dist(proc_state_ind, K_ind, n, l, phi_range_ind) + m_sum
             end do

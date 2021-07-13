@@ -47,16 +47,19 @@ set(vector_array_1d_real ${general_utils} ${array_1d_real} ${prefix}/src/utils/v
 set(vector_array_1d_complex ${general_utils} ${array_1d_complex} ${prefix}/src/utils/vector/vector_array_1d_complex.F90)
 set(vector ${vector_integer} ${vector_real} ${vector_complex} ${vector_string} ${vector_vector_integer} ${vector_vector_real} ${vector_array_1d_integer} ${vector_array_1d_real} ${vector_array_1d_complex} ${prefix}/src/utils/vector/vector.f90)
 
+set(array_2d_real ${prefix}/src/utils/array_2d/array_2d_real.F90)
+set(array_2d_complex ${prefix}/src/utils/array_2d/array_2d_complex.F90)
+set(array_2d ${array_2d_real} ${array_2d_complex} ${prefix}/src/utils/array_2d/array_2d.f90)
+
+set(array_3d_real ${prefix}/src/utils/array_3d/array_3d_real.F90)
+set(array_3d ${array_3d_real} ${prefix}/src/utils/array_3d/array_3d.f90)
+
 set(string_utils ${vector_string} ${prefix}/src/utils/string/string_utils.f90)
 
 set(algorithms_base ${general_utils} ${vector} ${prefix}/src/utils/algorithms/algorithms_base.f90)
 set(algorithms_integer ${algorithms_base} ${prefix}/src/utils/algorithms/algorithms_integer.F90)
 set(algorithms_real ${algorithms_base} ${prefix}/src/utils/algorithms/algorithms_real.F90)
 set(algorithms ${algorithms_integer} ${algorithms_real} ${prefix}/src/utils/algorithms/algorithms.f90)
-
-set(array_2d_real ${prefix}/src/utils/array_2d/array_2d_real.F90)
-set(array_2d_complex ${prefix}/src/utils/array_2d/array_2d_complex.F90)
-set(array_2d ${array_2d_real} ${array_2d_complex} ${prefix}/src/utils/array_2d/array_2d.f90)
 
 set(dict_utils_base ${string} ${vector_string} ${prefix}/src/interface/fdict/dict_utils_base.f90)
 set(dict_utils_integer ${dict_utils_base} ${prefix}/src/interface/fdict/dict_utils_integer.F90)
@@ -118,7 +121,7 @@ set(matmul_operator ${distributed_rovib_hamiltonian} ${input_params} ${matrix_bl
 set(slepc_solver ${general_utils} ${matmul_operator} ${parallel_utils} ${prefix}/src/base/eigensolve/slepc_solver.F90)
 set(eigensolve ${basis} ${cap} ${constants} ${general_utils} ${grid_info} ${input_params} ${io_utils} ${matmul_operator} ${parallel_utils} ${path_utils} ${slepc_solver} ${spectrumsdt_paths} ${spectrumsdt_utils} ${prefix}/src/base/eigensolve/eigensolve.f90)
 
-set(properties_base ${algorithms} ${array_1d} ${array_2d} ${constants} ${general_utils} ${grid_info} ${input_params} ${parallel_utils} ${path_utils} ${spectrumsdt_io} ${spectrumsdt_utils} ${rovib_utils} ${vector} ${prefix}/src/base/properties/properties_base.f90)
+set(properties_base ${algorithms} ${array_1d} ${array_2d} ${array_3d} ${constants} ${general_utils} ${grid_info} ${input_params} ${parallel_utils} ${path_utils} ${spectrumsdt_io} ${spectrumsdt_utils} ${rovib_utils} ${vector} ${prefix}/src/base/properties/properties_base.f90)
 set(properties_real ${properties_base} ${prefix}/src/base/properties/properties_real.F90)
 set(properties_complex ${properties_base} ${prefix}/src/base/properties/properties_complex.F90)
 set(properties ${properties_real} ${properties_complex} ${prefix}/src/base/properties/properties.f90)

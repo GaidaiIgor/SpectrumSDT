@@ -12,8 +12,7 @@ implicit none
 contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Appends all 2D slices to form a single 2D array. Assumes the number of rows is the same in each 2D slice.
-! *blocks* is an additional optional output argument, which saves initial slice number of each column in the resulting array.
+! Creates new instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(new_array_2d_,TEMPLATE_TYPE_NAME)(p) result(new_instance)
     TEMPLATE_TYPE, intent(in) :: p(:, :)

@@ -5,6 +5,7 @@ module properties_base_mod
   use algorithms_mod
   use array_1d_mod
   use array_2d_mod
+  use array_3d_mod
   use constants
   use general_utils_mod
   use grid_info_mod
