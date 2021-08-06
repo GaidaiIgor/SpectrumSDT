@@ -1,5 +1,6 @@
 #include "funcs.macro"
   use basis_base_mod
+  use debug_tools_mod
   implicit none
 
   interface calc_1d
@@ -83,17 +84,36 @@ contains
     integer :: theta_ind, file_unit
     real(real64), allocatable :: val1_all(:) ! All eigenvalues
     TEMPLATE_TYPE, allocatable :: ham(:, :) ! Hamiltonian
+    ! Debug
+    real(real64), allocatable :: basis(:, :)
+    complex(real64), allocatable :: eivecs_grid(:, :)
 
     allocate(nvec1(size(grid_theta)), val1(size(grid_theta)), vec1(size(grid_theta)))
     ! Solve eigenvalue problem for each thread
     do theta_ind = 1, size(grid_theta)
-      ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(theta_ind), grid_phi, potential(:, theta_ind, rho_ind))
+      if (debug_mode == 'geom_phase') then
+        ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(42), grid_phi, potential(:, 42, rho_ind))
+      else
+        ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(theta_ind), grid_phi, potential(:, theta_ind, rho_ind))
+      end if
+
       call lapack_eigensolver(ham, val1_all)
 
       ! Save results
       nvec1(theta_ind) = max(findloc(val1_all < params % basis % cutoff_energy_1d, .true., dim = 1, back = .true.), params % basis % min_solutions_1d)
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham(:, :nvec1(theta_ind))
+
+      if (debug_mode == 'geom_phase') then
+        call write_array(potential(:, 42, rho_ind), 'potential')
+        call write_array(val1(theta_ind) % p, 'vals')
+        basis = get_phi_basis_grid(params, grid_phi)
+        call write_matrix(basis, 'fbr_grid')
+        eivecs_grid = matmul(get_phi_basis_grid(params, grid_phi), vec1(theta_ind) % p)
+        call write_matrix(real(eivecs_grid), 'vecs_real')
+        call write_matrix(aimag(eivecs_grid), 'vecs_imag')
+        stop 'Done geom_phase'
+      end if
     end do
 
     ! Write results to a binary file
@@ -134,7 +154,7 @@ contains
         if (nvec1(block_row) == 0) then
           cycle
         end if
-        
+
         ! Calculate overlaps
         if (block_col == block_row) then
           block = identity_matrix(nvec1(block_col)) 
@@ -180,6 +200,7 @@ contains
     mu = get_reduced_mass(params % mass)
     ham2 = build_hamiltonian_2d(mu, rho_val, period_theta, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
+
     nvec2 = max(findloc(val2_all < params % basis % cutoff_energy_2d, .true., dim = 1, back = .true.), params % basis % min_solutions_2d)
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
@@ -213,7 +234,12 @@ contains
     allocate(proc_nvec1(size(grid_theta), proc_rhos), proc_val1(size(grid_theta), proc_rhos))
     step_theta = grid_theta(2) - grid_theta(1)
     do rho_ind = proc_first, proc_first + proc_rhos - 1
-      call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
+      if (debug_mode == 'geom_phase') then
+        call calc_1d(params, 13, grid_rho(13), grid_theta, grid_phi, potential, nvec1, val1, vec1)
+      else
+        call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
+      end if
+
       proc_nvec1(:, rho_ind - proc_first + 1) = nvec1
       proc_val1(:, rho_ind - proc_first + 1) = val1
 

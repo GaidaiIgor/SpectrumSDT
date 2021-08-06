@@ -34,7 +34,7 @@ contains
     if (any(params % basis % symmetry == [0, 2])) then
       basis(:, 1) = norm / sqrt(2d0)
       do j = 2, nphi
-        basis(:, j) = norm * cos((j-1) * grid_phi)
+        basis(:, j) = norm * cos((j - 1) * grid_phi)
       end do
     end if
 
