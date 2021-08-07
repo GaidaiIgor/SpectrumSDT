@@ -1,5 +1,5 @@
 #!/bin/sh
-ftn -c ../../path_resolution.f90 -g
-ftn -c ../../pes_utils.f90 -g
-ftn path_resolution.o pes_utils.o ../so2_pes.f90 ../klos/so2-X-mrcif12.f -g -w -o so2_pes
+mpifort -c ../../path_resolution.f90 -ffree-line-length-0 -g
+mpifort -c ../../pes_utils.f90 -ffree-line-length-0 -g
+mpifort path_resolution.o pes_utils.o ../so2_pes.f90 ../klos/so2-X-mrcif12.f -ffree-line-length-0 -g -w -o so2_pes
 

@@ -1,10 +1,10 @@
 #!/bin/sh
 DAWES_SRC=../dawes/src/*
-ftn -c ../../../path_resolution.f90 -g
-ftn -c ../dawes/src/splin.f90 -g
-ftn -c ../dawes/src/dynamic_parameters_3D.f90 -g
-ftn -c ../../../../src/base/coordinate_conversion.f90 -g
-ftn -c ../../../pes_utils.f90 -g
-ftn -c ../../ozone_utils.f90 -g
-ftn path_resolution.o coordinate_conversion.o pes_utils.o ozone_utils.o ../ozone_pes.f90 ${DAWES_SRC} -g -w -o ozone_pes
+mpifort -c ../../../path_resolution.f90 -ffree-line-length-0 -g
+mpifort -c ../dawes/src/splin.f90 -ffree-line-length-0 -g
+mpifort -c ../dawes/src/dynamic_parameters_3D.f90 -ffree-line-length-0 -g
+mpifort -c ../../../../src/base/coordinate_conversion.f90 -ffree-line-length-0 -g
+mpifort -c ../../../pes_utils.f90 -ffree-line-length-0 -g
+mpifort -c ../../ozone_utils.f90 -ffree-line-length-0 -g
+mpifort path_resolution.o coordinate_conversion.o pes_utils.o ozone_utils.o ../ozone_pes.f90 ${DAWES_SRC} -ffree-line-length-0 -g -w -o ozone_pes
 
