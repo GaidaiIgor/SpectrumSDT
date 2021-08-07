@@ -54,8 +54,9 @@ contains
 ! Calculates ozone potential at given *APH coordinates*.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calc_potential_point(aph, mass, shift) result(potential)
-    real(real64), intent(in) :: aph(3), mass(3)
-    real(real64), intent(in) :: shift
+    real(real64), intent(in) :: aph(3)
+    real(real64), optional, intent(in) :: mass(3)
+    real(real64), optional, intent(in) :: shift
     real(real64) :: potential
     real(real64) :: internal(3)
     real(real64) :: all_bonds(3, 1)

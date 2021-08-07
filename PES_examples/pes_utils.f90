@@ -12,8 +12,9 @@ module pes_utils_mod
   abstract interface
     function pes_point_calculator(coords, mass, shift) result(res)
       import real64
-      real(real64), intent(in) :: coords(3), mass(3)
-      real(real64), intent(in) :: shift
+      real(real64), intent(in) :: coords(3)
+      real(real64), optional, intent(in) :: mass(3)
+      real(real64), optional, intent(in) :: shift
       real(real64) :: res
     end function
   end interface
@@ -186,13 +187,13 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Calculates potential energy surface for each row in *coords* in parallel. Result is defined on 0th processor only.
+! Calculates potential energy surface for each column in *coords* in parallel. Result is defined on 0th processor only.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine calc_pes(coords, mass, shift, point_calculator, pes)
+  subroutine calc_pes(coords, point_calculator, mass, shift, pes)
     real(real64), intent(in) :: coords(:, :)
-    real(real64), intent(in) :: mass(3)
-    real(real64), intent(in) :: shift
     procedure(pes_point_calculator) :: point_calculator
+    real(real64), optional, intent(in) :: mass(3)
+    real(real64), optional, intent(in) :: shift
     real(real64), allocatable, intent(out) :: pes(:)
     integer :: proc_id, ierr, first_k, proc_points, proc_k, k
     integer, allocatable :: proc_counts(:), proc_shifts(:)

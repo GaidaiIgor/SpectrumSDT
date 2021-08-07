@@ -19,7 +19,7 @@ program pesprint
   call init_parameters(mass, shift)
 
   coords = load_coords('pes_in.txt')
-  call calc_pes(coords, mass, shift, calc_potential_point, pes)
+  call calc_pes(coords, calc_potential_point, mass, shift, pes)
 
   if (proc_id == 0) then
     call print_pes(pes, 'pes_out.txt')

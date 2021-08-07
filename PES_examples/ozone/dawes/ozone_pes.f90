@@ -21,7 +21,7 @@ program pesprint
   call load_grids_aph(grid_rho, grid_theta, grid_phi)
   coords = aph_grids_to_coord_list(grid_rho, grid_theta, grid_phi)
   print *, size(coords, 1), size(coords, 2)
-  call calc_pes(coords, mass, shift, calc_potential_point, pes)
+  call calc_pes(coords, calc_potential_point, mass, shift, pes)
 
   if (proc_id == 0) then
     call print_pes(pes, 'pes_out.txt')
