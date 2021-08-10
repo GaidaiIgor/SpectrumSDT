@@ -105,8 +105,8 @@ contains
       vec1(theta_ind) % p = ham(:, :nvec1(theta_ind))
 
       if (debug_mode == 'funcs_1d') then
-        call write_array(potential(:, debug_ints(2), rho_ind), 'potential')
-        call write_array(val1(theta_ind) % p, 'vals')
+        call write_array(potential(:, debug_ints(2), rho_ind) * au_to_wn, 'potential')
+        call write_array(val1(theta_ind) % p * au_to_wn, 'vals')
         basis = get_phi_basis_grid(params, grid_phi)
         call write_matrix(basis, 'fbr_grid')
         eivecs_grid = matmul(get_phi_basis_grid(params, grid_phi), vec1(theta_ind) % p)
