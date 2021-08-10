@@ -91,8 +91,8 @@ contains
     allocate(nvec1(size(grid_theta)), val1(size(grid_theta)), vec1(size(grid_theta)))
     ! Solve eigenvalue problem for each thread
     do theta_ind = 1, size(grid_theta)
-      if (debug_mode == 'geom_phase') then
-        ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(42), grid_phi, potential(:, 42, rho_ind))
+      if (debug_mode == 'funcs_1d') then
+        ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(debug_ints(2)), grid_phi, potential(:, debug_ints(2), rho_ind))
       else
         ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(theta_ind), grid_phi, potential(:, theta_ind, rho_ind))
       end if
@@ -104,15 +104,15 @@ contains
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham(:, :nvec1(theta_ind))
 
-      if (debug_mode == 'geom_phase') then
-        call write_array(potential(:, 42, rho_ind), 'potential')
+      if (debug_mode == 'funcs_1d') then
+        call write_array(potential(:, debug_ints(2), rho_ind), 'potential')
         call write_array(val1(theta_ind) % p, 'vals')
         basis = get_phi_basis_grid(params, grid_phi)
         call write_matrix(basis, 'fbr_grid')
         eivecs_grid = matmul(get_phi_basis_grid(params, grid_phi), vec1(theta_ind) % p)
         call write_matrix(real(eivecs_grid), 'vecs_real')
         call write_matrix(aimag(eivecs_grid), 'vecs_imag')
-        stop 'Done geom_phase'
+        stop 'Done funcs_1d'
       end if
     end do
 
@@ -234,8 +234,8 @@ contains
     allocate(proc_nvec1(size(grid_theta), proc_rhos), proc_val1(size(grid_theta), proc_rhos))
     step_theta = grid_theta(2) - grid_theta(1)
     do rho_ind = proc_first, proc_first + proc_rhos - 1
-      if (debug_mode == 'geom_phase') then
-        call calc_1d(params, 13, grid_rho(13), grid_theta, grid_phi, potential, nvec1, val1, vec1)
+      if (debug_mode == 'funcs_1d') then
+        call calc_1d(params, debug_ints(1), grid_rho(debug_ints(1)), grid_theta, grid_phi, potential, nvec1, val1, vec1)
       else
         call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
       end if
