@@ -81,7 +81,7 @@ set(cap_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} $
 set(eigensolve_params ${config} ${constants} ${dict_utils} ${general_utils} ${parallel_utils} ${string} ${prefix}/src/base/input_params/eigensolve_params.f90)
 set(fixed_basis_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/fixed_basis_params.f90)
 set(basis_params ${config} ${constants} ${dict_utils} ${fixed_basis_params} ${general_utils} ${string} ${prefix}/src/base/input_params/basis_params.f90)
-set(debug_params ${config} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/debug_params.f90)
+set(debug_params ${config} ${dict_utils} ${general_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/debug_params.f90)
 set(input_params ${algorithms} ${basis_params} ${cap_params} ${config} ${constants} ${debug_params} ${dict_utils} ${eigensolve_params} ${general_utils_ext} ${grid_info} ${grid_params} ${optgrid_params} ${parallel_utils} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
 
 set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils_base} ${prefix}/src/base/spectrumsdt_paths.f90)

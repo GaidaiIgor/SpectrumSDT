@@ -211,6 +211,21 @@ contains
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts string array to char str array.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function string_arr_to_char_str_arr(arr) result(char_str_arr)
+    class(string), intent(in) :: arr(:)
+    character(:), allocatable :: char_str_arr(:)
+    integer :: max_len, i
+
+    max_len = maxval(arr % length())
+    allocate(character(max_len) :: char_str_arr(size(arr)))
+    do i = 1, size(arr)
+      char_str_arr(i) = arr(i) % s
+    end do
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Trims string, both left and right.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   elemental subroutine trim_string(this)

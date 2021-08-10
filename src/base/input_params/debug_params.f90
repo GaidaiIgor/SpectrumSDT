@@ -5,6 +5,7 @@ module debug_params_mod
   use general_utils_mod
   use iso_fortran_env, only: real64
   use string_mod
+  use string_utils_mod
   implicit none
 
   private
@@ -16,7 +17,7 @@ module debug_params_mod
     integer :: optimized_mult = 1 ! disables matrix-vector multiplication optimizations
     integer :: treat_tp_as_xy = 0 ! treats theta and phi grids as x and y grids for aph plots
     character(:), allocatable :: mode
-    integer :: int_param = 0
+    integer, allocatable :: int_params(:)
     real(real64) :: real_param = 0d0
 
   contains
@@ -47,7 +48,7 @@ contains
     class(dictionary_t) :: config_dict ! intent(in)
     integer :: i
     character(:), allocatable :: next_key, next_value
-    type(string), allocatable :: key_set(:)
+    type(string), allocatable :: key_set(:), tokens(:)
 
     key_set = get_key_set(config_dict)
     do i = 1, size(key_set)
@@ -63,8 +64,9 @@ contains
           this % treat_tp_as_xy = str2int(next_value)
         case ('mode')
           this % mode = next_value
-        case ('int_param')
-          this % int_param = str2int(next_value)
+        case ('int_params')
+          tokens = strsplit(next_value, delim = ',')
+          this % int_params = str2int(string_arr_to_char_str_arr(tokens))
         case ('real_param')
           this % real_param = str2real(next_value)
       end select
@@ -82,7 +84,7 @@ contains
     call put_string(keys, 'optimized_mult')
     call put_string(keys, 'treat_tp_as_xy')
     call put_string(keys, 'mode')
-    call put_string(keys, 'int_param')
+    call put_string(keys, 'int_params')
     call put_string(keys, 'real_param')
   end function
 
