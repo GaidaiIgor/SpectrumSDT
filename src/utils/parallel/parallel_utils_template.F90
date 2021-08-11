@@ -16,6 +16,12 @@ contains
 
     if (.not. is_mpi_enabled()) then
       global = proc_chunk
+      if (present(proc_sizes)) then
+        proc_sizes = size(proc_chunk)
+      end if
+      if (present(proc_shifts)) then
+        proc_shifts = [0]
+      end if
       return
     end if
 

@@ -57,7 +57,7 @@ contains
       do i2 = 1, size(grid_theta)
         do i3 = 1, size(grid_phi)
           potential(i3, i2, i1) = potential(i3, i2, i1) + calc_rotational_potential(mu, grid_rho(i1), grid_theta(i2), params % J, params % K(1)) + &
-              calc_extra_potential(mu, grid_rho(i1), grid_theta(i2))
+            calc_extra_potential(mu, grid_rho(i1), grid_theta(i2))
         end do
       end do
     end do
