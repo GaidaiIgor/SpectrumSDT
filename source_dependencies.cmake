@@ -6,7 +6,7 @@ set(grid_info ${prefix}/src/base/grid_info.f90)
 set(constants ${prefix}/src/base/constants.f90)
 set(coordinate_conversion ${prefix}/src/base/coordinate_conversion.f90)
 set(rovib_utils_base ${prefix}/src/rovib/rovib_utils_base.f90)
-set(debug_tools_base ${prefix}/src/base/debug_tools_base.f90)
+set(debug_tools_base ${prefix}/src/base/debug/debug_tools_base.f90)
 set(block_borders ${prefix}/src/base/hamiltonian/block_borders.f90)
 
 set(general_utils_char_str ${prefix}/src/utils/general/general_utils_char_str.F90)
@@ -86,7 +86,7 @@ set(input_params ${algorithms} ${basis_params} ${cap_params} ${config} ${constan
 
 set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils_base} ${prefix}/src/base/spectrumsdt_paths.f90)
 set(spectrumsdt_utils ${constants} ${general_utils} ${input_params} ${prefix}/src/base/spectrumsdt_utils.f90)
-set(debug_tools ${debug_tools_base} ${input_params} ${io_utils} ${prefix}/src/base/debug_tools.f90)
+set(debug_tools ${debug_tools_base} ${input_params} ${io_utils} ${prefix}/src/base/debug/debug_tools.f90)
 set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/rovib/rovib_utils.f90)
 
 set(cap ${constants} ${grid_info} ${input_params} ${spectrumsdt_utils} ${prefix}/src/base/cap.f90)

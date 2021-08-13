@@ -14,7 +14,7 @@ contains
 ! vec1 - All 1D solutions from all threads of a given rho, expressed over sin/cos. i-th element contains 1D solutions from i-th thread.
 ! vec2 - 2D solution expressed over 1D solutions. Expansion coefficients over solutions in all threads are stacked together in a single vector.
 ! vec2_fbr - The same 2D solution expressed in the basis of sin/cos.
-! vec2_fbr consists of L blocks of length M each. Each L-block contains expansion coefficient over the same sin/cos function in different ls.
+! vec2_fbr consists of L blocks of length M each. Each L-block contains expansion coefficients over the same sin/cos functions in different ls.
 ! Each element of the vector is sum over i of a_nlm^i * b_nli^j (j is index of vec2 and is fixed within this procedure).
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function CONCAT2(transform_basis_1d_to_fbr_,TEMPLATE_TYPE_NAME)(nvec1, vec1, vec2) result(vec2_fbr)
@@ -39,9 +39,9 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates overlap block.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(calculate_overlap_block_,TEMPLATE_TYPE_NAME)(params, rho_ind_row, rho_ind_col, num_points_theta, sym_path) result(overlap_block)
+  function CONCAT2(calculate_overlap_block_,TEMPLATE_TYPE_NAME)(params, rho_ind_row, rho_ind_col, sym_path) result(overlap_block)
     class(input_params), intent(in) :: params
-    integer, intent(in) :: rho_ind_row, rho_ind_col, num_points_theta
+    integer, intent(in) :: rho_ind_row, rho_ind_col
     character(*), intent(in) :: sym_path
     TEMPLATE_TYPE, allocatable :: overlap_block(:, :)
     integer :: i, j
@@ -53,9 +53,9 @@ contains
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable :: solutions_1d_col(:), solutions_1d_row(:)
 
     ! Load bases
-    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_col), num_points_theta, params % basis % num_funcs_phi_per_sym, num_solutions_1d_col, energies_1d_col, solutions_1d_col)
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_col), num_solutions_1d_col, energies_1d_col, solutions_1d_col)
     call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_col), energies_2d_col, solutions_2d_col)
-    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_row), num_points_theta, params % basis % num_funcs_phi_per_sym, num_solutions_1d_row, energies_1d_row, solutions_1d_row)
+    call load_solutions_1D(get_solutions_1d_path(sym_path, rho_ind_row), num_solutions_1d_row, energies_1d_row, solutions_1d_row)
     call load_solutions_2D(get_solutions_2d_path(sym_path, rho_ind_row), energies_2d_row, solutions_2d_row)
 
     ! Calculate overlap matrix
@@ -72,9 +72,8 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates overlap blocks in upper triange of Hamiltonian and saves them on disk in binary form.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine CONCAT2(calculate_overlaps_,TEMPLATE_TYPE_NAME)(params, num_points_theta)
+  subroutine CONCAT2(calculate_overlaps_,TEMPLATE_TYPE_NAME)(params)
     class(input_params), intent(in) :: params
-    integer, intent(in) :: num_points_theta
     integer :: proc_id, num_procs, rho_ind_col, rho_ind_row, block_ind, file_unit
     integer, allocatable :: num_solutions_2d(:)
     TEMPLATE_TYPE, allocatable :: overlap_block(:, :)
@@ -103,7 +102,7 @@ contains
         end if
 
         ! Calculate and save block
-        overlap_block = CONCAT2(calculate_overlap_block_,TEMPLATE_TYPE_NAME)(params, rho_ind_row, rho_ind_col, num_points_theta, sym_path)
+        overlap_block = CONCAT2(calculate_overlap_block_,TEMPLATE_TYPE_NAME)(params, rho_ind_row, rho_ind_col, sym_path)
         open(newunit = file_unit, file = get_regular_overlap_path(sym_path, rho_ind_row, rho_ind_col), form = 'unformatted')
         write(file_unit) overlap_block
         close(file_unit)

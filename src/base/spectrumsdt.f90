@@ -68,10 +68,10 @@ contains
 
       case ('overlaps')
         if (params % use_geometric_phase == 0) then
-          call calculate_overlaps_real(params, size(theta_info % points))
+          call calculate_overlaps_real(params)
           call calculate_overlaps_extra_real(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
         else
-          call calculate_overlaps_complex(params, size(theta_info % points))
+          call calculate_overlaps_complex(params)
           call calculate_overlaps_extra_complex(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
         end if
 

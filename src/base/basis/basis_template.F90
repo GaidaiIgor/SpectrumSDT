@@ -84,9 +84,6 @@ contains
     integer :: theta_ind, file_unit
     real(real64), allocatable :: val1_all(:) ! All eigenvalues
     TEMPLATE_TYPE, allocatable :: ham(:, :) ! Hamiltonian
-    ! Debug
-    real(real64), allocatable :: basis(:, :)
-    complex(real64), allocatable :: eivecs_grid(:, :)
 
     allocate(nvec1(size(grid_theta)), val1(size(grid_theta)), vec1(size(grid_theta)))
     ! Solve eigenvalue problem for each thread
@@ -103,21 +100,11 @@ contains
       nvec1(theta_ind) = max(findloc(val1_all < params % basis % cutoff_energy_1d, .true., dim = 1, back = .true.), params % basis % min_solutions_1d)
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham(:, :nvec1(theta_ind))
-
-      if (debug_mode == 'funcs_1d') then
-        call write_array(potential(:, debug_ints(2), rho_ind) * au_to_wn, 'potential')
-        call write_array(val1(theta_ind) % p * au_to_wn, 'vals')
-        basis = get_phi_basis_grid(params, grid_phi)
-        call write_matrix(basis, 'fbr_grid')
-        eivecs_grid = matmul(get_phi_basis_grid(params, grid_phi), vec1(theta_ind) % p)
-        call write_matrix(real(eivecs_grid), 'vecs_real')
-        call write_matrix(aimag(eivecs_grid), 'vecs_imag')
-        stop 'Done funcs_1d'
-      end if
     end do
 
     ! Write results to a binary file
     open(newunit = file_unit, file = get_solutions_1d_path(get_sym_path(params), rho_ind), form = 'unformatted')
+    write(file_unit) size(nvec1), size(vec1(1) % p, 1)
     write(file_unit) nvec1
     do theta_ind = 1, size(grid_theta)
       write(file_unit) val1(theta_ind) % p
@@ -205,7 +192,6 @@ contains
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
 
-    ! Write results to a binary file for 3D solution
     open(newunit = file_unit, file = get_solutions_2d_path(get_sym_path(params), rho_ind), form = 'unformatted')
     write(file_unit) nvec2, size(ham2, 1)
     write(file_unit) val2

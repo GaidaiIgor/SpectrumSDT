@@ -52,7 +52,7 @@ contains
 
       ! Load solutions
       solutions_1d_path = get_solutions_1d_path(sym_folder, n)
-      call load_solutions_1D(solutions_1d_path, size(theta_grid), num_funcs_phi, num_solutions_1d, energies_1d, exp_coeffs_1d)
+      call load_solutions_1D(solutions_1d_path, num_solutions_1d, energies_1d, exp_coeffs_1d)
       solutions_2d_path = get_solutions_2d_path(sym_folder, n)
       call load_solutions_2D(solutions_2d_path, energies_2d, exp_coeffs_2d)
 
@@ -151,12 +151,12 @@ contains
 
       ! Load solutions
       solutions_1d_path_row = get_solutions_1d_path(sym_folder_row, n)
-      call load_solutions_1D(solutions_1d_path_row, size(theta_grid), num_funcs_phi, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
+      call load_solutions_1D(solutions_1d_path_row, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
       solutions_2d_path_row = get_solutions_2d_path(sym_folder_row, n)
       call load_solutions_2D(solutions_2d_path_row, energies_2d_row, exp_coeffs_2d_row)
 
       solutions_1d_path_col = get_solutions_1d_path(sym_folder_col, n)
-      call load_solutions_1D(solutions_1d_path_col, size(theta_grid), num_funcs_phi, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
+      call load_solutions_1D(solutions_1d_path_col, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
       solutions_2d_path_col = get_solutions_2d_path(sym_folder_col, n)
       call load_solutions_2D(solutions_2d_path_col, energies_2d_col, exp_coeffs_2d_col)
 
@@ -251,12 +251,12 @@ contains
 
       ! Load solutions
       solutions_1d_path_row = get_solutions_1d_path(sym_folder_row, n)
-      call load_solutions_1D(solutions_1d_path_row, size(theta_grid), num_funcs_phi, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
+      call load_solutions_1D(solutions_1d_path_row, num_solutions_1d_row, energies_1d_row, exp_coeffs_1d_row)
       solutions_2d_path_row = get_solutions_2d_path(sym_folder_row, n)
       call load_solutions_2D(solutions_2d_path_row, energies_2d_row, exp_coeffs_2d_row)
 
       solutions_1d_path_col = get_solutions_1d_path(sym_folder_col, n)
-      call load_solutions_1D(solutions_1d_path_col, size(theta_grid), num_funcs_phi, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
+      call load_solutions_1D(solutions_1d_path_col, num_solutions_1d_col, energies_1d_col, exp_coeffs_1d_col)
       solutions_2d_path_col = get_solutions_2d_path(sym_folder_col, n)
       call load_solutions_2D(solutions_2d_path_col, energies_2d_col, exp_coeffs_2d_col)
 
