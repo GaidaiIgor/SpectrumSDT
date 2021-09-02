@@ -53,14 +53,14 @@ contains
     coeff = -2 / mu / rho_val**2 / sin(theta_val)**2
     do m2_ind = 1, size(ham, 2)
       call get_m_ind_info(m2_ind, params % basis % symmetry, funcs_per_sym, m = m)
-      ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) + coeff * -m ** 2
+      ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * m ** 2
 
 #if TYPE_ID == COMPLEX_ID
       if (params % use_geometric_phase == 1) then
-        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - l_dash**2 / 4
-        if (m2_ind > funcs_per_sym) then
+        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * l_dash**2 / 4
+        if (m2_ind > funcs_per_sym .and. m2_ind < size(ham, 2)) then
           m1_ind = m + 1
-          ham(m1_ind, m2_ind) = (0, 1d0) * l_dash * m
+          ham(m1_ind, m2_ind) = coeff * (0, 1d0) * l_dash * m
           ham(m2_ind, m1_ind) = conjg(ham(m1_ind, m2_ind))
         end if
       end if
@@ -88,23 +88,18 @@ contains
     allocate(nvec1(size(grid_theta)), val1(size(grid_theta)), vec1(size(grid_theta)))
     ! Solve eigenvalue problem for each thread
     do theta_ind = 1, size(grid_theta)
-      if (debug_mode == 'funcs_1d') then
-        ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(debug_ints(2)), grid_phi, potential(:, debug_ints(2), rho_ind))
-      else
-        ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(theta_ind), grid_phi, potential(:, theta_ind, rho_ind))
-      end if
-
+      ham = CONCAT2(get_hamiltonian_1d_,TEMPLATE_TYPE_NAME)(params, rho_val, grid_theta(theta_ind), grid_phi, potential(:, theta_ind, rho_ind))
       call lapack_eigensolver(ham, val1_all)
 
       ! Save results
-      nvec1(theta_ind) = max(findloc(val1_all < params % basis % cutoff_energy_1d, .true., dim = 1, back = .true.), params % basis % min_solutions_1d)
+      nvec1(theta_ind) = min(max(findloc(val1_all < params % basis % cutoff_energy_1d, .true., dim = 1, back = .true.), params % basis % min_solutions_1d), size(ham, 1))
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham(:, :nvec1(theta_ind))
     end do
 
     ! Write results to a binary file
     open(newunit = file_unit, file = get_solutions_1d_path(get_sym_path(params), rho_ind), form = 'unformatted')
-    write(file_unit) size(nvec1), size(vec1(1) % p, 1)
+    write(file_unit) size(nvec1), size(ham, 1)
     write(file_unit) nvec1
     do theta_ind = 1, size(grid_theta)
       write(file_unit) val1(theta_ind) % p
@@ -188,7 +183,7 @@ contains
     ham2 = build_hamiltonian_2d(mu, rho_val, period_theta, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
 
-    nvec2 = max(findloc(val2_all < params % basis % cutoff_energy_2d, .true., dim = 1, back = .true.), params % basis % min_solutions_2d)
+    nvec2 = min(max(findloc(val2_all < params % basis % cutoff_energy_2d, .true., dim = 1, back = .true.), params % basis % min_solutions_2d), size(ham2, 1))
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
 
@@ -220,11 +215,7 @@ contains
     allocate(proc_nvec1(size(grid_theta), proc_rhos), proc_val1(size(grid_theta), proc_rhos))
     step_theta = grid_theta(2) - grid_theta(1)
     do rho_ind = proc_first, proc_first + proc_rhos - 1
-      if (debug_mode == 'funcs_1d') then
-        call calc_1d(params, debug_ints(1), grid_rho(debug_ints(1)), grid_theta, grid_phi, potential, nvec1, val1, vec1)
-      else
-        call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
-      end if
+      call calc_1d(params, rho_ind, grid_rho(rho_ind), grid_theta, grid_phi, potential, nvec1, val1, vec1)
 
       proc_nvec1(:, rho_ind - proc_first + 1) = nvec1
       proc_val1(:, rho_ind - proc_first + 1) = val1

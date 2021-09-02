@@ -36,6 +36,7 @@ program spectrumsdt
     call load_grids(params, rho_info, theta_info, phi_info)
     call params % check_resolve_grids(rho_info, theta_info, phi_info)
   end if
+
   call process_stage(params, rho_info, theta_info, phi_info)
 
   if (params % use_parallel == 1) then

@@ -70,7 +70,7 @@ set(dict_utils ${dict_utils_integer} ${dict_utils_integer_array} ${dict_utils_ch
 set(io_utils_base ${general_utils} ${string} ${string_utils} ${vector} ${prefix}/src/utils/io/io_utils_base.f90)
 set(io_utils_integer ${io_utils_base} ${prefix}/src/utils/io/io_utils_integer.F90)
 set(io_utils_real ${io_utils_base} ${prefix}/src/utils/io/io_utils_real.F90)
-set(io_utils_complex ${io_utils_base} ${prefix}/src/utils/io/io_utils_complex.F90)
+set(io_utils_complex ${io_utils_base} ${io_utils_real} ${prefix}/src/utils/io/io_utils_complex.F90)
 set(io_utils ${io_utils_integer} ${io_utils_real} ${io_utils_complex} ${prefix}/src/utils/io/io_utils.f90)
 
 set(config ${dict_utils} ${general_utils} ${io_utils} ${parallel_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/config.f90)
@@ -111,6 +111,8 @@ set(overlaps_real ${overlaps_base} ${prefix}/src/base/overlaps/overlaps_real.F90
 set(overlaps_complex ${overlaps_base} ${prefix}/src/base/overlaps/overlaps_complex.F90)
 set(overlaps ${overlaps_real} ${overlaps_complex} ${prefix}/src/base/overlaps/overlaps.f90)
 
+set(wf_print ${array_1d} ${array_2d} ${basis} ${general_utils} ${input_params} ${io_utils} ${overlaps} ${spectrumsdt_io} ${spectrumsdt_paths} ${prefix}/src/base/debug/wf_print.f90)
+
 set(overlaps_extra_base ${array_1d} ${array_2d} ${input_params} ${k_block_info} ${overlaps} ${parallel_utils} ${path_utils} ${spectrumsdt_io} ${spectrumsdt_utils} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_base.f90)
 set(overlaps_extra_real ${overlaps_extra_base} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_real.F90)
 set(overlaps_extra_complex ${overlaps_extra_base} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_complex.F90)
@@ -126,7 +128,7 @@ set(properties_real ${properties_base} ${prefix}/src/base/properties/properties_
 set(properties_complex ${properties_base} ${prefix}/src/base/properties/properties_complex.F90)
 set(properties ${properties_real} ${properties_complex} ${prefix}/src/base/properties/properties.f90)
 
-set(spectrumsdt ${basis} ${cap} ${config} ${debug_tools} ${dict_utils} ${eigensolve} ${input_params} ${grid_info} ${grids} ${overlaps} ${overlaps_extra} ${parallel_utils} ${potential} ${properties} ${spectrumsdt_utils} ${prefix}/src/base/spectrumsdt.f90)
+set(spectrumsdt ${basis} ${cap} ${config} ${debug_tools} ${dict_utils} ${eigensolve} ${input_params} ${grid_info} ${grids} ${overlaps} ${overlaps_extra} ${parallel_utils} ${potential} ${properties} ${spectrumsdt_utils} ${wf_print} ${prefix}/src/base/spectrumsdt.f90)
 
 # Disable all warnings and standard conformation checks for external sources
 set_source_files_properties(${external_sources} PROPERTIES COMPILE_FLAGS "-w -std=gnu")

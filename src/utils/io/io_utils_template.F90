@@ -88,7 +88,7 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
   subroutine CONCAT2(write_matrix_,TEMPLATE_TYPE_NAME)(matrix, file_name, append, print_size)
     TEMPLATE_TYPE, intent(in) :: matrix(:, :)
-    character(*), optional :: file_name
+    character(*), optional, intent(in) :: file_name
     integer, optional, intent(in) :: append, print_size
     integer :: unit, print_size_act, i
 
