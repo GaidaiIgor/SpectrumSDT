@@ -6,7 +6,7 @@ module properties_base_mod
   use array_1d_mod
   use array_2d_mod
   use array_3d_mod
-  use constants
+  use constants_mod
   use general_utils_mod
   use grid_info_mod
   use input_params_mod
@@ -19,6 +19,8 @@ module properties_base_mod
   use spectrumsdt_utils_mod
   use rovib_utils_mod
   use vector_mod
+
+  use debug_tools_base_mod
   implicit none
 
 contains
@@ -227,14 +229,28 @@ contains
 
     else if (m1 == m2) then
       if (F1_sym == F2_sym) then
-        integral_value = norm * 0.5d0 * (b - a - sign*(sin(2*a*m1) - sin(2*b*m1)) / (2*m1))
+
+        ! Debug replace
+        if (debug_mode == 'half_arg') then
+          integral_value = norm * 0.5d0 * (b - a - sign*(sin(2*a*(m1 - 0.5d0)) - sin(2*b*(m1 - 0.5d0))) / (2*(m1 - 0.5d0)))
+        else
+          integral_value = norm * 0.5d0 * (b - a - sign*(sin(2*a*m1) - sin(2*b*m1)) / (2*m1))
+        end if
+
       else
         integral_value = norm * 0.5d0 * (cos(2*a*m1) - cos(2*b*m1)) / (2*m1)
       end if
 
     else if (m1 /= m2) then
       if (F1_sym == F2_sym) then
-        integral_value = norm * 0.5d0 * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2)) - sign*sin(a*(m1 + m2))) / (m1 + m2))
+
+        ! Debug replace
+        if (debug_mode == 'half_arg') then
+          integral_value = norm * 0.5d0 * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2 - 1)) - sign*sin(a*(m1 + m2 - 1))) / (m1 + m2 - 1))
+        else
+          integral_value = norm * 0.5d0 * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2)) - sign*sin(a*(m1 + m2))) / (m1 + m2))
+        end if
+
       else
         integral_value = norm * 0.5d0 * ((-sign*cos(a*(m1 - m2)) + sign*cos(b*(m1 - m2))) / (m1 - m2) + (cos(a*(m1 + m2)) - cos(b*(m1 + m2))) / (m1 + m2))
       end if

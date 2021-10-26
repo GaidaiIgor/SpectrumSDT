@@ -3,7 +3,7 @@ module input_params_mod
   use basis_params_mod
   use cap_params_mod
   use config_mod
-  use constants
+  use constants_mod
   use debug_params_mod
   use dictionary
   use dict_utils_mod
@@ -500,7 +500,7 @@ contains
     call assert(any(this % output_coordinate_system == [character(100) :: 'aph', 'mass jacobi', 'jacobi', 'cartesian', 'all bonds', 'internal']), &
         'Error: output_coordinate_system should be "aph", "mass jacobi", "jacobi", "cartesian", "all bonds" or "internal"')
     call assert(all(this % mass > 0), 'Error: all mass should be > 0')
-    call assert((this % mass(1) .aeq. this % mass(3)) .and. .not. (this % mass(1) .aeq. this % mass(2)), 'Error: mass should be specified in ABA order')
+    call assert(this % mass(1) .aeq. this % mass(3), 'Error: mass should be specified in ABA order')
     call assert(this % J >= 0, 'Error: J should be >= 0')
     if (any(this % stage == [character(len = 100) :: 'eigensolve', 'properties']) .and. this % use_rovib_coupling == 1) then
       call assert(all(this % K >= get_k_start(this % J, this % parity)), 'Error: K should be >= mod(J+p, 2)')

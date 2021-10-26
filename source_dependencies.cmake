@@ -111,7 +111,10 @@ set(overlaps_real ${overlaps_base} ${prefix}/src/base/overlaps/overlaps_real.F90
 set(overlaps_complex ${overlaps_base} ${prefix}/src/base/overlaps/overlaps_complex.F90)
 set(overlaps ${overlaps_real} ${overlaps_complex} ${prefix}/src/base/overlaps/overlaps.f90)
 
-set(wf_print ${array_1d} ${array_2d} ${basis} ${general_utils} ${input_params} ${io_utils} ${overlaps} ${spectrumsdt_io} ${spectrumsdt_paths} ${prefix}/src/base/debug/wf_print.f90)
+set(wf_print_base ${array_1d} ${array_2d} ${basis} ${constants} ${general_utils} ${input_params} ${io_utils} ${overlaps} ${spectrumsdt_io} ${spectrumsdt_paths} ${prefix}/src/base/debug/wf_print/wf_print_base.f90)
+set(wf_print_real ${wf_print_base} ${prefix}/src/base/debug/wf_print/wf_print_real.F90)
+set(wf_print_complex ${wf_print_base} ${prefix}/src/base/debug/wf_print/wf_print_complex.F90)
+set(wf_print ${wf_print_real} ${wf_print_complex} ${prefix}/src/base/debug/wf_print/wf_print.f90)
 
 set(overlaps_extra_base ${array_1d} ${array_2d} ${input_params} ${k_block_info} ${overlaps} ${parallel_utils} ${path_utils} ${spectrumsdt_io} ${spectrumsdt_utils} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_base.f90)
 set(overlaps_extra_real ${overlaps_extra_base} ${prefix}/src/rovib/overlaps_extra/overlaps_extra_real.F90)

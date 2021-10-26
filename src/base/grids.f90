@@ -3,7 +3,7 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module grids_mod
   use config_mod
-  use constants
+  use constants_mod
   use coordinate_coversion_mod
   use general_utils_mod
   use grid_info_mod

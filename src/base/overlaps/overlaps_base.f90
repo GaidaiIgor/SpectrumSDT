@@ -1,7 +1,7 @@
 module overlaps_base_mod
   use array_1d_mod
   use array_2d_mod
-  use constants, only: au_to_wn
+  use constants_mod, only: au_to_wn
   use general_utils_mod
   use input_params_mod
   use iso_fortran_env, only: real64

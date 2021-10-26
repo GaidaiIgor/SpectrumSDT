@@ -1,6 +1,6 @@
 module fixed_basis_params_mod
   use config_mod
-  use constants
+  use constants_mod
   use dictionary
   use dict_utils_mod
   use general_utils_mod

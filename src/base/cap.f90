@@ -2,7 +2,7 @@
 ! Data and procedures related to complex absorbing potential (CAP).
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module cap_mod
-  use constants, only: pi
+  use constants_mod, only: pi
   use grid_info_mod
   use input_params_mod
   use iso_fortran_env, only: real64

@@ -15,8 +15,8 @@ module io_utils_complex_mod
     character(*), intent(in) :: file_name
     integer, optional, intent(in) :: append, print_size
 
-    call write_matrix(real(matrix), file_name // '_real', append, print_size)
-    call write_matrix(aimag(matrix), file_name // '_imag', append, print_size)
+    call write_matrix(real(matrix), file_name // '.real', append, print_size)
+    call write_matrix(aimag(matrix), file_name // '.imag', append, print_size)
   end subroutine
 
 end module

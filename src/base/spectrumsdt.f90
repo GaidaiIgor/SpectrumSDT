@@ -17,6 +17,8 @@ program spectrumsdt
   use potential_mod, only: load_potential
   use properties_mod
   use spectrumsdt_utils_mod, only: get_reduced_mass
+
+  use wf_print_mod
   implicit none
 
   integer :: ierr
@@ -54,6 +56,10 @@ contains
     real(real64), allocatable :: cap(:)
     real(real64), allocatable :: potential(:, :, :)
 
+    ! Debug
+    real(real64), allocatable :: wf_grid(:)
+    integer :: rho_ind, theta_ind, solution_ind
+
     call print_parallel('Stage: ' // params % stage)
     select case (params % stage)
       case ('grids')
@@ -61,6 +67,45 @@ contains
 
       case ('basis')
         potential = load_potential(params, rho_info % points, theta_info % points, phi_info % points)
+
+        ! Debug
+        if (debug_mode == 'print_wf' .or. &
+            debug_mode == 'half_arg' .and. allocated(debug_ints) .and. debug_ints(1) == 1 .or. &
+            debug_mode == '3m' .and. allocated(debug_ints) .and. debug_ints(1) == 1) then
+
+          ! Well
+          rho_ind = 13
+          theta_ind = 42
+          wf_grid = linspace(0d0, 2*pi, 1440)
+
+          ! Channel
+          ! rho_ind = 93 ! 46
+          ! theta_ind = 64
+          ! wf_grid = linspace(-pi, pi, 1440)
+
+          solution_ind = 5
+          call write_array(wf_grid, 'wf_grid')
+
+          if (params % use_geometric_phase == 1) then
+            ! ! 1D
+            ! call reprint_wf_grid_1d_complex(params, rho_ind, theta_ind, wf_grid)
+            ! call write_array(potential(:, theta_ind, rho_ind) * au_to_wn, 'pot')
+
+            ! 2D
+            call reprint_wf_grid_2d_complex(params, rho_ind, solution_ind, wf_grid)
+            call write_matrix(potential(:, :, rho_ind) * au_to_wn, 'pot')
+          else
+            ! 1D
+            call reprint_wf_grid_1d_real(params, rho_ind, theta_ind, wf_grid)
+            call write_array(potential(:, theta_ind, rho_ind) * au_to_wn, 'pot')
+
+            ! 2D
+            ! call reprint_wf_grid_2d_real(params, rho_ind, solution_ind, wf_grid)
+          end if
+
+          stop 'print_wf'
+        end if
+
         if (params % use_geometric_phase == 0) then
           call calculate_basis_real(params, rho_info % points, theta_info % points, phi_info % points, potential)
         else

@@ -4,7 +4,7 @@
 module eigensolve_mod
   use basis_mod, only: compute_kinetic_energy_dvr
   use cap_mod, only: calc_complex_cap
-  use constants, only: au_to_wn
+  use constants_mod, only: au_to_wn
   use general_utils_mod
   use grid_info_mod
   use input_params_mod

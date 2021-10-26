@@ -2,7 +2,7 @@ module basis_base_mod
   use algorithms_mod, only: prefix_sum_exclusive
   use array_1d_mod, only: array_1d_real
   use array_2d_mod
-  use constants, only: au_to_wn, pi
+  use constants_mod, only: au_to_wn, pi
   use fourier_transform_mod, only: dft_derivative2_optimized_dvr, dft_derivative2_equidistant_dvr, dft_derivative2_equidistant_dvr_analytical
   use general_utils_mod, only: iff, identity_matrix
   use input_params_mod
@@ -12,6 +12,8 @@ module basis_base_mod
   use parallel_utils_mod
   use spectrumsdt_paths_mod
   use spectrumsdt_utils_mod
+
+  use debug_tools_mod
   implicit none
 
 contains
@@ -34,14 +36,30 @@ contains
     if (any(params % basis % symmetry == [0, 2])) then
       basis(:, 1) = norm / sqrt(2d0)
       do j = 2, nphi
-        basis(:, j) = norm * cos((j - 1) * grid_phi)
+
+        ! Debug replace
+        if (debug_mode == '3m') then
+          basis(:, j) = norm * cos(3*(j - 1) * grid_phi)
+        else
+          basis(:, j) = norm * cos((j - 1) * grid_phi)
+        end if
+
       end do
     end if
 
     if (any(params % basis % symmetry == [1, 2])) then
       sin_shift = iff(params % basis % symmetry == 2, nphi, 0) ! shift of sine portion relative to leftmost column
       do j = 1 + sin_shift, size(basis, 2)
-        basis(:, j) = norm * sin((j - sin_shift) * grid_phi)
+
+        ! Debug replace
+        if (debug_mode == 'half_arg') then
+          basis(:, j) = norm * sin((j - 0.5d0) * grid_phi)
+        else if (debug_mode == '3m') then
+          basis(:, j) = norm * sin(3 * j * grid_phi)
+        else
+          basis(:, j) = norm * sin((j - sin_shift) * grid_phi)
+        end if
+
       end do
     end if
   end function

@@ -53,7 +53,15 @@ contains
     coeff = -2 / mu / rho_val**2 / sin(theta_val)**2
     do m2_ind = 1, size(ham, 2)
       call get_m_ind_info(m2_ind, params % basis % symmetry, funcs_per_sym, m = m)
-      ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * m ** 2
+
+      ! Debug replace
+      if (debug_mode == 'half_arg') then
+        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * (m - 0.5d0) ** 2
+      else if (debug_mode == '3m') then
+        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * (3*m) ** 2
+      else
+        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * m ** 2
+      end if
 
 #if TYPE_ID == COMPLEX_ID
       if (params % use_geometric_phase == 1) then

@@ -2,7 +2,7 @@ module fourier_transform_mod
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Contains procedures related to Fourier Transform
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  use constants, only : pi
+  use constants_mod, only : pi
   use general_utils_mod
   use iso_fortran_env, only : real64
 

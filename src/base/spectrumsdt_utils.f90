@@ -2,7 +2,7 @@
 ! Miscellaneous procedures specific to spectrumsdt.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 module spectrumsdt_utils_mod
-  use constants
+  use constants_mod
   use general_utils_mod
   use input_params_mod
   use iso_fortran_env, only: real64
