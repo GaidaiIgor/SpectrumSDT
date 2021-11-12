@@ -15,6 +15,7 @@ module input_params_mod
   use iso_fortran_env, only: real64
   use parallel_utils_mod
   use rovib_utils_base_mod
+  use spectrumsdt_utils_mod
   use string_mod
   use string_utils_mod
   use wf_section_params_mod
@@ -65,6 +66,17 @@ module input_params_mod
     procedure :: check_values => check_values_input_params
     procedure :: checked_init => checked_init_input_params
     procedure :: check_resolve_grids => check_resolve_grids_input_params
+
+    procedure :: get_basis_type_multiplier => get_basis_type_multiplier_input_params
+    procedure :: get_total_basis_multiplier => get_total_basis_multiplier_input_params
+    procedure :: get_num_funcs_phi_per_basis_type => get_num_funcs_phi_per_basis_type_input_params
+    procedure :: get_num_funcs_phi_total => get_num_funcs_phi_total_input_params
+    procedure :: get_min_solutions_1d_total => get_min_solutions_1d_total_input_params
+    procedure :: get_min_solutions_2d_total => get_min_solutions_2d_total_input_params
+    procedure :: get_num_states_total => get_num_states_total_input_params
+    procedure :: get_molecule_type => get_molecule_type_input_params
+    procedure :: get_reduced_mass => get_reduced_mass_input_params
+    procedure :: get_last_k_load => get_last_k_load_input_params
   end type
 
 contains
@@ -312,7 +324,7 @@ contains
     key_set = get_key_set(config_dict)
 
     ! We need to make sure some keys are assigned after other keys they depend on
-    call move_key('basis', size(key_set), key_set) ! depends on use_geometric_phase
+    call move_key('basis', size(key_set), key_set) ! depends on use_geometric_phase and mass
     call move_key('wf_sections', size(key_set) - 1, key_set) ! depends on K
     call move_key('K', size(key_set) - 2, key_set) ! depends on J and parity
     call move_key('grid_theta', size(key_set) - 3, key_set) ! depends on debug % treat_tp_as_xy
@@ -357,7 +369,7 @@ contains
         case ('parity')
           this % parity = str2int_config(next_value, next_key)
         case ('basis')
-          call this % basis % checked_init(subdict, auxiliary_subdict, this % stage, this % use_geometric_phase)
+          call this % basis % checked_init(subdict, auxiliary_subdict, this % stage, get_molecule_type(this % mass), this % use_geometric_phase)
         case ('eigensolve')
           call this % eigensolve % checked_init(subdict, auxiliary_subdict, this % stage)
         case ('cap')
@@ -539,12 +551,124 @@ contains
     class(input_params), intent(inout) :: this
     class(grid_info), intent(in) :: rho_info, theta_info, phi_info
 
-    call assert(this % basis % num_funcs_phi_per_sym <= size(phi_info % points) / 2, 'Error: basis % num_funcs_phi_per_sym should be <= num_points_phi / 2')
+    call assert(this % get_num_funcs_phi_total() <= size(phi_info % points) / 2, 'Error: rescaled basis % num_funcs_phi should be <= num_points_phi / 2')
     if (this % stage == 'properties') then
       call this % wf_sections % checked_resolve_rho_bounds(rho_info % from, rho_info % to)
       call this % wf_sections % checked_resolve_theta_bounds(theta_info % from, theta_info % to)
       call this % wf_sections % checked_resolve_phi_bounds(0d0, 2*pi)
     end if
   end subroutine
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns a multiplier, relating number of functions per symmetry block to number of functions per basis type (sines or cosines). Params version.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_basis_type_multiplier_input_params(this) result(basis_type_multiplier)
+    class(input_params), intent(in) :: this
+    integer :: basis_type_multiplier
+    basis_type_multiplier = get_basis_type_multiplier(this % basis % K0_symmetry, get_molecule_type(this % mass))
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns a multiplier, relating number of functions per symmetry block to total number of functions. Params version.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_total_basis_multiplier_input_params(this) result(total_multiplier)
+    class(input_params), intent(in) :: this
+    integer :: total_multiplier
+    total_multiplier = get_total_basis_multiplier(this % basis % K0_symmetry, get_molecule_type(this % mass), this % use_geometric_phase)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns number of basis phi functions per basis type.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_num_funcs_phi_per_basis_type_input_params(this) result(nphi_per_basis_type)
+    class(input_params), intent(in) :: this
+    integer :: nphi_per_basis_type
+    integer :: basis_type_multiplier
+
+    basis_type_multiplier = this % get_basis_type_multiplier()
+    nphi_per_basis_type = basis_type_multiplier * this % basis % num_funcs_phi
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns total number of basis phi functions.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_num_funcs_phi_total_input_params(this) result(nphi_total)
+    class(input_params), intent(in) :: this
+    integer :: nphi_total
+    integer :: total_multiplier
+
+    total_multiplier = this % get_total_basis_multiplier()
+    nphi_total = total_multiplier * this % basis % num_funcs_phi
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns total number of minimum 1d solutions.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_min_solutions_1d_total_input_params(this) result(min_solutions_1d_total)
+    class(input_params), intent(in) :: this
+    integer :: min_solutions_1d_total
+    integer :: total_multiplier
+
+    total_multiplier = this % get_total_basis_multiplier()
+    min_solutions_1d_total = total_multiplier * this % basis % min_solutions_1d
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns total number of minimum 1d solutions.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_min_solutions_2d_total_input_params(this) result(min_solutions_2d_total)
+    class(input_params), intent(in) :: this
+    integer :: min_solutions_2d_total
+    integer :: total_multiplier
+
+    total_multiplier = this % get_total_basis_multiplier()
+    min_solutions_2d_total = total_multiplier * this % basis % min_solutions_2d
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns total number of basis phi functions.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_num_states_total_input_params(this) result(nstates_total)
+    class(input_params), intent(in) :: this
+    integer :: nstates_total
+    integer :: total_multiplier
+
+    total_multiplier = this % get_total_basis_multiplier()
+    nstates_total = total_multiplier * this % eigensolve % num_states
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns molecule type: AAA or ABA.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_molecule_type_input_params(this) result(molecule_type)
+    class(input_params), intent(in) :: this
+    character(:), allocatable :: molecule_type
+    molecule_type = get_molecule_type(this % mass)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns reduced mass (mu).
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_reduced_mass_input_params(this) result(reduced_mass)
+    class(input_params), intent(in) :: this
+    real(real64) :: reduced_mass
+    reduced_mass = get_reduced_mass(this % mass)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Returns last loaded value of K.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_last_k_load_input_params(this) result(last_k_load)
+    class(input_params), intent(in) :: this
+    integer :: last_k_load
+
+    if (this % basis % fixed % enabled == 0) then
+      last_k_load = this % K(2)
+    else if (this % use_geometric_phase == 0) then
+      last_k_load = min(this % K(1) + 1, this % K(2))
+    else
+      last_k_load = this % K(1)
+    end if
+  end function
 
 end module

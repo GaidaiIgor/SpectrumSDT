@@ -63,24 +63,20 @@ contains
   subroutine load_block_sizes_diag(params, ham_info)
     class(input_params), intent(in) :: params
     type(matrix_block_info), intent(out) :: ham_info
-    integer :: K, K_load, K_ind, next_sym, total_rows, n_k_blocks
-    character(:), allocatable :: root_path, sym_folder, block_info_path
+    integer :: K, K_ind, total_rows, n_k_blocks
+    character(:), allocatable :: sym_folder, block_info_path
     type(matrix_block_info), pointer :: k_blocks_info(:, :)
 
     n_k_blocks = params % K(2) - params % K(1) + 1
     allocate(k_blocks_info(n_k_blocks, n_k_blocks))
-    next_sym = get_k_symmetry(params % K(1), params % basis % symmetry)
     total_rows = 0
     K_ind = 1
 
     do K = params % K(1), params % K(2)
-      K_load = merge(params % basis % fixed % K, K, params % basis % fixed % enabled == 1)
-      root_path = iff(params % basis % fixed % enabled == 1, params % basis % fixed % root_path, params % root_path)
-      sym_folder = get_sym_path_root(root_path, K_load, next_sym)
+      sym_folder = get_sym_path_smart(params, K)
       block_info_path = get_block_info_path(sym_folder)
       call load_k_subblock_sizes_diag(block_info_path, k_blocks_info(K_ind, K_ind))
       total_rows = total_rows + k_blocks_info(K_ind, K_ind) % rows
-      next_sym = 1 - next_sym
       K_ind = K_ind + 1
     end do
 
@@ -194,16 +190,16 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! General wrapper for loading overlap blocks. Converts real blocks to complex.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_overlap_block(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real) result(block)
-    character(*), intent(in) :: root_path
-    integer, intent(in) :: K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns
+  function load_overlap_block(params, K_row, K_col, overlap_type, slice_ind_row, slice_ind_col, rows, columns, is_file_real) result(block)
+    class(input_params), intent(in) :: params
+    integer, intent(in) :: K_row, K_col, overlap_type, slice_ind_row, slice_ind_col, rows, columns
     logical, intent(in) :: is_file_real
     complex(real64), allocatable :: block(:, :)
 
     if (is_file_real) then
-      block = load_overlap_block_real(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
+      block = load_overlap_block_real(params, K_row, K_col, overlap_type, slice_ind_row, slice_ind_col, rows, columns)
     else
-      block = load_overlap_block_complex(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns)
+      block = load_overlap_block_complex(params, K_row, K_col, overlap_type, slice_ind_row, slice_ind_col, rows, columns)
     end if
   end function
 
@@ -215,15 +211,13 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     logical :: is_file_real
-    integer :: ir, ic, K, K_load, K_ind, K_sym, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
+    integer :: ir, ic, K, K_ind, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
     complex(real64), allocatable :: overlap_block(:, :)
     complex(real64), pointer :: local_overlap_info_data(:, :)
-    character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
 
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
-    K_sym = get_k_symmetry(K, params % basis % symmetry)
     is_file_real = params % use_geometric_phase == 0
 
     do ir = 1, size(local_k_block_info % subblocks, 1)
@@ -239,9 +233,7 @@ contains
 
         rows = full_ham_overlap_info % rows
         columns = full_ham_overlap_info % columns
-        K_load = merge(params % basis % fixed % K, K, params % basis % fixed % enabled == 1)
-        root_path = iff(params % basis % fixed % enabled == 1, params % basis % fixed % root_path, params % root_path)
-        overlap_block = load_overlap_block(root_path, K_load, K_load, 0, K_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
+        overlap_block = load_overlap_block(params, K, K, 0, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
         last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
@@ -321,15 +313,14 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Loads 2d eigenvalues from file for given K, symmetry and slice index.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function load_eivals_2d(root_path, K, K_sym, slice_ind) result(eivals)
-    character(*), intent(in) :: root_path
-    integer, intent(in) :: K, K_sym, slice_ind
+  function load_eivals_2d(params, K, slice_ind) result(eivals)
+    class(input_params), intent(in) :: params
+    integer, intent(in) :: K, slice_ind
     real(real64), allocatable :: eivals(:)
     integer :: file_unit, n_eivals
-    character(:), allocatable :: k_path, sym_path, eivals_path
+    character(:), allocatable :: sym_path, eivals_path
 
-    k_path = get_k_folder_path(root_path, K)
-    sym_path = get_sym_path_int(k_path, K_sym)
+    sym_path = get_sym_path_smart(params, K)
     eivals_path = get_solutions_2d_path(sym_path, slice_ind)
     open(newunit = file_unit, file = eivals_path, form = 'unformatted')
     read(file_unit) n_eivals
@@ -345,15 +336,13 @@ contains
     class(distributed_rovib_hamiltonian), intent(inout) :: this
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
-    integer :: K_ind, K, K_sym, n, m, K_load, slice_ind_row, slice_ind_col, col_shift, row, col
+    integer :: K_ind, K, n, m, slice_ind_row, slice_ind_col, col_shift, row, col
     real(real64), allocatable :: eivals(:)
     complex(real64), pointer :: overlap_block(:, :)
-    character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_block_info, global_overlap_block_info, full_ham_overlap_block_info
 
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
-    K_sym = get_k_symmetry(K, params % basis % symmetry)
 
     ! Iterate thorugh n-blocks
     do n = 1, size(local_k_block_info % subblocks, 1)
@@ -376,9 +365,7 @@ contains
         ! First column of the main diagonal may not be first in this process chunk, so we need to make corresponding adjustments
         col_shift = global_overlap_block_info % borders % top - full_ham_overlap_block_info % borders % top
 
-        K_load = merge(params % basis % fixed % K, K, params % basis % fixed % enabled == 1)
-        root_path = iff(params % basis % fixed % enabled == 1, params % basis % fixed % root_path, params % root_path)
-        eivals = load_eivals_2d(root_path, K_load, K_sym, slice_ind_row)
+        eivals = load_eivals_2d(params, K, slice_ind_row)
         overlap_block => local_overlap_block_info % extract_from_matrix(this % proc_chunk)
         do row = 1, size(overlap_block, 1)
           col = row + col_shift
@@ -479,15 +466,13 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     logical :: is_file_real
-    integer :: K_ind, K, K_sym, ir, ic, K_load, slice_row_ind, slice_col_ind, rows, first_row, last_row, J_shift, K_shift, J_factor, K_factor
+    integer :: K_ind, K, ir, ic, slice_row_ind, slice_col_ind, rows, first_row, last_row, J_shift, K_shift, J_factor, K_factor
     complex(real64), allocatable :: overlap_block_J(:, :), overlap_block_K(:, :), overlap_block_slice(:, :)
     complex(real64), pointer :: existing_overlap_block(:, :)
-    character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
 
     K_ind = global_k_block_info % block_row_ind
     K = k_ind_to_k(K_ind, params % K(1))
-    K_sym = get_k_symmetry(K, params % basis % symmetry)
     is_file_real = params % use_geometric_phase == 0
 
     ! Iterate over n-blocks
@@ -508,10 +493,8 @@ contains
         call assert(full_ham_overlap_info % rows == full_ham_overlap_info % columns, 'Assertion error: diagonal n-block is not square')
         rows = full_ham_overlap_info % rows
 
-        K_load = merge(params % basis % fixed % K, K, params % basis % fixed % enabled == 1)
-        root_path = iff(params % basis % fixed % enabled == 1, params % basis % fixed % root_path, params % root_path)
-        overlap_block_J = load_overlap_block(root_path, K_load, K_load, 10, K_sym, slice_row_ind, slice_col_ind, rows, rows, is_file_real)
-        overlap_block_K = load_overlap_block(root_path, K_load, K_load, 11, K_sym, slice_row_ind, slice_col_ind, rows, rows, is_file_real)
+        overlap_block_J = load_overlap_block(params, K, K, 10, slice_row_ind, slice_col_ind, rows, rows, is_file_real)
+        overlap_block_K = load_overlap_block(params, K, K, 11, slice_row_ind, slice_col_ind, rows, rows, is_file_real)
 
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
@@ -580,7 +563,6 @@ contains
     if (1 - K1 == K2) then ! (1, 0) or (0, 1)
       W = W + (-1) ** (J + K1 + parity) * calculate_lambda_plus(J, K1 - 1)
     end if
-    W = W / 2d0
 
     ! Delta-term for K=0 case
     if (K1 == 0 .or. K2 == 0) then
@@ -596,31 +578,17 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     logical :: is_file_real
-    integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, ir, ic, K_row_load, K_col_load, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
+    integer :: K_row_ind, K_col_ind, K_row, K_col, ir, ic, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
     real(real64) :: W
     complex(real64), allocatable :: overlap_block(:, :)
     complex(real64), pointer :: local_overlap_info_data(:, :)
-    character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: global_overlap_info, full_ham_overlap_info
 
     K_row_ind = global_k_block_info % block_row_ind
     K_col_ind = global_k_block_info % block_col_ind
     K_row = k_ind_to_k(K_row_ind, params % K(1))
     K_col = k_ind_to_k(K_col_ind, params % K(1))
-    K_row_sym = get_k_symmetry(K_row, params % basis % symmetry)
     is_file_real = params % use_geometric_phase == 0
-
-    if (params % basis % fixed % enabled == 1) then
-      ! All K-blocks are the same, so we only need to keep K_row_load different from K_col_load for the correct block transposition 
-      ! (alghough even that should not matter since offdiagonal n-blocks are 0)
-      K_row_load = merge(params % basis % fixed % K, params % basis % fixed % K + 1, K_row < K_col) ! +1 even if fixed_basis % K == fixed_basis % J, since only lower value is used for loading
-      K_col_load = merge(params % basis % fixed % K + 1, params % basis % fixed % K, K_row < K_col)
-      root_path = params % basis % fixed % root_path
-    else
-      K_row_load = K_row
-      K_col_load = K_col
-      root_path = params % root_path
-    end if
 
     do ir = 1, size(local_k_block_info % subblocks, 1)
       do ic = 1, size(local_k_block_info % subblocks, 2)
@@ -645,7 +613,7 @@ contains
         ! Load block
         rows = full_ham_overlap_info % rows
         columns = full_ham_overlap_info % columns
-        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 2, K_row_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
+        overlap_block = load_overlap_block(params, K_row, K_col, 2, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
         last_row = size(overlap_block, 1) - (full_ham_overlap_info % borders % bottom - global_overlap_info % borders % bottom)
@@ -700,7 +668,6 @@ contains
     if (2 - K1 == K2) then
       U = U + (-1) ** (J + K1 + parity) * calculate_lambda_plus(J, K1 - 1) * calculate_lambda_plus(J, K1 - 2)
     end if
-    U = U / 2d0
 
     ! Delta-term for K=0 case
     if (K1 == 0 .or. K2 == 0) then
@@ -716,28 +683,16 @@ contains
     class(input_params), intent(in) :: params
     type(matrix_block_info), target, intent(in) :: local_k_block_info, global_k_block_info, full_ham_k_block_info
     logical :: is_file_real
-    integer :: K_row_ind, K_col_ind, K_row, K_col, K_row_sym, K_row_load, K_col_load, ir, ic, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
+    integer :: K_row_ind, K_col_ind, K_row, K_col, ir, ic, slice_ind_row, slice_ind_col, rows, columns, first_row, last_row
     complex(real64), allocatable :: overlap_block(:, :), overlap_block_slice(:, :)
     complex(real64), pointer :: existing_overlap_block(:, :)
-    character(:), allocatable :: root_path
     type(matrix_block_info), pointer :: local_overlap_info, global_overlap_info, full_ham_overlap_info
 
     K_row_ind = global_k_block_info % block_row_ind
     K_col_ind = global_k_block_info % block_col_ind
     K_row = k_ind_to_k(K_row_ind, params % K(1))
     K_col = k_ind_to_k(K_col_ind, params % K(1))
-    K_row_sym = get_k_symmetry(K_row, params % basis % symmetry)
     is_file_real = params % use_geometric_phase == 0
-
-    if (params % basis % fixed % enabled == 1) then
-      K_row_load = merge(params % basis % fixed % K, params % basis % fixed % K + 2, K_row <= K_col)
-      K_col_load = merge(params % basis % fixed % K + 2, params % basis % fixed % K, K_row <= K_col)
-      root_path = params % basis % fixed % root_path
-    else
-      K_row_load = K_row
-      K_col_load = K_col
-      root_path = params % root_path
-    end if
 
     do ir = 1, size(local_k_block_info % subblocks, 1)
       do ic = 1, size(local_k_block_info % subblocks, 2)
@@ -756,7 +711,7 @@ contains
         ! load block
         rows = full_ham_overlap_info % rows
         columns = full_ham_overlap_info % columns
-        overlap_block = load_overlap_block(root_path, K_row_load, K_col_load, 3, K_row_sym, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
+        overlap_block = load_overlap_block(params, K_row, K_col, 3, slice_ind_row, slice_ind_col, rows, columns, is_file_real)
 
         ! Determine which part of overlaps block should be stored in the current chunk
         first_row = global_overlap_info % borders % top - full_ham_overlap_info % borders % top + 1
@@ -795,8 +750,7 @@ contains
           cycle
         end if
 
-        call this % load_k_block_asym_term(params, this % local_chunk_info % subblocks(ir, ic), this % global_chunk_info % subblocks(ir, ic), &
-            ham_info % subblocks(K_row_ind, K_col_ind))
+        call this % load_k_block_asym_term(params, this % local_chunk_info % subblocks(ir, ic), this % global_chunk_info % subblocks(ir, ic), ham_info % subblocks(K_row_ind, K_col_ind))
       end do
     end do
   end subroutine
@@ -833,22 +787,20 @@ contains
       call print_parallel('Sym term is loaded')
     end if
 
-    if (params % use_rovib_coupling == 0) then
-      return
-    end if
+    if (params % use_rovib_coupling == 1) then
+      if (params % debug % enable_terms(1) == 0) then
+        call print_parallel('Coriolis term is disabled')
+      else
+        call this % load_chunk_coriolis_term(params, ham_info)
+        call print_parallel('Coriolis term is loaded')
+      end if
 
-    if (params % debug % enable_terms(1) == 0) then
-      call print_parallel('Coriolis term is disabled')
-    else
-      call this % load_chunk_coriolis_term(params, ham_info)
-      call print_parallel('Coriolis term is loaded')
-    end if
-
-    if (params % debug % enable_terms(2) == 0) then
-      call print_parallel('Asymmetric term is disabled')
-    else
-      call this % load_chunk_asym_term(params, ham_info)
-      call print_parallel('Asymmetric term is loaded')
+      if (params % debug % enable_terms(2) == 0) then
+        call print_parallel('Asymmetric term is disabled')
+      else
+        call this % load_chunk_asym_term(params, ham_info)
+        call print_parallel('Asymmetric term is loaded')
+      end if
     end if
   end subroutine
 

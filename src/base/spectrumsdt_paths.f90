@@ -7,7 +7,7 @@ module spectrumsdt_paths_mod
   use general_utils_mod
   use input_params_mod
   use path_utils_mod
-  use rovib_utils_base_mod
+  use rovib_utils_mod
   implicit none
 
   interface get_k_folder_path
@@ -148,11 +148,7 @@ contains
     character(:), allocatable :: res
     character(:), allocatable :: sym_name
 
-    if (sym_code == 2) then
-      sym_name = 'symmetry_all'
-    else
-      sym_name = 'symmetry_' // num2str(sym_code)
-    end if
+    sym_name = 'symmetry_' // num2str(sym_code)
     res = append_path_token(k_path, sym_name)
   end function
 
@@ -178,7 +174,30 @@ contains
     character(:), allocatable :: k_path
 
     k_path = get_k_folder_path(params)
-    res = get_sym_path_int(k_path, params % basis % symmetry)
+    res = get_sym_path_int(k_path, params % basis % K0_symmetry)
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
+! Generates path to folder with calculation results for a given *K*. Works as plain `get_sym_path` in adiabatic mode, but substitutes actual load path in fixed basis mode.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function get_sym_path_smart(params, K) result(sym_path)
+    class(input_params), intent(in) :: params
+    integer, intent(in) :: K
+    character(:), allocatable :: sym_path
+    integer :: K_load, sym_load, K1_symmetry
+    character(:), allocatable :: root_path
+
+    if (params % basis % fixed % enabled == 0) then
+      root_path = params % root_path
+      K_load = K
+      sym_load = params % basis % K0_symmetry
+    else
+      root_path = params % basis % fixed % root_path
+      K_load = params % basis % fixed % K
+      K1_symmetry = get_k_symmetry(1, params)
+      sym_load = iff(mod(K, 2) == mod(K_load, 2), params % basis % K0_symmetry, K1_symmetry)
+    end if
+    sym_path = get_sym_path_root(root_path, K_load, sym_load)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------

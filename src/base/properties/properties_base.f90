@@ -135,7 +135,7 @@ contains
     wf_sections_dist_mask = 0
     section_inds = get_wf_sections_dist_inds(params, rho_info % points, theta_info % points, phi_borders)
 
-    mu = get_reduced_mass(params % mass)
+    mu = params % get_reduced_mass()
     associate(si => section_inds)
       do i = 1, size(wf_sections_dist_mask, 1)
         wf_sections_dist_mask(i, si(i, 1, 1):si(i, 1, 2), si(i, 2, 1):si(i, 2, 2), si(i, 3, 1):si(i, 3, 2), si(i, 4, 1):si(i, 4, 2)) = 1
@@ -212,23 +212,23 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Evaluates the value of phi integral for functions of given symmetry in the range [a, b].
-! m1 and m2 >= 0. m1 or m2 can be 0 only if corresponding F_sym is 0. F_sym is either 0 (cos) or 1 (sin). a <= b. Both a and b are from 0 to 2*pi.
+! m1 and m2 >= 0. m1 or m2 can be 0 only if corresponding F_type is 0. F_type is either 0 (cos) or 1 (sin). a <= b. Both a and b are from 0 to 2*pi.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_phi_integral(m1, m2, F1_sym, F2_sym, a, b) result(integral_value)
+  function calc_phi_integral(m1, m2, F1_type, F2_type, a, b) result(integral_value)
     integer, intent(in) :: m1, m2 ! Frequency of integrand functions
     real(real64), intent(in) :: a, b ! Range of integration
-    integer, intent(in) :: F1_sym, F2_sym ! Symmetry of integrand functions: 0 for cos, 1 for sin
+    integer, intent(in) :: F1_type, F2_type ! Type of integrand functions: 0 for cos, 1 for sin
     real(real64) :: integral_value ! Result
     integer :: sign
     real(real64) :: norm
 
     norm = 1 / (pi * sqrt(1d0 * (delta(m1, 0) + 1) * (delta(m2, 0) + 1)))
-    sign = (-1) ** F1_sym
+    sign = (-1) ** F1_type
     if (m1 == 0 .and. m2 == 0) then
       integral_value = norm * (b - a)
 
     else if (m1 == m2) then
-      if (F1_sym == F2_sym) then
+      if (F1_type == F2_type) then
 
         ! Debug replace
         if (debug_mode == 'half_arg') then
@@ -242,7 +242,7 @@ contains
       end if
 
     else if (m1 /= m2) then
-      if (F1_sym == F2_sym) then
+      if (F1_type == F2_type) then
 
         ! Debug replace
         if (debug_mode == 'half_arg') then
@@ -259,35 +259,36 @@ contains
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Calculates phi-integral matrix for each phi range and symmetry. Only upper triangle is calculated since matrix is symmetric.
-! num_funcs_per_sym - number of phi basis functions per symmetry.
-! phi_sym - symmetry. 0 for cos, 1 for sin, 2 for both.
+! nphi_per_basis_type - number of phi basis functions per basis type (sin or cos).
+! sym - symmetry of phi basis. See basis_params for details.
 ! phi_borders - array of considered phi borders.
 ! phi_integral_matrix - 3D matrix. 1st dim - m1, 2nd - m2, 3rd - phi_range_ind.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_phi_integral_matrix(num_funcs_phi_per_sym, phi_sym, phi_borders) result(phi_integral_matrix)
-    integer, intent(in) :: num_funcs_phi_per_sym, phi_sym
+  function calc_phi_integral_matrix(nphi_per_basis_type, sym, molecule_type, use_geometric_phase, phi_borders) result(phi_integral_matrix)
+    integer, intent(in) :: nphi_per_basis_type, sym, use_geometric_phase
+    character(*), intent(in) :: molecule_type
     real(real64), intent(in) :: phi_borders(:)
     real(real64), allocatable :: phi_integral_matrix(:, :, :)
-    integer :: num_funcs_phi, range_ind, m1_ind, m2_ind, m1, m2, m1_sym, m2_sym
+    integer :: nphi_total, range_ind, m1_ind, m2_ind, m1, m2, m1_type, m2_type
     real(real64) :: a, b
 
-    num_funcs_phi = get_num_funcs_phi(num_funcs_phi_per_sym, phi_sym)
-    allocate(phi_integral_matrix(num_funcs_phi, num_funcs_phi, size(phi_borders) - 1))
+    nphi_total = get_basis_type_to_total_multiplier(use_geometric_phase) * nphi_per_basis_type
+    allocate(phi_integral_matrix(nphi_total, nphi_total, size(phi_borders) - 1))
     do range_ind = 1, size(phi_integral_matrix, 3)
       a = phi_borders(range_ind)
       b = phi_borders(range_ind + 1)
       do m2_ind = 1, size(phi_integral_matrix, 2)
-        call get_m_ind_info(m2_ind, phi_sym, num_funcs_phi_per_sym, m = m2, m_sym = m2_sym)
+        call get_m_ind_info(m2_ind, nphi_per_basis_type, sym, molecule_type, m = m2, m_type = m2_type)
         do m1_ind = 1, m2_ind
-          call get_m_ind_info(m1_ind, phi_sym, num_funcs_phi_per_sym, m = m1, m_sym = m1_sym)
-          phi_integral_matrix(m1_ind, m2_ind, range_ind) = calc_phi_integral(m1, m2, m1_sym, m2_sym, a, b)
+          call get_m_ind_info(m1_ind, nphi_per_basis_type, sym, molecule_type, m = m1, m_type = m1_type)
+          phi_integral_matrix(m1_ind, m2_ind, range_ind) = calc_phi_integral(m1, m2, m1_type, m2_type, a, b)
         end do
       end do
     end do
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! The three functions below can be used for debug purposes to check orthnormality of 1D, 2D and 3D solutions
+! The three functions below can be used for debug purposes to check orthnormality of 1D and 2D solutions.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 
 ! !-------------------------------------------------------------------------------------------------------------------------------------------
@@ -343,58 +344,6 @@ contains
 !             max_deviation = max(max_deviation, abs(0 ** (j2 - j1) - overlap))
 !           end do
 !         end do
-!       end do
-!     end do
-!   end function
-!
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-! ! Checks orthonormality of 3D solutions. Returns deviation from expected value (0 for different ks, 1 for same ks).
-! !-------------------------------------------------------------------------------------------------------------------------------------------
-!   function check_orthonormality_3D(As, Bs, Cs, params, k1_first, k2_first, k1_last, k2_last) result(max_deviation)
-!     ! Arrays of size K x N x L. Each element is a matrix with expansion coefficients - M x S_Knl for A, S_Knl x S_Kn for B.
-!     type(array_2d_real), intent(in) :: As(:, :, :), Bs(:, :, :)
-!     type(array_2d_complex), intent(in) :: Cs(:, :) ! 3D expansion coefficients K x n. Inner expansion matrix is S_Kn x S.
-!     class(input_params), intent(in) :: params
-!     integer, intent(in) :: k1_first, k2_first
-!     integer, optional, intent(in) :: k1_last, k2_last
-!     real(real64) :: max_deviation
-!     integer :: K_val, K_sym, K_ind, K_ind_comp, n, l, m_ind, j, k1, k2, k1_last_act, k2_last_act
-!     real(real64) :: i_sum
-!     complex(real64) :: j1_sum, j2_sum
-!     complex(real64) :: overlap
-!
-!     k1_last_act = arg_or_default(k1_last, k1_first)
-!     k2_last_act = arg_or_default(k2_last, k2_first)
-!     max_deviation = 0
-!     do k1 = k1_first, k1_last_act ! size(Cs(1, 1) % p, 2)
-!       do k2 = k2_first, k2_last_act ! k1, size(Cs(1, 1) % p, 2)
-!         if (k2 < k1) then
-!           print *, 'Skipping ovelap between', k1, k2, 'since k1 has to be >= than k2'
-!           cycle
-!         end if
-!
-!         print *, 'Calculating overlap between', k1, k2
-!         overlap = 0
-!         do K_val = params % K(1), params % K(2)
-!           call get_k_attributes(K_val, params, K_ind, K_sym, K_ind_comp)
-!           do n = 1, size(As, 2)
-!             ! call track_progress(n * 1d0 / size(As, 2))
-!             do l = 1, size(As, 3)
-!               do m_ind = 1, size(As(K_ind_comp, n, l) % p, 1)
-!                 j1_sum = 0
-!                 j2_sum = 0
-!                 do j = 1, size(Bs(K_ind_comp, n, l) % p, 2)
-!                   i_sum = sum(Bs(K_ind_comp, n, l) % p(:, j) * As(K_ind_comp, n, l) % p(m_ind, :))
-!                   j1_sum = j1_sum + conjg(Cs(K_ind, n) % p(j, k1)) * i_sum
-!                   j2_sum = j2_sum + Cs(K_ind, n) % p(j, k2) * i_sum
-!                 end do
-!                 overlap = overlap + j1_sum * j2_sum
-!               end do
-!             end do
-!           end do
-!         end do
-!
-!         max_deviation = max(max_deviation, abs(0 ** (k2 - k1) - overlap))
 !       end do
 !     end do
 !   end function

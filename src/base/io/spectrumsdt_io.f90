@@ -41,7 +41,7 @@ contains
     integer, intent(in) :: num_solutions_2d(:, :)
     type(array_2d_complex), allocatable, intent(out) :: Cs(:, :) ! K x N. Inner dimensions: S_Kn x S
     complex(real64), allocatable, optional, intent(out) :: Cs_plain(:, :) ! Stacked over Ks and ns (in this order) version of Cs
-    integer :: total_solutions_2d, first_elem, proc_elems, sln_ind, total_Ks, start_ind, K, K_ind, K_sym, K_ind_comp, n_val
+    integer :: total_solutions_2d, first_elem, proc_elems, sln_ind, total_Ks, start_ind, K, K_ind, K_ind_smart, n_val
     complex(real64), allocatable :: Cs_raw_col(:) ! column in Cs_raw
     complex(real64), allocatable :: Cs_raw(:, :) ! unarranged Cs
     character(:), allocatable :: exp_coeffs_path
@@ -49,8 +49,8 @@ contains
     ! Count total number of 2D solutions
     total_solutions_2d = 0
     do K = params % K(1), params % K(2)
-      call get_k_attributes(K, params, K_ind, K_sym, K_ind_comp)
-      total_solutions_2d = total_solutions_2d + sum(num_solutions_2d(K_ind_comp, :))
+      call get_k_attributes(K, params, K_ind_smart = K_ind_smart)
+      total_solutions_2d = total_solutions_2d + sum(num_solutions_2d(K_ind_smart, :))
     end do
 
     ! Load raw matrix
@@ -71,10 +71,10 @@ contains
     allocate(Cs(total_Ks, N))
     start_ind = 1
     do K = params % K(1), params % K(2)
-      call get_k_attributes(K, params, K_ind, K_sym, K_ind_comp)
+      call get_k_attributes(K, params, K_ind = K_ind, K_ind_smart = K_ind_smart)
       do n_val = 1, N
-        Cs(K_ind, n_val) = array_2d_complex(Cs_raw(start_ind : start_ind + num_solutions_2d(K_ind_comp, n_val) - 1, :))
-        start_ind = start_ind + num_solutions_2d(K_ind_comp, n_val)
+        Cs(K_ind, n_val) = array_2d_complex(Cs_raw(start_ind : start_ind + num_solutions_2d(K_ind_smart, n_val) - 1, :))
+        start_ind = start_ind + num_solutions_2d(K_ind_smart, n_val)
       end do
     end do
   end subroutine

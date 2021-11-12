@@ -36,7 +36,7 @@ contains
 
     ! Setup parameters for Manolopoulos CAP
     delta = c / (4 * pi)
-    mu = get_reduced_mass(params % mass)
+    mu = params % get_reduced_mass()
     kmin = sqrt(2 * mu * params % cap % min_absorbed_energy)
     absorbing_width = c / (2 * delta * kmin)
     rho_start = rho_info % to - absorbing_width

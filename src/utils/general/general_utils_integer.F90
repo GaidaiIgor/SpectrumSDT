@@ -21,6 +21,23 @@ module general_utils_integer_mod
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
+! Converts integer array to string.
+!-------------------------------------------------------------------------------------------------------------------------------------------
+  function arr2str_integer(arr, format) result(str)
+    integer, intent(in) :: arr(:)
+    character(*), optional, intent(in) :: format
+    character(:), allocatable :: str
+    integer :: i
+    character(:), allocatable :: next_num
+
+    str = num2str_integer(arr(1), format)
+    do i = 2, size(arr)
+      next_num = num2str_integer(arr(i), format)
+      str = str // ', ' // next_num
+    end do
+  end function
+
+!-------------------------------------------------------------------------------------------------------------------------------------------
 ! Converts string to integer.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   impure elemental function str2int(str, iostat) result(int)

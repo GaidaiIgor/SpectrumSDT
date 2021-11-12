@@ -15,6 +15,7 @@ module eigensolve_mod
   use slepc_solver_mod, only: find_eigenpairs_slepc
   use spectrumsdt_paths_mod
   use spectrumsdt_utils_mod, only: get_reduced_mass
+  use debug_tools_mod
   implicit none
 
 contains
@@ -88,11 +89,11 @@ contains
       end if
     end if
     call rovib_ham % build(params, kinetic, cap)
-    call print_parallel('Hamiltonian matrix is built. Size: ' // num2str(rovib_ham % global_chunk_info % columns) // ' x ' // num2str(size(rovib_ham % proc_chunk, 2)))
 
+    call print_parallel('Hamiltonian matrix is built. Size: ' // num2str(rovib_ham % global_chunk_info % columns) // ' x ' // num2str(size(rovib_ham % proc_chunk, 2)))
     call init_matmul(params) ! rovib_ham is already set
     call print_parallel('Eigenvalue solver has started')
-    call find_eigenpairs_slepc(params % eigensolve % num_states, params % eigensolve % ncv, params % eigensolve % mpd, eivals, eivecs)
+    call find_eigenpairs_slepc(params % get_num_states_total(), params % eigensolve % ncv, params % eigensolve % mpd, eivals, eivecs)
     call print_states(params, eivals, eivecs)
   end subroutine
 

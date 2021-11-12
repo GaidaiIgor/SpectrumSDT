@@ -14,15 +14,24 @@ module basis_params_mod
 
   type :: basis_params
     character(:), allocatable :: prefix
-    integer :: num_funcs_phi_per_sym = -1 ! number of sines or cosines in basis of 1D problem
-    integer :: symmetry = 2 ! 0 (even, cos, +) or 1 (odd, sin, -) or 2 (both). In case of coupled hamiltonian means symmetry of K=0, even when K=0 is not included.
+    ! Number of sines or cosines in basis of 1D problem.
+    ! This number is specified with respect to the smallest symmetry block (3m) and scales proportionally to the selected basis symmetry.
+    integer :: num_funcs_phi = -1
+    ! Specifies which subset of the complete sin/cos basis set to use in cases when it's not fully coupled.
+    ! For AAA-molecules it can be 0 (cos(3m)), 1 (sin(3m)), 2 (cos(3m+1), cos(3m+2)) or 3 (sin(3m+1), sin(3m+2)).
+    ! This is the most decoupled case. In the cases when some of these groups are coupled, the lowest group number represents the combined group. Namely,
+    ! For ABA-molecules it can be 0 (all cos, groups 0 + 2) or 1 (all sin, groups 1 + 3).
+    ! When geometric phase effects are enabled, sines and cosines are coupled, so the total number of symmetries is halved. Namely,
+    ! For AAA-molecules it can be 0 (cos(3m) + sin(3m), groups 0 + 1), or 2 (cos(3m+1) + cos(3m+2) + sin(3m+1) + sin(3m+2), groups 2 + 3).
+    ! For ABA-molecules it can only be 0 (all functions, all groups).
+    integer :: K0_symmetry = 0
     real(real64) :: cutoff_energy_1d = 0 ! 1D solutions with energies higher than this are discarded from basis
     real(real64) :: cutoff_energy_2d = 0 ! 2D solutions with energies higher than this are discarded from basis
-    integer :: min_solutions_1d = 1 ! minimum number of 1D solutions in each slice, kept even if energies are higher than cutoff_energy_1d
-    integer :: min_solutions_2d = 1 ! minimum number of 2D solutions in each slice, kept even if energies are higher than cutoff_energy_2d
-    integer :: print_energies_1d = 0 ! whether or not to create a file with formatted 1D energies
-    integer :: print_energies_2d = 0 ! whether or not to create a file with formatted 2D energies
-    type(fixed_basis_params) :: fixed ! parameters describing rotational state of fixed basis, if used
+    integer :: min_solutions_1d = 1 ! Minimum number of 1D solutions in each slice, kept even if energies are higher than cutoff_energy_1d (per symmetry block)
+    integer :: min_solutions_2d = 1 ! Minimum number of 2D solutions in each slice, kept even if energies are higher than cutoff_energy_2d (per symmetry block)
+    integer :: print_energies_1d = 0 ! Whether or not to create a file with formatted 1D energies
+    integer :: print_energies_2d = 0 ! Whether or not to create a file with formatted 2D energies
+    type(fixed_basis_params) :: fixed ! Parameters describing rotational state of fixed basis, if used
 
   contains
     procedure, nopass :: check_key_types_basis_params
@@ -75,14 +84,10 @@ contains
       end select
 
       select case (next_key)
-        case ('num_funcs_phi_per_sym')
-          this % num_funcs_phi_per_sym = str2int_config(next_value, full_key)
-        case ('symmetry')
-          if (next_value == 'all') then
-            this % symmetry = 2
-          else
-            this % symmetry = str2int_config(next_value, full_key)
-          end if
+        case ('num_funcs_phi')
+          this % num_funcs_phi = str2int_config(next_value, full_key)
+        case ('K0_symmetry')
+          this % K0_symmetry = str2int_config(next_value, full_key)
         case ('cutoff_energy_1d')
           this % cutoff_energy_1d = str2real_config(next_value, full_key) / au_to_wn
         case ('cutoff_energy_2d')
@@ -104,15 +109,16 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns a set of mandatory keys.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function get_mandatory_keys_basis_params(this, use_geometric_phase) result(keys)
+  function get_mandatory_keys_basis_params(this, molecule_type, use_geometric_phase) result(keys)
     class(basis_params), intent(in) :: this
+    character(*), intent(in) :: molecule_type
     integer, intent(in) :: use_geometric_phase
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'num_funcs_phi_per_sym')
+    call put_string(keys, 'num_funcs_phi')
     call put_string(keys, 'min_solutions_2d')
-    if (use_geometric_phase == 0) then
-      call put_string(keys, 'symmetry')
+    if (.not. (molecule_type == 'ABA' .and. use_geometric_phase == 1)) then
+      call put_string(keys, 'K0_symmetry')
     end if
   end function
 
@@ -123,8 +129,8 @@ contains
     class(basis_params), intent(in) :: this
     type(dictionary_t) :: keys
 
-    call put_string(keys, 'num_funcs_phi_per_sym')
-    call put_string(keys, 'symmetry')
+    call put_string(keys, 'num_funcs_phi')
+    call put_string(keys, 'K0_symmetry')
     call put_string(keys, 'cutoff_energy_1d')
     call put_string(keys, 'cutoff_energy_2d')
     call put_string(keys, 'min_solutions_1d')
@@ -160,31 +166,42 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Checks validity of provided values.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine check_values_basis_params(this, use_geometric_phase)
+  subroutine check_values_basis_params(this, molecule_type, use_geometric_phase)
     class(basis_params), intent(in) :: this
+    character(*), intent(in) :: molecule_type
     integer, intent(in) :: use_geometric_phase
+    integer, allocatable :: allowed_symmetries(:)
 
-    call assert(this % num_funcs_phi_per_sym > 0, 'Error: ' // this % prefix // 'num_funcs_phi_per_sym should be > 0.')
+    call assert(this % num_funcs_phi > 0, 'Error: ' // this % prefix // 'num_funcs_phi should be > 0.')
     call assert(this % min_solutions_1d > 0, 'Error: ' // this % prefix // 'min_solutions_1d should be > 0.')
     call assert(this % min_solutions_2d > 0, 'Error: ' // this % prefix // 'min_solutions_2d should be > 0.')
     call assert(any(this % print_energies_1d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_1d should be 0 or 1.')
     call assert(any(this % print_energies_2d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_2d should be 0 or 1.')
 
-    if (use_geometric_phase == 1) then
-      call assert(this % symmetry == 2, 'Error: ' // this % prefix // 'symmery should be all, if geometric phase effects are requested.')
-    else
-      call assert(any(this % symmetry == [0, 1]), 'Error: ' // this % prefix // 'symmery should be 0 or 1.')
+    if (molecule_type == 'AAA') then
+      if (use_geometric_phase == 0) then
+        allowed_symmetries = [0, 1, 2, 3]
+      else
+        allowed_symmetries = [0, 2]
+      end if
+    else if (molecule_type == 'ABA') then
+      if (use_geometric_phase == 0) then
+        allowed_symmetries = [0, 1]
+      else
+        allowed_symmetries = [0]
+      end if
     end if
+    call assert(any(this % K0_symmetry == allowed_symmetries), 'Error: ' // this % prefix // 'symmery should be one of:' // num2str(allowed_symmetries))
   end subroutine
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Initializes an instance of basis_params from a given *config_dict* with user set key-value parameters.
 ! Validates created instance.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine checked_init_basis_params(this, config_dict, auxiliary_info, stage, use_geometric_phase)
+  subroutine checked_init_basis_params(this, config_dict, auxiliary_info, stage, molecule_type, use_geometric_phase)
     class(basis_params), intent(inout) :: this
     class(dictionary_t) :: config_dict, auxiliary_info ! intent(in)
-    character(*), intent(in) :: stage
+    character(*), intent(in) :: stage, molecule_type
     integer, intent(in) :: use_geometric_phase
     type(dictionary_t) :: mandatory_keys, all_keys
 
@@ -193,10 +210,10 @@ contains
     call check_extra_keys(config_dict, all_keys, this % prefix)
     call check_key_types_basis_params(config_dict, auxiliary_info)
     call this % assign_dict(config_dict, auxiliary_info)
-    mandatory_keys = this % get_mandatory_keys(use_geometric_phase)
+    mandatory_keys = this % get_mandatory_keys(molecule_type, use_geometric_phase)
     call check_mandatory_keys(config_dict, mandatory_keys, this % prefix)
     call this % set_defaults(config_dict, stage)
-    call this % check_values(use_geometric_phase)
+    call this % check_values(molecule_type, use_geometric_phase)
   end subroutine
 
 end module

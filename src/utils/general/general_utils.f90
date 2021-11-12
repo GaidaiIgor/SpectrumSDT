@@ -7,7 +7,7 @@ module general_utils_mod
   implicit none
 
   interface num2str
-    module procedure :: num2str_integer, num2str_real
+    module procedure :: num2str_integer, num2str_real, arr2str_integer
   end interface
 
   interface conjg

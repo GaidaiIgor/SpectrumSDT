@@ -1,5 +1,6 @@
 #include "funcs.macro"
   use basis_base_mod
+
   use debug_tools_mod
   implicit none
 
@@ -25,15 +26,15 @@ contains
     real(real64), intent(in) :: rho_val, theta_val
     real(real64), intent(in) :: grid_phi(:), potential_phi(:)
     TEMPLATE_TYPE, allocatable :: ham(:, :)
-    integer :: funcs_per_sym, l_dash, m1_ind, m2_ind, m_shift, m
+    integer :: nphi_per_sym, l_dash, m1_ind, m2_ind, m_shift, m
     real(real64) :: mu, coeff, step_phi
     real(real64), allocatable :: func(:)
     real(real64), allocatable :: basis(:, :)
 
     basis = get_phi_basis_grid(params, grid_phi)
-    mu = get_reduced_mass(params % mass)
+    mu = params % get_reduced_mass()
     step_phi = grid_phi(2) - grid_phi(1)
-    funcs_per_sym = params % basis % num_funcs_phi_per_sym
+    nphi_per_sym = params % get_num_funcs_phi_per_basis_type()
     l_dash = 3
 
     allocate(ham(size(basis, 2), size(basis, 2)))
@@ -41,7 +42,7 @@ contains
 
     ! Build potential energy matrix
     do m2_ind = 1, size(ham, 2)
-      m_shift = iff(m2_ind > funcs_per_sym, funcs_per_sym, 0) ! Skip empty quadrant when both symmetries are included
+      m_shift = iff(m2_ind > nphi_per_sym, nphi_per_sym, 0) ! Skip empty quadrant when both symmetries are included
       do m1_ind = 1 + m_shift, m2_ind
         func = basis(:, m1_ind) * potential_phi * basis(:, m2_ind)
         ham(m1_ind, m2_ind) = integrate_1d(func, step_phi)
@@ -52,13 +53,13 @@ contains
     ! Add kinetic energy matrix
     coeff = -2 / mu / rho_val**2 / sin(theta_val)**2
     do m2_ind = 1, size(ham, 2)
-      call get_m_ind_info(m2_ind, params % basis % symmetry, funcs_per_sym, m = m)
+      call get_m_ind_info(m2_ind, params, m = m)
 
       ! Debug replace
       if (debug_mode == 'half_arg') then
         ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * (m - 0.5d0) ** 2
-      else if (debug_mode == '3m') then
-        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * (3*m) ** 2
+      else if (debug_mode == '3m_half') then
+        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * (3 * (m - 0.5d0)) ** 2
       else
         ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * m ** 2
       end if
@@ -66,7 +67,7 @@ contains
 #if TYPE_ID == COMPLEX_ID
       if (params % use_geometric_phase == 1) then
         ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * l_dash**2 / 4
-        if (m2_ind > funcs_per_sym .and. m2_ind < size(ham, 2)) then
+        if (m2_ind > nphi_per_sym .and. m2_ind < size(ham, 2)) then
           m1_ind = m + 1
           ham(m1_ind, m2_ind) = coeff * (0, 1d0) * l_dash * m
           ham(m2_ind, m1_ind) = conjg(ham(m1_ind, m2_ind))
@@ -100,7 +101,7 @@ contains
       call lapack_eigensolver(ham, val1_all)
 
       ! Save results
-      nvec1(theta_ind) = min(max(findloc(val1_all < params % basis % cutoff_energy_1d, .true., dim = 1, back = .true.), params % basis % min_solutions_1d), size(ham, 1))
+      nvec1(theta_ind) = min(max(findloc(val1_all < params % basis % cutoff_energy_1d, .true., dim = 1, back = .true.), params % get_min_solutions_1d_total()), size(ham, 1))
       val1(theta_ind) % p = val1_all(:nvec1(theta_ind))
       vec1(theta_ind) % p = ham(:, :nvec1(theta_ind))
     end do
@@ -187,11 +188,11 @@ contains
     real(real64), allocatable :: val2_all(:)
     TEMPLATE_TYPE, allocatable :: ham2(:, :), vec2(:, :)
 
-    mu = get_reduced_mass(params % mass)
+    mu = params % get_reduced_mass()
     ham2 = build_hamiltonian_2d(mu, rho_val, period_theta, nvec1, val1, vec1)
     call lapack_eigensolver(ham2, val2_all)
 
-    nvec2 = min(max(findloc(val2_all < params % basis % cutoff_energy_2d, .true., dim = 1, back = .true.), params % basis % min_solutions_2d), size(ham2, 1))
+    nvec2 = min(max(findloc(val2_all < params % basis % cutoff_energy_2d, .true., dim = 1, back = .true.), params % get_min_solutions_2d_total()), size(ham2, 1))
     val2 = val2_all(:nvec2)
     vec2 = ham2(:, :nvec2)
 

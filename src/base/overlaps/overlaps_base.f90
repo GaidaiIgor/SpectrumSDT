@@ -9,5 +9,6 @@ module overlaps_base_mod
   use parallel_utils_mod
   use spectrumsdt_io_mod, only: load_basis_size_2d, load_solutions_1D, load_solutions_2D
   use spectrumsdt_paths_mod
+  use debug_tools_mod
   implicit none
 end module

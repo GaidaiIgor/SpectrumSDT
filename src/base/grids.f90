@@ -398,7 +398,7 @@ contains
     real(real64), allocatable :: grid_rho(:), grid_theta(:), grid_phi(:)
     real(real64), allocatable :: jac_rho(:), jac_theta(:), jac_phi(:)
 
-    mu = get_reduced_mass(params % mass)
+    mu = params % get_reduced_mass()
     env_emax = params % grid_rho % max_energy / au_to_wn
     rho_step = params % grid_rho % step
     theta_step = params % grid_theta % step

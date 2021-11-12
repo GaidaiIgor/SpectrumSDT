@@ -71,16 +71,19 @@ contains
         ! Debug
         if (debug_mode == 'print_wf' .or. &
             debug_mode == 'half_arg' .and. allocated(debug_ints) .and. debug_ints(1) == 1 .or. &
-            debug_mode == '3m' .and. allocated(debug_ints) .and. debug_ints(1) == 1) then
+            debug_mode == '3m' .and. allocated(debug_ints) .and. debug_ints(1) == 1 .or. &
+            debug_mode == '3m_no_const' .and. allocated(debug_ints) .and. debug_ints(1) == 1 .or. &
+            debug_mode == '3m_half' .and. allocated(debug_ints) .and. debug_ints(1) == 1 .or. &
+            debug_mode == '12m' .and. allocated(debug_ints) .and. debug_ints(1) == 1) then
 
           ! Well
-          rho_ind = 13
-          theta_ind = 42
+          ! rho_ind = 13
+          ! theta_ind = 42
           wf_grid = linspace(0d0, 2*pi, 1440)
 
           ! Channel
-          ! rho_ind = 93 ! 46
-          ! theta_ind = 64
+          rho_ind = 93 ! 46
+          theta_ind = 70 ! 80 ! 64
           ! wf_grid = linspace(-pi, pi, 1440)
 
           solution_ind = 5
@@ -115,10 +118,10 @@ contains
       case ('overlaps')
         if (params % use_geometric_phase == 0) then
           call calculate_overlaps_real(params)
-          call calculate_overlaps_extra_real(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
+          call calculate_overlaps_extra_real(params, rho_info % points, theta_info % points)
         else
           call calculate_overlaps_complex(params)
-          call calculate_overlaps_extra_complex(params, get_reduced_mass(params % mass), rho_info % points, theta_info % points)
+          call calculate_overlaps_extra_complex(params, rho_info % points, theta_info % points)
         end if
 
       case ('eigensolve')

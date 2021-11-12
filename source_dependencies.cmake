@@ -82,12 +82,13 @@ set(eigensolve_params ${config} ${constants} ${dict_utils} ${general_utils} ${pa
 set(fixed_basis_params ${config} ${constants} ${dict_utils} ${general_utils} ${string} ${prefix}/src/base/input_params/fixed_basis_params.f90)
 set(basis_params ${config} ${constants} ${dict_utils} ${fixed_basis_params} ${general_utils} ${string} ${prefix}/src/base/input_params/basis_params.f90)
 set(debug_params ${config} ${dict_utils} ${general_utils} ${string} ${string_utils} ${prefix}/src/base/input_params/debug_params.f90)
-set(input_params ${algorithms} ${basis_params} ${cap_params} ${config} ${constants} ${debug_params} ${dict_utils} ${eigensolve_params} ${general_utils_ext} ${grid_info} ${grid_params} ${optgrid_params} ${parallel_utils} ${rovib_utils_base} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
+set(spectrumsdt_utils ${constants} ${general_utils} ${prefix}/src/base/spectrumsdt_utils.f90)
+set(input_params ${algorithms} ${basis_params} ${cap_params} ${config} ${constants} ${debug_params} ${dict_utils} ${eigensolve_params} ${general_utils_ext} ${grid_info} ${grid_params} ${optgrid_params} ${parallel_utils} ${rovib_utils_base} ${spectrumsdt_utils} ${string} ${string_utils} ${wf_section_params} ${prefix}/src/base/input_params/input_params.f90)
 
-set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils_base} ${prefix}/src/base/spectrumsdt_paths.f90)
-set(spectrumsdt_utils ${constants} ${general_utils} ${input_params} ${prefix}/src/base/spectrumsdt_utils.f90)
+set(spectrumsdt_paths ${general_utils} ${input_params} ${path_utils} ${rovib_utils} ${prefix}/src/base/spectrumsdt_paths.f90)
 set(debug_tools ${debug_tools_base} ${input_params} ${io_utils} ${prefix}/src/base/debug/debug_tools.f90)
-set(rovib_utils ${input_params} ${rovib_utils_base} ${prefix}/src/rovib/rovib_utils.f90)
+set(rovib_utils ${general_utils} ${input_params} ${rovib_utils_base} ${prefix}/src/rovib/rovib_utils.f90)
+set(spectrumsdt_utils_ext ${input_params} ${rovib_utils} ${spectrumsdt_utils} ${prefix}/src/base/spectrumsdt_utils_ext.f90)
 
 set(cap ${constants} ${grid_info} ${input_params} ${spectrumsdt_utils} ${prefix}/src/base/cap.f90)
 set(potential ${input_params} ${spectrumsdt_paths} ${spectrumsdt_utils} ${prefix}/src/base/potential.f90)
@@ -101,7 +102,7 @@ set(k_block_info ${algorithms} ${io_utils} ${matrix_block_info} ${spectrumsdt_io
 
 set(grids ${config} ${constants} ${coordinate_conversion} ${general_utils} ${grid_info} ${input_params} ${io_utils} ${numerical_recipies} ${path_utils} ${spectrumsdt_paths} ${spectrumsdt_utils} ${vector} ${prefix}/src/base/grids.f90)
 
-set(basis_base ${algorithms} ${array_1d} ${array_2d} ${constants} ${fourier_transform} ${general_utils} ${input_params} ${lapack_interface} ${parallel_utils} ${spectrumsdt_paths} ${spectrumsdt_utils} ${prefix}/src/base/basis/basis_base.f90)
+set(basis_base ${algorithms} ${array_1d} ${array_2d} ${constants} ${fourier_transform} ${general_utils} ${input_params} ${lapack_interface} ${parallel_utils} ${spectrumsdt_paths} ${spectrumsdt_utils_ext} ${prefix}/src/base/basis/basis_base.f90)
 set(basis_real ${basis_base} ${prefix}/src/base/basis/basis_real.F90)
 set(basis_complex ${basis_base} ${prefix}/src/base/basis/basis_complex.F90)
 set(basis ${basis_real} ${basis_complex} ${prefix}/src/base/basis/basis.f90)

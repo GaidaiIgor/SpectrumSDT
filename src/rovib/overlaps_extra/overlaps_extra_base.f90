@@ -19,15 +19,17 @@ contains
   subroutine check_prerequisites(params)
     type(input_params), intent(in) :: params
     logical :: file_exists
-    character(:), allocatable :: block_info_path
+    character(:), allocatable :: sym_path, block_info_path
 
-    block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), params % basis % symmetry))
+    sym_path = get_sym_path_smart(params, params % K(1))
+    block_info_path = get_block_info_path(sym_path)
     inquire(file = block_info_path, exist = file_exists)
     call assert(file_exists, 'Error: basis is not computed')
 
     ! the other symmetry is also required in this mode
-    if (params % basis % fixed % enabled == 1) then
-      block_info_path = get_block_info_path(get_sym_path_root(params % root_path, params % K(1), 1 - params % basis % symmetry))
+    if (params % basis % fixed % enabled == 1 .and. params % use_rovib_coupling == 1) then
+      sym_path = get_sym_path_smart(params, params % K(1) + 1)
+      block_info_path = get_block_info_path(sym_path)
       inquire(file = block_info_path, exist = file_exists)
       call assert(file_exists, 'Error: basis of both symmetries has to be computed in fixed basis mode')
     end if

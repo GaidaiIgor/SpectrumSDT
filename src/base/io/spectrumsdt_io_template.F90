@@ -14,10 +14,6 @@
     module procedure :: CONCAT2(load_1D_expansion_coefficients_,TEMPLATE_TYPE_NAME)
   end interface
 
-  interface load_1D_expansion_coefficients_fixed_basis
-    module procedure :: CONCAT2(load_1D_expansion_coefficients_fixed_basis_,TEMPLATE_TYPE_NAME)
-  end interface
-
   interface load_solutions_2D
     module procedure :: CONCAT2(load_solutions_2D_,TEMPLATE_TYPE_NAME)
   end interface
@@ -28,10 +24,6 @@
 
   interface load_2D_expansion_coefficients
     module procedure :: CONCAT2(load_2D_expansion_coefficients_,TEMPLATE_TYPE_NAME)
-  end interface
-
-  interface load_2D_expansion_coefficients_fixed_basis
-    module procedure :: CONCAT2(load_2D_expansion_coefficients_fixed_basis_,TEMPLATE_TYPE_NAME)
   end interface
 
 contains
@@ -90,37 +82,15 @@ contains
     integer, intent(in) :: N, L ! Num of points along rho and theta
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, intent(out) :: As(:, :, :) ! K x N x L. Inner matrix is M x S_Knl
     integer, allocatable, intent(out) :: num_solutions_1d(:, :, :)
-    integer :: K_start, K_end, total_Ks, K, K_ind, K_sym
+    integer :: last_K_load, total_Ks_load, K, K_ind
     character(:), allocatable :: sym_path
 
-    K_start = params % K(1)
-    K_end = params % K(2)
-    total_Ks = K_end - K_start + 1
-    allocate(As(total_Ks, N, L), num_solutions_1d(total_Ks, N, L))
-
-    do K = K_start, K_end
-      K_ind = get_k_ind(K, K_start)
-      K_sym = get_k_symmetry(K, params % basis % symmetry)
-      sym_path = get_sym_path_root(params % root_path, K, K_sym)
-      call load_1D_expansion_coefficients_K(sym_path, K_ind, N, num_solutions_1d, As)
-    end do
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 1D expansion coefficients in fixed basis mode.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine CONCAT2(load_1D_expansion_coefficients_fixed_basis_,TEMPLATE_TYPE_NAME)(params, N, L, As, num_solutions_1d)
-    class(input_params), intent(in) :: params
-    integer, intent(in) :: N, L ! Num of points along rho and theta
-    type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, intent(out) :: As(:, :, :) ! first dim: 1 - even, 2 - odd. Inner matrix is M x S_Knl.
-    integer, allocatable, intent(out) :: num_solutions_1d(:, :, :)
-    integer :: K_ind, K_sym
-    character(:), allocatable :: sym_path
-
-    allocate(As(2, N, L), num_solutions_1d(2, N, L))
-    do K_sym = 0, 1
-      K_ind = K_sym + 1
-      sym_path = get_sym_path_root(params % basis % fixed % root_path, params % basis % fixed % K, K_sym)
+    last_K_load = params % get_last_k_load()
+    total_Ks_load = last_K_load - params % K(1) + 1
+    allocate(As(total_Ks_load, N, L), num_solutions_1d(total_Ks_load, N, L))
+    do K = params % K(1), last_K_load
+      K_ind = get_k_ind_smart(K, params)
+      sym_path = get_sym_path_smart(params, K)
       call load_1D_expansion_coefficients_K(sym_path, K_ind, N, num_solutions_1d, As)
     end do
   end subroutine
@@ -191,50 +161,20 @@ contains
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, intent(out) :: Bs(:, :, :) ! K x N x L
     type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, optional, intent(out) :: Bs_plain(:, :) ! K x N, all Ls are stacked in columns
     integer, allocatable, intent(out) :: num_solutions_2d(:, :)
-    integer :: K_start, K_end, total_Ks
-    integer :: K, K_ind, K_sym
+    integer :: last_K_load, total_Ks_load, K, K_ind
     character(:), allocatable :: sym_path
 
-    K_start = params % K(1)
-    K_end = params % K(2)
-    total_Ks = K_end - K_start + 1
-    allocate(Bs(total_Ks, N, L), num_solutions_2d(total_Ks, N))
+    last_K_load = params % get_last_k_load()
+    total_Ks_load = last_k_load - params % K(1) + 1
+    allocate(Bs(total_Ks_load, N, L), num_solutions_2d(total_Ks_load, N))
     num_solutions_2d = 0
     if (present(Bs_plain)) then
-      allocate(Bs_plain(total_Ks, N))
+      allocate(Bs_plain(total_Ks_load, N))
     end if
 
-    do K = K_start, K_end
-      K_ind = get_k_ind(K, K_start)
-      K_sym = get_k_symmetry(K, params % basis % symmetry)
-      sym_path = get_sym_path_root(params % root_path, K, K_sym)
-      call load_2D_expansion_coefficients_K(sym_path, K_ind, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
-    end do
-  end subroutine
-
-!-------------------------------------------------------------------------------------------------------------------------------------------
-! Loads and rearranges 2D expansion coefficients in fixed basis mode.
-! Bs: Outer dimensions: 2 x N x L. Inner dimensions: S_Knl x S_Kn. All coeffs of a single 2D solution should be collected over different Ls.
-!-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine CONCAT2(load_2D_expansion_coefficients_fixed_basis_,TEMPLATE_TYPE_NAME)(params, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
-    class(input_params), intent(in) :: params
-    integer, intent(in) :: N, L ! Num of points along rho and theta
-    integer, intent(in) :: num_solutions_1d(:, :, :)
-    type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, intent(out) :: Bs(:, :, :)
-    integer, allocatable, intent(out) :: num_solutions_2d(:, :)
-    type(CONCAT2(array_2d_,TEMPLATE_TYPE_NAME)), allocatable, optional, intent(out) :: Bs_plain(:, :) ! K x N, all Ls are stacked together
-    integer :: K_ind, K_sym
-    character(:), allocatable :: sym_path
-
-    allocate(Bs(2, N, L), num_solutions_2d(2, N))
-    num_solutions_2d = 0
-    if (present(Bs_plain)) then
-      allocate(Bs_plain(2, N))
-    end if
-
-    do K_sym = 0, 1
-      K_ind = K_sym + 1
-      sym_path = get_sym_path_root(params % basis % fixed % root_path, params % basis % fixed % K, K_sym)
+    do K = params % K(1), last_K_load
+      K_ind = get_k_ind_smart(K, params)
+      sym_path = get_sym_path_smart(params, K)
       call load_2D_expansion_coefficients_K(sym_path, K_ind, N, L, num_solutions_1d, Bs, num_solutions_2d, Bs_plain)
     end do
   end subroutine
@@ -244,12 +184,12 @@ contains
 ! overlap_type: 0 - regular, 10 - symmetric J, 11 - symmetric K, 2 - coriolis, 3 - asymmetric.
 ! *is_file_real* is 1 if overlap file is written with real data, otherwise complex is assumed.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function CONCAT2(load_overlap_block_,TEMPLATE_TYPE_NAME)(root_path, K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns) result(block)
-    character(*), intent(in) :: root_path
-    integer, intent(in) :: K_row, K_col, overlap_type, K_row_sym, slice_ind_row, slice_ind_col, rows, columns
+  function CONCAT2(load_overlap_block_,TEMPLATE_TYPE_NAME)(params, K_row, K_col, overlap_type, slice_ind_row, slice_ind_col, rows, columns) result(block)
+    class(input_params), intent(in) :: params
+    integer, intent(in) :: K_row, K_col, overlap_type, slice_ind_row, slice_ind_col, rows, columns
     TEMPLATE_TYPE, allocatable :: block(:, :)
     logical :: swap_condition
-    integer :: file_unit, K_row_load, K_col_load, K_row_load_sym, slice_ind_row_load, slice_ind_col_load, rows_load, columns_load
+    integer :: file_unit, K_row_load, K_col_load, slice_ind_row_load, slice_ind_col_load, rows_load, columns_load
     character(:), allocatable :: sym_path, file_path
 
     ! Load identity matrix for regular diagonal overlaps
@@ -264,13 +204,12 @@ contains
     swap_condition = K_row > K_col .or. slice_ind_row > slice_ind_col
     K_row_load = merge(K_col, K_row, swap_condition)
     K_col_load = merge(K_row, K_col, swap_condition)
-    K_row_load_sym = merge(1 - K_row_sym, K_row_sym, swap_condition .and. overlap_type == 2) ! In case of coriolis we also need to change symmetry
     slice_ind_row_load = merge(slice_ind_col, slice_ind_row, swap_condition)
     slice_ind_col_load = merge(slice_ind_row, slice_ind_col, swap_condition)
     rows_load = merge(columns, rows, swap_condition)
     columns_load = merge(rows, columns, swap_condition)
 
-    sym_path = get_sym_path_root(root_path, K_row_load, K_row_load_sym)
+    sym_path = get_sym_path_smart(params, K_row_load)
     if (overlap_type == 0) then
       file_path = get_regular_overlap_path(sym_path, slice_ind_row_load, slice_ind_col_load)
     else if (overlap_type == 10) then

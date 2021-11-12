@@ -52,7 +52,7 @@ contains
     call assert(.not. is_iostat_end(iostat), 'Error: size of pes.out is not sufficient for the specified grids')
 
     ! Add rotational and extra potentials
-    mu = get_reduced_mass(params % mass)
+    mu = params % get_reduced_mass()
     do i1 = 1, size(grid_rho)
       do i2 = 1, size(grid_theta)
         do i3 = 1, size(grid_phi)

@@ -11,7 +11,7 @@ module basis_base_mod
   use mpi
   use parallel_utils_mod
   use spectrumsdt_paths_mod
-  use spectrumsdt_utils_mod
+  use spectrumsdt_utils_ext_mod
 
   use debug_tools_mod
   implicit none
@@ -25,43 +25,21 @@ contains
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: grid_phi(:)
     real(real64), allocatable :: basis(:, :)
-    integer :: nphi, nphi_total, j, sin_shift
-    real(real64) :: norm
+    integer :: nphi_total, m_ind, m, m_type
 
-    nphi = params % basis % num_funcs_phi_per_sym
-    nphi_total = iff(params % basis % symmetry == 2, 2 * nphi, nphi)
+    nphi_total = params % get_num_funcs_phi_total()
     allocate(basis(size(grid_phi), nphi_total))
-    norm = sqrt(1 / pi)
-
-    if (any(params % basis % symmetry == [0, 2])) then
-      basis(:, 1) = norm / sqrt(2d0)
-      do j = 2, nphi
-
-        ! Debug replace
-        if (debug_mode == '3m') then
-          basis(:, j) = norm * cos(3*(j - 1) * grid_phi)
-        else
-          basis(:, j) = norm * cos((j - 1) * grid_phi)
-        end if
-
-      end do
-    end if
-
-    if (any(params % basis % symmetry == [1, 2])) then
-      sin_shift = iff(params % basis % symmetry == 2, nphi, 0) ! shift of sine portion relative to leftmost column
-      do j = 1 + sin_shift, size(basis, 2)
-
-        ! Debug replace
-        if (debug_mode == 'half_arg') then
-          basis(:, j) = norm * sin((j - 0.5d0) * grid_phi)
-        else if (debug_mode == '3m') then
-          basis(:, j) = norm * sin(3 * j * grid_phi)
-        else
-          basis(:, j) = norm * sin((j - sin_shift) * grid_phi)
-        end if
-
-      end do
-    end if
+    do m_ind = 1, size(basis, 2)
+      call get_m_ind_info(m_ind, params, m, m_type)
+      if (m == 0) then
+        basis(:, m_ind) = sqrt(0.5d0)
+      else if (m_type == 0) then
+        basis(:, m_ind) = cos(m * grid_phi)
+      else if (m_type == 1) then
+        basis(:, m_ind) = sin(m * grid_phi)
+      end if
+    end do
+    basis = basis / sqrt(pi)
   end function
 
 !-------------------------------------------------------------------------------------------------------------------------------------------
