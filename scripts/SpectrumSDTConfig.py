@@ -34,6 +34,18 @@ class SpectrumSDTConfig:
     def get_mass_str(self) -> str:
         return self.params["mass"]
 
+    def get_molecule_type(self) -> str:
+        mass_string = self.get_mass_str()
+        mass_tokens = mass_string.split(",")
+        mass_tokens = [token.strip() for token in mass_tokens]
+        if mass_tokens[0] == mass_tokens[2]:
+            if mass_tokens[0] == mass_tokens[1]:
+                return "AAA"
+            else:
+                return "ABA"
+        else:
+            raise Exception("Unknown molecule type")
+
     def get_J(self) -> int:
         return int(self.params["J"])
 
@@ -75,3 +87,10 @@ class SpectrumSDTConfig:
 
     def get_root_path(self) -> str:
         return self.params["root_path"]
+
+    def get_geometric_phase(self) -> int:
+        if "use_geometric_phase" not in self.params:
+            return 0
+        else:
+            return int(self.params["use_geometric_phase"])
+

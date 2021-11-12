@@ -15,7 +15,7 @@ def parse_command_line_args() -> argparse.Namespace:
             "Placeholder values can be referred to in config template as {parameter}, where parameter name can be one of: K, symmetry, stage or parity (if K is a range).")
     parser.add_argument("-c", "--config", default="spectrumsdt.config", help="Path to a template configuration file. ./spectrumsdt.config by default.")
     parser.add_argument("-K", required=True, help="The value of K for which to generate the folder structure. "
-    "Can either be a scalar, a custom range in the form K1..K2, or 'all' to include all Ks for a given J and parity.")
+        "Can either be a scalar, a custom range in the form K1..K2, or 'all' to include all Ks for a given J and parity.")
     parser.add_argument("--extra", help="A dictionary with extra placeholder values that are applied to all target folders.")
     args = parser.parse_args()
     return args
@@ -29,6 +29,19 @@ def resolve_defaults(args: argparse.Namespace):
         for key, value in args.extra.items():
             if not isinstance(value, str):
                 args.extra[key] = str(value)
+
+
+def get_available_symmetries(molecule_type: str, use_geometric_phase: int) -> List[str]:
+    if (molecule_type == "AAA"):
+        if (use_geometric_phase == 0):
+            return ["0", "1", "2", "3"]
+        else:
+            return ["0", "2"]
+    else:
+        if (use_geometric_phase == 0):
+            return ["0", "1"]
+        else:
+            return ["0"]
 
 
 def generate_paths(base_path: str, param_names: List[str], use_param_names: List[bool], value_combos) -> List[str]:
@@ -95,14 +108,14 @@ def main():
     config_path = path.abspath(args.config)
     config = SpectrumSDTConfig(config_path)
 
+    molecule_type = config.get_molecule_type()
+    use_geometric_phase = config.get_geometric_phase()
+    available_symmetries = get_available_symmetries(molecule_type, use_geometric_phase)
+
     # this is general template, which may be modified below
     param_names = ["K", "symmetry", "stage"]
     use_param_names = [True, True, False]
-    param_values = [[args.K], ["0", "1"], ["eigensolve", "properties"]]
-
-    # both symmetries are used when geometric phase effects are enabled
-    if "use_geometric_phase" in config.params and config.params["use_geometric_phase"] == "1":
-        param_values[1] = ["all"]
+    param_values = [[args.K], available_symmetries, ["eigensolve", "properties"]]
 
     Ks = SpectrumSDTConfig.parse_Ks(args.K, config.get_J())
     if Ks[0] == Ks[1]:
