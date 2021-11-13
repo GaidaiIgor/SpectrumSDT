@@ -115,9 +115,9 @@ contains
     integer, optional, intent(out) :: m, m_type
     integer :: m_ind_sym, m_act, m_type_act
 
-    m_type = iff(m_ind <= nphi_per_basis_type .and. any(K_sym == [0, 2]), 0, 1)
+    m_type_act = iff(m_ind <= nphi_per_basis_type .and. any(K_sym == [0, 2]), 0, 1)
     m_ind_sym = iff(m_ind > nphi_per_basis_type, m_ind - nphi_per_basis_type, m_ind)
-    m_ind_sym = iff(m_type == 0 .and. K_sym == 0, m_ind_sym - 1, m_ind_sym)
+    m_ind_sym = iff(m_type_act == 0 .and. K_sym == 0, m_ind_sym - 1, m_ind_sym)
 
     if (molecule_type == 'AAA') then
       if (any(K_sym == [0, 1])) then
