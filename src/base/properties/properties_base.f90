@@ -215,42 +215,28 @@ contains
 ! m1 and m2 >= 0. m1 or m2 can be 0 only if corresponding F_type is 0. F_type is either 0 (cos) or 1 (sin). a <= b. Both a and b are from 0 to 2*pi.
 !-------------------------------------------------------------------------------------------------------------------------------------------
   function calc_phi_integral(m1, m2, F1_type, F2_type, a, b) result(integral_value)
-    integer, intent(in) :: m1, m2 ! Frequency of integrand functions
-    real(real64), intent(in) :: a, b ! Range of integration
+    real(real64), intent(in) :: m1, m2 ! Frequency of integrand functions
     integer, intent(in) :: F1_type, F2_type ! Type of integrand functions: 0 for cos, 1 for sin
+    real(real64), intent(in) :: a, b ! Range of integration
     real(real64) :: integral_value ! Result
     integer :: sign
     real(real64) :: norm
 
-    norm = 1 / (pi * sqrt(1d0 * (delta(m1, 0) + 1) * (delta(m2, 0) + 1)))
+    norm = 1 / (pi * sqrt(1d0 * (delta(m1, 0d0) + 1) * (delta(m2, 0d0) + 1)))
     sign = (-1) ** F1_type
-    if (m1 == 0 .and. m2 == 0) then
+    if ((m1 .aeq. 0d0) .and. (m2 .aeq. 0d0)) then
       integral_value = norm * (b - a)
 
-    else if (m1 == m2) then
+    else if (m1 .aeq. m2) then
       if (F1_type == F2_type) then
-
-        ! Debug replace
-        if (debug_mode == 'half_arg') then
-          integral_value = norm * 0.5d0 * (b - a - sign*(sin(2*a*(m1 - 0.5d0)) - sin(2*b*(m1 - 0.5d0))) / (2*(m1 - 0.5d0)))
-        else
-          integral_value = norm * 0.5d0 * (b - a - sign*(sin(2*a*m1) - sin(2*b*m1)) / (2*m1))
-        end if
-
+        integral_value = norm * 0.5d0 * (b - a - sign*(sin(2*a*m1) - sin(2*b*m1)) / (2*m1))
       else
         integral_value = norm * 0.5d0 * (cos(2*a*m1) - cos(2*b*m1)) / (2*m1)
       end if
 
-    else if (m1 /= m2) then
+    else if (.not. (m1 .aeq. m2)) then
       if (F1_type == F2_type) then
-
-        ! Debug replace
-        if (debug_mode == 'half_arg') then
-          integral_value = norm * 0.5d0 * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2 - 1)) - sign*sin(a*(m1 + m2 - 1))) / (m1 + m2 - 1))
-        else
-          integral_value = norm * 0.5d0 * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2)) - sign*sin(a*(m1 + m2))) / (m1 + m2))
-        end if
-
+        integral_value = norm * 0.5d0 * ((sin(b*(m1 - m2)) - sin(a*(m1 - m2))) / (m1 - m2) + (sign*sin(b*(m1 + m2)) - sign*sin(a*(m1 + m2))) / (m1 + m2))
       else
         integral_value = norm * 0.5d0 * ((-sign*cos(a*(m1 - m2)) + sign*cos(b*(m1 - m2))) / (m1 - m2) + (cos(a*(m1 + m2)) - cos(b*(m1 + m2))) / (m1 + m2))
       end if
@@ -264,13 +250,13 @@ contains
 ! phi_borders - array of considered phi borders.
 ! phi_integral_matrix - 3D matrix. 1st dim - m1, 2nd - m2, 3rd - phi_range_ind.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  function calc_phi_integral_matrix(nphi_per_basis_type, sym, molecule_type, use_geometric_phase, phi_borders) result(phi_integral_matrix)
-    integer, intent(in) :: nphi_per_basis_type, sym, use_geometric_phase
+  function calc_phi_integral_matrix(nphi_per_basis_type, sym, molecule_type, use_geometric_phase, use_half_integers, phi_borders) result(phi_integral_matrix)
+    integer, intent(in) :: nphi_per_basis_type, sym, use_geometric_phase, use_half_integers
     character(*), intent(in) :: molecule_type
     real(real64), intent(in) :: phi_borders(:)
     real(real64), allocatable :: phi_integral_matrix(:, :, :)
-    integer :: nphi_total, range_ind, m1_ind, m2_ind, m1, m2, m1_type, m2_type
-    real(real64) :: a, b
+    integer :: nphi_total, range_ind, m1_ind, m2_ind, m1_type, m2_type
+    real(real64) :: a, b, m1, m2
 
     nphi_total = get_basis_type_to_total_multiplier(use_geometric_phase) * nphi_per_basis_type
     allocate(phi_integral_matrix(nphi_total, nphi_total, size(phi_borders) - 1))
@@ -278,9 +264,9 @@ contains
       a = phi_borders(range_ind)
       b = phi_borders(range_ind + 1)
       do m2_ind = 1, size(phi_integral_matrix, 2)
-        call get_m_ind_info(m2_ind, nphi_per_basis_type, sym, molecule_type, m = m2, m_type = m2_type)
+        call get_m_ind_info(m2_ind, nphi_per_basis_type, sym, molecule_type, use_half_integers, m = m2, m_type = m2_type)
         do m1_ind = 1, m2_ind
-          call get_m_ind_info(m1_ind, nphi_per_basis_type, sym, molecule_type, m = m1, m_type = m1_type)
+          call get_m_ind_info(m1_ind, nphi_per_basis_type, sym, molecule_type, use_half_integers, m = m1, m_type = m1_type)
           phi_integral_matrix(m1_ind, m2_ind, range_ind) = calc_phi_integral(m1, m2, m1_type, m2_type, a, b)
         end do
       end do

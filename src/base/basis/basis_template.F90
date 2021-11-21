@@ -26,8 +26,8 @@ contains
     real(real64), intent(in) :: rho_val, theta_val
     real(real64), intent(in) :: grid_phi(:), potential_phi(:)
     TEMPLATE_TYPE, allocatable :: ham(:, :)
-    integer :: nphi_per_basis_type, l_dash, m1_ind, m2_ind, m_shift, m
-    real(real64) :: mu, coeff, step_phi
+    integer :: nphi_per_basis_type, l_dash, m1_ind, m2_ind, m_shift
+    real(real64) :: mu, step_phi, coeff, m
     real(real64), allocatable :: func(:)
     real(real64), allocatable :: basis(:, :)
 
@@ -54,15 +54,7 @@ contains
     coeff = -2 / mu / rho_val**2 / sin(theta_val)**2
     do m2_ind = 1, size(ham, 2)
       call get_m_ind_info(m2_ind, params, m = m)
-
-      ! Debug replace
-      if (debug_mode == 'half_arg') then
-        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * (m - 0.5d0) ** 2
-      else if (debug_mode == '3m_half') then
-        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * (3 * (m - 0.5d0)) ** 2
-      else
-        ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * m ** 2
-      end if
+      ham(m2_ind, m2_ind) = ham(m2_ind, m2_ind) - coeff * m ** 2
 
 #if TYPE_ID == COMPLEX_ID
       if (params % use_geometric_phase == 1) then

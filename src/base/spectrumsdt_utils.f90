@@ -109,21 +109,25 @@ contains
 !-------------------------------------------------------------------------------------------------------------------------------------------
 ! Returns information associated with a given *m_ind*. m_type = 0 for cos, 1 for sin.
 !-------------------------------------------------------------------------------------------------------------------------------------------
-  subroutine get_m_ind_info_plain(m_ind, nphi_per_basis_type, K_sym, molecule_type, m, m_type)
-    integer, intent(in) :: m_ind, nphi_per_basis_type, K_sym
+  subroutine get_m_ind_info_plain(m_ind, nphi_per_basis_type, K_sym, molecule_type, use_half_integers, m, m_type)
+    integer, intent(in) :: m_ind, nphi_per_basis_type, K_sym, use_half_integers
     character(*), intent(in) :: molecule_type
-    integer, optional, intent(out) :: m, m_type
-    integer :: m_ind_sym, m_act, m_type_act
+    real(real64), optional, intent(out) :: m
+    integer, optional, intent(out) :: m_type
+    integer :: m_act, m_type_act
+    real(real64) :: m_ind_sym, m12_shift
 
     m_type_act = iff(m_ind <= nphi_per_basis_type .and. any(K_sym == [0, 2]), 0, 1)
-    m_ind_sym = iff(m_ind > nphi_per_basis_type, m_ind - nphi_per_basis_type, m_ind)
-    m_ind_sym = iff(m_type_act == 0 .and. K_sym == 0, m_ind_sym - 1, m_ind_sym)
+    m_ind_sym = iff(m_ind <= nphi_per_basis_type, m_ind, m_ind - nphi_per_basis_type)
+    m_ind_sym = iff(m_type_act == 0 .and. K_sym == 0 .and. use_half_integers == 0, m_ind_sym - 1, m_ind_sym)
+    m_ind_sym = iff(use_half_integers == 0, m_ind_sym, m_ind_sym - 0.5d0)
+    m12_shift = iff(use_half_integers == 0, -1d0, 0.5d0)
 
     if (molecule_type == 'AAA') then
       if (any(K_sym == [0, 1])) then
         m_act = 3 * m_ind_sym
       else if (any(K_sym == [2, 3])) then
-        m_act = m_ind_sym + int((m_ind_sym - 1) / 2)
+        m_act = m_ind_sym + int((m_ind_sym + m12_shift) / 2)
       end if
     else if (molecule_type == 'ABA') then
       m_act = m_ind_sym

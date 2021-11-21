@@ -8,7 +8,7 @@ module overlaps_extra_base_mod
   use parallel_utils_mod
   use path_utils_mod
   use spectrumsdt_io_mod
-  use spectrumsdt_utils_mod
+  use spectrumsdt_utils_ext_mod
   implicit none
 
 contains

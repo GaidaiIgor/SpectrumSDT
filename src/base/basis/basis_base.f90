@@ -25,7 +25,8 @@ contains
     class(input_params), intent(in) :: params
     real(real64), intent(in) :: grid_phi(:)
     real(real64), allocatable :: basis(:, :)
-    integer :: nphi_total, m_ind, m, m_type
+    integer :: nphi_total, m_ind, m_type
+    real(real64) :: m
 
     nphi_total = params % get_num_funcs_phi_total()
     allocate(basis(size(grid_phi), nphi_total))

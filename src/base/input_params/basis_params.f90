@@ -17,6 +17,7 @@ module basis_params_mod
     ! Number of sines or cosines in basis of 1D problem.
     ! This number is specified with respect to the smallest symmetry block (3m) and scales proportionally to the selected basis symmetry.
     integer :: num_funcs_phi = -1
+    integer :: use_half_integers = 0 ! Uses functions of the form sin(m-0.5) (depends on symmetry) to enforce antisymmetric behavior in dissociation channels.
     ! Specifies which subset of the complete sin/cos basis set to use in cases when it's not fully coupled.
     ! For AAA-molecules it can be 0 (cos(3m)), 1 (sin(3m)), 2 (cos(3m+1), cos(3m+2)) or 3 (sin(3m+1), sin(3m+2)).
     ! This is the most decoupled case. In the cases when some of these groups are coupled, the lowest group number represents the combined group. Namely,
@@ -86,6 +87,8 @@ contains
       select case (next_key)
         case ('num_funcs_phi')
           this % num_funcs_phi = str2int_config(next_value, full_key)
+        case ('use_half_integers')
+          this % use_half_integers = str2int_config(next_value, full_key)
         case ('K0_symmetry')
           this % K0_symmetry = str2int_config(next_value, full_key)
         case ('cutoff_energy_1d')
@@ -130,6 +133,7 @@ contains
     type(dictionary_t) :: keys
 
     call put_string(keys, 'num_funcs_phi')
+    call put_string(keys, 'use_half_integers')
     call put_string(keys, 'K0_symmetry')
     call put_string(keys, 'cutoff_energy_1d')
     call put_string(keys, 'cutoff_energy_2d')
@@ -173,6 +177,7 @@ contains
     integer, allocatable :: allowed_symmetries(:)
 
     call assert(this % num_funcs_phi > 0, 'Error: ' // this % prefix // 'num_funcs_phi should be > 0.')
+    call assert(any(this % use_half_integers == [0, 1]), 'Error: ' // this % prefix // 'use_half_integers should be 0 or 1.')
     call assert(this % min_solutions_1d > 0, 'Error: ' // this % prefix // 'min_solutions_1d should be > 0.')
     call assert(this % min_solutions_2d > 0, 'Error: ' // this % prefix // 'min_solutions_2d should be > 0.')
     call assert(any(this % print_energies_1d == [0, 1]), 'Error: ' // this % prefix // 'print_energies_1d should be 0 or 1.')

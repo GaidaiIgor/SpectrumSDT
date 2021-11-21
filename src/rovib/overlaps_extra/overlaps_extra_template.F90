@@ -102,9 +102,9 @@ contains
   subroutine CONCAT2(calculate_coriolis_term_,TEMPLATE_TYPE_NAME)(params, rho_grid, theta_grid)
     type(input_params), intent(in) :: params
     real(real64), intent(in) :: rho_grid(:), theta_grid(:)
-    integer :: my_id, n_procs, nphi_per_basis_type, nphi_total, K_row, K_col, sym_row, sym_col, m_shift, m_ind, m_sign, n, m, l, ir, ic, file_unit
+    integer :: my_id, n_procs, nphi_per_basis_type, nphi_total, K_row, K_col, sym_row, sym_col, m_shift, m_ind, m_sign, n, l, ir, ic, file_unit
     integer :: m_range_row(2), m_range_col(2), m_range_global_row(2), m_range_global_col(2)
-    real(real64) :: mu ! reduced mass
+    real(real64) :: mu, m
     ! Arrays for data length
     integer, allocatable :: num_solutions_1d_row(:), num_solutions_1d_col(:) ! number of 1D solutions in each theta slice (for fixed rho)
     integer, allocatable :: num_solutions_2d_row(:), num_solutions_2d_col(:) ! number of 2D solutions in each rho slice
@@ -154,7 +154,7 @@ contains
     ! Prepare m-values
     allocate(m_values(nphi_per_basis_type - m_shift), cor_factors_b(size(theta_grid)), partial_sum(size(theta_grid)))
     do m_ind = m_range_row(1), m_range_row(2)
-      call get_m_ind_info(m_ind, nphi_per_basis_type, sym_row, params % get_molecule_type(), m = m)
+      call get_m_ind_info(m_ind, params, m = m)
       m_values(m_ind - m_range_row(1) + 1) = m
     end do
     ! Sign of factor depends on which function we take derivative from. Always positive for the first half (cos), when geometric phase is enabled.

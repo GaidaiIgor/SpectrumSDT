@@ -22,13 +22,14 @@ contains
     real(real64), intent(in) :: phi_borders(:)
     real(real64), allocatable :: proc_p_dist(:, :, :, :, :)
     logical :: use_simplified_method
-    integer :: nphi_total, proc_first_state, proc_states, K_ind, K1_sym, K_sym, K_ind_smart, proc_state_ind, K_val, n, l, phi_matrix_ind, phi_range_ind, m_ind, j
+    integer :: nphi_basis_type, nphi_total, proc_first_state, proc_states, K_ind, K1_sym, K_sym, K_ind_smart, proc_state_ind, K_val, n, l, phi_matrix_ind, phi_range_ind, m_ind, j
     real(real64) :: i_sum, m_sum
     real(real64) :: phi_range(2)
     type(array_3d_real) :: phi_integral_matrix(2) ! Phi-integal matrices for each symmetry of phi basis functions. Up to 2 may be needed if phi symmetry changes with K.
     complex(real64), allocatable :: j_sums(:) ! j-sums for different ms
     character(:), allocatable :: molecule_type
 
+    nphi_basis_type = params % get_num_funcs_phi_per_basis_type()
     molecule_type = get_molecule_type(params % mass)
     call get_k_attributes(params % K(1), params, K_sym = K1_sym)
     call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
@@ -39,10 +40,10 @@ contains
     use_simplified_method = size(phi_borders) == 2 .and. (phi_borders(1) .aeq. 0d0) .and. (phi_borders(2) .aeq. 2*pi)
     if (.not. use_simplified_method) then
       ! Calculate necessary phi-integral matrices
-      phi_integral_matrix(1) % p = calc_phi_integral_matrix(params % get_num_funcs_phi_per_basis_type(), K1_sym, molecule_type, params % use_geometric_phase, phi_borders)
+      phi_integral_matrix(1) % p = calc_phi_integral_matrix(nphi_basis_type, K1_sym, molecule_type, params % use_geometric_phase, params % basis % use_half_integers, phi_borders)
       if (params % use_geometric_phase == 0 .and. params % K(2) > params % K(1)) then
         call get_k_attributes(params % K(1) + 1, params, K_sym = K_sym)
-        phi_integral_matrix(2) % p = calc_phi_integral_matrix(params % get_num_funcs_phi_per_basis_type(), K_sym, molecule_type, params % use_geometric_phase, phi_borders)
+        phi_integral_matrix(2) % p = calc_phi_integral_matrix(nphi_basis_type, K_sym, molecule_type, params % use_geometric_phase, params % basis % use_half_integers, phi_borders)
       end if
     end if
 
