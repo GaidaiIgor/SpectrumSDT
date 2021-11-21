@@ -68,7 +68,7 @@ class SpectrumSDTConfig:
         return SpectrumSDTConfig.parse_Ks(self.params["K"], self.get_J(), self.get_parity())
 
     def get_symmetry(self) -> int:
-        return int(self.params["basis"]["symmetry"])
+        return int(self.params["basis"]["K0_symmetry"])
 
     def get_basis_fixed_J(self) -> int:
         return int(self.params["basis"]["fixed"]["J"])
