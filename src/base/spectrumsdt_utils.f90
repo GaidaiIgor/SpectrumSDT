@@ -114,8 +114,8 @@ contains
     character(*), intent(in) :: molecule_type
     real(real64), optional, intent(out) :: m
     integer, optional, intent(out) :: m_type
-    integer :: m_act, m_type_act
-    real(real64) :: m_ind_sym, m12_shift
+    integer :: m_type_act
+    real(real64) :: m_ind_sym, m_act, m12_shift
 
     m_type_act = iff(m_ind <= nphi_per_basis_type .and. any(K_sym == [0, 2]), 0, 1)
     m_ind_sym = iff(m_ind <= nphi_per_basis_type, m_ind, m_ind - nphi_per_basis_type)
