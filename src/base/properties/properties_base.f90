@@ -198,7 +198,7 @@ contains
     integer :: proc_first_state, proc_states, i, j
     real(real64), allocatable :: proc_section_stats(:, :)
 
-    call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
+    call get_proc_elem_range(params % get_num_states_total(), proc_first_state, proc_states)
     call assert(size(proc_p_dist, 1) == proc_states, 'Error: wrong size of proc_p_dist')
     ! Calculate local chunks
     allocate(proc_section_stats(proc_states, size(params % wf_sections)))

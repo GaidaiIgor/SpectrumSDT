@@ -30,9 +30,9 @@ contains
     character(:), allocatable :: molecule_type
 
     nphi_basis_type = params % get_num_funcs_phi_per_basis_type()
-    molecule_type = get_molecule_type(params % mass)
-    call get_k_attributes(params % K(1), params, K_sym = K1_sym)
-    call get_proc_elem_range(params % eigensolve % num_states, proc_first_state, proc_states)
+    molecule_type = params % get_molecule_type()
+    K1_sym = get_k_symmetry(params % K(1), params)
+    call get_proc_elem_range(params % get_num_states_total(), proc_first_state, proc_states)
     allocate(proc_p_dist(proc_states, params % K(2) - params % K(1) + 1, size(As, 2), size(As, 3), size(phi_borders) - 1))
     proc_p_dist = 0
 
@@ -109,7 +109,7 @@ contains
     ! Load energies and gammas
     states_path = get_states_path(params)
     eigenvalues_3d = read_matrix_real(states_path, skip_lines = 1)
-    call assert(size(eigenvalues_3d, 1) >= params % eigensolve % num_states, 'Error: not enough eigenstates computed')
+    call assert(size(eigenvalues_3d, 1) >= params % get_num_states_total(), 'Error: not enough eigenstates computed')
 
     N = size(rho_info % points)
     L = size(theta_info % points)

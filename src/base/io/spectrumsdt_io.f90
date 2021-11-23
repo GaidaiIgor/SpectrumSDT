@@ -49,12 +49,12 @@ contains
     ! Count total number of 2D solutions
     total_solutions_2d = 0
     do K = params % K(1), params % K(2)
-      call get_k_attributes(K, params, K_ind_smart = K_ind_smart)
+      K_ind_smart = get_k_ind_smart(K, params)
       total_solutions_2d = total_solutions_2d + sum(num_solutions_2d(K_ind_smart, :))
     end do
 
     ! Load raw matrix
-    call get_proc_elem_range(params % eigensolve % num_states, first_elem, proc_elems)
+    call get_proc_elem_range(params % get_num_states_total(), first_elem, proc_elems)
     allocate(Cs_raw(total_solutions_2d, proc_elems))
     do sln_ind = first_elem, first_elem + proc_elems - 1
       exp_coeffs_path = get_solution_3d_path(params, sln_ind)
