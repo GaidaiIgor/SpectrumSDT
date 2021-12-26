@@ -16,6 +16,7 @@ module debug_params_mod
     integer :: enable_terms(2) = 1 ! 1st digit - coriolis, 2nd - asymmetric
     integer :: optimized_mult = 1 ! disables matrix-vector multiplication optimizations
     integer :: treat_tp_as_xy = 0 ! treats theta and phi grids as x and y grids for aph plots
+    integer :: disable_check ! disables some parameter checks
     character(:), allocatable :: mode
     integer, allocatable :: int_params(:)
     real(real64) :: real_param = 0d0
@@ -62,6 +63,8 @@ contains
           this % optimized_mult = str2int(next_value)
         case ('treat_tp_as_xy')
           this % treat_tp_as_xy = str2int(next_value)
+        case ('disable_check')
+          this % disable_check = str2int(next_value)
         case ('mode')
           this % mode = next_value
         case ('int_params')
@@ -83,6 +86,7 @@ contains
     call put_string(keys, 'enable_terms')
     call put_string(keys, 'optimized_mult')
     call put_string(keys, 'treat_tp_as_xy')
+    call put_string(keys, 'disable_check')
     call put_string(keys, 'mode')
     call put_string(keys, 'int_params')
     call put_string(keys, 'real_param')

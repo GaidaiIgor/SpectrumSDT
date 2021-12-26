@@ -504,7 +504,7 @@ contains
     call assert(any(this % stage == [character(100) :: 'grids', 'basis', 'overlaps', 'eigensolve', 'properties']), 'Error: stage should be "grids", "basis", "overlaps", "eigensolve" or "properties"')
     call assert(any(this % use_rovib_coupling == [0, 1]), 'Error: use_rovib_coupling should be 0 or 1')
     call assert(any(this % use_geometric_phase == [0, 1]), 'Error: use_geometric_phase should be 0 or 1')
-    if (this % debug % treat_tp_as_xy /= 1) then
+    if (this % debug % treat_tp_as_xy /= 1 .and. this % debug % disable_check /= 1) then
       call assert(this % grid_theta % from .ale. pi/2, 'Error: grid_theta % from should be <= pi/2')
       call assert(this % grid_theta % to .ale. pi/2, 'Error: grid_theta % to should be <= pi/2')
     end if
