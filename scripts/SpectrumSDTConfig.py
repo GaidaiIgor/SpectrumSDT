@@ -80,7 +80,9 @@ class SpectrumSDTConfig:
         return self.params["basis"]["fixed"]["root_path"]
 
     def get_number_of_states(self) -> int:
-        return int(self.params["eigensolve"]["num_states"])
+        mol_type = self.get_molecule_type()
+        state_mult = 1 if mol_type == "666" else 3
+        return int(self.params["eigensolve"]["num_states"] * state_mult)
 
     def get_grid_path(self) -> str:
         return self.params["grid_path"]
