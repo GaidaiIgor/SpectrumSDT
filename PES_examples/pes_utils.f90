@@ -8,6 +8,7 @@ module pes_utils_mod
   real(real64), parameter :: amu_to_kg = 1.660538921d-27 ! kg / amu (kilograms per atomic mass unit)
   real(real64), parameter :: aum_to_kg = 9.10938291d-31 ! kg / aum (kilogram per electron (atomic unit of mass))
   real(real64), parameter :: amu_to_aum = amu_to_kg / aum_to_kg ! aum / amu
+  real(real64), parameter :: m_per_a0 = 5.2917721092d-11
 
   abstract interface
     function pes_point_calculator(coords, mass, shift) result(res)

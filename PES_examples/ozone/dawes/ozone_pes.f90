@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------------------------------------------------------------------
-! Reads APH grid files and computes corresponding ozone potential using Dawe's PES.
+! Reads APH grid files and computes corresponding ozone potential using Dawes's PES.
 !-------------------------------------------------------------------------------------------------------------------------------------------
 program pesprint
   use iso_fortran_env, only: real64
@@ -20,7 +20,6 @@ program pesprint
 
   call load_grids_aph(grid_rho, grid_theta, grid_phi)
   coords = aph_grids_to_coord_list(grid_rho, grid_theta, grid_phi)
-  print *, size(coords, 1), size(coords, 2)
   call calc_pes(coords, calc_potential_point, mass, shift, pes)
 
   if (proc_id == 0) then
