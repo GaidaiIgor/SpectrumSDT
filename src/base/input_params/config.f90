@@ -80,7 +80,7 @@ contains
     character(*), intent(in) :: config_path
     type(dictionary_t), intent(out) :: config, auxiliary_info
     integer :: file_unit, line_num
-    
+
     open(newunit = file_unit, file = config_path)
     line_num = 0
     call read_inner_dict(file_unit, 1, line_num, '', config, auxiliary_info)

@@ -62,6 +62,7 @@ contains
     integer, intent(in) :: counts(:), shifts(:)
     real(real64), allocatable, intent(out) :: global(:, :)
     integer :: ind, ierr
+    external :: MPI_Gatherv
 
     ! Avoid calling MPI functions if MPI is not initialized
     if (.not. is_mpi_enabled()) then

@@ -13,6 +13,7 @@ contains
     integer, allocatable, optional, intent(out) :: proc_sizes(:), proc_shifts(:)
     integer :: ierr
     integer, allocatable :: proc_sizes_act(:), proc_shifts_act(:)
+    external :: MPI_Allgather, MPI_Gatherv
 
     if (.not. is_mpi_enabled()) then
       global = proc_chunk

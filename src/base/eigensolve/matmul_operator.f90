@@ -82,6 +82,7 @@ contains
     integer :: ierr, K_row_ind, K_col_ind, n_row_ind, n_col_ind, v_start
     complex(real64) :: v(msize)
     type(matrix_block_info), pointer :: local_K_block_info, global_K_block_info, local_n_block_info, global_n_block_info
+    external :: MPI_Allgatherv
 
     call MPI_Allgatherv(v_proc_inp, size(v_proc_inp), MPI_DOUBLE_COMPLEX, v, rovib_ham % all_counts, rovib_ham % all_shifts, MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD, ierr)
     v_proc_out = 0
@@ -126,6 +127,7 @@ contains
     complex(real64) :: v_proc_out(size_proc) ! This processor's chunk of the result of multiplication
     integer :: i, j, ierr
     complex(real64) :: v(msize)
+    external :: MPI_Allgatherv
 
     if (size_proc == msize) then
       v = v_proc_inp

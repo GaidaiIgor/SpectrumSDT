@@ -30,6 +30,7 @@ contains
     integer :: work_size, info
     real(real64) :: work_size_query(1)
     real(real64), allocatable :: work(:)
+    external :: dsyev
 
     ! Trivial case: return empty vector if empty matrix is given
     if (size(eivals) == 0) then
@@ -71,6 +72,7 @@ contains
     real(real64), allocatable :: rwork(:)
     complex(real64) :: work_size_query(1)
     complex(real64), allocatable :: work(:)
+    external :: zheev
 
     allocate(eivals(size(matrix, 1)))
     allocate(rwork(3*size(matrix, 1) - 2))
@@ -100,6 +102,7 @@ contains
     real(real64), allocatable, intent(out) :: lu_factors(:, :)
     integer, allocatable, intent(out) :: pivot_indices(:)
     integer :: info
+    external :: dgetrf
 
     lu_factors = matrix
     allocate(pivot_indices(min(size(lu_factors, 1), size(lu_factors, 2))))
@@ -117,6 +120,7 @@ contains
     integer, allocatable :: pivot_indices(:)
     real(real64) :: work_size_query(1)
     real(real64), allocatable :: work(:)
+    external :: dgetri
 
     call lapack_lu_factorization(matrix, inverse, pivot_indices)
     ! Work size query

@@ -32,6 +32,7 @@ contains
     EPS :: eps
     DS :: ds
     Vec :: next_eivec
+    external :: SlepcInitialize, MatCreateShell, MatShellSetOperation, MatCreateVecs, MPI_Gatherv, SlepcFinalize
 
     msize_petsc = msize
     call SlepcInitialize(PETSC_NULL_CHARACTER, ierr)
