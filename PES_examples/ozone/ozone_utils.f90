@@ -6,12 +6,12 @@ module ozone_utils_mod
 
   real(real64), parameter :: ozone_isotope_masses(3) = [15.99491461956d0, 16.99913170d0, 17.9991596129d0] * amu_to_aum ! aum; masses of isotopes of oxygen 16, 17 and 18 respectively
   ! As computed by program zpeO2
-  real(real64), parameter :: zpe_66 = 791.6373314827983d0 / au_to_wn ! J = 0
-  ! real(real64), parameter :: zpe_66 = 794.5112391213112d0 / au_to_wn ! J = 1
-  real(real64), parameter :: zpe_68 = 769.3702558802487d0 / au_to_wn ! J = 0
-  ! real(real64), parameter :: zpe_68 = 772.0845812041375d0 / au_to_wn ! J = 1
-  real(real64), parameter :: zpe_88 = 746.4311399198617d0 / au_to_wn ! J = 0
-  ! real(real64), parameter :: zpe_88 = 748.9858447146220d0 / au_to_wn ! J = 1
+  real(real64), parameter :: zpe_66 = 791.6382691754641d0 / au_to_wn ! J = 0
+  real(real64), parameter :: zpe_67 = 779.9050607081324d0 / au_to_wn ! J = 0
+  real(real64), parameter :: zpe_68 = 769.3708543295361d0 / au_to_wn ! J = 0
+  real(real64), parameter :: zpe_77 = 767.9904668774815d0 / au_to_wn ! J = 0
+  real(real64), parameter :: zpe_78 = 757.2885872707559d0 / au_to_wn ! J = 0
+  real(real64), parameter :: zpe_88 = 746.4315071358510d0 / au_to_wn ! J = 0
 
   ! Obtained as energy of dissociated O3 on ozone PES of Dawes for r1 = 900 Bohr, angle = 90 deg (does not matter which one), r2 is optimized to 10^-15 precision (see dawes_de.f90)
   real(real64), parameter :: De = 9274.99560025014d0 / au_to_wn
@@ -41,9 +41,15 @@ contains
     ! select corresponding ZPE
     if (ozone_isotopes == '666') then
       shift = -zpe_66
+    else if (ozone_isotopes == '676') then
+      shift = -zpe_67
     else if (ozone_isotopes == '686') then
       shift = -zpe_68
-    else if (ozone_isotopes == '868') then
+    else if (ozone_isotopes == '767' .or. ozone_isotopes == '777') then
+      shift = -zpe_77
+    else if (ozone_isotopes == '787') then
+      shift = -zpe_78
+    else if (ozone_isotopes == '868' .or. ozone_isotopes == '878' .or. ozone_isotopes == '888') then
       shift = -zpe_88
     else
       stop 'Unsupported isotopic composition'
