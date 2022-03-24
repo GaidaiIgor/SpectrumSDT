@@ -38,6 +38,7 @@ class SpectrumSDTConfig:
         mass_string = self.get_mass_str()
         mass_tokens = mass_string.split(",")
         mass_tokens = [token.strip() for token in mass_tokens]
+        # 2 types are supported
         if mass_tokens[0] == mass_tokens[2]:
             if mass_tokens[0] == mass_tokens[1]:
                 return "AAA"
@@ -81,8 +82,8 @@ class SpectrumSDTConfig:
 
     def get_number_of_states(self) -> int:
         mol_type = self.get_molecule_type()
-        state_mult = 1 if mol_type == "666" else 3
-        return int(self.params["eigensolve"]["num_states"] * state_mult)
+        state_mult = 1 if mol_type == "AAA" else 3
+        return int(self.params["eigensolve"]["num_states"]) * state_mult
 
     def get_grid_path(self) -> str:
         return self.params["grid_path"]
@@ -95,4 +96,10 @@ class SpectrumSDTConfig:
             return 0
         else:
             return int(self.params["use_geometric_phase"])
+
+    def get_half_integers(self) -> bool:
+        if "use_half_integers" not in self.params["basis"]:
+            return False
+        else:
+            return bool(self.params["basis"]["use_half_integers"])
 
