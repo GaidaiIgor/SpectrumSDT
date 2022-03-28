@@ -103,3 +103,9 @@ class SpectrumSDTConfig:
         else:
             return bool(self.params["basis"]["use_half_integers"])
 
+    def get_full_symmetry_name(self) -> str:
+        sym = str(self.get_symmetry())
+        if self.get_half_integers():
+            sym = sym + 'H'
+        return sym
+
